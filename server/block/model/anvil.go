@@ -1,0 +1,22 @@
+package model
+
+import (
+	"github.com/helix-bedrock/helix/server/block/cube"
+	"github.com/helix-bedrock/helix/server/world"
+)
+
+// Anvil is a model used by anvils.
+type Anvil struct {
+	// Facing is the direction that the anvil is facing.
+	Facing cube.Direction
+}
+
+// BBox ...
+func (a Anvil) BBox(cube.Pos, world.BlockSource) []cube.BBox {
+	return []cube.BBox{full.Stretch(a.Facing.RotateLeft().Face().Axis(), -0.125)}
+}
+
+// FaceSolid ...
+func (Anvil) FaceSolid(cube.Pos, cube.Face, world.BlockSource) bool {
+	return false
+}
