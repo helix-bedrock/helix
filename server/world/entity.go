@@ -143,7 +143,11 @@ func (e *EntityHandle) Type() EntityType {
 // A non-nil Entity is returned only if the entity's world matches the world of
 // the Tx. If they do not match, false is returned.
 func (e *EntityHandle) Entity(tx *Tx) (Entity, bool) {
-	if e == nil || e.w != tx.World() {
+	if e == nil || e.w != tx.w {
+		return nil, false
+	}
+	// Helix: an entity is only usable on the region it is in.
+	if _, ok := tx.r.entities[e]; !ok && !tx.r.conf.Synchronous {
 		return nil, false
 	}
 	return e.t.Open(tx, e, &e.data), true
@@ -297,7 +301,7 @@ func (e *EntityHandle) weakExec(f execFunc, allowedCloseWorld *World) bool {
 	// length of the channel. This might look weird, but the crucial part here
 	// is the call to e.cond.Wait(), which unlocks e.cond.L. This is required
 	// to prevent a deadlock if an earlier transaction tries to change e.w.
-	c := w.weakExec(func() bool {
+	c := w.weakExec(e, func() bool {
 		return e.worldVersion.Load() == version && !e.worldless.Load()
 	}, e.cond, f, w == allowedCloseWorld)
 	for len(c) == 0 && e.w != closeWorld {

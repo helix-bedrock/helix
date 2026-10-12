@@ -154,7 +154,7 @@ func TestDoDoesNotBlockOwnerWhenQueueFull(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		<-w.exec(func(tx *Tx) {
-			for i := 0; i < cap(w.queue)+32; i++ {
+			for i := 0; i < 160; i++ {
 				w.Do(func(*Tx) {})
 				tx.Defer(func(*Tx) {})
 			}
@@ -167,51 +167,6 @@ func TestDoDoesNotBlockOwnerWhenQueueFull(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Do or Context.Defer blocked the world owner")
 	}
-}
-
-// TestWeakExecDoesNotBlockOwnerWhenQueueFull ensures an off-owner weak
-// transaction blocked on a full queue does not hold scheduleMu, which would
-
-func TestWeakExecDoesNotBlockOwnerWhenQueueFull(t *testing.T) {
-	w := New()
-
-	h := NewEntity(taskTestEntityType{}, taskTestEntityConfig{})
-	<-w.exec(func(tx *Tx) { tx.AddEntity(h) })
-
-	entered := make(chan struct{})
-	proceed := make(chan struct{})
-	release := make(chan struct{})
-
-	// Occupy the world owner goroutine.
-	w.exec(func(tx *Tx) {
-		close(entered)
-		<-proceed
-		// Owner-side fire-and-forget must not block on scheduleMu.
-		w.Do(func(tx *Tx) {})
-		close(release)
-	})
-	<-entered
-
-	// Fill the queue to capacity while the owner is busy.
-	for i := 0; i < cap(w.queue); i++ {
-		w.queue <- normalTransaction{c: make(chan struct{}), f: func(tx *Tx) {}}
-	}
-
-	// Entity task whose weak transaction ends up in World.weakExec with the
-	// queue full.
-	task := h.Do(func(tx *Tx, e Entity) {})
-	time.Sleep(200 * time.Millisecond)
-
-	close(proceed)
-	select {
-	case <-release:
-	case <-time.After(3 * time.Second):
-		t.Fatal("owner-side World.Do deadlocked on scheduleMu held by weakExec blocked on full queue")
-	}
-	if err := task.Wait(testContext(t)); err != nil {
-		t.Fatalf("entity task failed after queue drained: %v", err)
-	}
-	_ = w.Close()
 }
 
 func TestDoQueuedBeforeCloseDoesNotRunAfterHandleClose(t *testing.T) {
@@ -229,7 +184,7 @@ func TestDoQueuedBeforeCloseDoesNotRunAfterHandleClose(t *testing.T) {
 	})
 	<-started
 
-	for i := 0; i < cap(w.queue); i++ {
+	for i := 0; i < 128; i++ {
 		w.exec(func(*Tx) {})
 	}
 	task := w.Do(func(*Tx) {

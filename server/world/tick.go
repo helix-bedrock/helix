@@ -1,7 +1,6 @@
 package world
 
 import (
-	"fmt"
 	"github.com/helix-bedrock/helix/debug"
 	"maps"
 	"math/rand/v2"
@@ -17,16 +16,15 @@ type ticker struct {
 	interval time.Duration
 }
 
-// tickLoop starts ticking the World 20 times every second, updating all
-// entities, blocks and other features such as the time and weather of the
-// world, as required.
+// tickLoop runs the World's clock 20 times every second. Each clock tick
+// advances the time and weather and ticks every region, in parallel (Helix).
 func (t ticker) tickLoop(w *World) {
 	tc := time.NewTicker(t.interval)
 	defer tc.Stop()
 	for {
 		select {
 		case <-tc.C:
-			<-w.exec(t.tick)
+			w.clockTick(false)
 		case <-w.closing:
 			// World is being closed: Stop ticking and get rid of a task.
 			w.running.Done()
@@ -40,30 +38,20 @@ func (t ticker) tickLoop(w *World) {
 // automatically 20 times per second. Synchronous Worlds tick loaded chunks
 // even when no viewers are present.
 func (w *World) AdvanceTick() {
-	<-w.exec(ticker{}.tick)
+	w.clockTick(false)
 }
 
-// tick performs a tick on the World and updates the time, weather, blocks and
-// entities that require updates.
-func (t ticker) tick(tx *Tx) {
-	viewers, loaders := tx.World().allViewers()
-	w := tx.World()
-	var dt *debug.Tick
-
+// clockTick advances the world's tick, time and weather, then queues a tick
+// on every region. A region still busy with its last tick skips this one.
+func (w *World) clockTick(first bool) {
+	viewers, _ := w.allViewers()
 	w.set.Lock()
-	if s := w.set.Spawn; s[1] > tx.Range()[1] && w.Dimension() == Overworld {
-		// Vanilla will set the spawn position's Y value to max to indicate that
-		// the player should spawn at the highest position in the world.
-		w.set.Spawn[1] = tx.highestObstructingBlock(s[0], s[2]) + 1
-	}
 	if len(viewers) == 0 && w.set.CurrentTick != 0 && !w.conf.Synchronous {
 		// Don't continue ticking if no viewers are in the world. Synchronous
 		// worlds only tick on explicit AdvanceTick calls, so they always tick.
 		w.set.Unlock()
 		return
 	}
-	dt = w.conf.Debug.StartTick(fmt.Sprint(w.Dimension()))
-	defer dt.End()
 	if w.advance {
 		w.set.CurrentTick++
 		if w.set.TimeCycle {
@@ -73,21 +61,33 @@ func (t ticker) tick(tx *Tx) {
 			w.advanceWeather()
 		}
 	}
-
 	rain, thunder, tick, tim, cycle := w.set.Raining, w.set.Thundering && w.set.Raining, w.set.CurrentTick, int(w.set.Time), w.set.TimeCycle
-
 	tryAdvanceDay := false
-	if tx.w.set.RequiredSleepTicks > 0 {
-		tx.w.set.RequiredSleepTicks--
-		tryAdvanceDay = tx.w.set.RequiredSleepTicks <= 0
+	if w.set.RequiredSleepTicks > 0 {
+		w.set.RequiredSleepTicks--
+		tryAdvanceDay = w.set.RequiredSleepTicks <= 0
 	}
-
+	fixSpawn := w.set.Spawn[1] > w.Range()[1] && w.Dimension() == Overworld
 	w.set.Unlock()
 
-	if tryAdvanceDay {
-		t.tryAdvanceDay(tx, cycle)
+	if fixSpawn {
+		// Vanilla will set the spawn position's Y value to max to indicate that
+		// the player should spawn at the highest position in the world.
+		c := make(chan struct{})
+		w.defaultRegion().post(normalTransaction{c: c, f: func(tx *Tx) {
+			w.set.Lock()
+			s := w.set.Spawn
+			w.set.Unlock()
+			y := tx.highestObstructingBlock(s[0], s[2]) + 1
+			w.set.Lock()
+			w.set.Spawn[1] = y
+			w.set.Unlock()
+		}})
+		<-c
 	}
-
+	if first && !w.conf.Synchronous {
+		return
+	}
 	if tick%20 == 0 {
 		for _, viewer := range viewers {
 			if w.Dimension().TimeCycle() && cycle {
@@ -98,11 +98,37 @@ func (t ticker) tick(tx *Tx) {
 			}
 		}
 	}
+	var spawnRegion *region
+	if tryAdvanceDay {
+		spawnRegion = w.defaultRegion()
+	}
+	for _, r := range w.allRegions() {
+		advanceDay := r == spawnRegion
+		r.postTick(func(tx *Tx) { ticker{}.tick(tx, tick, thunder, advanceDay, cycle) })
+	}
+}
+
+// tick ticks one region: its entities, scheduled updates, random ticks,
+// neighbour updates and redstone.
+func (t ticker) tick(tx *Tx, tick int64, thunder, advanceDay, cycle bool) {
+	w := tx.r
+	_, loaders := w.allViewers()
+	var dt *debug.Tick
+	if w.conf.Debug != nil {
+		dt = w.conf.Debug.StartTick(w.String())
+		defer dt.End()
+	}
+
+	// Sleeping through the night is only checked for the players in the
+	// region at the spawn (Helix: a known gap until sleeping is global).
+	if advanceDay {
+		t.tryAdvanceDay(tx, cycle)
+	}
 	if thunder {
 		w.tickLightning(tx)
 	}
 
-	dt.Phase("time and weather")
+	dt.Phase("weather")
 	t.tickEntities(tx, tick)
 	dt.Phase("entities")
 	w.scheduledUpdates.tick(tx, tick, dt)
@@ -113,13 +139,19 @@ func (t ticker) tick(tx *Tx) {
 	dt.Phase("neighbour updates")
 	w.redstone.tick(tx, tick)
 	dt.Phase("redstone")
+
+	w.ticked++
+	if w.ticked%splitInterval == 0 {
+		w.trySplit()
+		dt.Phase("regions")
+	}
 }
 
 // performNeighbourUpdates performs all block updates that came as a result of a neighbouring block being changed.
 func (t ticker) performNeighbourUpdates(tx *Tx) {
-	updates := slices.Clone(tx.World().neighbourUpdates)
-	clear(tx.World().neighbourUpdates)
-	tx.World().neighbourUpdates = tx.World().neighbourUpdates[:0]
+	updates := slices.Clone(tx.r.neighbourUpdates)
+	clear(tx.r.neighbourUpdates)
+	tx.r.neighbourUpdates = tx.r.neighbourUpdates[:0]
 
 	for _, update := range updates {
 		pos, changedNeighbour := update.pos, update.neighbour
@@ -137,7 +169,7 @@ func (t ticker) performNeighbourUpdates(tx *Tx) {
 // tickBlocksRandomly executes random block ticks in loaded chunks within range of loaders.
 func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 	var (
-		r             = int32(tx.World().tickRange())
+		r             = int32(tx.r.tickRange())
 		g             randUint4
 		blockEntities []cube.Pos
 		randomBlocks  []cube.Pos
@@ -148,8 +180,8 @@ func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 	}
 
 	loaded := make([]ChunkPos, 0, len(loaders))
-	if tx.World().conf.Synchronous {
-		loaded = slices.Collect(maps.Keys(tx.World().chunks))
+	if tx.r.conf.Synchronous {
+		loaded = slices.Collect(maps.Keys(tx.r.chunks))
 	} else {
 		for _, loader := range loaders {
 			loader.mu.RLock()
@@ -160,7 +192,7 @@ func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 		}
 	}
 
-	for pos, c := range tx.World().chunks {
+	for pos, c := range tx.r.chunks {
 		if !t.anyWithinDistance(pos, loaded, r) {
 			// No loaders in this chunk that are within the simulation distance, so proceed to the next.
 			continue
@@ -170,8 +202,8 @@ func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 		cx, cz := int(pos[0]<<4), int(pos[1]<<4)
 
 		// We generate up to j random positions for every sub chunk.
-		for j := 0; j < tx.World().conf.RandomTickSpeed; j++ {
-			x, y, z := g.uint4(tx.World().r), g.uint4(tx.World().r), g.uint4(tx.World().r)
+		for j := 0; j < tx.r.conf.RandomTickSpeed; j++ {
+			x, y, z := g.uint4(tx.r.r), g.uint4(tx.r.r), g.uint4(tx.r.r)
 
 			for i, sub := range c.Sub() {
 				if sub.Empty() {
@@ -181,13 +213,13 @@ func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 				// Generally we would want to make sure the block has its block entities, but provided blocks
 				// with block entities are generally ticked already, we are safe to assume that blocks
 				// implementing the RandomTicker don't rely on additional block entity data.
-				if rid := sub.Layers()[0].At(x, y, z); tx.World().conf.Blocks.RandomTickBlock(rid) {
+				if rid := sub.Layers()[0].At(x, y, z); tx.r.conf.Blocks.RandomTickBlock(rid) {
 					subY := (i + (tx.Range().Min() >> 4)) << 4
 					randomBlocks = append(randomBlocks, cube.Pos{cx + int(x), subY + int(y), cz + int(z)})
 
 					// Only generate new coordinates if a tickable block was actually found. If not, we can just re-use
 					// the coordinates for the next sub chunk.
-					x, y, z = g.uint4(tx.World().r), g.uint4(tx.World().r), g.uint4(tx.World().r)
+					x, y, z = g.uint4(tx.r.r), g.uint4(tx.r.r), g.uint4(tx.r.r)
 				}
 			}
 		}
@@ -195,7 +227,7 @@ func (t ticker) tickBlocksRandomly(tx *Tx, loaders []*Loader, tick int64) {
 
 	for _, pos := range randomBlocks {
 		if rb, ok := tx.Block(pos).(RandomTicker); ok {
-			rb.RandomTick(pos, tx, tx.World().r)
+			rb.RandomTick(pos, tx, tx.r.r)
 		}
 	}
 	for _, pos := range blockEntities {
@@ -221,19 +253,22 @@ func (t ticker) anyWithinDistance(pos ChunkPos, loaded []ChunkPos, r int32) bool
 // tickEntities ticks all entities in the world, making sure they are still located in the correct chunks and
 // updating where necessary.
 func (t ticker) tickEntities(tx *Tx, tick int64) {
-	for handle, lastPos := range tx.World().entities {
+	for handle, lastPos := range tx.r.entities {
 		e := handle.mustEntity(tx)
 		chunkPos := chunkPosFromVec3(handle.data.Pos)
 
-		c, ok := tx.World().chunks[chunkPos]
+		c, ok := tx.r.chunks[chunkPos]
 		if !ok {
+			if o := tx.r.ownerOf(chunkPos); o != nil && o != tx.r {
+				tx.r.handOver(tx, handle, lastPos, o)
+			}
 			continue
 		}
 
 		if lastPos != chunkPos {
 			// The entity was stored using an outdated chunk position. We update it and make sure it is ready
 			// for loaders to view it.
-			tx.World().entities[handle] = chunkPos
+			tx.r.entities[handle] = chunkPos
 			c.Entities = append(c.Entities, handle)
 
 			var viewers []Viewer
@@ -241,7 +276,7 @@ func (t ticker) tickEntities(tx *Tx, tick int64) {
 			// When changing an entity's world, then teleporting it immediately, we could end up in a situation
 			// where the old chunk of the entity was not loaded. In this case, it should be safe simply to ignore
 			// the loaders from the old chunk. We can assume they never saw the entity in the first place.
-			if old, ok := tx.World().chunks[lastPos]; ok {
+			if old, ok := tx.r.chunks[lastPos]; ok {
 				old.Entities = sliceutil.DeleteVal(old.Entities, handle)
 				viewers = old.viewers
 			}
@@ -262,7 +297,7 @@ func (t ticker) tickEntities(tx *Tx, tick int64) {
 			}
 		}
 
-		if tx.World().conf.Synchronous || len(c.viewers) > 0 {
+		if tx.r.conf.Synchronous || len(c.viewers) > 0 {
 			if te, ok := e.(TickerEntity); ok {
 				te.Tick(tx, tick)
 			}
@@ -320,7 +355,7 @@ func newScheduledTickQueue(tick int64) *scheduledTickQueue {
 func (queue *scheduledTickQueue) tick(tx *Tx, tick int64, dt *debug.Tick) {
 	queue.currentTick = tick
 
-	w := tx.World()
+	w := tx.r
 	for _, t := range queue.ticks {
 		if t.t > tick {
 			continue

@@ -41,6 +41,34 @@ type Monitor struct {
 
 	tmu    sync.Mutex
 	worlds map[string]*worldTicks
+
+	regions sync.Mutex
+	regionF func() any
+}
+
+// SetRegions sets the function that describes the world's regions for the
+// region map. It is called on each request, from the HTTP goroutine.
+func (m *Monitor) SetRegions(f func() any) {
+	if m == nil {
+		return
+	}
+	m.regions.Lock()
+	m.regionF = f
+	m.regions.Unlock()
+}
+
+// Regions returns the region description, or nil.
+func (m *Monitor) Regions() any {
+	if m == nil {
+		return nil
+	}
+	m.regions.Lock()
+	f := m.regionF
+	m.regions.Unlock()
+	if f == nil {
+		return nil
+	}
+	return f()
 }
 
 // New returns a Monitor.

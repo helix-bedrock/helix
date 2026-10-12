@@ -6,7 +6,7 @@ import (
 
 // loadedSource is a BlockSource reading from the chunks a World has loaded. Positions in an unloaded
 // chunk or outside the World's Range read as air.
-type loadedSource struct{ w *World }
+type loadedSource struct{ w *region }
 
 // Block ...
 func (s loadedSource) Block(pos cube.Pos) Block {
@@ -22,7 +22,7 @@ type derivedBlock struct {
 
 // deriveStates recalculates the derived states of the chunk at centre and of the chunks around it, so
 // that a chunk that was missing neighbours earlier is upgraded once the chunk completing it is loaded.
-func (w *World) deriveStates(centre ChunkPos) {
+func (w *region) deriveStates(centre ChunkPos) {
 	for x := int32(-1); x <= 1; x++ {
 		for z := int32(-1); z <= 1; z++ {
 			pos := ChunkPos{centre[0] + x, centre[1] + z}
@@ -36,7 +36,7 @@ func (w *World) deriveStates(centre ChunkPos) {
 // deriveChunkStates recalculates the derived states of the chunk at pos. Blocks on the edge of a chunk
 // derive their state partly from the chunk next to it, so the chunk is left marked and untouched until
 // every chunk around it is loaded.
-func (w *World) deriveChunkStates(pos ChunkPos, c *Column) {
+func (w *region) deriveChunkStates(pos ChunkPos, c *Column) {
 	for x := int32(-1); x <= 1; x++ {
 		for z := int32(-1); z <= 1; z++ {
 			if _, ok := w.chunks[ChunkPos{pos[0] + x, pos[1] + z}]; !ok {

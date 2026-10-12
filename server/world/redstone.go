@@ -391,15 +391,15 @@ func (e *redstoneEngine) compile(tx *Tx, candidates []cube.Pos) redstoneGraph {
 
 // compileAdjacentRedstone adds redstone blocks that can interact with pos directly or through an adjacent conductor.
 func (e *redstoneEngine) compileAdjacentRedstone(tx *Tx, pos cube.Pos, seen map[cube.Pos]struct{}, nodes *[]redstoneNode) {
-	if b, ok := tx.World().blockLoaded(pos); ok && e.redstoneBlockMayConduct(tx, pos, b) {
+	if b, ok := tx.r.blockLoaded(pos); ok && e.redstoneBlockMayConduct(tx, pos, b) {
 		pos.Neighbours(func(neighbour cube.Pos) {
-			if b, ok := tx.World().blockLoaded(neighbour); ok && isRedstoneRelevant(b) {
+			if b, ok := tx.r.blockLoaded(neighbour); ok && isRedstoneRelevant(b) {
 				e.compileRegion(tx, neighbour, seen, nodes)
 			}
 		}, tx.Range())
 	}
 	pos.Neighbours(func(neighbour cube.Pos) {
-		b, ok := tx.World().blockLoaded(neighbour)
+		b, ok := tx.r.blockLoaded(neighbour)
 		if !ok {
 			return
 		}
@@ -408,7 +408,7 @@ func (e *redstoneEngine) compileAdjacentRedstone(tx *Tx, pos cube.Pos, seen map[
 		}
 		if e.redstoneBlockMayConduct(tx, neighbour, b) {
 			neighbour.Neighbours(func(conductedNeighbour cube.Pos) {
-				if b, ok := tx.World().blockLoaded(conductedNeighbour); ok && isRedstoneRelevant(b) {
+				if b, ok := tx.r.blockLoaded(conductedNeighbour); ok && isRedstoneRelevant(b) {
 					e.compileRegion(tx, conductedNeighbour, seen, nodes)
 				}
 			}, tx.Range())
@@ -440,7 +440,7 @@ func (e *redstoneEngine) compileRegion(tx *Tx, pos cube.Pos, seen map[cube.Pos]s
 		}
 		seen[p] = struct{}{}
 
-		b, ok := tx.World().blockLoaded(p)
+		b, ok := tx.r.blockLoaded(p)
 		if !ok {
 			continue
 		}
@@ -457,7 +457,7 @@ func (e *redstoneEngine) compileRegion(tx *Tx, pos cube.Pos, seen map[cube.Pos]s
 			continue
 		}
 		for _, neighbour := range e.redstoneRelayerConnectedPositions(tx, p, b) {
-			if b, ok := tx.World().blockLoaded(neighbour); ok && isRedstoneRelevant(b) {
+			if b, ok := tx.r.blockLoaded(neighbour); ok && isRedstoneRelevant(b) {
 				queue = append(queue, neighbour)
 			}
 		}
@@ -517,7 +517,7 @@ func (e *redstoneEngine) updateGraphSources(tx *Tx, graph redstoneGraph, dirty m
 		if !node.source {
 			continue
 		}
-		b, ok := tx.World().blockLoaded(node.pos)
+		b, ok := tx.r.blockLoaded(node.pos)
 		if !ok {
 			continue
 		}
@@ -580,7 +580,7 @@ func (e *redstoneEngine) directPowerFrom(pos cube.Pos, tx *Tx, face cube.Face) i
 	if neighbour.OutOfBounds(tx.Range()) {
 		return 0
 	}
-	b, ok := tx.World().blockLoaded(neighbour)
+	b, ok := tx.r.blockLoaded(neighbour)
 	if !ok {
 		return 0
 	}
@@ -605,7 +605,7 @@ func (e *redstoneEngine) strongPowerFrom(pos cube.Pos, tx *Tx, face cube.Face) i
 	if neighbour.OutOfBounds(tx.Range()) {
 		return 0
 	}
-	b, ok := tx.World().blockLoaded(neighbour)
+	b, ok := tx.r.blockLoaded(neighbour)
 	if !ok {
 		return 0
 	}
@@ -633,7 +633,7 @@ func (e *redstoneEngine) conductedStrongPowerFrom(pos cube.Pos, tx *Tx, face cub
 	if conductorPos.OutOfBounds(tx.Range()) {
 		return 0
 	}
-	conductor, ok := tx.World().blockLoaded(conductorPos)
+	conductor, ok := tx.r.blockLoaded(conductorPos)
 	if !ok || !redstoneStrongPowerConductor(conductorPos, conductor, tx, face.Opposite()) {
 		return 0
 	}
@@ -659,7 +659,7 @@ func (e *redstoneEngine) weakBlockPowerFrom(pos cube.Pos, tx *Tx, face cube.Face
 	if sourcePos.OutOfBounds(tx.Range()) {
 		return 0
 	}
-	b, ok := tx.World().blockLoaded(sourcePos)
+	b, ok := tx.r.blockLoaded(sourcePos)
 	if !ok {
 		return 0
 	}
@@ -685,7 +685,7 @@ func (e *redstoneEngine) conductedWeakPowerFrom(pos cube.Pos, tx *Tx, face cube.
 	if conductorPos.OutOfBounds(tx.Range()) {
 		return 0
 	}
-	conductor, ok := tx.World().blockLoaded(conductorPos)
+	conductor, ok := tx.r.blockLoaded(conductorPos)
 	if !ok || !redstoneStrongPowerConductor(conductorPos, conductor, tx, face.Opposite()) {
 		return 0
 	}
@@ -704,7 +704,7 @@ func (e *redstoneEngine) conductedActivationPowerFrom(pos cube.Pos, tx *Tx, face
 
 // conductivePowerTo returns power held by pos as a conductive block, excluding direct component activation.
 func (e *redstoneEngine) conductivePowerTo(pos cube.Pos, tx *Tx) int {
-	b, ok := tx.World().blockLoaded(pos)
+	b, ok := tx.r.blockLoaded(pos)
 	if !ok || !RedstoneFullPowerConductor(pos, b, tx) {
 		return 0
 	}
@@ -713,7 +713,7 @@ func (e *redstoneEngine) conductivePowerTo(pos cube.Pos, tx *Tx) int {
 
 // acceptsDirectSourcePower reports whether direct source output should activate the block at pos.
 func (e *redstoneEngine) acceptsDirectSourcePower(pos cube.Pos, tx *Tx) bool {
-	b, ok := tx.World().blockLoaded(pos)
+	b, ok := tx.r.blockLoaded(pos)
 	if !ok {
 		return true
 	}
@@ -725,7 +725,7 @@ func (e *redstoneEngine) acceptsDirectSourcePower(pos cube.Pos, tx *Tx) bool {
 
 // acceptsWeakConductedPower reports whether the block at pos may be activated by a weakly powered conductor.
 func (e *redstoneEngine) acceptsWeakConductedPower(pos cube.Pos, tx *Tx) bool {
-	b, ok := tx.World().blockLoaded(pos)
+	b, ok := tx.r.blockLoaded(pos)
 	if !ok {
 		return true
 	}
@@ -741,7 +741,7 @@ func (e *redstoneEngine) redstoneWeaklyPowersBlocks(b Block) bool {
 
 // sourcePower returns the strongest output emitted by a source block.
 func (e *redstoneEngine) sourcePower(pos cube.Pos, tx *Tx) int {
-	b, ok := tx.World().blockLoaded(pos)
+	b, ok := tx.r.blockLoaded(pos)
 	if !ok {
 		return 0
 	}
@@ -769,7 +769,7 @@ func (e *redstoneEngine) graphPower(tx *Tx, graph redstoneGraph) []int {
 	edges := make([][]redstoneEdge, len(graph.nodes))
 	for i, node := range graph.nodes {
 		index[node.pos] = i
-		if b, ok := tx.World().blockLoaded(node.pos); ok {
+		if b, ok := tx.r.blockLoaded(node.pos); ok {
 			sources[i], _ = b.(RedstonePowerSource)
 			relayers[i], _ = b.(RedstonePowerRelayer)
 		}
@@ -867,7 +867,7 @@ func (e *redstoneEngine) powerFrom(pos cube.Pos, tx *Tx, face cube.Face) int {
 		}
 		seen[s.pos] = s.loss
 
-		b, ok := tx.World().blockLoaded(s.pos)
+		b, ok := tx.r.blockLoaded(s.pos)
 		if !ok {
 			continue
 		}
@@ -885,7 +885,7 @@ func (e *redstoneEngine) powerFrom(pos cube.Pos, tx *Tx, face cube.Face) int {
 			if to == s.from {
 				continue
 			}
-			nextBlock, ok := tx.World().blockLoaded(next)
+			nextBlock, ok := tx.r.blockLoaded(next)
 			if !ok {
 				continue
 			}
@@ -1003,7 +1003,7 @@ func (e *redstoneEngine) redstonePower(source RedstonePowerSource, pos cube.Pos,
 // redstoneUpdateAllowed dispatches redstone callbacks and reports whether the update was cancelled.
 func (e *redstoneEngine) redstoneUpdateAllowed(tx *Tx, update RedstoneUpdate) bool {
 	ctx := tx.Event()
-	tx.World().Handler().HandleRedstoneUpdate(ctx, update)
+	tx.r.Handler().HandleRedstoneUpdate(ctx, update)
 	return !ctx.Cancelled()
 }
 
@@ -1045,7 +1045,7 @@ func (e *redstoneEngine) compileEdges(tx *Tx, nodes []redstoneNode) []redstoneEd
 	}
 	edges := make([]redstoneEdge, 0, len(nodes))
 	for i, node := range nodes {
-		b, loaded := tx.World().blockLoaded(node.pos)
+		b, loaded := tx.r.blockLoaded(node.pos)
 		if !loaded {
 			continue
 		}
@@ -1059,7 +1059,7 @@ func (e *redstoneEngine) compileEdges(tx *Tx, nodes []redstoneNode) []redstoneEd
 				continue
 			}
 			weight := 0
-			if neighbourBlock, ok := tx.World().blockLoaded(neighbour); ok {
+			if neighbourBlock, ok := tx.r.blockLoaded(neighbour); ok {
 				if _, neighbourRelayer := neighbourBlock.(RedstonePowerRelayer); neighbourRelayer {
 					weight = max(relayer.RedstoneSignalLoss(node.pos, tx), 1)
 				}
@@ -1098,7 +1098,7 @@ func (e *redstoneEngine) redstoneRelayerConnectedPositions(tx *Tx, pos cube.Pos,
 		if _, ok := seen[candidate]; ok {
 			continue
 		}
-		candidateBlock, ok := tx.World().blockLoaded(candidate)
+		candidateBlock, ok := tx.r.blockLoaded(candidate)
 		if !ok {
 			continue
 		}
@@ -1211,4 +1211,30 @@ func ClampRedstonePower(power int) int {
 		return 15
 	}
 	return power
+}
+
+// moveTo moves the redstone state of the chunks for which has returns true
+// to dst, when regions merge or split (Helix).
+func (e *redstoneEngine) moveTo(dst *redstoneEngine, has func(ChunkPos) bool) {
+	if dst.suppressedSources == nil {
+		dst.suppressedSources = make(map[cube.Pos]int)
+	}
+	if dst.torchBurnout == nil {
+		dst.torchBurnout = make(map[cube.Pos]redstoneTorchBurnout)
+	}
+	movePos(e.dirty, dst.dirty, has)
+	movePos(e.power, dst.power, has)
+	movePos(e.output, dst.output, has)
+	movePos(e.evaluating, dst.evaluating, has)
+	movePos(e.suppressedSources, dst.suppressedSources, has)
+	movePos(e.torchBurnout, dst.torchBurnout, has)
+}
+
+func movePos[V any](src, dst map[cube.Pos]V, has func(ChunkPos) bool) {
+	for pos, v := range src {
+		if has(chunkPosFromBlockPos(pos)) {
+			dst[pos] = v
+			delete(src, pos)
+		}
+	}
 }

@@ -51,7 +51,7 @@ func (l *Loader) ChangeWorld(tx *Tx, new *World) {
 	loaded := maps.Clone(l.loaded)
 	l.w.exec(func(tx *Tx) {
 		for pos := range loaded {
-			tx.World().removeViewer(tx, pos, l)
+			tx.r.removeViewer(tx, pos, l)
 		}
 	})
 	clear(l.loaded)
@@ -102,7 +102,7 @@ func (l *Loader) Load(tx *Tx, n int) {
 			break
 		}
 		pos := l.loadQueue[0]
-		w := tx.World()
+		w := tx.r
 		l.pending[pos] = struct{}{}
 
 		// Shift the first element from the load queue off so that we can take a new one during the next
@@ -127,7 +127,7 @@ func (l *Loader) viewChunk(tx *Tx, pos ChunkPos, c *Column) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.closed || l.viewer == nil || l.w == nil || l.w != tx.World() {
+	if l.closed || l.viewer == nil || l.w == nil || l.w != tx.w {
 		return
 	}
 	delete(l.pending, pos)
@@ -142,7 +142,7 @@ func (l *Loader) viewChunk(tx *Tx, pos ChunkPos, c *Column) {
 		return
 	}
 	l.viewer.ViewChunk(pos, l.w.Dimension(), c.BlockEntities, c.Chunk)
-	l.w.addViewer(tx, c, l)
+	tx.r.addViewer(tx, c, l)
 
 	l.loaded[pos] = c
 }
@@ -163,7 +163,7 @@ func (l *Loader) Close(tx *Tx) {
 	defer l.mu.Unlock()
 
 	for pos := range l.loaded {
-		tx.World().removeViewer(tx, pos, l)
+		tx.r.removeViewer(tx, pos, l)
 	}
 	l.loaded = map[ChunkPos]*Column{}
 	clear(l.pending)
@@ -190,7 +190,7 @@ func (l *Loader) evictUnused(tx *Tx) {
 	for pos := range l.loaded {
 		if !l.withinLoadRadius(pos) {
 			delete(l.loaded, pos)
-			l.w.removeViewer(tx, pos, l)
+			tx.r.removeViewer(tx, pos, l)
 		}
 	}
 }

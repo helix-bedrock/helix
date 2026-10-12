@@ -22,6 +22,22 @@ go run main.go
 
 Press ctrl+c to stop the server.
 
+## Regions
+
+Each world is split into regions that tick in parallel, one goroutine each,
+like Folia. Chunks are grouped into sections (8 by 8 chunks by default) and
+every section belongs to one region. Regions stay at least two sections
+apart: when players bring them closer, they merge; when a region's areas
+drift apart, it splits. A region only touches its own chunks and entities,
+so ticks never wait for each other. Set `RegionSize` under `[World]` in
+`config.toml` to change the section size; 1 or 2 makes region borders
+common, for testing them. The debug dashboard draws the region map.
+
+Known limits: a block update or entity reaching a chunk of another region
+sees it as unloaded until the regions merge; command targets (`@a`, player
+names) and sleeping through the night only see the region the command or
+sleeper is in.
+
 ## Debugging
 
 Set an address in `config.toml` to open the debug dashboard:

@@ -614,6 +614,7 @@ func (srv *Server) createWorld(dim world.Dimension, nether, end **world.World) *
 		Entities:            srv.conf.Entities,
 		Blocks:              srv.conf.Blocks,
 		Debug:               srv.conf.Debug,
+		SectionSize:         srv.conf.RegionSectionSize,
 		PortalDestination: func(dim world.Dimension) *world.World {
 			switch dim {
 			case world.Nether:

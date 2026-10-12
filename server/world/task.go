@@ -290,7 +290,7 @@ func (w *World) DoAfter(delay time.Duration, f func(tx *Tx)) *Task {
 	if delay <= 0 {
 		return w.scheduleTask(t, run)
 	}
-	if w == nil || w.queue == nil || w.closed.Load() {
+	if w == nil || w.closed.Load() {
 		t.failIfPending(ErrWorldClosed)
 		return t
 	}
@@ -347,7 +347,7 @@ func (w *World) scheduleTask(task *Task, f func(tx *Tx) error) *Task {
 	if task == nil {
 		task = newTask()
 	}
-	if w == nil || w.queue == nil || w.closed.Load() {
+	if w == nil || w.closed.Load() {
 		task.failIfPending(ErrWorldClosed)
 		return task
 	}
@@ -355,47 +355,13 @@ func (w *World) scheduleTask(task *Task, f func(tx *Tx) error) *Task {
 		return task
 	}
 	st := scheduledTransaction{task: task, f: f}
-	w.scheduleMu.Lock()
-	if w.closed.Load() {
-		w.scheduleMu.Unlock()
-		task.failIfPending(ErrWorldClosed)
-		return task
-	}
 	if w.conf.Synchronous {
-		w.scheduleMu.Unlock()
-		st.Run(w)
+		st.Run(w.main)
 		return task
 	}
-	select {
-	case <-w.closing:
-		task.failIfPending(ErrWorldClosed)
-	case <-w.queueClosing:
-		task.failIfPending(ErrWorldClosed)
-	case w.queue <- st:
-	default:
-		w.scheduling.Add(1)
-		go w.queueScheduled(st)
-	}
-	w.scheduleMu.Unlock()
+	// Helix: tasks without a position run on the region at the spawn.
+	w.defaultRegion().post(st)
 	return task
-}
-
-// queueScheduled retries enqueuing st once the queue, full at schedule time,
-// has room, failing the task if the world closes first.
-func (w *World) queueScheduled(st scheduledTransaction) {
-	defer w.scheduling.Done()
-	if w.closed.Load() {
-		st.task.failIfPending(ErrWorldClosed)
-		return
-	}
-	select {
-	case <-w.closing:
-		st.task.failIfPending(ErrWorldClosed)
-	case <-w.queueClosing:
-		st.task.failIfPending(ErrWorldClosed)
-	case <-st.task.Done():
-	case w.queue <- st:
-	}
 }
 
 // scheduledTransaction is a queued task from Do, DoAfter or Tx.Defer: it
@@ -407,12 +373,12 @@ type scheduledTransaction struct {
 }
 
 // Run executes the scheduled callback on the world goroutine.
-func (st scheduledTransaction) Run(w *World) {
+func (st scheduledTransaction) Run(r *region) {
 	if !st.task.begin() {
 		return
 	}
-	tx := newTx(w)
-	err := executeWithRecovery(w, func() error { return st.f(tx) })
+	tx := newTx(r)
+	err := executeWithRecovery(r.World, func() error { return st.f(tx) })
 	tx.close()
 	tx.runDeferred()
 	st.task.finish(err)

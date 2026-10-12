@@ -25,7 +25,7 @@ func (w weather) StartWeatherCycle() {
 // is returned if the temperature in the Biome at that position is sufficiently
 // low, if it is raining and if it's above the top-most obstructing block.
 func (tx *Tx) snowingAt(pos cube.Pos) bool {
-	w := tx.World()
+	w := tx.r
 	if w == nil || !w.Dimension().WeatherCycle() {
 		return false
 	}
@@ -43,7 +43,7 @@ func (tx *Tx) snowingAt(pos cube.Pos) bool {
 // for it not to be snow and if the block is above the top-most obstructing
 // block.
 func (tx *Tx) rainingAt(pos cube.Pos) bool {
-	w := tx.World()
+	w := tx.r
 	if w == nil || !w.Dimension().WeatherCycle() {
 		return false
 	}
@@ -60,7 +60,7 @@ func (tx *Tx) rainingAt(pos cube.Pos) bool {
 // True is returned if rainingAt returns true and if it is thundering in the
 // world.
 func (tx *Tx) thunderingAt(pos cube.Pos) bool {
-	w := tx.World()
+	w := tx.r
 	raining := tx.rainingAt(pos)
 	w.set.Lock()
 	a := w.set.Thundering && raining
@@ -191,11 +191,11 @@ func (w weather) enableWeatherCycle(v bool) {
 // tickLightning iterates over all loaded chunks in the World, striking
 // lightning in each one with a 1/100,000 chance.
 func (w weather) tickLightning(tx *Tx) {
-	positions := make([]ChunkPos, 0, len(w.w.chunks)/100000)
-	for pos := range w.w.chunks {
+	positions := make([]ChunkPos, 0, len(tx.r.chunks)/100000)
+	for pos := range tx.r.chunks {
 		// Wiki: For each loaded chunk, every tick there is a 1⁄100,000 chance
 		// of an attempted lightning strike during a thunderstorm
-		if w.w.r.IntN(100000) == 0 {
+		if tx.r.r.IntN(100000) == 0 {
 			positions = append(positions, pos)
 		}
 	}
@@ -222,7 +222,7 @@ func (w weather) strikeLightning(tx *Tx, c ChunkPos) {
 // lightning and adjusts the position to any of the living entities found in or
 // above the position if any are found.
 func (w weather) lightningPosition(tx *Tx, c ChunkPos) mgl64.Vec3 {
-	v := w.w.r.Int32()
+	v := tx.r.r.Int32()
 	x, z := float64(c[0]<<4+(v&0xf)), float64(c[1]<<4+((v>>8)&0xf))
 
 	vec := w.adjustPositionToEntities(tx, mgl64.Vec3{x, float64(tx.HighestBlock(int(x), int(z)) + 1), z})
@@ -258,7 +258,7 @@ func (w weather) adjustPositionToEntities(tx *Tx, vec mgl64.Vec3) mgl64.Vec3 {
 	// block and adjust the position of the lightning to it, so that the entity
 	// is struck directly.
 	if len(list) > 0 {
-		vec = list[w.w.r.IntN(len(list))]
+		vec = list[tx.r.r.IntN(len(list))]
 	}
 	return vec
 }

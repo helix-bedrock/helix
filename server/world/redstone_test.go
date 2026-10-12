@@ -267,10 +267,10 @@ func TestRedstoneCancelledSourceDoesNotPropagate(t *testing.T) {
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
 		tx.SetBlock(sinkPos, redstoneCancellationConsumer{}, nil)
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 
 		sinkPowered = tx.Block(sinkPos).(redstoneCancellationConsumer).Powered
-		sourceOutput = tx.World().redstone.output[sourcePos]
+		sourceOutput = tx.r.redstone.output[sourcePos]
 	})
 	if sinkPowered {
 		t.Fatalf("sink powered after cancelling source update")
@@ -290,11 +290,11 @@ func TestRedstoneCancelledSourceKeepsPreviousOutputDuringEvaluation(t *testing.T
 	var sourceOutput int
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{}, &SetOpts{DisableRedstoneUpdates: true})
-		tx.World().redstone.output[sourcePos] = 15
-		tx.World().redstone.invalidate(sourcePos, redstoneDirty{changed: sourcePos, hasChanged: true, source: sourcePos, hasSource: true, cause: RedstoneUpdateCauseBlockUpdate}, tx.Range())
-		tx.World().redstone.tick(tx, 2)
+		tx.r.redstone.output[sourcePos] = 15
+		tx.r.redstone.invalidate(sourcePos, redstoneDirty{changed: sourcePos, hasChanged: true, source: sourcePos, hasSource: true, cause: RedstoneUpdateCauseBlockUpdate}, tx.Range())
+		tx.r.redstone.tick(tx, 2)
 
-		sourceOutput = tx.World().redstone.output[sourcePos]
+		sourceOutput = tx.r.redstone.output[sourcePos]
 	})
 	if sourceOutput != 15 {
 		t.Fatalf("stored source output after cancelled update = %d, want 15", sourceOutput)
@@ -311,7 +311,7 @@ func TestRedstoneCancelledConsumerDoesNotUpdate(t *testing.T) {
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
 		tx.SetBlock(sinkPos, redstoneCancellationConsumer{}, nil)
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 
 		sinkPowered = tx.Block(sinkPos).(redstoneCancellationConsumer).Powered
 	})
@@ -330,7 +330,7 @@ func TestRedstoneUpdateIncludesContextMetadata(t *testing.T) {
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sinkPos, redstoneCancellationConsumer{}, &SetOpts{DisableRedstoneUpdates: true})
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
-		tx.World().redstone.tick(tx, 7)
+		tx.r.redstone.tick(tx, 7)
 	})
 	if len(handler.updates) == 0 {
 		t.Fatal("no redstone update recorded for consumer")
@@ -394,7 +394,7 @@ func TestRedstoneCancelledActionDoesNotRun(t *testing.T) {
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
 		tx.SetBlock(actionPos, redstoneCancellationAction{}, nil)
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 	})
 	if actions != 0 {
 		t.Fatalf("actions = %d, want 0", actions)
@@ -414,9 +414,9 @@ func TestRedstoneActionOnlyRunsOnPowerChange(t *testing.T) {
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
 		tx.SetBlock(actionPos, redstoneCancellationAction{}, nil)
-		tx.World().redstone.tick(tx, 1)
-		tx.World().redstone.invalidate(actionPos, redstoneDirty{cause: RedstoneUpdateCauseBlockUpdate}, tx.Range())
-		tx.World().redstone.tick(tx, 2)
+		tx.r.redstone.tick(tx, 1)
+		tx.r.redstone.invalidate(actionPos, redstoneDirty{cause: RedstoneUpdateCauseBlockUpdate}, tx.Range())
+		tx.r.redstone.tick(tx, 2)
 	})
 	if actions != 1 {
 		t.Fatalf("actions after same-power dirty evaluation = %d, want 1", actions)
@@ -435,7 +435,7 @@ func TestRedstoneRelayerToSinkDoesNotLosePower(t *testing.T) {
 		tx.SetBlock(sinkPos, redstoneLossConsumer{}, nil)
 
 		directPower = tx.RedstonePower(sinkPos)
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 		if sink, ok := tx.Block(sinkPos).(redstoneLossConsumer); ok {
 			sinkPower = sink.Power
 		}
@@ -474,7 +474,7 @@ func TestRedstoneVerticalRelayerPropagation(t *testing.T) {
 				tx.SetBlock(high.Side(cube.FaceDown), test.block, nil)
 				tx.SetBlock(source, redstoneVerticalSource{}, nil)
 
-				tx.World().redstone.tick(tx, 1)
+				tx.r.redstone.tick(tx, 1)
 				got = tx.Block(test.to).(redstoneVerticalRelayer).Power
 			})
 			if got != test.want {
@@ -496,8 +496,8 @@ func TestPlacedRedstoneTorchTurnsOffWhenAttachmentBecomesPowered(t *testing.T) {
 		tx.SetBlock(torchPos, redstoneAttachmentTorch{Facing: cube.FaceWest, Lit: true}, nil)
 		tx.SetBlock(attachmentPos.Side(cube.FaceNorth), redstoneWeakBlockSource{}, nil)
 
-		tx.World().scheduledUpdates.tick(tx, 2, nil)
-		tx.World().redstone.tick(tx, 2)
+		tx.r.scheduledUpdates.tick(tx, 2, nil)
+		tx.r.redstone.tick(tx, 2)
 		lit = tx.Block(torchPos).(redstoneAttachmentTorch).Lit
 	})
 
@@ -517,7 +517,7 @@ func TestRedstoneConsumerUpdatesBehindPoweredConductor(t *testing.T) {
 		tx.SetBlock(conductorPos, redstoneSolidBlock{}, nil)
 		tx.SetBlock(consumerPos, redstoneCancellationConsumer{}, nil)
 
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 		powered = tx.Block(consumerPos).(redstoneCancellationConsumer).Powered
 	})
 
@@ -542,7 +542,7 @@ func TestWeaklyPoweredConductorActivatesConsumerButNotDust(t *testing.T) {
 		tx.SetBlock(consumerPos, redstoneCancellationConsumer{}, nil)
 		tx.SetBlock(dustPos, redstoneVerticalRelayer{}, nil)
 
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 		consumerPowered = tx.Block(consumerPos).(redstoneCancellationConsumer).Powered
 		dustPower = tx.Block(dustPos).(redstoneVerticalRelayer).Power
 	})
@@ -566,7 +566,7 @@ func TestDirectSourceDoesNotWeakPowerConductor(t *testing.T) {
 		tx.SetBlock(conductorPos, redstoneSolidBlock{}, nil)
 		tx.SetBlock(consumerPos, redstoneCancellationConsumer{}, nil)
 
-		tx.World().redstone.tick(tx, 1)
+		tx.r.redstone.tick(tx, 1)
 		powered = tx.Block(consumerPos).(redstoneCancellationConsumer).Powered
 	})
 
@@ -1081,7 +1081,7 @@ func (redstoneLadderGlass) Model() BlockModel      { return redstoneSolidModel{}
 
 func redstoneTestCanTransmitDown(tx *Tx, pos cube.Pos) bool {
 	supportPos := pos.Side(cube.FaceDown)
-	support, ok := tx.World().blockLoaded(supportPos)
+	support, ok := tx.r.blockLoaded(supportPos)
 	if !ok || !support.Model().FaceSolid(supportPos, cube.FaceUp, tx) {
 		return false
 	}

@@ -31,6 +31,9 @@
 <h2>Ticks</h2>
 <div id="ticks"></div>
 
+<h2>Regions</h2>
+<div id="regions"></div>
+
 <h2>Packets</h2>
 <div class="row">
   <input id="player" placeholder="player">
@@ -74,6 +77,34 @@ async function ticks() {
   }).join('') || '<span class="muted">no ticks yet (worlds tick when a player is in them)</span>';
 }
 
+const hue = id => (id * 137.508) % 360;
+async function regions() {
+  const ws = await get('/api/regions');
+  if (!ws) { $('regions').innerHTML = '<span class="muted">no worlds</span>'; return; }
+  const html = [];
+  for (const [name, w] of Object.entries(ws)) {
+    const rs = w.regions || [];
+    if (!rs.length) continue;
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    for (const r of rs) for (const [x, z] of r.Sections || []) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); }
+    const cols = maxX - minX + 1, rows = maxZ - minZ + 1;
+    const cell = Math.max(2, Math.min(24, Math.floor(600 / Math.max(cols, rows))));
+    html.push(`<div class="row"><b>${esc(name)}</b><span class="muted">${rs.length} regions · sections of ${w.sectionSize}×${w.sectionSize} chunks</span></div>
+      <canvas data-world="${esc(name)}" width="${cols * cell}" height="${rows * cell}" style="max-width:100%;border:1px solid var(--line)"></canvas>
+      <div class="muted">${rs.map(r => `<span style="color:hsl(${hue(r.ID)},70%,50%)">■</span> region ${r.ID}: ${r.Chunks} chunks, ${r.Entities} entities`).join(' · ')}</div>`);
+    queueMicrotask(() => {
+      const c = document.querySelector(`canvas[data-world="${CSS.escape(name)}"]`);
+      if (!c) return;
+      const g = c.getContext('2d');
+      for (const r of rs) {
+        g.fillStyle = `hsl(${hue(r.ID)},70%,50%)`;
+        for (const [x, z] of r.Sections || []) g.fillRect((x - minX) * cell, (z - minZ) * cell, cell - (cell > 4 ? 1 : 0), cell - (cell > 4 ? 1 : 0));
+      }
+    });
+  }
+  $('regions').innerHTML = html.join('') || '<span class="muted">no regions yet (they appear when chunks load)</span>';
+}
+
 async function packets() {
   const q = new URLSearchParams({player:$('player').value, name:$('name').value, dir:$('dir').value, limit:$('limit').value});
   const ps = await get('/api/packets?' + q) || [];
@@ -89,7 +120,7 @@ async function counts() {
 }
 
 async function refresh() {
-  if ($('live').checked) { try { await Promise.all([ticks(), packets(), counts()]); } catch (e) {} }
+  if ($('live').checked) { try { await Promise.all([ticks(), regions(), packets(), counts()]); } catch (e) {} }
   setTimeout(refresh, 1000);
 }
 for (const id of ['player', 'name', 'dir', 'limit']) $(id).addEventListener('input', packets);

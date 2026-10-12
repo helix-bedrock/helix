@@ -29,6 +29,9 @@ import (
 
 // Config contains options for starting a Minecraft server.
 type Config struct {
+	// RegionSectionSize is the width in chunks of the sections that worlds
+	// split into regions with. If 0, world.DefaultSectionSize.
+	RegionSectionSize int
 	// Debug records packets and tick timings when set, for the debug
 	// dashboard. Nil turns it off.
 	Debug *debug.Monitor
@@ -214,6 +217,13 @@ func (conf Config) New() *Server {
 	srv.world = srv.createWorld(world.Overworld, &srv.nether, &srv.end)
 	srv.nether = srv.createWorld(world.Nether, &srv.world, &srv.end)
 	srv.end = srv.createWorld(world.End, &srv.nether, &srv.world)
+	conf.Debug.SetRegions(func() any {
+		out := map[string]any{}
+		for _, w := range []*world.World{srv.world, srv.nether, srv.end} {
+			out[fmt.Sprint(w.Dimension())] = map[string]any{"sectionSize": w.SectionSize(), "regions": w.Regions()}
+		}
+		return out
+	})
 
 	return srv
 }
@@ -274,6 +284,10 @@ type UserConfig struct {
 		SaveData bool
 		// Folder is the folder that the data of the world resides in.
 		Folder string
+		// RegionSize is the width in chunks of the sections worlds are split
+		// into regions with. Regions tick in parallel. Leave it at 8; set it
+		// to 1 or 2 to make region borders common when testing them.
+		RegionSize int
 	}
 	Players struct {
 		// MaxCount is the maximum amount of players allowed to join the server
@@ -327,6 +341,7 @@ func (uc UserConfig) Config(log *slog.Logger) (Config, error) {
 		MaxPlayers:              uc.Players.MaxCount,
 		MaxChunkRadius:          uc.Players.MaximumChunkRadius,
 		DisableResourceBuilding: !uc.Resources.AutoBuildPack,
+		RegionSectionSize:       uc.World.RegionSize,
 	}
 	listeners, err := uc.transportListeners()
 	if err != nil {
@@ -436,6 +451,7 @@ func DefaultConfig() UserConfig {
 	c.Server.AuthEnabled = true
 	c.World.SaveData = true
 	c.World.Folder = "world"
+	c.World.RegionSize = world.DefaultSectionSize
 	c.Players.MaximumChunkRadius = 32
 	c.Players.SaveData = true
 	c.Players.Folder = "players"

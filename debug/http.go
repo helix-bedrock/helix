@@ -46,6 +46,7 @@ func (m *Monitor) Serve(address string, log *slog.Logger) (net.Addr, error) {
 	mux.HandleFunc("/api/packets", m.servePackets)
 	mux.HandleFunc("/api/counts", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, m.Counts()) })
 	mux.HandleFunc("/api/ticks", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, m.Ticks()) })
+	mux.HandleFunc("/api/regions", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, m.Regions()) })
 	mux.HandleFunc("/record", m.serveRecord)
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)

@@ -16,6 +16,10 @@ type blockRegistrySetter interface {
 // Config may be used to create a new World. It holds a variety of fields that
 // influence the World.
 type Config struct {
+	// SectionSize is the width in chunks of the sections regions are made
+	// of. If 0, DefaultSectionSize. Small sections make region borders
+	// common, which is useful for testing them.
+	SectionSize int
 	// Debug records tick timings when set. Nil turns it off.
 	Debug *debug.Monitor
 	// Log is the Logger that will be used to log errors and debug messages to.
@@ -149,41 +153,44 @@ func (conf Config) New() *World {
 		conf.Generator = &lockedGenerator{g: conf.Generator}
 	}
 	w := &World{
-		scheduledUpdates: newScheduledTickQueue(s.CurrentTick),
-		redstone:         newRedstoneEngine(s.CurrentTick),
-		entities:         make(map[*EntityHandle]ChunkPos),
-		viewers:          make(map[*Loader]Viewer),
-		chunks:           make(map[ChunkPos]*Column),
-		chunkRequests:    make(map[ChunkPos]*chunkRequest),
-		queueClosing:     make(chan struct{}),
-		closeStarted:     make(chan struct{}),
-		closing:          make(chan struct{}),
-		queue:            make(chan transaction, 128),
-		r:                rand.New(conf.RandSource),
-		advance:          s.ref.Add(1) == 1,
-		conf:             conf,
-		ra:               conf.Dim.Range(),
-		set:              s,
+		viewers:      make(map[*Loader]Viewer),
+		sectionOwner: make(map[secPos]*region),
+		entityOwner:  make(map[*EntityHandle]*region),
+		regions:      make(map[*region]struct{}),
+		mergeWake:    make(chan struct{}, 1),
+		sectionSize:  int32(conf.SectionSize),
+		closeStarted: make(chan struct{}),
+		queueClosing: make(chan struct{}),
+		closing:      make(chan struct{}),
+		r:            rand.New(conf.RandSource),
+		seedRand:     rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 1)),
+		advance:      s.ref.Add(1) == 1,
+		conf:         conf,
+		ra:           conf.Dim.Range(),
+		set:          s,
+	}
+	if w.sectionSize <= 0 {
+		w.sectionSize = DefaultSectionSize
 	}
 	w.chunkWorkers = newChunkWorkerPool(w)
 	w.weather = weather{w: w}
 	var h Handler = NopHandler{}
 	w.handler.Store(&h)
 
+	if conf.Synchronous {
+		w.main = w.newRegion()
+	}
 	t := ticker{interval: time.Second / 20}
 	if !conf.Synchronous {
-		w.queueing.Add(1)
-		w.running.Add(2)
-
+		w.running.Add(3)
 		go t.tickLoop(w)
 		go w.autoSave()
-		go w.handleTransactions()
+		go w.mergeLoop()
 		w.chunkWorkers.wg.Add(conf.ChunkLoadWorkers)
 		for range conf.ChunkLoadWorkers {
 			go w.chunkWorkers.handle()
 		}
 	}
-
-	<-w.exec(t.tick)
+	w.clockTick(true)
 	return w
 }

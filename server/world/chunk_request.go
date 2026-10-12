@@ -52,7 +52,8 @@ func (r *chunkRequest) doImmediate(tx *Tx) *Column {
 func (r *chunkRequest) load(w *World) {
 	r.col, r.err = w.loadChunk(r.pos)
 	close(r.done)
-	w.Do(r.signal)
+	// Helix: finish on the region that owns the chunk.
+	w.postAt(r.pos, r.signal)
 }
 
 // abort cancels a request that will never be carried out because the world is
@@ -119,7 +120,7 @@ func (r *chunkRequest) signal(tx *Tx) {
 	}
 	r.signalled = true
 
-	w := tx.World()
+	w := tx.r
 	pos := r.pos
 
 	delete(w.chunkRequests, pos)

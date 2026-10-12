@@ -11,7 +11,7 @@ import (
 )
 
 // blocksWithin implements Tx.BlocksWithin. It must only be called during a transaction.
-func (w *World) blocksWithin(pos cube.Pos, radius int, blocks ...Block) iter.Seq[cube.Pos] {
+func (w *region) blocksWithin(pos cube.Pos, radius int, blocks ...Block) iter.Seq[cube.Pos] {
 	return func(yield func(cube.Pos) bool) {
 		if radius <= 0 || len(blocks) == 0 {
 			return
