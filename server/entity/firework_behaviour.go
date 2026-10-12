@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/cube/trace"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
@@ -131,7 +132,12 @@ func (f *FireworkBehaviour) explode(e *Ent, tx *world.Tx) {
 			victim.(Living).Hurt(dmg, src)
 			continue
 		}
-		if _, ok := trace.Perform(pos, tpos, tx, victim.H().Type().BBox(victim).Grow(0.3), nil); ok {
+		var obstructed bool
+		trace.TraverseBlocks(pos, tpos, func(bpos cube.Pos) bool {
+			_, obstructed = trace.BlockIntercept(bpos, tx, tx.Block(bpos), pos, tpos)
+			return !obstructed
+		})
+		if !obstructed {
 			victim.(Living).Hurt(dmg, src)
 		}
 	}
