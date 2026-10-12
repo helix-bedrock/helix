@@ -23,6 +23,7 @@ func TestTicksRecorded(t *testing.T) {
 	m := New(Config{Ticks: 4, SlowTick: time.Nanosecond})
 	for range 6 {
 		tk := m.StartTick("overworld")
+		time.Sleep(2 * time.Millisecond) // Windows clocks are coarse
 		tk.Phase("entities")
 		tk.Block("minecraft:water", time.Millisecond)
 		tk.End()

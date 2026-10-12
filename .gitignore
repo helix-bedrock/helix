@@ -10,3 +10,4 @@
 
 # NetherNet server identity keys
 /keys
+out.log
