@@ -2301,10 +2301,17 @@ func (p *Player) PickBlock(pos cube.Pos) {
 // Teleport teleports the player to a target position in the world. Unlike Move, it immediately changes the
 // position of the player, rather than showing an animation.
 func (p *Player) Teleport(pos mgl64.Vec3) {
+	p.TeleportRotated(pos, p.Rotation())
+}
+
+// TeleportRotated teleports the player to a target position in the world, facing the rotation passed. Unlike
+// Move, it immediately changes the position and rotation of the player, rather than showing an animation.
+func (p *Player) TeleportRotated(pos mgl64.Vec3, rot cube.Rotation) {
 	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleTeleport(ctx, pos); ctx.Cancelled() {
+	if p.Handler().HandleTeleport(ctx, pos, rot); ctx.Cancelled() {
 		return
 	}
+	p.data.Rot = rot
 	p.forceTeleport(pos)
 }
 
