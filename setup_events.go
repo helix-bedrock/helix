@@ -99,8 +99,8 @@ func (r *Setup) PlayerDiagnostics(fn func(*event.PlayerDiagnostics), opts ...Opt
 	register(r, &r.srv.playerEvents.Diagnostics, fn, opts)
 }
 
-// Command registers a listener for when a player runs a command.
-func (r *Setup) Command(fn func(*event.Command), opts ...Option) {
+// PlayerCommand registers a listener for when a player runs a command.
+func (r *Setup) PlayerCommand(fn func(*event.PlayerCommand), opts ...Option) {
 	register(r, &r.srv.playerEvents.Command, fn, opts)
 }
 
@@ -287,4 +287,14 @@ func (r *Setup) InventoryPlace(fn func(*event.InventoryPlace), opts ...Option) {
 // InventoryDrop registers a listener for when a stack is dropped out of an inventory slot.
 func (r *Setup) InventoryDrop(fn func(*event.InventoryDrop), opts ...Option) {
 	register(r, &r.srv.inventoryEvents.Drop, fn, opts)
+}
+
+// PacketIn registers a listener for when a client sends a packet. It runs on the network goroutine, not a region.
+func (r *Setup) PacketIn(fn func(*event.PacketIn), opts ...Option) {
+	register(r, &r.srv.packetEvents.PacketIn, fn, opts)
+}
+
+// PacketOut registers a listener for when a packet is sent to a client. It runs on the network goroutine, not a region.
+func (r *Setup) PacketOut(fn func(*event.PacketOut), opts ...Option) {
+	register(r, &r.srv.packetEvents.PacketOut, fn, opts)
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/csv"
 	"fmt"
+	"github.com/helix-bedrock/helix/server/hook"
 	"go/ast"
 	"reflect"
 	"slices"
@@ -52,7 +53,20 @@ type Command struct {
 	description string
 	usage       string
 	aliases     []string
+	// owner is the plugin that registered the command (Helix). While it is
+	// disabled the command is hidden, and its code runs through it.
+	owner hook.Owner
 }
+
+// WithOwner returns the command owned by o: hidden while o is disabled, and
+// run through o, which recovers and reports panics (Helix).
+func (cmd Command) WithOwner(o hook.Owner) Command {
+	cmd.owner = o
+	return cmd
+}
+
+// enabled reports whether the command may be used.
+func (cmd Command) enabled() bool { return cmd.owner == nil || cmd.owner.Enabled() }
 
 // New returns a new Command using the name and description passed. Command
 // names and aliases are all converted to lowercase. The Runnable passed must
@@ -129,8 +143,19 @@ func (cmd Command) Aliases() []string {
 // independently nil-check tx before using it.
 func (cmd Command) Execute(args string, source Source, tx *world.Tx) {
 	if source == nil {
-		panic("execute: invalid command source: source must not be nil")
+		return
 	}
+	if cmd.owner != nil {
+		if !cmd.owner.Enabled() {
+			return
+		}
+		cmd.owner.Run("command /"+cmd.name, func() { cmd.execute(args, source, tx) })
+		return
+	}
+	cmd.execute(args, source, tx)
+}
+
+func (cmd Command) execute(args string, source Source, tx *world.Tx) {
 	output := &Output{}
 	defer source.SendCommandOutput(output)
 

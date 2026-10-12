@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/helix-bedrock/helix/event"
+	"github.com/helix-bedrock/helix/server/cmd"
 	"github.com/helix-bedrock/helix/server/hook"
 )
 
@@ -112,4 +113,19 @@ func register[E any](r *Setup, l *hook.List[E], fn func(*E), opts []Option) {
 	}
 	s, p, ic := r.state, o.priority, o.ignoreCancelled
 	r.pending = append(r.pending, func() { l.Add(s, fn, p, ic, filter) })
+}
+
+// Command registers a command of the plugin, made with cmd.New. While the
+// plugin is disabled the command is hidden and cannot be run, and a panic
+// in it is logged with the plugin's name. A name or alias another command
+// already has fails the plugin's load.
+func (r *Setup) Command(c cmd.Command) {
+	for _, name := range append([]string{c.Name()}, c.Aliases()...) {
+		if _, taken := cmd.ByAlias(name); taken {
+			r.errs = append(r.errs, fmt.Errorf("command /%s: name already taken", name))
+			return
+		}
+	}
+	s := r.state
+	r.pending = append(r.pending, func() { cmd.Register(c.WithOwner(s)) })
 }

@@ -363,6 +363,7 @@ func listenerConfig(conf Config) network.Config {
 		Compression:            conf.Compression,
 		Allow:                  conf.Allower.Allow,
 		Hooks:                  conf.Debug.Hooks(),
+		Events:                 conf.PacketEvents,
 	}
 }
 

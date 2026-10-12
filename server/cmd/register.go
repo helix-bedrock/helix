@@ -21,14 +21,20 @@ func ByAlias(alias string) (Command, bool) {
 	if !ok {
 		return Command{}, false
 	}
-	return command.(Command), ok
+	c := command.(Command)
+	if !c.enabled() {
+		return Command{}, false
+	}
+	return c, true
 }
 
 // Commands returns a map of all registered commands indexed by the alias they were registered with.
 func Commands() map[string]Command {
 	cmd := make(map[string]Command)
 	commands.Range(func(key, value any) bool {
-		cmd[key.(string)] = value.(Command)
+		if c := value.(Command); c.enabled() {
+			cmd[key.(string)] = c
+		}
 		return true
 	})
 	return cmd

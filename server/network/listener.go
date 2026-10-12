@@ -71,6 +71,8 @@ type Config struct {
 	// Hooks run for every connection, before its own hooks: packet logging
 	// and metrics attach here.
 	Hooks *conn.Hooks
+	// Events are the packet event lists plugins listen on. May be nil.
+	Events *Events
 }
 
 // Transport is a listener of packet transports: raknet or nethernet.
@@ -116,6 +118,7 @@ func Listen(t Transport, conf Config) *Listener {
 	if conf.FlushRate == 0 {
 		conf.FlushRate = 50 * time.Millisecond
 	}
+	conf.Hooks = conf.Events.hooks(conf.Hooks)
 	l := &Listener{conf: conf, t: t, verifier: auth.New(auth.Config{}),
 		incoming: make(chan *Conn), closed: make(chan struct{})}
 	go l.pongLoop()

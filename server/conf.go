@@ -37,6 +37,8 @@ type Config struct {
 	PlayerEvents    *player.Events
 	WorldEvents     *world.Events
 	InventoryEvents *inventory.Events
+	// PacketEvents are the packet event lists, fired on network goroutines.
+	PacketEvents *network.Events
 	// RegionSectionSize is the width in chunks of the sections that worlds
 	// split into regions with. If 0, world.DefaultSectionSize.
 	RegionSectionSize int
@@ -168,6 +170,9 @@ func (conf Config) New() *Server {
 	}
 	if conf.InventoryEvents == nil {
 		conf.InventoryEvents = &inventory.Events{}
+	}
+	if conf.PacketEvents == nil {
+		conf.PacketEvents = &network.Events{}
 	}
 	if conf.StatusProvider == nil {
 		conf.StatusProvider = statusProvider{name: conf.Name}

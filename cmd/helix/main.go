@@ -23,6 +23,7 @@ func main() {
 		slog.Error("some plugins did not load", "err", err)
 	}
 	srv.CloseOnProgramEnd()
+	go srv.Console(os.Stdin, os.Stdout)
 	srv.Run()
 }
 

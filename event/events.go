@@ -4,6 +4,7 @@ package event
 
 import (
 	"github.com/helix-bedrock/helix/server/item/inventory"
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/player"
 	"github.com/helix-bedrock/helix/server/world"
 )
@@ -65,8 +66,8 @@ type PlayerTransfer = player.TransferEvent
 // PlayerDiagnostics is called when a client sends performance figures.
 type PlayerDiagnostics = player.DiagnosticsEvent
 
-// Command is called when a player runs a command.
-type Command = player.CommandEvent
+// PlayerCommand is called when a player runs a command.
+type PlayerCommand = player.CommandEvent
 
 // FireExtinguish is called when a player puts out a fire.
 type FireExtinguish = player.FireExtinguishEvent
@@ -178,3 +179,9 @@ type InventoryPlace = inventory.PlaceEvent
 
 // InventoryDrop is called when a stack is dropped out of an inventory slot.
 type InventoryDrop = inventory.DropEvent
+
+// PacketIn is called when a client sends a packet. It runs on the network goroutine, not a region.
+type PacketIn = network.PacketInEvent
+
+// PacketOut is called when a packet is sent to a client. It runs on the network goroutine, not a region.
+type PacketOut = network.PacketOutEvent

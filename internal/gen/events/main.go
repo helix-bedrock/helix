@@ -39,7 +39,7 @@ var events = []ev{
 	{"PlayerSleep", "player", "SleepEvent", "Sleep", "a player goes to sleep"},
 	{"PlayerTransfer", "player", "TransferEvent", "Transfer", "a player is sent to another server"},
 	{"PlayerDiagnostics", "player", "DiagnosticsEvent", "Diagnostics", "a client sends performance figures"},
-	{"Command", "player", "CommandEvent", "Command", "a player runs a command"},
+	{"PlayerCommand", "player", "CommandEvent", "Command", "a player runs a command"},
 	{"FireExtinguish", "player", "FireExtinguishEvent", "FireExtinguish", "a player puts out a fire"},
 	{"BlockStartBreak", "player", "StartBreakEvent", "StartBreak", "a player starts breaking a block"},
 	{"BlockBreak", "player", "BlockBreakEvent", "BlockBreak", "a player breaks a block"},
@@ -77,6 +77,8 @@ var events = []ev{
 	{"InventoryTake", "inventory", "TakeEvent", "Take", "a stack is taken from an inventory slot"},
 	{"InventoryPlace", "inventory", "PlaceEvent", "Place", "a stack is placed in an inventory slot"},
 	{"InventoryDrop", "inventory", "DropEvent", "Drop", "a stack is dropped out of an inventory slot"},
+	{"PacketIn", "network", "PacketInEvent", "PacketIn", "a client sends a packet. It runs on the network goroutine, not a region"},
+	{"PacketOut", "network", "PacketOutEvent", "PacketOut", "a packet is sent to a client. It runs on the network goroutine, not a region"},
 }
 
 func main() {
@@ -87,6 +89,7 @@ package event
 
 import (
 	"github.com/helix-bedrock/helix/server/item/inventory"
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/player"
 	"github.com/helix-bedrock/helix/server/world"
 )
@@ -105,7 +108,7 @@ package helix
 import "github.com/helix-bedrock/helix/event"
 
 `)
-	lists := map[string]string{"player": "r.srv.playerEvents", "world": "r.srv.worldEvents", "inventory": "r.srv.inventoryEvents"}
+	lists := map[string]string{"player": "r.srv.playerEvents", "world": "r.srv.worldEvents", "inventory": "r.srv.inventoryEvents", "network": "r.srv.packetEvents"}
 	for _, e := range events {
 		fmt.Fprintf(&b, "// %s registers a listener for when %s.\nfunc (r *Setup) %s(fn func(*event.%s), opts ...Option) {\n\tregister(r, &%s.%s, fn, opts)\n}\n\n",
 			e.name, e.about, e.name, e.name, lists[e.pkg], e.list)

@@ -42,6 +42,19 @@ while the server runs (`srv.Plugins().Disable("Protect")`). A panic in a
 plugin is recovered and logged with its name; `helix.Config.PanicLimit`
 disables a plugin that keeps panicking.
 
+A plugin can also:
+
+- schedule work: `p.After(d, fn)`, `p.Every(d, fn)`, and `p.Do(world, pos, fn)`
+  or `p.DoPlayer(player, fn)` to run on the region that owns something;
+- register commands: `r.Command(cmd.New(...))`, hidden while it is disabled;
+- watch or change packets: `r.PacketIn` and `r.PacketOut` (these run on the
+  network goroutine, not a region);
+- keep data: `p.DataDir()` and `p.Config(&v)` for `plugins/<Name>/config.toml`.
+
+Disabling a plugin stops all of it: listeners, tasks, commands and packet
+hooks. The console (stdin of `cmd/helix`) runs commands and `plugins`,
+`plugins enable|disable <name>` and `stop`; `/plugins` lists them in game.
+
 Listeners run on the region the event happens in, in parallel with other
 regions. A listener may use the event's `Tx` for the world, but must not keep
 it, the event or the player after it returns.

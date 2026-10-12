@@ -11,6 +11,7 @@ import (
 	"github.com/helix-bedrock/helix/event"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/item/inventory"
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/player"
 	"github.com/helix-bedrock/helix/server/world"
 )
@@ -19,8 +20,8 @@ import (
 // loading and dispatch.
 func testServer(t *testing.T, limit PanicLimit, ps ...Pluggable) (*Server, error) {
 	t.Helper()
-	s := &Server{log: slog.New(slog.DiscardHandler),
-		playerEvents: &player.Events{}, worldEvents: &world.Events{}, inventoryEvents: &inventory.Events{}}
+	s := &Server{log: slog.New(slog.DiscardHandler), pluginDir: t.TempDir(),
+		playerEvents: &player.Events{}, worldEvents: &world.Events{}, inventoryEvents: &inventory.Events{}, packetEvents: &network.Events{}}
 	s.plugins = &Plugins{srv: s, byName: map[string]*pluginState{}}
 	return s, s.plugins.load(ps, s.log, limit)
 }

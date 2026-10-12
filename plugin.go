@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"runtime/debug"
 	"slices"
 	"sync"
@@ -79,6 +80,11 @@ type pluginState struct {
 
 	panicMu sync.Mutex
 	panics  []time.Time
+
+	taskMu sync.Mutex
+	tasks  map[*Task]struct{}
+
+	dir string // data folder
 }
 
 // PanicLimit disables a plugin that panics Count times within Window. The
@@ -272,7 +278,7 @@ func (ps *Plugins) load(list []plugin, log *slog.Logger, limit PanicLimit) error
 func (ps *Plugins) add(p plugin, log *slog.Logger, limit PanicLimit) error {
 	info := p.Info()
 	s := &pluginState{p: p, info: info, srv: ps.srv, limit: limit,
-		log: log.With("plugin", info.Name)}
+		log: log.With("plugin", info.Name), dir: filepath.Join(ps.srv.pluginDir, info.Name)}
 	p.base().state = s
 
 	r := &Setup{state: s, srv: ps.srv}

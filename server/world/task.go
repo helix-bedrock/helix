@@ -335,6 +335,26 @@ func Call[T any](ctx context.Context, w *World, f func(tx *Tx) (T, error)) (T, e
 	return awaitTask(ctx, task, &result)
 }
 
+// DoAt schedules f on the region of w that owns the chunk at pos and
+// returns at once (Helix).
+func (w *World) DoAt(pos mgl64.Vec3, f func(tx *Tx)) *Task {
+	task := newTask()
+	if w == nil || w.closed.Load() {
+		task.failIfPending(ErrWorldClosed)
+		return task
+	}
+	st := scheduledTransaction{task: task, f: func(tx *Tx) error {
+		f(tx)
+		return nil
+	}}
+	if w.conf.Synchronous {
+		st.Run(w.main)
+		return task
+	}
+	w.regionAt(chunkPosFromVec3(pos)).post(st)
+	return task
+}
+
 // CallAt runs f on the region of w that owns the chunk at pos and waits for
 // its result, like Call. Use it to work with something at a known position
 // (Helix).
