@@ -3,12 +3,12 @@ package block
 import (
 	"math/rand/v2"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/model"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // CopperDoor is a block that can be used as an openable 1x2 barrier.

@@ -1,10 +1,10 @@
 package block
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // InfestedDeepslate is a block that hides a silverfish. It looks identical to deepslate.

@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/entity"
@@ -18,12 +21,9 @@ import (
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/particle"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/nbt"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // NetworkEncodeableEntity is a world.EntityType where the save ID and network

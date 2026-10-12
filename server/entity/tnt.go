@@ -5,11 +5,11 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/internal/nbtconv"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // NewTNT creates a new primed TNT entity.

@@ -1,8 +1,8 @@
 package entity
 
 import (
-	"github.com/helix-bedrock/helix/server/world"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/world"
 )
 
 // Eyed represents an entity that has eyes.

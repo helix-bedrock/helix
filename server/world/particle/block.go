@@ -3,10 +3,10 @@ package particle
 import (
 	"image/color"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Flame is a particle shown around torches. It can have any colour specified with the Colour field.

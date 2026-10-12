@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/df-mc/worldupgrader/blockupgrader"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 type (

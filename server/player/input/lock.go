@@ -1,6 +1,6 @@
 package input
 
-import "github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+import "github.com/helix-bedrock/protocol/packet"
 
 // Lock represents a client input lock that can be applied to a player to disable specific inputs such as
 // camera rotation, movement, jumping, sneaking or mounting/dismounting entities.

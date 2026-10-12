@@ -1,9 +1,9 @@
 package session
 
 import (
-	"github.com/helix-bedrock/helix/server/world"
 	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/helix/server/world"
+	"github.com/helix-bedrock/protocol/packet"
 	"time"
 )
 

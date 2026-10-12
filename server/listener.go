@@ -19,12 +19,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/session"
-	"github.com/df-mc/go-nethernet"
-	"github.com/df-mc/go-nethernet/endpoint"
+	"github.com/helix-bedrock/nethernet"
+	"github.com/helix-bedrock/nethernet/endpoint"
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
-	"github.com/sandertv/gophertunnel/minecraft"
 )
 
 // Listener is a source for connections that may be listened on by a Server using Server.listen. Proxies can use this to
@@ -137,7 +137,7 @@ func netherNetKey(path string, log *slog.Logger) (*ecdsa.PrivateKey, error) {
 // rakNetListenerFunc returns a Listener accepting RakNet connections on
 // UserConfig.Network.Address. It is the default transport of UserConfig.Config.
 func (uc UserConfig) rakNetListenerFunc(conf Config) (Listener, error) {
-	l, err := listenerConfig(conf).Listen("raknet", uc.Network.Address)
+	l, err := network.ListenRakNet(uc.Network.Address, listenerConfig(conf))
 	if err != nil {
 		return nil, fmt.Errorf("create RakNet listener: %w", err)
 	}
@@ -164,15 +164,11 @@ func (uc UserConfig) netherNetListenerFunc(conf Config) (Listener, error) {
 	return NetherNetConfig{Address: address, Key: key, Domain: nn.Domain, UDPPorts: r}.Listener(conf)
 }
 
-// ListenNetwork returns a Listener accepting connections for conf over any
-// [minecraft.Network] at address, for transports beyond the built-in RakNet and
-// NetherNet ones. Use it from a Config.Listeners function.
-func ListenNetwork(conf Config, network minecraft.Network, address string) (Listener, error) {
-	l, err := listenerConfig(conf).ListenNetwork(network, address)
-	if err != nil {
-		return nil, err
-	}
-	return listener{Listener: l}, nil
+// ListenTransport returns a Listener accepting connections for conf over any
+// packet transport, for transports beyond the built-in RakNet and NetherNet
+// ones. Use it from a Config.Listeners function.
+func ListenTransport(conf Config, t network.Transport) Listener {
+	return listener{Listener: network.Listen(t, listenerConfig(conf))}
 }
 
 // NetherNetConfig may be used to create a NetherNet Listener for a Server, accepting
@@ -328,11 +324,7 @@ func (nc NetherNetConfig) Listener(conf Config) (Listener, error) {
 	})
 
 	handler := endpoint.HandlerConfig{Logger: httpLog, Credentials: nc.Credentials}.New()
-	cfg := listenerConfig(conf)
-	l, err := cfg.ListenNetwork(minecraft.NetherNet{
-		Signaling:    handler,
-		ListenConfig: lcfg,
-	}, handler.NetworkID())
+	nl, err := lcfg.Listen(handler)
 	if err != nil {
 		_ = deferred.Close()
 		return nil, fmt.Errorf("create NetherNet listener: %w", err)
@@ -348,7 +340,7 @@ func (nc NetherNetConfig) Listener(conf Config) (Listener, error) {
 	}()
 
 	conf.Log.Info("NetherNet listener running.", "addr", tcp.Addr())
-	return listener{Listener: l, close: deferred.Close}, nil
+	return listener{Listener: network.Listen(nl, listenerConfig(conf)), close: deferred.Close}, nil
 }
 
 // logHTTPRequests logs signaling requests at debug level before passing them to next. The
@@ -360,8 +352,9 @@ func logHTTPRequests(log *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-func listenerConfig(conf Config) minecraft.ListenConfig {
-	cfg := minecraft.ListenConfig{
+func listenerConfig(conf Config) network.Config {
+	return network.Config{
+		Log:                    conf.Log.With("net origin", "network"),
 		MaximumPlayers:         conf.MaxPlayers,
 		StatusProvider:         conf.StatusProvider,
 		AuthenticationDisabled: conf.AuthDisabled,
@@ -370,16 +363,12 @@ func listenerConfig(conf Config) minecraft.ListenConfig {
 		Compression:            conf.Compression,
 		Allow:                  conf.Allower.Allow,
 	}
-	if conf.Log.Enabled(context.Background(), slog.LevelDebug) {
-		cfg.ErrorLog = conf.Log.With("net origin", "gophertunnel")
-	}
-	return cfg
 }
 
-// listener is a Listener implementation that wraps around a minecraft.Listener so that it can be listened on by
+// listener is a Listener implementation that wraps around a network.Listener so that it can be listened on by
 // Server.
 type listener struct {
-	*minecraft.Listener
+	*network.Listener
 	close func() error // stops the sidecar HTTP signaling server, if any
 }
 
@@ -390,12 +379,16 @@ func (l listener) Accept() (session.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return conn.(session.Conn), err
+	return conn, nil
 }
 
 // Disconnect disconnects a connection from the Listener with a reason.
 func (l listener) Disconnect(conn session.Conn, reason string) error {
-	return l.Listener.Disconnect(conn.(*minecraft.Conn), reason)
+	c, ok := conn.(*network.Conn)
+	if !ok {
+		return conn.Close()
+	}
+	return l.Listener.Disconnect(c, reason)
 }
 
 // Close closes the Minecraft listener and any sidecar listener it depends on.

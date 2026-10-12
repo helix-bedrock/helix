@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/portal"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 func TestPortalTravelComputerStopPortalContact(t *testing.T) {

@@ -1,11 +1,11 @@
 package item
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/portal"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // EnderEye is the item used to fill End portal frames. The stronghold-locating throw is not implemented.

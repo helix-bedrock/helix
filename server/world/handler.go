@@ -1,8 +1,8 @@
 package world
 
 import (
-	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/block/cube"
 )
 
 // Handler handles events that are called by a world. Implementations of

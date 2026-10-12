@@ -11,7 +11,7 @@ import (
 	_ "github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 // Item represents a registered item in the creative inventory. It holds a stack of the item and a group that

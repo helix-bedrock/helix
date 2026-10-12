@@ -4,10 +4,10 @@ import (
 	"math"
 	"math/rand/v2"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // SeaPickle is a small stationary underwater block that emits light, and is typically found in colonies of up to

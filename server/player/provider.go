@@ -2,8 +2,8 @@ package player
 
 import (
 	"errors"
-	"github.com/helix-bedrock/helix/server/world"
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/server/world"
 	"io"
 )
 

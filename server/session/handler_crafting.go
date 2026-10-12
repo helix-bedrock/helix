@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/server/item/inventory"
 	"github.com/helix-bedrock/helix/server/item/recipe"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 	"math"
 	"slices"
 )

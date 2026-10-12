@@ -3,10 +3,10 @@ package session
 import (
 	"math"
 
-	"github.com/helix-bedrock/helix/server/cmd"
 	"github.com/go-gl/mathgl/mgl64"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/helix/server/cmd"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 	"golang.org/x/text/language"
 )
 

@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
+	"github.com/helix-bedrock/protocol/login"
 	"net"
 )
 

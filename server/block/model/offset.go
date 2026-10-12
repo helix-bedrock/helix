@@ -3,9 +3,9 @@ package model
 import (
 	"math"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/internal/mcrandom"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // randomOffset returns the deterministic horizontal offset vanilla applies to

@@ -1,8 +1,8 @@
 package customblock
 
 import (
-	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/block/cube"
 )
 
 // Properties represents the different properties that can be applied to a block or a permutation.

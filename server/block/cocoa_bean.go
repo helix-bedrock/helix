@@ -3,11 +3,11 @@ package block
 import (
 	"math/rand/v2"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/model"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // CocoaBean is a crop block found in jungle biomes.

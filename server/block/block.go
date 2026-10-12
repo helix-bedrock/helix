@@ -4,12 +4,12 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/customblock"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Activatable represents a block that may be activated by a viewer of the world. When activated, the block

@@ -1,9 +1,9 @@
 package recipe
 
 import (
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/google/uuid"
 )
 
 // Recipe is implemented by all recipe types.

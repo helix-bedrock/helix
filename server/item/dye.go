@@ -1,9 +1,9 @@
 package item
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Dye is an item that comes in 16 colours which allows you to colour blocks like concrete and sheep.

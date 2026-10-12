@@ -3,10 +3,10 @@ package block
 import (
 	"math/rand/v2"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // RedShrub is a small decorative plant that grows on dirt. Bone meal spreads it to the blocks around it.

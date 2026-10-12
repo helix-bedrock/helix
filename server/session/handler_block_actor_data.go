@@ -2,12 +2,12 @@ package session
 
 import (
 	"fmt"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/entity"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 	"strings"
 	"unicode/utf8"
 )

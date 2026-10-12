@@ -3,10 +3,10 @@ package block
 import (
 	"math/rand/v2"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // CopperBars are blocks that serve a similar purpose to glass panes, but made of copper instead of glass.

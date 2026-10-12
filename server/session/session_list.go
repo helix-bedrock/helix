@@ -4,12 +4,12 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/internal/sliceutil"
 	"github.com/helix-bedrock/helix/server/player/skin"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 var sessions = new(sessionList)

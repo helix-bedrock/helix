@@ -1,6 +1,6 @@
 package item
 
-import "github.com/sandertv/gophertunnel/minecraft/text"
+import "github.com/helix-bedrock/helix/server/internal/text"
 
 // Diamond is a rare mineral obtained from diamond ore or loot chests.
 type Diamond struct{}

@@ -1,6 +1,6 @@
 package item
 
-import "github.com/sandertv/gophertunnel/minecraft/text"
+import "github.com/helix-bedrock/helix/server/internal/text"
 
 // NetheriteIngot is a rare mineral crafted with 4 pieces of netherite scrap and 4 gold ingots.
 type NetheriteIngot struct{}

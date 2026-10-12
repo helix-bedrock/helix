@@ -4,10 +4,10 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Potato is a crop that can be consumed raw or cooked to make baked potatoes.

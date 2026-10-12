@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 var (

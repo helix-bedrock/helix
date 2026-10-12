@@ -1,9 +1,9 @@
 package item
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Shears is a tool used to shear sheep, mine a few types of blocks, and carve pumpkins.

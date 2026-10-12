@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/player/chat"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Tx is the owner transaction handle passed to world callbacks. It is the

@@ -1,6 +1,6 @@
 package item
 
-import "github.com/sandertv/gophertunnel/minecraft/text"
+import "github.com/helix-bedrock/helix/server/internal/text"
 
 type RedstoneWire struct{}
 

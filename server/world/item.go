@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/helix-bedrock/helix/server/item/category"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 	"image"
 )
 

@@ -7,9 +7,9 @@ import (
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/chunk"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/nbt"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // subChunkRequests is set to true to enable the sub-chunk request system. This can (likely) cause unexpected issues,

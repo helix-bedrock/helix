@@ -3,7 +3,7 @@ package chat
 import (
 	"fmt"
 
-	"github.com/sandertv/gophertunnel/minecraft/text"
+	"github.com/helix-bedrock/helix/server/internal/text"
 	"golang.org/x/text/language"
 )
 

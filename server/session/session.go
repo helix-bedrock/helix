@@ -11,23 +11,23 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/cmd"
 	"github.com/helix-bedrock/helix/server/item/inventory"
 	"github.com/helix-bedrock/helix/server/item/recipe"
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/player/chat"
 	"github.com/helix-bedrock/helix/server/player/debug"
 	"github.com/helix-bedrock/helix/server/player/form"
 	"github.com/helix-bedrock/helix/server/player/hud"
 	"github.com/helix-bedrock/helix/server/player/skin"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/login"
+	"github.com/helix-bedrock/protocol/nbt"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // Session handles incoming packets from connections and sends outgoing packets by providing a thin layer
@@ -143,7 +143,7 @@ type Conn interface {
 	// packet.
 	WritePacket(pk packet.Packet) error
 	// StartGameContext starts the game for the Conn with a context to cancel it.
-	StartGameContext(ctx context.Context, data minecraft.GameData) error
+	StartGameContext(ctx context.Context, data network.GameData) error
 }
 
 // Nop represents a no-operation session. It does not do anything when sending a packet to it.
@@ -379,7 +379,7 @@ func sessionOwnerStopped(err error) bool {
 	return errors.Is(err, world.ErrEntityClosed) || errors.Is(err, world.ErrWorldClosed) || errors.Is(err, world.ErrTaskCancelled)
 }
 
-// ClientData returns the login.ClientData of the underlying *minecraft.Conn.
+// ClientData returns the login.ClientData of the underlying network.Conn.
 func (s *Session) ClientData() login.ClientData {
 	return s.conn.ClientData()
 }

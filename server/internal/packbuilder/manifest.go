@@ -3,8 +3,8 @@ package packbuilder
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/resource"
+	"github.com/helix-bedrock/helix/server/resource"
+	"github.com/helix-bedrock/protocol"
 	"os"
 	"path/filepath"
 	"strconv"

@@ -11,13 +11,13 @@ import (
 	"slices"
 	"time"
 
+	"github.com/df-mc/goleveldb/leveldb"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/chunk"
 	"github.com/helix-bedrock/helix/server/world/mcdb/leveldat"
-	"github.com/df-mc/goleveldb/leveldb"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 // DB implements a world provider for the Minecraft world format, which

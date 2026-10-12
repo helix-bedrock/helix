@@ -6,7 +6,7 @@ import (
 	"github.com/helix-bedrock/helix/server/entity/effect"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 )
 
 // beaconInputSlot is the slot index of the input item in the beacon.

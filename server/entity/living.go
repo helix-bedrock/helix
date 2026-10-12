@@ -1,9 +1,9 @@
 package entity
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/entity/effect"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Living represents an entity that is alive and that has health. It is able to take damage and will die upon

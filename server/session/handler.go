@@ -2,7 +2,7 @@ package session
 
 import (
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // packetHandler represents a type that is able to handle a specific type of incoming packets from the client.

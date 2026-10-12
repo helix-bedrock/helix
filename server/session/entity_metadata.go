@@ -4,6 +4,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/entity"
 	"github.com/helix-bedrock/helix/server/entity/effect"
@@ -11,9 +13,7 @@ import (
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/item/potion"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 )
 
 // parseEntityMetadata returns an entity metadata object with default values. It is equivalent to setting

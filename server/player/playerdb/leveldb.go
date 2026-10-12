@@ -2,11 +2,11 @@ package playerdb
 
 import (
 	"encoding/json"
-	"github.com/helix-bedrock/helix/server/player"
-	"github.com/helix-bedrock/helix/server/world"
 	"github.com/df-mc/goleveldb/leveldb"
 	"github.com/df-mc/goleveldb/leveldb/opt"
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/server/player"
+	"github.com/helix-bedrock/helix/server/world"
 	"os"
 )
 

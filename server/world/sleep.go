@@ -1,9 +1,9 @@
 package world
 
 import (
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/player/chat"
-	"github.com/google/uuid"
 )
 
 // Sleeper represents an entity that can sleep.

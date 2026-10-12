@@ -1,7 +1,7 @@
 package leveldat
 
 import (
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 	"strconv"
 	"strings"
 )

@@ -4,8 +4,8 @@ import (
 	"image/color"
 	"sync/atomic"
 
-	"github.com/helix-bedrock/helix/server/world"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/world"
 )
 
 var nextShapeID atomic.Int32

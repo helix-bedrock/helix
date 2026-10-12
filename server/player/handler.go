@@ -4,13 +4,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/cmd"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/player/skin"
 	"github.com/helix-bedrock/helix/server/session"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Handler handles events that are called by a player. Implementations of Handler may be used to listen to

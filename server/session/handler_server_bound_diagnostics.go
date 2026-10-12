@@ -2,7 +2,7 @@ package session
 
 import (
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // ServerBoundDiagnosticsHandler handles diagnostic updates from the client.

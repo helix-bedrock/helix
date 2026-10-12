@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/block/cube"
 )
 
 var _ Handler = minimalRedstoneTestHandler{}

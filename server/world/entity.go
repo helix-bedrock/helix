@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/server/block/cube"
 )
 
 // EntityType is the type of Entity. It specifies the name, encoded Entity

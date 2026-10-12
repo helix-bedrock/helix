@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"slices"
 
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 )
 
 var (

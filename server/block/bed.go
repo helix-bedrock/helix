@@ -1,13 +1,13 @@
 package block
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/model"
 	"github.com/helix-bedrock/helix/server/internal/nbtconv"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/player/chat"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Bed is a dyeable utility block that allows a player in the Overworld to sleep through the night and reset

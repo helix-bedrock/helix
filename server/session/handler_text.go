@@ -3,7 +3,7 @@ package session
 import (
 	"fmt"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // TextHandler handles the Text packet.

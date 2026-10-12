@@ -1,6 +1,6 @@
 package item
 
-import "github.com/sandertv/gophertunnel/minecraft/text"
+import "github.com/helix-bedrock/helix/server/internal/text"
 
 // ResinBrick is an item used to create resin bricks. It can also be used as a
 // smithing ingredient, giving orange details to pieces of armour.

@@ -3,10 +3,10 @@ package world
 import (
 	"time"
 
-	"github.com/helix-bedrock/helix/server/block/cube"
-	"github.com/helix-bedrock/helix/server/world/chunk"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/server/block/cube"
+	"github.com/helix-bedrock/helix/server/world/chunk"
 )
 
 // Viewer is a viewer in the world. It can view changes that are made in the world, such as the addition of

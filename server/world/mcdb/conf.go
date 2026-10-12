@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/helix-bedrock/helix/server/world"
-	"github.com/helix-bedrock/helix/server/world/mcdb/leveldat"
 	"github.com/df-mc/goleveldb/leveldb"
 	"github.com/df-mc/goleveldb/leveldb/opt"
+	"github.com/helix-bedrock/helix/server/world"
+	"github.com/helix-bedrock/helix/server/world/mcdb/leveldat"
 )
 
 // Config holds the optional parameters of a DB.

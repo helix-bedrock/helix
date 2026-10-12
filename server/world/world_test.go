@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/block/cube"
 )
 
 // TestSynchronousWorldDo verifies that Do on a synchronous World runs the task

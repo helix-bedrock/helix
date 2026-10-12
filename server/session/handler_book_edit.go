@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // BookEditHandler handles the BookEdit packet.

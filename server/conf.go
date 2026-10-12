@@ -10,20 +10,20 @@ import (
 	"time"
 	_ "unsafe"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/entity"
 	"github.com/helix-bedrock/helix/server/internal/packbuilder"
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/player"
 	"github.com/helix-bedrock/helix/server/player/chat"
 	"github.com/helix-bedrock/helix/server/player/playerdb"
+	"github.com/helix-bedrock/helix/server/resource"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/biome"
 	"github.com/helix-bedrock/helix/server/world/generator"
 	"github.com/helix-bedrock/helix/server/world/mcdb"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
-	"github.com/sandertv/gophertunnel/minecraft/resource"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // Config contains options for starting a Minecraft server.
@@ -79,7 +79,7 @@ type Config struct {
 	// StatusProvider provides the server status shown to players in the server
 	// list. By default, StatusProvider will show the server name from the Name
 	// field and the current player count and maximum players.
-	StatusProvider minecraft.ServerStatusProvider
+	StatusProvider network.StatusProvider
 	// Compression is the packet compression used for connections accepted by
 	// the default listener. If nil, gophertunnel's default compression is used.
 	Compression packet.Compression

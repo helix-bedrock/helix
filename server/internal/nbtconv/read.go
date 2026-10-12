@@ -3,9 +3,9 @@ package nbtconv
 import (
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 	"golang.org/x/exp/constraints"
 )
 

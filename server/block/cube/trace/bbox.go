@@ -1,8 +1,8 @@
 package trace
 
 import (
-	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/block/cube"
 	"math"
 )
 

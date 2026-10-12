@@ -4,8 +4,8 @@ import (
 	_ "embed"
 	"os"
 
+	"github.com/helix-bedrock/helix/server/resource"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/resource"
 	"golang.org/x/mod/sumdb/dirhash"
 )
 

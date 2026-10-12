@@ -5,10 +5,10 @@ import (
 	"image/color"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/entity/effect"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // MaxCounter represents an item that has a specific max count. By default, each item will be expected to have

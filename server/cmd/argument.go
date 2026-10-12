@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/internal/sliceutil"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 	"math/rand/v2"
 	"reflect"
 	"slices"

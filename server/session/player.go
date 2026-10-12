@@ -11,6 +11,9 @@ import (
 	"time"
 	_ "unsafe" // Imported for compiler directives.
 
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/entity"
 	"github.com/helix-bedrock/helix/server/entity/effect"
@@ -26,11 +29,8 @@ import (
 	"github.com/helix-bedrock/helix/server/player/skin"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // StopShowingEntity stops showing a world.Entity to the Session. It will be completely invisible until a call to

@@ -14,3 +14,18 @@ Copyright (c) the df-mc contributors, used under the MIT licence in
   it was at that commit.
 
 Every later commit is Helix's own and is listed in the git history.
+
+## gophertunnel
+
+Parts of [gophertunnel](https://github.com/Sandertv/gophertunnel) (MIT,
+Copyright (c) Sandertv), v1.62.0, which Dragonfly depended on:
+
+| Helix path | gophertunnel path | Notes |
+|---|---|---|
+| `server/internal/text` | `minecraft/text` | Copied unchanged |
+| `server/resource` | `minecraft/resource` | Copied unchanged |
+| `server/network/gamedata.go` | `minecraft/game_data.go` | `GameData` copied |
+| `server/network/conn.go`, `listener.go` | `minecraft/conn.go`, `listener.go` | Server-side login, resource pack sending, start game and spawn sequence, and the server list answer, rewritten on Helix's own `protocol`, `raknet` and `nethernet` libraries |
+
+Login verification (Xbox Live tokens and the legacy chain) is Helix's own,
+in `github.com/helix-bedrock/protocol/login` and `protocol/auth`.

@@ -1,6 +1,6 @@
 package item
 
-import "github.com/sandertv/gophertunnel/minecraft/text"
+import "github.com/helix-bedrock/helix/server/internal/text"
 
 // IronIngot is a metal ingot melted from raw iron or obtained from loot chests.
 type IronIngot struct{}

@@ -2,6 +2,7 @@ package block
 
 import (
 	"fmt"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/model"
 	"github.com/helix-bedrock/helix/server/internal/nbtconv"
@@ -9,7 +10,6 @@ import (
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/particle"
 	"github.com/helix-bedrock/helix/server/world/sound"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // PotDecoration represents an item that can be used as a decoration on a pot.

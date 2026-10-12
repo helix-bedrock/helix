@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 // LevelDat implements the encoding and decoding of level.dat files. An empty

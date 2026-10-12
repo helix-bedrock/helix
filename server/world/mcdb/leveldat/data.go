@@ -6,7 +6,7 @@ import (
 
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 )
 
 // Data holds a collection of data that specify a range of Settings of the

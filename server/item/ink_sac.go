@@ -1,9 +1,9 @@
 package item
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // InkSac is an item dropped by a squid upon death used to create black dye, dark prismarine and book and quill. The

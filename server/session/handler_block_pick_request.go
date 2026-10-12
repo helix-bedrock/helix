@@ -3,7 +3,7 @@ package session
 import (
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // BlockPickRequestHandler handles the BlockPickRequest packet.

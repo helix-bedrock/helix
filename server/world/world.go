@@ -13,12 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/helix-bedrock/helix/server/block/cube"
-	"github.com/helix-bedrock/helix/server/internal/sliceutil"
-	"github.com/helix-bedrock/helix/server/world/chunk"
 	"github.com/df-mc/goleveldb/leveldb"
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/server/block/cube"
+	"github.com/helix-bedrock/helix/server/internal/sliceutil"
+	"github.com/helix-bedrock/helix/server/world/chunk"
 )
 
 // World implements a Minecraft world. It manages all aspects of what players

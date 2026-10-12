@@ -3,7 +3,7 @@ package playerdb
 import (
 	"bytes"
 	"github.com/helix-bedrock/helix/server/item"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 // InventoryData is a struct that contains all data of the player inventories.

@@ -5,7 +5,7 @@ import (
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
+	"github.com/helix-bedrock/protocol"
 )
 
 const (

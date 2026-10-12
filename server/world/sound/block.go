@@ -1,8 +1,8 @@
 package sound
 
 import (
-	"github.com/helix-bedrock/helix/server/world"
 	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/server/world"
 )
 
 // BlockPlace is a sound sent when a block is placed.

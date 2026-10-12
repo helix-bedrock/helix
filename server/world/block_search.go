@@ -5,9 +5,9 @@ import (
 	"iter"
 	"slices"
 
+	"github.com/df-mc/goleveldb/leveldb"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world/chunk"
-	"github.com/df-mc/goleveldb/leveldb"
 )
 
 // blocksWithin implements Tx.BlocksWithin. It must only be called during a transaction.

@@ -1,11 +1,11 @@
 package block
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/particle"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // Sponge is a block that can be used to remove water around itself when placed, turning into a wet sponge in the

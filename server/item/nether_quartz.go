@@ -1,6 +1,6 @@
 package item
 
-import "github.com/sandertv/gophertunnel/minecraft/text"
+import "github.com/helix-bedrock/helix/server/internal/text"
 
 // NetherQuartz is a smooth, white mineral found in the Nether.
 type NetherQuartz struct{}

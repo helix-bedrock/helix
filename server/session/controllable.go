@@ -1,6 +1,8 @@
 package session
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/cmd"
 	"github.com/helix-bedrock/helix/server/entity/effect"
@@ -14,8 +16,6 @@ import (
 	"github.com/helix-bedrock/helix/server/player/input"
 	"github.com/helix-bedrock/helix/server/player/skin"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/google/uuid"
 	"golang.org/x/text/language"
 )
 

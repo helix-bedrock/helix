@@ -3,10 +3,10 @@ package recipe
 import (
 	_ "embed"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
+	"github.com/helix-bedrock/protocol/nbt"
 )
 
 var (

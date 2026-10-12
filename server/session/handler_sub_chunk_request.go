@@ -2,8 +2,8 @@ package session
 
 import (
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // SubChunkRequestHandler handles sub-chunk requests from the client. The server will respond with a packet containing

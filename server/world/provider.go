@@ -3,10 +3,10 @@ package world
 import (
 	"sync"
 
-	"github.com/helix-bedrock/helix/server/block/cube"
-	"github.com/helix-bedrock/helix/server/world/chunk"
 	"github.com/df-mc/goleveldb/leveldb"
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/server/block/cube"
+	"github.com/helix-bedrock/helix/server/world/chunk"
 	"io"
 )
 

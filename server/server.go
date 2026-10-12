@@ -17,23 +17,23 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/server/internal/blockinternal"
 	"github.com/helix-bedrock/helix/server/internal/iteminternal"
 	"github.com/helix-bedrock/helix/server/internal/sliceutil"
 	_ "github.com/helix-bedrock/helix/server/item" // Imported for maintaining correct initialisation order.
+	"github.com/helix-bedrock/helix/server/network"
 	"github.com/helix-bedrock/helix/server/player"
 	"github.com/helix-bedrock/helix/server/player/chat"
 	"github.com/helix-bedrock/helix/server/player/skin"
 	"github.com/helix-bedrock/helix/server/session"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
-	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft"
-	"github.com/sandertv/gophertunnel/minecraft/nbt"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/login"
+	"github.com/helix-bedrock/protocol/nbt"
+	"github.com/helix-bedrock/protocol/packet"
 	"golang.org/x/text/language"
 )
 
@@ -109,7 +109,7 @@ func (srv *Server) Listen() {
 		}
 	}
 
-	srv.conf.Log.Info("Dragonfly server started.", "mc-version", protocol.CurrentVersion, "go-version", info.GoVersion, "commit", revision)
+	srv.conf.Log.Info("Helix server started.", "mc-version", protocol.CurrentVersion, "go-version", info.GoVersion, "commit", revision)
 	srv.startListening()
 	go srv.wait()
 }
@@ -495,12 +495,12 @@ func (srv *Server) finaliseConn(ctx context.Context, conn session.Conn, l Listen
 	srv.incoming <- srv.createPlayer(id, conn, d, w)
 }
 
-// defaultGameData returns a minecraft.GameData as sent for a new player. It
+// defaultGameData returns a network.GameData as sent for a new player. It
 // may later be modified if the player was saved in the player provider of the
 // server.
-func (srv *Server) defaultGameData() minecraft.GameData {
+func (srv *Server) defaultGameData() network.GameData {
 	gm, _ := world.GameModeID(srv.world.DefaultGameMode())
-	return minecraft.GameData{
+	return network.GameData{
 		// Entity runtime/unique ID for the player itself is always 1 in df.
 		EntityUniqueID:  1,
 		EntityRuntimeID: 1,

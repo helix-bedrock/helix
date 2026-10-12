@@ -4,11 +4,11 @@ import (
 	"image/color"
 	"math/rand/v2"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/helix/server/world/particle"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 var redstoneOreParticleColour = color.RGBA{R: 255, A: 255}

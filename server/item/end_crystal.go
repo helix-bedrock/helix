@@ -1,9 +1,9 @@
 package item
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // EndCrystal is an item that can be placed on obsidian or bedrock to spawn an End crystal entity.

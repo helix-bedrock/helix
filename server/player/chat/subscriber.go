@@ -3,7 +3,7 @@ package chat
 import (
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/sandertv/gophertunnel/minecraft/text"
+	"github.com/helix-bedrock/helix/server/internal/text"
 	"strings"
 )
 

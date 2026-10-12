@@ -8,8 +8,8 @@ import (
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/item/inventory"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 	"math"
 	"time"
 )

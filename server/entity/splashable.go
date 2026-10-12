@@ -1,13 +1,13 @@
 package entity
 
 import (
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/block/cube/trace"
 	"github.com/helix-bedrock/helix/server/entity/effect"
 	"github.com/helix-bedrock/helix/server/item/potion"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 	"time"
 )
 

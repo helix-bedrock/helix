@@ -3,10 +3,10 @@ package block
 import (
 	"time"
 
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // RedstoneWire is a block that is used to transfer a charge between objects. Charged objects can be used to open doors

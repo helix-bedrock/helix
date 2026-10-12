@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/world"
-	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // LecternUpdateHandler handles the LecternUpdate packet, sent when a player interacts with a lectern.
