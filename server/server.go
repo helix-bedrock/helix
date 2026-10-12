@@ -501,6 +501,7 @@ func (srv *Server) finaliseConn(ctx context.Context, conn session.Conn, l Listen
 func (srv *Server) defaultGameData() network.GameData {
 	gm, _ := world.GameModeID(srv.world.DefaultGameMode())
 	return network.GameData{
+		UseBlockNetworkIDHashes: true,
 		// Entity runtime/unique ID for the player itself is always 1 in df.
 		EntityUniqueID:  1,
 		EntityRuntimeID: 1,

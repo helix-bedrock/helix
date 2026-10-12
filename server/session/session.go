@@ -217,9 +217,9 @@ func (conf Config) New(conn Conn) *Session {
 	s.currentLines.Store(&scoreboardLines)
 
 	if conf.BlockRegistry == nil {
-		s.br = world.DefaultBlockRegistry
+		s.br = hashRegistry{world.DefaultBlockRegistry}
 	} else {
-		s.br = conf.BlockRegistry
+		s.br = hashRegistry{conf.BlockRegistry}
 	}
 
 	s.registerHandlers()

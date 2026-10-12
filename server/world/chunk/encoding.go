@@ -162,11 +162,19 @@ func (diskEncoding) decodePalette(buf *bytes.Buffer, blockSize paletteSize, e pa
 type networkEncoding struct{}
 
 func (networkEncoding) network() byte { return 1 }
-func (networkEncoding) encodePalette(buf *bytes.Buffer, p *Palette, _ paletteEncoding) {
+func (networkEncoding) encodePalette(buf *bytes.Buffer, p *Palette, e paletteEncoding) {
 	if p.size != 0 {
 		_ = protocol.WriteVarint32(buf, int32(p.Len()))
 	}
+	// Helix sends blocks by network hash (StartGame.UseBlockNetworkIDHashes),
+	// so the client does not depend on the order of the block state list.
+	bpe, blocks := e.(BlockPaletteEncoding)
 	for _, val := range p.values {
+		if blocks && bpe.Blocks != nil {
+			if h, ok := bpe.Blocks.RuntimeIDToHash(val); ok {
+				val = h
+			}
+		}
 		_ = protocol.WriteVarint32(buf, int32(val))
 	}
 }
