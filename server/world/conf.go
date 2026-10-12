@@ -1,6 +1,7 @@
 package world
 
 import (
+	"github.com/helix-bedrock/helix/debug"
 	"log/slog"
 	"math/rand/v2"
 	"time"
@@ -15,6 +16,8 @@ type blockRegistrySetter interface {
 // Config may be used to create a new World. It holds a variety of fields that
 // influence the World.
 type Config struct {
+	// Debug records tick timings when set. Nil turns it off.
+	Debug *debug.Monitor
 	// Log is the Logger that will be used to log errors and debug messages to.
 	// If set to nil, slog.Default() is set.
 	Log *slog.Logger

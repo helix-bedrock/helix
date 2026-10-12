@@ -1,6 +1,8 @@
 package world
 
 import (
+	"fmt"
+	"github.com/helix-bedrock/helix/debug"
 	"maps"
 	"math/rand/v2"
 	"slices"
@@ -46,6 +48,7 @@ func (w *World) AdvanceTick() {
 func (t ticker) tick(tx *Tx) {
 	viewers, loaders := tx.World().allViewers()
 	w := tx.World()
+	var dt *debug.Tick
 
 	w.set.Lock()
 	if s := w.set.Spawn; s[1] > tx.Range()[1] && w.Dimension() == Overworld {
@@ -59,6 +62,8 @@ func (t ticker) tick(tx *Tx) {
 		w.set.Unlock()
 		return
 	}
+	dt = w.conf.Debug.StartTick(fmt.Sprint(w.Dimension()))
+	defer dt.End()
 	if w.advance {
 		w.set.CurrentTick++
 		if w.set.TimeCycle {
@@ -97,11 +102,17 @@ func (t ticker) tick(tx *Tx) {
 		w.tickLightning(tx)
 	}
 
+	dt.Phase("time and weather")
 	t.tickEntities(tx, tick)
-	w.scheduledUpdates.tick(tx, tick)
+	dt.Phase("entities")
+	w.scheduledUpdates.tick(tx, tick, dt)
+	dt.Phase("scheduled updates")
 	t.tickBlocksRandomly(tx, loaders, tick)
+	dt.Phase("random ticks")
 	t.performNeighbourUpdates(tx)
+	dt.Phase("neighbour updates")
 	w.redstone.tick(tx, tick)
+	dt.Phase("redstone")
 }
 
 // performNeighbourUpdates performs all block updates that came as a result of a neighbouring block being changed.
@@ -306,7 +317,7 @@ func newScheduledTickQueue(tick int64) *scheduledTickQueue {
 // tick processes scheduled ticks, calling ScheduledTicker.ScheduledTick for any
 // block update that is scheduled for the tick passed, and removing it from the
 // queue.
-func (queue *scheduledTickQueue) tick(tx *Tx, tick int64) {
+func (queue *scheduledTickQueue) tick(tx *Tx, tick int64, dt *debug.Tick) {
 	queue.currentTick = tick
 
 	w := tx.World()
@@ -316,10 +327,20 @@ func (queue *scheduledTickQueue) tick(tx *Tx, tick int64) {
 		}
 		b := tx.Block(t.pos)
 		if ticker, ok := b.(ScheduledTicker); ok && w.conf.Blocks.BlockHash(b) == t.bhash {
+			start := dt.Now()
 			ticker.ScheduledTick(t.pos, tx, w.r)
+			if dt != nil {
+				name, _ := b.EncodeBlock()
+				dt.Block(name, time.Since(start))
+			}
 		} else if liquid, ok := tx.additionalLiquid(t.pos); ok && w.conf.Blocks.BlockHash(liquid) == t.bhash {
 			if ticker, ok := liquid.(ScheduledTicker); ok {
+				start := dt.Now()
 				ticker.ScheduledTick(t.pos, tx, w.r)
+				if dt != nil {
+					name, _ := liquid.EncodeBlock()
+					dt.Block(name, time.Since(start))
+				}
 			}
 		}
 	}

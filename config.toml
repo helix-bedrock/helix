@@ -68,3 +68,6 @@
   Folder = "resources"
   # Required configures whether the server will require players to have a resource pack to join.
   Required = true
+
+[Debug]
+  Address = "localhost:8087"

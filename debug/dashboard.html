@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helix debug</title>
+<style>
+  :root { --bg:#fff; --fg:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea; --in:#0a7d32; --out:#0b57d0; --slow:#c5221f; --bar:#8ab4f8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16161a; --fg:#eaeaea; --muted:#9a9aa2; --line:#2c2c33; --in:#5bd17b; --out:#7aa7ff; --slow:#ff6b6b; --bar:#3d5a99; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui, sans-serif; }
+  h1 { font-size:18px; margin:0 0 12px; } h2 { font-size:15px; margin:20px 0 8px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  input, select, button { font:inherit; padding:4px 8px; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px; }
+  table { border-collapse:collapse; width:100%; font:12px ui-monospace, monospace; }
+  td, th { border-bottom:1px solid var(--line); padding:3px 6px; text-align:left; vertical-align:top; }
+  .wrap { overflow-x:auto; } .in { color:var(--in); } .out { color:var(--out); } .slow { color:var(--slow); font-weight:600; }
+  .muted { color:var(--muted); } .body { max-width:60ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bars { display:flex; align-items:flex-end; gap:1px; height:60px; border-bottom:1px solid var(--line); }
+  .bars div { flex:1; background:var(--bar); min-height:1px; } .bars div.slow { background:var(--slow); }
+</style>
+</head>
+<body>
+<h1>Helix debug</h1>
+<div class="row">
+  <label><input type="checkbox" id="live" checked> live</label>
+  <a href="/record?seconds=60" class="muted">record 60s</a>
+  <a href="/record?seconds=60&full=1" class="muted">record 60s (full packets)</a>
+  <a href="/debug/pprof/" class="muted">pprof</a>
+</div>
+
+<h2>Ticks</h2>
+<div id="ticks"></div>
+
+<h2>Packets</h2>
+<div class="row">
+  <input id="player" placeholder="player">
+  <input id="name" placeholder="packet name">
+  <select id="dir"><option value="">in + out</option><option value="in">in</option><option value="out">out</option></select>
+  <input id="limit" type="number" value="200" min="1" max="5000" style="width:6em">
+</div>
+<div class="wrap"><table><thead><tr><th>time</th><th>dir</th><th>player</th><th>packet</th><th>fields</th></tr></thead><tbody id="packets"></tbody></table></div>
+
+<h2>Packet counts</h2>
+<div class="wrap"><table><thead><tr><th>packet</th><th>in</th><th>out</th></tr></thead><tbody id="counts"></tbody></table></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ms = ns => (ns / 1e6).toFixed(2);
+
+async function get(u) { const r = await fetch(u); return r.json(); }
+
+async function ticks() {
+  const ws = await get('/api/ticks') || [];
+  $('ticks').innerHTML = ws.map(w => {
+    const last = w.ticks.slice(-120);
+    const peak = Math.max(50, ...last.map(t => t.took / 1e6));
+    const bars = last.map(t => `<div class="${t.slow ? 'slow' : ''}" style="height:${(t.took/1e6/peak*100).toFixed(1)}%" title="${ms(t.took)} ms"></div>`).join('');
+    const phases = {}, blocks = {};
+    for (const t of last) {
+      for (const p of t.phases || []) phases[p.name] = (phases[p.name] || 0) + p.took;
+      for (const b of t.blocks || []) { const x = blocks[b.name] ||= {count:0, took:0}; x.count += b.count; x.took += b.took; }
+    }
+    const n = last.length || 1;
+    const ph = Object.entries(phases).map(([k, v]) => `${esc(k)} ${ms(v / n)}`).join(' · ');
+    const bl = Object.entries(blocks).sort((a, b) => b[1].took - a[1].took).slice(0, 8)
+      .map(([k, v]) => `${esc(k)}: ${v.count} updates, ${ms(v.took)} ms`).join('<br>');
+    return `<div class="row"><b>${esc(w.world)}</b>
+      <span>${w.tps.toFixed(1)} TPS</span><span>avg ${w.avgMs.toFixed(2)} ms</span><span>max ${w.maxMs.toFixed(2)} ms</span>
+      <span class="${w.slow ? 'slow' : 'muted'}">${w.slow} slow of ${w.total}</span></div>
+      <div class="bars">${bars}</div>
+      <div class="muted">avg per tick (ms): ${ph || '—'}</div>
+      <div class="muted">scheduled updates, last ${n} ticks:<br>${bl || '—'}</div>`;
+  }).join('') || '<span class="muted">no ticks yet (worlds tick when a player is in them)</span>';
+}
+
+async function packets() {
+  const q = new URLSearchParams({player:$('player').value, name:$('name').value, dir:$('dir').value, limit:$('limit').value});
+  const ps = await get('/api/packets?' + q) || [];
+  $('packets').innerHTML = ps.slice().reverse().map(p => `<tr>
+    <td class="muted">${new Date(p.time).toLocaleTimeString()}.${String(new Date(p.time).getMilliseconds()).padStart(3,'0')}</td>
+    <td class="${p.in ? 'in' : 'out'}">${p.in ? 'in' : 'out'}</td><td>${esc(p.player || p.addr)}</td>
+    <td>${esc(p.name)}</td><td class="body" title="${esc(p.body)}">${esc(p.body)}</td></tr>`).join('');
+}
+
+async function counts() {
+  const cs = (await get('/api/counts') || []).sort((a, b) => (b.in + b.out) - (a.in + a.out));
+  $('counts').innerHTML = cs.map(c => `<tr><td>${esc(c.name)}</td><td class="in">${c.in}</td><td class="out">${c.out}</td></tr>`).join('');
+}
+
+async function refresh() {
+  if ($('live').checked) { try { await Promise.all([ticks(), packets(), counts()]); } catch (e) {} }
+  setTimeout(refresh, 1000);
+}
+for (const id of ['player', 'name', 'dir', 'limit']) $(id).addEventListener('input', packets);
+refresh();
+</script>
+</body>
+</html>

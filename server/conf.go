@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/helix-bedrock/helix/debug"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -28,6 +29,9 @@ import (
 
 // Config contains options for starting a Minecraft server.
 type Config struct {
+	// Debug records packets and tick timings when set, for the debug
+	// dashboard. Nil turns it off.
+	Debug *debug.Monitor
 	// Log is the Logger to use for logging information. If nil, Log is set to
 	// slog.Default(). Errors reported by the underlying network are only logged
 	// if Log has at least debug level.
@@ -290,6 +294,12 @@ type UserConfig struct {
 		// LevelDB player provider if it is enabled.
 		Folder string
 	}
+	Debug struct {
+		// Address serves the debug dashboard (packets, tick timings,
+		// profiler) on this address, such as "localhost:8080". Empty turns
+		// debugging off. Keep it on localhost: it shows every packet.
+		Address string
+	}
 	Resources struct {
 		// AutoBuildPack is if the server should automatically generate a
 		// resource pack for custom features.
@@ -342,6 +352,14 @@ func (uc UserConfig) Config(log *slog.Logger) (Config, error) {
 		}
 	}
 	conf.Listeners = append(conf.Listeners, listeners...)
+	if uc.Debug.Address != "" {
+		conf.Debug = debug.New(debug.Config{})
+		addr, err := conf.Debug.Serve(uc.Debug.Address, log)
+		if err != nil {
+			return conf, fmt.Errorf("start debug dashboard: %w", err)
+		}
+		log.Info("Debug dashboard running.", "url", "http://"+addr.String())
+	}
 	return conf, nil
 }
 

@@ -362,6 +362,7 @@ func listenerConfig(conf Config) network.Config {
 		TexturePacksRequired:   conf.ResourcesRequired,
 		Compression:            conf.Compression,
 		Allow:                  conf.Allower.Allow,
+		Hooks:                  conf.Debug.Hooks(),
 	}
 }
 

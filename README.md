@@ -21,3 +21,20 @@ go run main.go
 ```
 
 Press ctrl+c to stop the server.
+
+## Debugging
+
+Set an address in `config.toml` to open the debug dashboard:
+
+```toml
+[Debug]
+  Address = "localhost:8080"
+```
+
+Then open `http://localhost:8080` in a browser. It shows every packet sent
+and received (filter by player, packet name and direction), packet counts,
+each world's tick time split into its parts, which blocks scheduled updates
+(water, lava, redstone) spent time on, and Go's profiler at
+`/debug/pprof/`. `/record?seconds=60` downloads a recording of every packet
+for a minute (`&full=1` includes whole packets) to send with a bug report.
+Keep the address on localhost: the dashboard shows every player's packets.

@@ -496,7 +496,7 @@ func TestPlacedRedstoneTorchTurnsOffWhenAttachmentBecomesPowered(t *testing.T) {
 		tx.SetBlock(torchPos, redstoneAttachmentTorch{Facing: cube.FaceWest, Lit: true}, nil)
 		tx.SetBlock(attachmentPos.Side(cube.FaceNorth), redstoneWeakBlockSource{}, nil)
 
-		tx.World().scheduledUpdates.tick(tx, 2)
+		tx.World().scheduledUpdates.tick(tx, 2, nil)
 		tx.World().redstone.tick(tx, 2)
 		lit = tx.Block(torchPos).(redstoneAttachmentTorch).Lit
 	})
@@ -667,12 +667,12 @@ func TestScheduledTickQueueExecutesEarlierDueTickBeforeLaterTick(t *testing.T) {
 		queue.schedule(registry, pos, b, time.Second/20)
 		queue.schedule(registry, pos, b, time.Second/10)
 
-		queue.tick(tx, 101)
+		queue.tick(tx, 101, nil)
 		ticksAfterFirst = ticks
 		activeAfterFirst = queue.fromChunk(chunkPosFromBlockPos(pos))
 		furthestAfterFirst, hasFurthestAfterFirst = queue.furthestTicks[index]
 
-		queue.tick(tx, 102)
+		queue.tick(tx, 102, nil)
 		ticksAfterSecond = ticks
 		activeAfterSecond = queue.fromChunk(chunkPosFromBlockPos(pos))
 	})
