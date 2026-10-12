@@ -1435,6 +1435,16 @@ func (w *region) removeViewer(tx *Tx, pos ChunkPos, loader *Loader, viewer Viewe
 	}
 	c, ok := w.chunks[pos]
 	if !ok {
+		// Helix: the chunk may have moved to another region since the
+		// loader viewed it. Remove the viewer there, or it would keep the
+		// chunk loaded and keep sending to it.
+		if o := w.ownerOf(pos); o != nil && o != w {
+			o.post(normalTransaction{c: make(chan struct{}), f: func(tx *Tx) {
+				if _, ok := tx.r.chunks[pos]; ok {
+					tx.r.removeViewer(tx, pos, loader, viewer)
+				}
+			}})
+		}
 		return
 	}
 	if i := slices.Index(c.loaders, loader); i != -1 {

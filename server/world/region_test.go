@@ -2,6 +2,7 @@ package world
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,4 +169,83 @@ func TestDoGlobalSeesTheWholeWorld(t *testing.T) {
 	// The regions split apart again on their own.
 	<-w.exec(func(tx *Tx) { tx.r.ticked = 0; tx.r.trySplit() })
 	eventually(t, "split after the global task", func() bool { return w.RegionCount() == 2 })
+}
+
+// playerEntityType is a test entity that counts as a player, which views
+// chunks and so never changes region alone.
+type playerEntityType struct{ taskTestEntityType }
+
+func (playerEntityType) EncodeEntity() string { return "minecraft:player" }
+
+func TestPlayerMovingIntoAnotherRegionMergesThem(t *testing.T) {
+	w := regionWorld(t)
+	load(t, w, ChunkPos{0, 0})
+	load(t, w, ChunkPos{100, 0})
+	h := NewEntity(playerEntityType{}, taskTestEntityConfig{})
+	done := make(chan struct{})
+	w.postAt(ChunkPos{0, 0}, func(tx *Tx) {
+		tx.AddEntityAt(h, mgl64.Vec3{1, 0, 1})
+		close(done)
+	})
+	<-done
+	// Teleport the player into the other region's chunk and tick: the
+	// regions merge instead of the player being handed over alone.
+	<-w.exec(func(tx *Tx) {
+		if _, ok := tx.r.entities[h]; ok {
+			h.data.Pos = mgl64.Vec3{100<<4 + 1, 0, 1}
+			ticker{}.tickEntities(tx, 1)
+		}
+	})
+	eventually(t, "merge", func() bool { return w.RegionCount() == 1 })
+	if w.regionOfEntity(h) != w.ownerOf(ChunkPos{100, 0}) {
+		t.Fatal("player is not in the region of its new chunk")
+	}
+}
+
+// TestRegionsUnderLoad moves several loaders toward and away from each
+// other while the world ticks, so regions keep merging and splitting. It
+// is mostly a test for the race detector and for deadlocks.
+func TestRegionsUnderLoad(t *testing.T) {
+	if testing.Short() {
+		t.Skip("slow")
+	}
+	w := regionWorld(t)
+	const n = 4
+	loaders := make([]*Loader, n)
+	for i := range loaders {
+		loaders[i] = NewLoader(2, w, NopViewer{})
+	}
+	pos := func(i, step int) mgl64.Vec3 {
+		// Each loader walks between its own far corner and the centre.
+		phase := float64(step%40) / 40
+		if step/40%2 == 1 {
+			phase = 1 - phase
+		}
+		far := []mgl64.Vec3{{800, 0, 0}, {-800, 0, 0}, {0, 0, 800}, {0, 0, -800}}[i]
+		return far.Mul(1 - phase)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for step := 0; time.Now().Before(deadline); step++ {
+		var wg sync.WaitGroup
+		for i, l := range loaders {
+			p := pos(i, step)
+			wg.Add(1)
+			w.postAt(chunkPosFromVec3(p), func(tx *Tx) {
+				defer wg.Done()
+				l.Move(tx, p)
+				l.Load(tx, 8)
+			})
+		}
+		done := make(chan struct{})
+		go func() { wg.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("deadlock: loader steps did not finish")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if w.RegionCount() < 1 {
+		t.Fatal("no regions")
+	}
 }

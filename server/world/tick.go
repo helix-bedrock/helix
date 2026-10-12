@@ -254,7 +254,14 @@ func (t ticker) tickEntities(tx *Tx, tick int64) {
 		c, ok := tx.r.chunks[chunkPos]
 		if !ok {
 			if o := tx.r.ownerOf(chunkPos); o != nil && o != tx.r {
-				tx.r.handOver(tx, handle, lastPos, o)
+				if viewsChunks(handle) {
+					// A player keeps the chunks it views in this region: handing
+					// it over alone would leave two regions sending it packets.
+					// Merge the regions instead; it moves with them.
+					tx.r.requestMerge(tx.r, o)
+				} else {
+					tx.r.handOver(tx, handle, lastPos, o)
+				}
 			}
 			continue
 		}

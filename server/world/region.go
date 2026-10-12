@@ -684,6 +684,19 @@ func (w *World) DoGlobal(f func(tx *Tx)) *Task {
 	return task
 }
 
+// viewsChunks reports whether an entity views chunks through a Loader, as
+// players do. Such entities never change region alone: the regions merge.
+func viewsChunks(h *EntityHandle) bool {
+	return h.t.EncodeEntity() == "minecraft:player"
+}
+
+// requestMerge asks for rs to be merged.
+func (w *World) requestMerge(rs ...*region) {
+	w.layoutMu.Lock()
+	w.requestMergeLocked(rs)
+	w.layoutMu.Unlock()
+}
+
 // RegionInfo describes one region, for debugging.
 type RegionInfo struct {
 	ID       uint64
