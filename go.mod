@@ -11,6 +11,7 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/google/uuid v1.6.0
+	github.com/helix-bedrock/helix-data v0.0.0-20261012134851-825cfe633133
 	github.com/helix-bedrock/nethernet v0.0.0-20261011191808-e81dea4c069d
 	github.com/helix-bedrock/protocol v0.0.0-20261012133225-7028ed4ab60b
 	github.com/helix-bedrock/raknet v0.0.0-20261011185733-0d441ae6e71a
@@ -27,7 +28,8 @@ require (
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v1.0.0 // indirect
+	github.com/helix-bedrock/world v0.0.0-20261012002455-1abd7956f430 // indirect
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
@@ -50,5 +52,4 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/helix-bedrock/helix-data/data"
 	"maps"
 	"math"
 	"slices"
@@ -14,8 +15,6 @@ import (
 )
 
 var (
-	//go:embed block_states.nbt
-	blockStateData []byte
 
 	//go:embed data_driven_blocks.nbt
 	dataDrivenBlockData []byte
@@ -23,16 +22,15 @@ var (
 )
 
 func init() {
-	dec := nbt.NewDecoder(bytes.NewBuffer(blockStateData))
-
-	// Register all block states present in the block_states.nbt file. These are all possible options registered
-	// blocks may encode to.
-	for {
-		var s BlockState
-		if err := dec.Decode(&s); err != nil {
-			break
-		}
-		DefaultBlockRegistry.RegisterBlockState(s)
+	// Helix: block states come from helix-data (dumped from BDS) instead of
+	// Dragonfly's block_states.nbt, so the engine, the world files and the
+	// client agree on one list.
+	states, err := data.BlockStates()
+	if err != nil {
+		panic(fmt.Errorf("load block states from helix-data: %w", err))
+	}
+	for _, s := range states {
+		DefaultBlockRegistry.RegisterBlockState(BlockState{Name: s.Name, Properties: s.Properties, Version: s.Version})
 	}
 
 	var m struct {

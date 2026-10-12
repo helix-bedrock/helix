@@ -15,6 +15,10 @@ Copyright (c) the df-mc contributors, used under the MIT licence in
 
 Every later commit is Helix's own and is listed in the git history.
 
+## Data
+
+Block states come from [helix-data](https://github.com/helix-bedrock/helix-data), dumped from the Bedrock Dedicated Server, instead of Dragonfly's `block_states.nbt`. Item and creative data are still Dragonfly's (`server/world/vanilla_items.nbt`, `server/item/creative/creative_items.nbt`).
+
 ## gophertunnel
 
 Parts of [gophertunnel](https://github.com/Sandertv/gophertunnel) (MIT,
