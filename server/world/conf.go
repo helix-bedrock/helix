@@ -16,6 +16,9 @@ type blockRegistrySetter interface {
 // Config may be used to create a new World. It holds a variety of fields that
 // influence the World.
 type Config struct {
+	// Events are the event listener lists of the world (Helix). Worlds of
+	// one server share them. If nil, the world gets its own empty lists.
+	Events *Events
 	// SectionSize is the width in chunks of the sections regions are made
 	// of. If 0, DefaultSectionSize. Small sections make region borders
 	// common, which is useful for testing them.
@@ -174,8 +177,10 @@ func (conf Config) New() *World {
 	}
 	w.chunkWorkers = newChunkWorkerPool(w)
 	w.weather = weather{w: w}
-	var h Handler = NopHandler{}
-	w.handler.Store(&h)
+	if conf.Events == nil {
+		conf.Events = &Events{}
+		w.conf.Events = conf.Events
+	}
 
 	if conf.Synchronous {
 		w.main = w.newRegion()

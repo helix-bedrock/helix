@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	rtdebug "runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -562,6 +563,14 @@ func (s *Session) ChunkRadius() int32 {
 // handlePacket handles an incoming packet, processing it accordingly. If the packet had invalid data or was
 // otherwise not valid in its context, an error is returned.
 func (s *Session) handlePacket(pk packet.Packet, tx *world.Tx, c Controllable) (err error) {
+	defer func() {
+		// Helix: a packet that makes a handler panic disconnects only the
+		// player that sent it.
+		if v := recover(); v != nil {
+			s.conf.Log.Error("recovered from a panic handling a packet", "packet", fmt.Sprintf("%T", pk), "panic", v, "stack", string(rtdebug.Stack()))
+			err = fmt.Errorf("%T: handler panicked: %v", pk, v)
+		}
+	}()
 	handler, ok := s.handlers[pk.ID()]
 	if !ok {
 		s.conf.Log.Debug("unhandled packet", "packet", fmt.Sprintf("%T", pk), "data", fmt.Sprintf("%+v", pk)[1:])

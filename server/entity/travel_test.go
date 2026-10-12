@@ -2,6 +2,7 @@ package entity
 
 import (
 	"context"
+	"github.com/helix-bedrock/helix/server/hook"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestEntProjectileTravelsThroughPortal(t *testing.T) {
 	})
 
 	spawnRecorder := &entitySpawnRecorder{}
-	nether.Handle(spawnRecorder)
+	recordSpawns(nether, spawnRecorder)
 
 	sourcePos := mgl64.Vec3{80.5, 64, 80.5}
 	targetPortal := cube.Pos{10, 64, 10}
@@ -323,7 +324,7 @@ func TestEntPortalTravelWithoutDestinationPortal(t *testing.T) {
 	overworld, nether := portalWorlds(t)
 
 	spawnRecorder := &entitySpawnRecorder{}
-	nether.Handle(spawnRecorder)
+	recordSpawns(nether, spawnRecorder)
 
 	sourcePos := mgl64.Vec3{80.5, 64, 80.5}
 	handle := world.EntitySpawnOpts{Position: sourcePos}.New(EnderPearlType, enderPearlConf)
@@ -402,7 +403,7 @@ func TestPortalTravelRethrowsDestinationPanic(t *testing.T) {
 		_ = source.Close()
 		_ = destination.Close()
 	})
-	destination.Handle(panicSpawnHandler{})
+	destination.Events().EntitySpawn.Add(testOwner{}, func(*world.EntitySpawnEvent) { panic("spawn panic") }, hook.Normal, false, nil)
 
 	origin := mgl64.Vec3{80.5, 64, 80.5}
 	handle := world.EntitySpawnOpts{Position: origin}.New(testMovingEntType{}, testPortalCreatorConfig{})
@@ -427,7 +428,7 @@ func TestFallingBlockDoesNotTravelThroughPortal(t *testing.T) {
 	overworld, nether := portalWorlds(t)
 
 	spawnRecorder := &entitySpawnRecorder{}
-	nether.Handle(spawnRecorder)
+	recordSpawns(nether, spawnRecorder)
 
 	targetPortal := cube.Pos{10, 64, 10}
 	mustDo(t, nether, func(tx *world.Tx) {
@@ -546,19 +547,22 @@ func buildActivePortal(tx *world.Tx, origin cube.Pos) {
 }
 
 type entitySpawnRecorder struct {
-	world.NopHandler
-
 	called bool
 	pos    mgl64.Vec3
 }
 
-type panicSpawnHandler struct{ world.NopHandler }
+// testOwner runs listeners directly, always enabled.
+type testOwner struct{}
 
-func (panicSpawnHandler) HandleEntitySpawn(*world.Tx, world.Entity) { panic("spawn panic") }
+func (testOwner) Enabled() bool          { return true }
+func (testOwner) Run(_ string, f func()) { f() }
 
-func (r *entitySpawnRecorder) HandleEntitySpawn(_ *world.Tx, e world.Entity) {
-	r.called = true
-	r.pos = e.Position()
+// recordSpawns records entity spawns in w into r.
+func recordSpawns(w *world.World, r *entitySpawnRecorder) {
+	w.Events().EntitySpawn.Add(testOwner{}, func(e *world.EntitySpawnEvent) {
+		r.called = true
+		r.pos = e.Entity.Position()
+	}, hook.Normal, false, nil)
 }
 
 type testMoveConfig struct {

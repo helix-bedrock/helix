@@ -49,7 +49,6 @@ type World struct {
 	o sync.Once
 
 	set     *Settings
-	handler atomic.Pointer[Handler]
 
 	weather
 
@@ -802,8 +801,7 @@ func (w *region) addParticle(pos mgl64.Vec3, p Particle) {
 // playSound plays a sound at a specific position in the World. Viewers of that
 // position will be able to hear the sound if they are close enough.
 func (w *region) playSound(tx *Tx, pos mgl64.Vec3, s Sound) {
-	ctx := tx.Event()
-	if w.Handler().HandleSound(ctx, s, pos); ctx.Cancelled() {
+	if ev := &w.conf.Events.Sound; ev.Active() && ev.Fire(&SoundEvent{txWorld: txWorld{tx}, Sound: s, Position: pos}) {
 		return
 	}
 	s.Play(w.World, pos)
@@ -833,16 +831,23 @@ func (w *region) addEntityAt(tx *Tx, handle *EntityHandle, pos mgl64.Vec3) Entit
 			w.setEntityRegion(handle, o)
 			o.post(normalTransaction{c: make(chan struct{}), f: func(tx *Tx) {
 				e := tx.r.insertEntity(tx, handle)
-				tx.r.Handler().HandleEntitySpawn(tx, e)
+				tx.r.fireEntitySpawn(tx, e)
 				handle.markWorldReady(tx.w)
 			}})
 			return handle.t.Open(tx, handle, &handle.data)
 		}
 	}
 	e := w.insertEntity(tx, handle)
-	w.Handler().HandleEntitySpawn(tx, e)
+	w.fireEntitySpawn(tx, e)
 	handle.markWorldReady(w.World)
 	return e
+}
+
+// fireEntitySpawn fires EntitySpawnEvent.
+func (w *region) fireEntitySpawn(tx *Tx, e Entity) {
+	if ev := &w.conf.Events.EntitySpawn; ev.Active() {
+		ev.Fire(&EntitySpawnEvent{txWorld: txWorld{tx}, Entity: e})
+	}
 }
 
 // insertEntity puts an entity whose world is already set into its chunk in
@@ -901,7 +906,9 @@ func (w *region) removeEntity(e Entity, tx *Tx) *EntityHandle {
 		// The entity currently isn't in this world.
 		return nil
 	}
-	w.Handler().HandleEntityDespawn(tx, e)
+	if ev := &w.conf.Events.EntityDespawn; ev.Active() {
+		ev.Fire(&EntityDespawnEvent{txWorld: txWorld{tx}, Entity: e})
+	}
 
 	c := tx.chunk(pos)
 	c.Entities, c.modified = sliceutil.DeleteVal(c.Entities, handle), true
@@ -1187,18 +1194,6 @@ func (w *region) updateNeighbour(pos, changedNeighbour cube.Pos) {
 	w.neighbourUpdates = append(w.neighbourUpdates, neighbourUpdate{pos: pos, neighbour: changedNeighbour})
 }
 
-// Handle changes the current Handler of the world. As a result, events called
-// by the world will call the methods of the Handler passed. Handle sets the
-// world's Handler to NopHandler if nil is passed.
-func (w *World) Handle(h Handler) {
-	if w == nil {
-		return
-	}
-	if h == nil {
-		h = NopHandler{}
-	}
-	w.handler.Store(&h)
-}
 
 // viewersOf returns all viewers viewing the position passed.
 func (w *region) viewersOf(pos mgl64.Vec3) []Viewer {
@@ -1358,9 +1353,10 @@ func (w *World) close() {
 	w.scheduleMu.Unlock()
 	<-w.exec(func(tx *Tx) {
 		// Let user code run anything that needs to be finished before closing.
-		w.Handler().HandleClose(tx)
+		if ev := &w.conf.Events.Close; ev.Active() {
+			ev.Fire(&CloseEvent{txWorld: txWorld{tx}})
+		}
 		tx.runDeferred()
-		w.Handle(NopHandler{})
 
 		tx.r.save(tx.r.closeChunk)(tx)
 	})
@@ -1458,13 +1454,6 @@ func (w *region) removeViewer(tx *Tx, pos ChunkPos, loader *Loader, viewer Viewe
 	}
 }
 
-// Handler returns the Handler of the world.
-func (w *World) Handler() Handler {
-	if w == nil {
-		return NopHandler{}
-	}
-	return *w.handler.Load()
-}
 
 // showEntity shows an Entity to a viewer of the world. It makes sure
 // everything of the Entity, including the items held, is shown.

@@ -3,6 +3,7 @@ package block
 import (
 	"context"
 	"fmt"
+	"github.com/helix-bedrock/helix/server/hook"
 	"sync"
 	"testing"
 	"time"
@@ -441,7 +442,7 @@ func TestNoteBlockPlaysOnRedstoneRisingEdgeOnly(t *testing.T) {
 	defer w.Close()
 
 	handler := &redstoneSoundTestHandler{}
-	w.Handle(handler)
+	w.Events().Sound.Add(soundTestOwner{}, handler.record, hook.Normal, false, nil)
 
 	leverPos := cube.Pos{0, 64, 0}
 	attachmentPos := leverPos.Side(cube.FaceWest)
@@ -936,16 +937,20 @@ func (v *redstoneWireTestBlockUpdateViewer) blockUpdateCount(pos cube.Pos) int {
 }
 
 type redstoneSoundTestHandler struct {
-	world.NopHandler
-
 	noteSounds int
 }
 
-func (h *redstoneSoundTestHandler) HandleSound(_ *world.Context, s world.Sound, _ mgl64.Vec3) {
-	if _, ok := s.(sound.Note); ok {
+func (h *redstoneSoundTestHandler) record(e *world.SoundEvent) {
+	if _, ok := e.Sound.(sound.Note); ok {
 		h.noteSounds++
 	}
 }
+
+// soundTestOwner runs listeners directly, always enabled.
+type soundTestOwner struct{}
+
+func (soundTestOwner) Enabled() bool          { return true }
+func (soundTestOwner) Run(_ string, f func()) { f() }
 
 func redstoneTNTTestEntityRegistry() world.EntityRegistry {
 	return world.EntityRegistryConfig{

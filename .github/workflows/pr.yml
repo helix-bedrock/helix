@@ -27,7 +27,7 @@ jobs:
           git diff --exit-code
 
       - name: Build deployment artifact
-        run: go build -o helix_exe -v .
+        run: go build -o helix_exe -v ./cmd/helix
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v7

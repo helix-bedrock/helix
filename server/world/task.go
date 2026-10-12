@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-gl/mathgl/mgl64"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -331,6 +332,33 @@ func Call[T any](ctx context.Context, w *World, f func(tx *Tx) (T, error)) (T, e
 		result, err = f(tx)
 		return err
 	})
+	return awaitTask(ctx, task, &result)
+}
+
+// CallAt runs f on the region of w that owns the chunk at pos and waits for
+// its result, like Call. Use it to work with something at a known position
+// (Helix).
+func CallAt[T any](ctx context.Context, w *World, pos mgl64.Vec3, f func(tx *Tx) (T, error)) (T, error) {
+	var zero T
+	ctx, err := callContext(ctx)
+	if err != nil {
+		return zero, err
+	}
+	if w == nil || w.closed.Load() {
+		return zero, ErrWorldClosed
+	}
+	var result T
+	task := newTask()
+	st := scheduledTransaction{task: task, f: func(tx *Tx) error {
+		var err error
+		result, err = f(tx)
+		return err
+	}}
+	if w.conf.Synchronous {
+		st.Run(w.main)
+	} else {
+		w.regionAt(chunkPosFromVec3(pos)).post(st)
+	}
 	return awaitTask(ctx, task, &result)
 }
 

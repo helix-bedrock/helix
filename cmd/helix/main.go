@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/helix-bedrock/helix"
 	"github.com/helix-bedrock/helix/server"
 	"github.com/helix-bedrock/helix/server/player/chat"
 	"github.com/pelletier/go-toml"
@@ -17,13 +18,12 @@ func main() {
 		panic(err)
 	}
 
-	srv := conf.New()
-	srv.CloseOnProgramEnd()
-
-	srv.Listen()
-	for p := range srv.Accept() {
-		_ = p
+	srv, err := helix.New(helix.Config{Server: conf})
+	if err != nil {
+		slog.Error("some plugins did not load", "err", err)
 	}
+	srv.CloseOnProgramEnd()
+	srv.Run()
 }
 
 // readConfig reads the configuration from the config.toml file, or creates the

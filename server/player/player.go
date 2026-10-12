@@ -19,7 +19,6 @@ import (
 	"github.com/helix-bedrock/helix/server/cmd"
 	"github.com/helix-bedrock/helix/server/entity"
 	"github.com/helix-bedrock/helix/server/entity/effect"
-	"github.com/helix-bedrock/helix/server/event"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/item/enchantment"
 	"github.com/helix-bedrock/helix/server/item/inventory"
@@ -51,7 +50,8 @@ type playerData struct {
 	gameMode world.GameMode
 	skin     skin.Skin
 	s        *session.Session
-	h        Handler
+	ev       *Events
+	invEv    *inventory.Events
 
 	inv, offHand, enderChest, ui *inventory.Inventory
 	armour                       *inventory.Armour
@@ -199,8 +199,7 @@ func (p *Player) Skin() skin.Skin {
 // SetSkin changes the skin of the player. This skin will be visible to other players that the player
 // is shown to.
 func (p *Player) SetSkin(skin skin.Skin) {
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleSkinChange(ctx, &skin); ctx.Cancelled() {
+	if l := &p.ev.SkinChange; l.Active() && l.Fire(&SkinChangeEvent{Base: p.base(), Skin: &skin}) {
 		p.session().ViewSkin(p)
 		return
 	}
@@ -213,16 +212,6 @@ func (p *Player) SetSkin(skin skin.Skin) {
 // Locale returns the language and locale of the Player, as selected in the Player's settings.
 func (p *Player) Locale() language.Tag {
 	return p.locale
-}
-
-// Handle changes the current Handler of the player. As a result, events called by the player will call
-// handlers of the Handler passed.
-// Handle sets the player's Handler to NopHandler if nil is passed.
-func (p *Player) Handle(h Handler) {
-	if h == nil {
-		h = NopHandler{}
-	}
-	p.h = h
 }
 
 // Message sends a formatted message to the player. The message is formatted following the rules of
@@ -326,8 +315,7 @@ func (p *Player) RemoveBossBar() {
 // player and is formatted following the rules of fmt.Sprintln.
 func (p *Player) Chat(msg ...any) {
 	message := format(msg)
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleChat(ctx, &message); ctx.Cancelled() {
+	if l := &p.ev.Chat; l.Active() && l.Fire(&ChatEvent{Base: p.base(), Message: &message}) {
 		return
 	}
 	_, _ = fmt.Fprintf(chat.Global, "<%v> %v\n", p.Name(), message)
@@ -371,8 +359,7 @@ func (p *Player) executeCommand(commandLine string) {
 		p.SendCommandOutput(o)
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleCommandExecution(ctx, command, args[1:]); ctx.Cancelled() {
+	if l := &p.ev.Command; l.Active() && l.Fire(&CommandEvent{Base: p.base(), Command: command, Args: args[1:]}) {
 		return
 	}
 	command.Execute(strings.Join(args[1:], " "), p, p.tx)
@@ -386,8 +373,7 @@ func (p *Player) Transfer(address string) error {
 		return err
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleTransfer(ctx, addr); ctx.Cancelled() {
+	if l := &p.ev.Transfer; l.Active() && l.Fire(&TransferEvent{Base: p.base(), Address: addr}) {
 		return nil
 	}
 	p.session().Transfer(addr.IP, addr.Port)
@@ -562,8 +548,7 @@ func (p *Player) Heal(health float64, source world.HealingSource) float64 {
 	if p.Dead() || health < 0 || !p.GameMode().AllowsTakingDamage() {
 		return 0
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleHeal(ctx, &health, source); ctx.Cancelled() {
+	if l := &p.ev.Heal; l.Active() && l.Fire(&HealEvent{Base: p.base(), Health: &health, Source: source}) {
 		return 0
 	}
 	oldHealth := p.Health()
@@ -657,8 +642,7 @@ func (p *Player) Hurt(dmg float64, src world.DamageSource) (float64, bool) {
 	}
 
 	immunity := time.Second / 2
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleHurt(ctx, &damageLeft, immune, &immunity, src); ctx.Cancelled() {
+	if l := &p.ev.Hurt; l.Active() && l.Fire(&HurtEvent{Base: p.base(), Damage: &damageLeft, Immune: immune, AttackImmunity: &immunity, Source: src}) {
 		return 0, false
 	}
 	p.setAttackImmunity(immunity, totalDamage)
@@ -887,8 +871,7 @@ func (p *Player) Exhaust(points float64) {
 		// Temporarily set the food level back so that it hasn't yet changed once the event is handled.
 		p.hunger.SetFood(before)
 
-		ctx := NewEventContext(p.tx, p)
-		if p.Handler().HandleFoodLoss(ctx, before, &after); ctx.Cancelled() {
+		if l := &p.ev.FoodLoss; l.Active() && l.Fire(&FoodLossEvent{Base: p.base(), From: before, To: &after}) {
 			// Reset the exhaustion level if the event was cancelled. Because if
 			// we cancel this, and at some point we stop cancelling it, the
 			// first food point will be lost more quickly than expected.
@@ -928,7 +911,9 @@ func (p *Player) kill(src world.DamageSource) {
 	p.addHealth(-p.MaxHealth())
 
 	keepInv := false
-	p.Handler().HandleDeath(p, src, &keepInv)
+	if l := &p.ev.Death; l.Active() {
+		l.Fire(&DeathEvent{Base: p.base(), Source: src, KeepInventory: &keepInv})
+	}
 	p.StopSneaking()
 	p.StopSprinting()
 
@@ -1032,7 +1017,9 @@ func (p *Player) respawn(f func(p *Player)) {
 	p.Extinguish()
 	p.ResetFallDistance()
 
-	p.Handler().HandleRespawn(p, &pos, &w)
+	if l := &p.ev.Respawn; l.Active() {
+		l.Fire(&RespawnEvent{Base: p.base(), Position: &pos, World: &w})
+	}
 
 	sess := p.session()
 	src := p.tx.World()
@@ -1111,8 +1098,7 @@ func (p *Player) StartSprinting() {
 	if !p.hunger.canSprint() && p.GameMode().AllowsTakingDamage() || p.crawling || p.sprinting {
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleToggleSprint(ctx, true); ctx.Cancelled() {
+	if l := &p.ev.ToggleSprint; l.Active() && l.Fire(&ToggleSprintEvent{Base: p.base(), Sprinting: true}) {
 		return
 	}
 	p.StopSneaking()
@@ -1131,8 +1117,7 @@ func (p *Player) StopSprinting() {
 	if !p.sprinting {
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleToggleSprint(ctx, false); ctx.Cancelled() {
+	if l := &p.ev.ToggleSprint; l.Active() && l.Fire(&ToggleSprintEvent{Base: p.base(), Sprinting: false}) {
 		return
 	}
 	p.sprinting = false
@@ -1147,8 +1132,7 @@ func (p *Player) StartSneaking() {
 	if p.sneaking {
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleToggleSneak(ctx, true); ctx.Cancelled() {
+	if l := &p.ev.ToggleSneak; l.Active() && l.Fire(&ToggleSneakEvent{Base: p.base(), Sneaking: true}) {
 		return
 	}
 	if !p.Flying() {
@@ -1169,8 +1153,7 @@ func (p *Player) StopSneaking() {
 	if !p.sneaking {
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleToggleSneak(ctx, false); ctx.Cancelled() {
+	if l := &p.ev.ToggleSneak; l.Active() && l.Fire(&ToggleSneakEvent{Base: p.base(), Sneaking: false}) {
 		return
 	}
 	p.sneaking = false
@@ -1299,7 +1282,9 @@ func (p *Player) Jump() {
 		return
 	}
 
-	p.Handler().HandleJump(p)
+	if l := &p.ev.Jump; l.Active() {
+		l.Fire(&JumpEvent{Base: p.base()})
+	}
 	if p.OnGround() {
 		jumpVel := 0.42
 		if e, ok := p.Effect(effect.JumpBoost); ok {
@@ -1329,8 +1314,8 @@ func (p *Player) Sleep(pos cube.Pos) {
 		return
 	}
 
-	ctx, sendReminder := NewEventContext(p.tx, p), true
-	if p.Handler().HandleSleep(ctx, &sendReminder); ctx.Cancelled() {
+	sendReminder := true
+	if l := &p.ev.Sleep; l.Active() && l.Fire(&SleepEvent{Base: p.base(), SendReminder: &sendReminder}) {
 		return
 	}
 
@@ -1456,8 +1441,7 @@ func (p *Player) SetOnFire(duration time.Duration) {
 	}
 
 	duration = time.Duration(ticks) * time.Second / 20
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleSetOnFire(ctx, &duration); ctx.Cancelled() {
+	if l := &p.ev.SetOnFire; l.Active() && l.Fire(&SetOnFireEvent{Base: p.base(), Duration: &duration}) {
 		return
 	}
 
@@ -1514,9 +1498,7 @@ func (p *Player) SetHeldSlot(to int) error {
 		return nil
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	p.Handler().HandleHeldSlotChange(ctx, from, to)
-	if ctx.Cancelled() {
+	if l := &p.ev.HeldSlotChange; l.Active() && l.Fire(&HeldSlotChangeEvent{Base: p.base(), From: from, To: to}) {
 		// The slot change was cancelled, resend held slot.
 		p.session().SendHeldSlot(from, p, true)
 		return nil
@@ -1620,11 +1602,10 @@ func (p *Player) UseItem() {
 		return
 	}
 	i, _ := p.HeldItems()
-	ctx := NewEventContext(p.tx, p)
 	if p.HasCooldown(i.Item()) {
 		return
 	}
-	if p.Handler().HandleItemUse(ctx); ctx.Cancelled() {
+	if l := &p.ev.ItemUse; l.Active() && l.Fire(&ItemUseEvent{Base: p.base()}) {
 		return
 	}
 	i, _ = p.HeldItems()
@@ -1697,8 +1678,7 @@ func (p *Player) UseItem() {
 		}
 		// Reset the duration for the next item to be consumed.
 		p.usingSince = time.Now()
-		ctx := NewEventContext(p.tx, p)
-		if p.Handler().HandleItemConsume(ctx, i); ctx.Cancelled() {
+		if l := &p.ev.ItemConsume; l.Active() && l.Fire(&ItemConsumeEvent{Base: p.base(), Item: i}) {
 			return
 		}
 		useCtx.CountSub, useCtx.NewItem = 1, usable.Consume(p.tx, p)
@@ -1722,8 +1702,7 @@ func (p *Player) ReleaseItem() {
 
 	useCtx, dur := p.useContext(), p.useDuration()
 	i, _ := p.HeldItems()
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleItemRelease(ctx, i, dur); ctx.Cancelled() {
+	if l := &p.ev.ItemRelease; l.Active() && l.Fire(&ItemReleaseEvent{Base: p.base(), Item: i, Duration: dur}) {
 		p.resyncInventory()
 		return
 	}
@@ -1821,8 +1800,7 @@ func (p *Player) UseItemOnBlock(pos cube.Pos, face cube.Face, clickPos mgl64.Vec
 		p.resendNearbyBlocks(pos, face)
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleItemUseOnBlock(ctx, pos, face, clickPos); ctx.Cancelled() {
+	if l := &p.ev.ItemUseOnBlock; l.Active() && l.Fire(&ItemUseOnBlockEvent{Base: p.base(), Pos: pos, Face: face, ClickPos: clickPos}) {
 		p.resendNearbyBlocks(pos, face)
 		return
 	}
@@ -1882,8 +1860,7 @@ func (p *Player) UseItemOnEntity(e world.Entity) bool {
 	if !p.canReach(e.Position()) {
 		return false
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleItemUseOnEntity(ctx, e); ctx.Cancelled() {
+	if l := &p.ev.ItemUseOnEntity; l.Active() && l.Fire(&ItemUseOnEntityEvent{Base: p.base(), Entity: e}) {
 		return false
 	}
 	i, _ := p.HeldItems()
@@ -1929,8 +1906,7 @@ func (p *Player) AttackEntity(e world.Entity) bool {
 		height += inc
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleAttackEntity(ctx, e, &force, &height, &critical); ctx.Cancelled() {
+	if l := &p.ev.AttackEntity; l.Active() && l.Fire(&AttackEntityEvent{Base: p.base(), Entity: e, Force: &force, Height: &height, Critical: &critical}) {
 		return false
 	}
 	p.SwingArm()
@@ -2009,8 +1985,7 @@ func (p *Player) StartBreaking(pos cube.Pos, face cube.Face) {
 		return
 	}
 	if _, ok := p.tx.Block(pos.Side(face)).(block.Fire); ok {
-		ctx := NewEventContext(p.tx, p)
-		if p.Handler().HandleFireExtinguish(ctx, pos); ctx.Cancelled() {
+		if l := &p.ev.FireExtinguish; l.Active() && l.Fire(&FireExtinguishEvent{Base: p.base(), Pos: pos}) {
 			// Resend the block because on client side that was extinguished
 			p.resendNearbyBlocks(pos, face)
 			return
@@ -2030,8 +2005,7 @@ func (p *Player) StartBreaking(pos cube.Pos, face cube.Face) {
 	// can resend the block to the client when it tries to break the block regardless.
 	p.breakingPos = pos
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleStartBreak(ctx, pos); ctx.Cancelled() {
+	if l := &p.ev.StartBreak; l.Active() && l.Fire(&StartBreakEvent{Base: p.base(), Pos: pos, Block: p.tx.Block(pos)}) {
 		return
 	}
 	if punchable, ok := p.tx.Block(pos).(block.Punchable); ok {
@@ -2161,8 +2135,7 @@ func (p *Player) placeBlock(pos cube.Pos, b world.Block, ignoreBBox bool) bool {
 		return false
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleBlockPlace(ctx, pos, b); ctx.Cancelled() {
+	if l := &p.ev.BlockPlace; l.Active() && l.Fire(&BlockPlaceEvent{Base: p.base(), Pos: pos, Block: b}) {
 		p.resendNearbyBlocks(pos, cube.Faces()...)
 		return false
 	}
@@ -2231,8 +2204,7 @@ func (p *Player) BreakBlock(pos cube.Pos) {
 		}
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleBlockBreak(ctx, pos, &drops, &xp); ctx.Cancelled() {
+	if l := &p.ev.BlockBreak; l.Active() && l.Fire(&BlockBreakEvent{Base: p.base(), Pos: pos, Drops: &drops, XP: &xp, Block: p.tx.Block(pos)}) {
 		p.resendNearbyBlocks(pos)
 		return
 	}
@@ -2308,8 +2280,7 @@ func (p *Player) PickBlock(pos cube.Pos) {
 		return
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleBlockPick(ctx, pos, b); ctx.Cancelled() {
+	if l := &p.ev.BlockPick; l.Active() && l.Fire(&BlockPickEvent{Base: p.base(), Pos: pos, Block: b}) {
 		return
 	}
 	_, offhand := p.HeldItems()
@@ -2346,8 +2317,7 @@ func (p *Player) Teleport(pos mgl64.Vec3) {
 // TeleportRotated teleports the player to a target position in the world, facing the rotation passed. Unlike
 // Move, it immediately changes the position and rotation of the player, rather than showing an animation.
 func (p *Player) TeleportRotated(pos mgl64.Vec3, rot cube.Rotation) {
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleTeleport(ctx, pos, rot); ctx.Cancelled() {
+	if l := &p.ev.Teleport; l.Active() && l.Fire(&TeleportEvent{Base: p.base(), Position: pos, Rotation: rot}) {
 		return
 	}
 	p.data.Rot = rot
@@ -2392,8 +2362,7 @@ func (p *Player) Move(deltaPos mgl64.Vec3, deltaYaw, deltaPitch float64) {
 		pos         = p.Position()
 		res, resRot = pos.Add(deltaPos), p.Rotation().Add(cube.Rotation{deltaYaw, deltaPitch})
 	)
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleMove(ctx, res, resRot); ctx.Cancelled() {
+	if l := &p.ev.Move; l.Active() && l.Fire(&MoveEvent{Base: p.base(), Position: res, Rotation: resRot}) {
 		if p.session() != session.Nop && pos.ApproxEqual(p.Position()) {
 			// The position of the player was changed and the event cancelled. This means we still need to notify the
 			// player of this movement change.
@@ -2501,8 +2470,7 @@ func (p *Player) Collect(s item.Stack) (int, bool) {
 	if p.Dead() || !p.GameMode().AllowsInteraction() {
 		return 0, false
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleItemPickup(ctx, &s); ctx.Cancelled() {
+	if l := &p.ev.ItemPickup; l.Active() && l.Fire(&ItemPickupEvent{Base: p.base(), Item: &s}) {
 		return 0, false
 	}
 	var added int
@@ -2533,8 +2501,7 @@ func (p *Player) ResetEnchantmentSeed() {
 
 // AddExperience adds experience to the player.
 func (p *Player) AddExperience(amount int) int {
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleExperienceGain(ctx, &amount); ctx.Cancelled() {
+	if l := &p.ev.ExperienceGain; l.Active() && l.Fire(&ExperienceGainEvent{Base: p.base(), Amount: &amount}) {
 		return 0
 	}
 	before := p.experience.Level()
@@ -2654,8 +2621,7 @@ func (p *Player) mendItems(xp int) int {
 // The number of items that was dropped in the end is returned. It is generally the count of the stack passed
 // or 0 if dropping the item.Stack was cancelled.
 func (p *Player) Drop(s item.Stack) int {
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleItemDrop(ctx, s); ctx.Cancelled() {
+	if l := &p.ev.ItemDrop; l.Active() && l.Fire(&ItemDropEvent{Base: p.base(), Item: s}) {
 		return 0
 	}
 	// An item entity holds at most a maximum sized stack and discards the rest, so a bigger stack is dropped as
@@ -2783,7 +2749,9 @@ func (p *Player) Tick(tx *world.Tx, current int64) {
 	p.session().SendHudUpdates()
 
 	if p.prevWorld != tx.World() && p.prevWorld != nil {
-		p.Handler().HandleChangeWorld(p, p.prevWorld, tx.World())
+		if l := &p.ev.ChangeWorld; l.Active() {
+			l.Fire(&ChangeWorldEvent{Base: p.base(), Before: p.prevWorld, After: tx.World()})
+		}
 	}
 	p.prevWorld = tx.World()
 
@@ -3195,16 +3163,15 @@ func (p *Player) EditSign(pos cube.Pos, frontText, backText string) error {
 		return nil
 	}
 
-	ctx := NewEventContext(p.tx, p)
 	if frontText != sign.Front.Text {
-		if p.Handler().HandleSignEdit(ctx, pos, true, sign.Front.Text, frontText); ctx.Cancelled() {
+		if l := &p.ev.SignEdit; l.Active() && l.Fire(&SignEditEvent{Base: p.base(), Pos: pos, FrontSide: true, OldText: sign.Front.Text, NewText: frontText}) {
 			p.resendNearbyBlock(pos)
 			return nil
 		}
 		sign.Front.Text = frontText
 		sign.Front.Owner = p.XUID()
 	} else {
-		if p.Handler().HandleSignEdit(ctx, pos, false, sign.Back.Text, backText); ctx.Cancelled() {
+		if l := &p.ev.SignEdit; l.Active() && l.Fire(&SignEditEvent{Base: p.base(), Pos: pos, FrontSide: false, OldText: sign.Back.Text, NewText: backText}) {
 			p.resendNearbyBlock(pos)
 			return nil
 		}
@@ -3223,8 +3190,7 @@ func (p *Player) TurnLecternPage(pos cube.Pos, page int) error {
 		return fmt.Errorf("edit lectern: no lectern at position %v", pos)
 	}
 
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleLecternPageTurn(ctx, pos, lectern.Page, &page); ctx.Cancelled() {
+	if l := &p.ev.LecternPageTurn; l.Active() && l.Fire(&LecternPageTurnEvent{Base: p.base(), Pos: pos, OldPage: lectern.Page, NewPage: &page}) {
 		return nil
 	}
 
@@ -3265,8 +3231,7 @@ func (p *Player) PunchAir() {
 	if p.Dead() {
 		return
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandlePunchAir(ctx); ctx.Cancelled() {
+	if l := &p.ev.PunchAir; l.Active() && l.Fire(&PunchAirEvent{Base: p.base()}) {
 		return
 	}
 	p.SwingArm()
@@ -3275,7 +3240,9 @@ func (p *Player) PunchAir() {
 
 // UpdateDiagnostics updates the diagnostics of the player.
 func (p *Player) UpdateDiagnostics(d session.Diagnostics) {
-	p.Handler().HandleDiagnostics(p, d)
+	if l := &p.ev.Diagnostics; l.Active() {
+		l.Fire(&DiagnosticsEvent{Base: p.base(), Diagnostics: d})
+	}
 }
 
 // ShowHudElement shows a HUD element to the player if it is not already shown.
@@ -3348,8 +3315,7 @@ func (p *Player) damageItem(s item.Stack, d int) item.Stack {
 	if p.GameMode().CreativeInventory() || d == 0 || s.MaxDurability() == -1 {
 		return s
 	}
-	ctx := NewEventContext(p.tx, p)
-	if p.Handler().HandleItemDamage(ctx, s, &d); ctx.Cancelled() || d <= 0 {
+	if l := &p.ev.ItemDamage; l.Active() && l.Fire(&ItemDamageEvent{Base: p.base(), Item: s, Damage: &d}) || d <= 0 {
 		return s
 	}
 	if e, ok := s.Enchantment(enchantment.Unbreaking); ok {
@@ -3438,8 +3404,11 @@ func (p *Player) close(msg string) {
 }
 
 func (p *Player) quit(msg string) {
-	p.h.HandleQuit(p)
-	p.h = NopHandler{}
+	if l := &p.ev.Quit; l.Active() {
+		l.Fire(&QuitEvent{Base: p.base()})
+	}
+	// Nothing is fired for a player that has quit.
+	p.ev = noEvents
 
 	if s := p.s; s != nil {
 		s.Disconnect(msg)
@@ -3504,27 +3473,15 @@ func (p *Player) session() *session.Session {
 
 // useContext returns an item.UseContext initialised for a Player.
 func (p *Player) useContext() *item.UseContext {
-	call := func(ctx *inventory.Context, slot int, it item.Stack, f func(ctx *inventory.Context, slot int, it item.Stack)) error {
-		if ctx.Cancelled() {
-			return fmt.Errorf("action was cancelled")
-		}
-		f(ctx, slot, it)
-		if ctx.Cancelled() {
-			return fmt.Errorf("action was cancelled")
-		}
-		return nil
-	}
 	return &item.UseContext{
 		SwapHeldWithArmour: func(i int) {
 			src, dst, srcInv, dstInv := int(*p.heldSlot), i, p.inv, p.armour.Inventory()
 			srcIt, _ := srcInv.Item(src)
 			dstIt, _ := dstInv.Item(dst)
 
-			ctx := event.C(inventory.Holder(p))
-			_ = call(ctx, src, srcIt, srcInv.Handler().HandleTake)
-			_ = call(ctx, src, dstIt, srcInv.Handler().HandlePlace)
-			_ = call(ctx, dst, dstIt, dstInv.Handler().HandleTake)
-			if err := call(ctx, dst, srcIt, dstInv.Handler().HandlePlace); err == nil {
+			ev := p.invEv
+			if !ev.FireTake(p, srcInv, src, srcIt) && !ev.FirePlace(p, srcInv, src, dstIt) &&
+				!ev.FireTake(p, dstInv, dst, dstIt) && !ev.FirePlace(p, dstInv, dst, srcIt) {
 				_ = srcInv.SetItem(src, dstIt)
 				_ = dstInv.SetItem(dst, srcIt)
 				p.PlaySound(sound.EquipItem{Item: srcIt.Item()})
@@ -3546,10 +3503,9 @@ func (p *Player) useContext() *item.UseContext {
 	}
 }
 
-// Handler returns the Handler of the player.
-func (p *Player) Handler() Handler {
-	return p.h
-}
+// InventoryEvents returns the inventory event lists the player fires when it
+// moves items.
+func (p *Player) InventoryEvents() *inventory.Events { return p.invEv }
 
 // broadcastItems broadcasts the items held to viewers.
 func (p *Player) broadcastItems(int, item.Stack, item.Stack) {

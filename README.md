@@ -17,10 +17,34 @@ otherwise unchanged. Everything after it is Helix's own work. See
 Requires Go 1.26 or later.
 
 ```shell
-go run main.go
+go run ./cmd/helix
 ```
 
 Press ctrl+c to stop the server.
+
+## Plugins
+
+A plugin is a struct embedding `helix.Plugin` with `Info` and `Setup`
+methods (RFC 0001). `Setup` registers listeners, any number per event, with
+options for priority, skipping cancelled events and filters:
+
+```go
+func (p *Protect) Setup(r *helix.Setup) {
+    r.BlockBreak(p.protect, helix.OnlyBlock("minecraft:diamond_ore"), helix.Priority(event.High))
+    r.PlayerJoin(p.welcome)
+}
+```
+
+Pass plugins to `helix.New` (see `examples/protect`). The engine fires events
+directly where things happen; an event nobody listens to costs a fraction
+of a nanosecond and allocates nothing. Plugins can be enabled and disabled
+while the server runs (`srv.Plugins().Disable("Protect")`). A panic in a
+plugin is recovered and logged with its name; `helix.Config.PanicLimit`
+disables a plugin that keeps panicking.
+
+Listeners run on the region the event happens in, in parallel with other
+regions. A listener may use the event's `Tx` for the world, but must not keep
+it, the event or the player after it returns.
 
 ## Regions
 

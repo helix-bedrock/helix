@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/helix-bedrock/helix/server/block"
 	"github.com/helix-bedrock/helix/server/entity"
-	"github.com/helix-bedrock/helix/server/event"
 	"github.com/helix-bedrock/helix/server/item"
 	"github.com/helix-bedrock/helix/server/item/inventory"
 	"github.com/helix-bedrock/helix/server/world"
@@ -169,11 +168,10 @@ func (h *ItemStackRequestHandler) handleTransfer(from, to protocol.StackRequestS
 	invA, _ := s.invByID(int32(from.Container.ContainerID), tx)
 	invB, _ := s.invByID(int32(to.Container.ContainerID), tx)
 
-	ctx := event.C(inventory.Holder(c))
-	_ = call(ctx, int(from.Slot), i.Grow(int(count)-i.Count()), invA.Handler().HandleTake)
-	err := call(ctx, int(to.Slot), i.Grow(int(count)-i.Count()), invB.Handler().HandlePlace)
-	if err != nil {
-		return err
+	ev := c.InventoryEvents()
+	moved := i.Grow(int(count) - i.Count())
+	if ev.FireTake(c, invA, int(from.Slot), moved) || ev.FirePlace(c, invB, int(to.Slot), moved) {
+		return errCancelled
 	}
 
 	// The destination is written first: a refused write there must leave the source untouched.
@@ -198,13 +196,10 @@ func (h *ItemStackRequestHandler) handleSwap(a *protocol.SwapStackRequestAction,
 	invA, _ := s.invByID(int32(a.Source.Container.ContainerID), tx)
 	invB, _ := s.invByID(int32(a.Destination.Container.ContainerID), tx)
 
-	ctx := event.C(inventory.Holder(c))
-	_ = call(ctx, int(a.Source.Slot), i, invA.Handler().HandleTake)
-	_ = call(ctx, int(a.Source.Slot), dest, invA.Handler().HandlePlace)
-	_ = call(ctx, int(a.Destination.Slot), dest, invB.Handler().HandleTake)
-	err := call(ctx, int(a.Destination.Slot), i, invB.Handler().HandlePlace)
-	if err != nil {
-		return err
+	ev := c.InventoryEvents()
+	if ev.FireTake(c, invA, int(a.Source.Slot), i) || ev.FirePlace(c, invA, int(a.Source.Slot), dest) ||
+		ev.FireTake(c, invB, int(a.Destination.Slot), dest) || ev.FirePlace(c, invB, int(a.Destination.Slot), i) {
+		return errCancelled
 	}
 
 	// The destination is written first: a refused write there must leave the source untouched.
@@ -263,8 +258,8 @@ func (h *ItemStackRequestHandler) handleDrop(a *protocol.DropStackRequestAction,
 	}
 
 	inv, _ := s.invByID(int32(a.Source.Container.ContainerID), tx)
-	if err := call(event.C(inventory.Holder(c)), int(a.Source.Slot), i.Grow(int(a.Count)-i.Count()), inv.Handler().HandleDrop); err != nil {
-		return err
+	if c.InventoryEvents().FireDrop(c, inv, int(a.Source.Slot), i.Grow(int(a.Count)-i.Count())) {
+		return errCancelled
 	}
 
 	n := c.Drop(i.Grow(int(a.Count) - i.Count()))
@@ -527,18 +522,8 @@ func (h *ItemStackRequestHandler) reject(id int32, s *Session, tx *world.Tx) {
 	h.pendingResults = nil
 }
 
-// call uses an event.Context, slot and item.Stack to call the event handler function passed. An error is returned if
-// the event.Context was cancelled either before or after the call.
-func call(ctx *inventory.Context, slot int, it item.Stack, f func(ctx *inventory.Context, slot int, it item.Stack)) error {
-	if ctx.Cancelled() {
-		return fmt.Errorf("action was cancelled")
-	}
-	f(ctx, slot, it)
-	if ctx.Cancelled() {
-		return fmt.Errorf("action was cancelled")
-	}
-	return nil
-}
+// errCancelled is returned when a plugin cancelled an inventory action.
+var errCancelled = fmt.Errorf("action was cancelled")
 
 // resolveSlot returns the Inventory a slot of a request refers to and the index within it. Several container IDs
 // address the same Inventory, and the off hand is recorded under its first slot, so two slots are only the same slot

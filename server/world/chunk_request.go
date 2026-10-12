@@ -1,6 +1,7 @@
 package world
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/helix-bedrock/helix/server/world/chunk"
@@ -54,7 +55,16 @@ func (r *chunkRequest) doImmediate(tx *Tx) *Column {
 // load loads or generates the chunk and hands it back to the world to be
 // added.
 func (r *chunkRequest) load(w *World) {
-	r.col, r.err = w.loadChunk(r.pos)
+	func() {
+		// Helix: a corrupt chunk or a broken generator must not stop the
+		// server; the chunk fails to load instead.
+		defer func() {
+			if v := recover(); v != nil {
+				r.col, r.err = nil, fmt.Errorf("panic loading chunk: %v", v)
+			}
+		}()
+		r.col, r.err = w.loadChunk(r.pos)
+	}()
 	close(r.done)
 	// Helix: finish on the region that owns the chunk.
 	w.postAt(r.pos, r.signal)

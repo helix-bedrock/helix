@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/helix-bedrock/helix/debug"
+	"github.com/helix-bedrock/helix/server/item/inventory"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -29,6 +30,13 @@ import (
 
 // Config contains options for starting a Minecraft server.
 type Config struct {
+	// PlayerEvents, WorldEvents and InventoryEvents are the event listener
+	// lists of the server (Helix, RFC 0001), shared by its players and
+	// worlds. Plugins register listeners in them through the helix package.
+	// If nil, empty lists are made.
+	PlayerEvents    *player.Events
+	WorldEvents     *world.Events
+	InventoryEvents *inventory.Events
 	// RegionSectionSize is the width in chunks of the sections that worlds
 	// split into regions with. If 0, world.DefaultSectionSize.
 	RegionSectionSize int
@@ -151,6 +159,15 @@ func (conf Config) New() *Server {
 	}
 	if conf.Name == "" {
 		conf.Name = "Helix Server"
+	}
+	if conf.PlayerEvents == nil {
+		conf.PlayerEvents = &player.Events{}
+	}
+	if conf.WorldEvents == nil {
+		conf.WorldEvents = &world.Events{}
+	}
+	if conf.InventoryEvents == nil {
+		conf.InventoryEvents = &inventory.Events{}
 	}
 	if conf.StatusProvider == nil {
 		conf.StatusProvider = statusProvider{name: conf.Name}

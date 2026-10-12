@@ -2,6 +2,7 @@ package world
 
 import (
 	"iter"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -19,30 +20,10 @@ type Tx struct {
 	deferred []scheduledTransaction
 }
 
-// Context is a cancellable event scope passed to Handler events. It embeds the
-// owner transaction, so world operations are available directly on it.
-type Context struct {
-	*Tx
-	cancel bool
-}
-
-// newTx returns a fresh transaction on World w.
+// newTx returns a fresh transaction on region r.
 func newTx(r *region) *Tx {
 	return &Tx{w: r.World, r: r}
 }
-
-// Event returns a fresh Context for dispatching one Handler event on this
-// transaction, so cancelling one event cannot affect another.
-func (tx *Tx) Event() *Context {
-	return &Context{Tx: tx}
-}
-
-// Cancelled returns whether the Context has been cancelled by an event handler.
-func (ctx *Context) Cancelled() bool { return ctx.cancel }
-
-// Cancel cancels the Context. It is used by event handlers to signal that the
-// default behaviour of the event should not run.
-func (ctx *Context) Cancel() { ctx.cancel = true }
 
 // Defer schedules f to run on the owner after the current callback completes
 // and before the parent Task completes. Deferred callbacks run FIFO in
@@ -441,11 +422,26 @@ type normalTransaction struct {
 // Run creates a *Tx, calls ntx.f, closes the transaction and finally closes
 // ntx.c.
 func (ntx normalTransaction) Run(r *region) {
+	defer close(ntx.c)
 	tx := newTx(r)
-	ntx.f(tx)
-	tx.close()
-	tx.runDeferred()
-	close(ntx.c)
+	runRecovered(r, func() {
+		ntx.f(tx)
+		tx.close()
+		tx.runDeferred()
+	})
+}
+
+// runRecovered runs f, logging and stopping a panic in it so that one bad
+// transaction, block or entity cannot stop the region or the server
+// (Helix: never crash).
+func runRecovered(r *region, f func()) {
+	defer func() {
+		if v := recover(); v != nil {
+			r.conf.Log.Error("recovered from a panic in a world transaction; it was cut short",
+				"region", r.String(), "panic", v, "stack", string(debug.Stack()))
+		}
+	}()
+	f()
 }
 
 // weakTransaction is a transaction that may be cancelled by its validity
@@ -473,9 +469,11 @@ func (wtx weakTransaction) Run(r *region) {
 	valid := wtx.valid == nil || wtx.valid()
 	if valid {
 		tx := newTx(r)
-		wtx.f(tx)
-		tx.close()
-		tx.runDeferred()
+		runRecovered(r, func() {
+			wtx.f(tx)
+			tx.close()
+			tx.runDeferred()
+		})
 	}
 	// We have to acquire a lock on wtx.cond.L here to make sure cond.Wait()
 	// has been called before we call cond.Broadcast(). If not, we might

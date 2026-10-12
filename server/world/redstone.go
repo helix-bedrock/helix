@@ -1002,9 +1002,11 @@ func (e *redstoneEngine) redstonePower(source RedstonePowerSource, pos cube.Pos,
 
 // redstoneUpdateAllowed dispatches redstone callbacks and reports whether the update was cancelled.
 func (e *redstoneEngine) redstoneUpdateAllowed(tx *Tx, update RedstoneUpdate) bool {
-	ctx := tx.Event()
-	tx.r.Handler().HandleRedstoneUpdate(ctx, update)
-	return !ctx.Cancelled()
+	ev := &tx.w.conf.Events.RedstoneUpdate
+	if !ev.Active() {
+		return true
+	}
+	return !ev.Fire(&RedstoneUpdateEvent{txWorld: txWorld{tx}, Update: update})
 }
 
 // redstoneLightDiffuser is the local subset needed to exclude transparent conductors.

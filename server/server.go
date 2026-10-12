@@ -141,9 +141,14 @@ func (srv *Server) Accept() iter.Seq[*player.Player] {
 			srv.p[inc.p.handle.UUID()] = inc.p
 			srv.pmu.Unlock()
 
-			ret, err := world.Call(context.Background(), inc.w, func(tx *world.Tx) (bool, error) {
+			// Helix: join on the region at the player's position, which may
+			// not be the spawn's region.
+			ret, err := world.CallAt(context.Background(), inc.w, inc.p.handle.SpawnPosition(), func(tx *world.Tx) (bool, error) {
 				p := tx.AddEntity(inc.p.handle).(*player.Player)
 				inc.s.Spawn(p, tx)
+				if l := &srv.conf.PlayerEvents.Join; l.Active() {
+					l.Fire(&player.JoinEvent{Base: player.Base{Tx: tx, Player: p}})
+				}
 				return !yield(p), nil
 			})
 			if err != nil {
@@ -591,6 +596,7 @@ func (srv *Server) createPlayer(id uuid.UUID, conn session.Conn, conf player.Con
 	conf.Locale, _ = language.Parse(strings.Replace(conn.ClientData().LanguageCode, "_", "-", 1))
 	conf.Skin = srv.parseSkin(conn.ClientData())
 	conf.Session = s
+	conf.Events, conf.InventoryEvents = srv.conf.PlayerEvents, srv.conf.InventoryEvents
 
 	handle := world.EntitySpawnOpts{Position: conf.Position, ID: id}.New(player.Type, conf)
 	s.SetHandle(handle, conf.Skin)
@@ -616,6 +622,7 @@ func (srv *Server) createWorld(dim world.Dimension, nether, end **world.World) *
 		ChunkLoadWorkers:    srv.conf.ChunkLoadWorkers,
 		Entities:            srv.conf.Entities,
 		Blocks:              srv.conf.Blocks,
+		Events:              srv.conf.WorldEvents,
 		Debug:               srv.conf.Debug,
 		SectionSize:         srv.conf.RegionSectionSize,
 		PortalDestination: func(dim world.Dimension) *world.World {

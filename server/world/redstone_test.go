@@ -2,39 +2,18 @@ package world
 
 import (
 	"context"
+	"github.com/helix-bedrock/helix/server/hook"
 	"math/rand/v2"
 	"slices"
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 )
-
-var _ Handler = minimalRedstoneTestHandler{}
-
-type minimalRedstoneTestHandler struct{}
 
 func runWorld(w *World, f func(*Tx)) {
 	w.Do(f).Wait(context.Background())
 }
-
-func (minimalRedstoneTestHandler) HandleRedstoneUpdate(*Context, RedstoneUpdate)                {}
-func (minimalRedstoneTestHandler) HandleLiquidFlow(*Context, cube.Pos, cube.Pos, Liquid, Block) {}
-func (minimalRedstoneTestHandler) HandleLiquidDecay(*Context, cube.Pos, Liquid, Liquid)         {}
-func (minimalRedstoneTestHandler) HandleLiquidHarden(*Context, cube.Pos, Block, Block, Block)   {}
-func (minimalRedstoneTestHandler) HandleSound(*Context, Sound, mgl64.Vec3)                      {}
-func (minimalRedstoneTestHandler) HandleFireSpread(*Context, cube.Pos, cube.Pos)                {}
-func (minimalRedstoneTestHandler) HandleBlockBurn(*Context, cube.Pos)                           {}
-func (minimalRedstoneTestHandler) HandleCropTrample(*Context, cube.Pos)                         {}
-func (minimalRedstoneTestHandler) HandleLeavesDecay(*Context, cube.Pos)                         {}
-func (minimalRedstoneTestHandler) HandlePortalCreate(*Context, Dimension, []cube.Pos)           {}
-func (minimalRedstoneTestHandler) HandlePortalActivate(*Context, Dimension, []cube.Pos)         {}
-func (minimalRedstoneTestHandler) HandleEntitySpawn(*Tx, Entity)                                {}
-func (minimalRedstoneTestHandler) HandleEntityDespawn(*Tx, Entity)                              {}
-func (minimalRedstoneTestHandler) HandleExplosion(*Context, ExplosionSource, *[]Entity, *[]cube.Pos, *float64, *bool) {
-}
-func (minimalRedstoneTestHandler) HandleClose(*Tx) {}
 
 func TestClampRedstonePower(t *testing.T) {
 	tests := []struct {
@@ -261,7 +240,7 @@ func TestRedstoneCancelledSourceDoesNotPropagate(t *testing.T) {
 	w := Config{Synchronous: true, Blocks: redstoneCancellationTestRegistry()}.New()
 	defer w.Close()
 
-	w.Handle(&redstoneCancellationHandler{cancel: map[cube.Pos]struct{}{sourcePos: {}}})
+	cancelRedstoneAt(w, sourcePos)
 	var sinkPowered bool
 	var sourceOutput int
 	runWorld(w, func(tx *Tx) {
@@ -285,7 +264,7 @@ func TestRedstoneCancelledSourceKeepsPreviousOutputDuringEvaluation(t *testing.T
 	w := Config{Synchronous: true, Blocks: redstoneCancellationTestRegistry()}.New()
 	defer w.Close()
 
-	w.Handle(&redstoneCancellationHandler{cancel: map[cube.Pos]struct{}{sourcePos: {}}})
+	cancelRedstoneAt(w, sourcePos)
 
 	var sourceOutput int
 	runWorld(w, func(tx *Tx) {
@@ -306,7 +285,7 @@ func TestRedstoneCancelledConsumerDoesNotUpdate(t *testing.T) {
 	w := Config{Synchronous: true, Blocks: redstoneCancellationTestRegistry()}.New()
 	defer w.Close()
 
-	w.Handle(&redstoneCancellationHandler{cancel: map[cube.Pos]struct{}{sinkPos: {}}})
+	cancelRedstoneAt(w, sinkPos)
 	var sinkPowered bool
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
@@ -326,7 +305,7 @@ func TestRedstoneUpdateIncludesContextMetadata(t *testing.T) {
 	defer w.Close()
 
 	handler := &redstoneRecordingHandler{pos: sinkPos}
-	w.Handle(handler)
+	w.Events().RedstoneUpdate.Add(testOwner{}, handler.record, hook.Normal, false, nil)
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sinkPos, redstoneCancellationConsumer{}, &SetOpts{DisableRedstoneUpdates: true})
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
@@ -390,7 +369,7 @@ func TestRedstoneCancelledActionDoesNotRun(t *testing.T) {
 	t.Cleanup(func() {
 		redstoneCancellationActions = nil
 	})
-	w.Handle(&redstoneCancellationHandler{cancel: map[cube.Pos]struct{}{actionPos: {}}})
+	cancelRedstoneAt(w, actionPos)
 	runWorld(w, func(tx *Tx) {
 		tx.SetBlock(sourcePos, redstoneCancellationSource{Power: 15}, nil)
 		tx.SetBlock(actionPos, redstoneCancellationAction{}, nil)
@@ -729,26 +708,29 @@ func (redstoneNeighbourOrderTestBlock) EncodeBlock() (string, map[string]any) {
 func (redstoneNeighbourOrderTestBlock) Hash() (uint64, uint64) { return 1 << 41, 0 }
 func (redstoneNeighbourOrderTestBlock) Model() BlockModel      { return nil }
 
-type redstoneCancellationHandler struct {
-	NopHandler
-	cancel map[cube.Pos]struct{}
-}
+// testOwner runs listeners directly, always enabled.
+type testOwner struct{}
 
-func (h *redstoneCancellationHandler) HandleRedstoneUpdate(ctx *Context, update RedstoneUpdate) {
-	if _, ok := h.cancel[update.Pos]; ok {
-		ctx.Cancel()
-	}
+func (testOwner) Enabled() bool          { return true }
+func (testOwner) Run(_ string, f func()) { f() }
+
+// cancelRedstoneAt cancels redstone updates at pos.
+func cancelRedstoneAt(w *World, pos cube.Pos) {
+	w.Events().RedstoneUpdate.Add(testOwner{}, func(e *RedstoneUpdateEvent) {
+		if e.Update.Pos == pos {
+			e.Cancel()
+		}
+	}, hook.Normal, false, nil)
 }
 
 type redstoneRecordingHandler struct {
-	NopHandler
 	pos     cube.Pos
 	updates []RedstoneUpdate
 }
 
-func (h *redstoneRecordingHandler) HandleRedstoneUpdate(_ *Context, update RedstoneUpdate) {
-	if update.Pos == h.pos {
-		h.updates = append(h.updates, update)
+func (h *redstoneRecordingHandler) record(e *RedstoneUpdateEvent) {
+	if e.Update.Pos == h.pos {
+		h.updates = append(h.updates, e.Update)
 	}
 }
 

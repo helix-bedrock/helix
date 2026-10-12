@@ -135,6 +135,12 @@ func entityFromData(t EntityType, id int64, data map[string]any) *EntityHandle {
 }
 
 // Type returns the EntityType of the EntityHandle.
+// SpawnPosition returns the position the entity will be added to a world
+// at. Only call it while the entity is in no world (Helix).
+func (e *EntityHandle) SpawnPosition() mgl64.Vec3 {
+	return e.data.Pos
+}
+
 func (e *EntityHandle) Type() EntityType {
 	return e.t
 }

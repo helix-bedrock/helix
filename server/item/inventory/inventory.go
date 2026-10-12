@@ -17,7 +17,6 @@ import (
 // Inventory is safe for concurrent usage: Its values are protected by a mutex.
 type Inventory struct {
 	mu    sync.RWMutex
-	h     Handler
 	slots []item.Stack
 
 	f         SlotFunc
@@ -49,7 +48,7 @@ func New(size int, f SlotFunc) *Inventory {
 	if f == nil {
 		f = func(slot int, before, after item.Stack) {}
 	}
-	return &Inventory{h: NopHandler{}, slots: make([]item.Stack, size), f: f, validator: func(s item.Stack, slot int) bool { return true }}
+	return &Inventory{slots: make([]item.Stack, size), f: f, validator: func(s item.Stack, slot int) bool { return true }}
 }
 
 // Clone copies an Inventory and returns it, calling the SlotFunc passed for any
@@ -58,7 +57,7 @@ func (inv *Inventory) Clone(f SlotFunc) *Inventory {
 	if f == nil {
 		f = func(slot int, before, after item.Stack) {}
 	}
-	return &Inventory{h: NopHandler{}, slots: inv.Slots(), f: f, validator: func(s item.Stack, slot int) bool { return true }}
+	return &Inventory{slots: inv.Slots(), f: f, validator: func(s item.Stack, slot int) bool { return true }}
 }
 
 // SlotFunc changes the function called when a slot in the inventory is changed.
@@ -370,28 +369,6 @@ func (inv *Inventory) Clear() []item.Stack {
 	inv.mu.Unlock()
 
 	return items
-}
-
-// Handle assigns a Handler to an Inventory so that its methods are called for the respective events. Nil may be passed
-// to set the default NopHandler.
-func (inv *Inventory) Handle(h Handler) {
-	inv.mu.Lock()
-	defer inv.mu.Unlock()
-
-	inv.check()
-	if h == nil {
-		h = NopHandler{}
-	}
-	inv.h = h
-}
-
-// Handler returns the Handler currently assigned to the Inventory. This is the NopHandler by default.
-func (inv *Inventory) Handler() Handler {
-	inv.mu.RLock()
-	defer inv.mu.RUnlock()
-
-	inv.check()
-	return inv.h
 }
 
 // setItem sets an item to a specific slot and overwrites the existing item. It returns the function which is called

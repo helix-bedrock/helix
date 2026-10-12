@@ -56,9 +56,8 @@ func ActivateNetherPortal(tx *world.Tx, pos cube.Pos) bool {
 	if !ok || !p.Framed() || p.Activated() {
 		return false
 	}
-	ctx := tx.Event()
 	positions := append([]cube.Pos(nil), p.Positions()...)
-	if tx.World().Handler().HandlePortalActivate(ctx, world.Nether, positions); ctx.Cancelled() {
+	if world.PortalActivate(tx, world.Nether, positions) {
 		return false
 	}
 	p.Activate()
@@ -276,9 +275,8 @@ func CreateNetherPortal(tx *world.Tx, pos cube.Pos) (Nether, bool) {
 		}
 	}
 
-	ctx := tx.Event()
 	handlerPositions := append([]cube.Pos(nil), affected...)
-	if tx.World().Handler().HandlePortalCreate(ctx, world.Nether, handlerPositions); ctx.Cancelled() {
+	if world.PortalCreate(tx, world.Nether, handlerPositions) {
 		return Nether{}, false
 	}
 	for _, pos := range affected {

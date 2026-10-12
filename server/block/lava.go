@@ -176,8 +176,7 @@ func (l Lava) Harden(pos cube.Pos, tx *world.Tx, flownIntoBy *cube.Pos) bool {
 			}
 		}, tx.Range())
 		if b != nil {
-			ctx := tx.Event()
-			if tx.World().Handler().HandleLiquidHarden(ctx, pos, l, water, b); ctx.Cancelled() {
+			if world.LiquidHarden(tx, pos, l, water, b) {
 				return false
 			}
 			tx.PlaySound(pos.Vec3Centre(), sound.Fizz{})
@@ -196,8 +195,7 @@ func (l Lava) Harden(pos cube.Pos, tx *world.Tx, flownIntoBy *cube.Pos) bool {
 	} else {
 		b = Cobblestone{}
 	}
-	ctx := tx.Event()
-	if tx.World().Handler().HandleLiquidHarden(ctx, pos, l, water, b); ctx.Cancelled() {
+	if world.LiquidHarden(tx, pos, l, water, b) {
 		return false
 	}
 	tx.SetBlock(pos, b, nil)

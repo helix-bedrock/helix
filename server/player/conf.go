@@ -19,13 +19,17 @@ import (
 
 // Config holds options that a Player can be created with.
 type Config struct {
-	Session  *session.Session
-	Skin     skin.Skin
-	XUID     string
-	UUID     uuid.UUID
-	Name     string
-	Locale   language.Tag
-	GameMode world.GameMode
+	// Events are the player event lists (Helix). If nil, nothing listens.
+	Events *Events
+	// InventoryEvents are the inventory event lists the player fires.
+	InventoryEvents *inventory.Events
+	Session         *session.Session
+	Skin            skin.Skin
+	XUID            string
+	UUID            uuid.UUID
+	Name            string
+	Locale          language.Tag
+	GameMode        world.GameMode
 
 	Position               mgl64.Vec3
 	Rotation               cube.Rotation
@@ -52,6 +56,9 @@ type Config struct {
 // Apply applies fields from a Config to a world.EntityData, filling out empty
 // fields with reasonable defaults.
 func (cfg Config) Apply(data *world.EntityData) {
+	if cfg.Events == nil {
+		cfg.Events = noEvents
+	}
 	conf := fillDefaults(cfg)
 
 	data.Name, data.Pos, data.Rot = conf.Name, conf.Position, conf.Rotation
@@ -75,7 +82,8 @@ func (cfg Config) Apply(data *world.EntityData) {
 		skin:                conf.Skin,
 		enchantSeed:         conf.EnchantmentSeed,
 		s:                   conf.Session,
-		h:                   NopHandler{},
+		ev:                  cfg.Events,
+		invEv:               cfg.InventoryEvents,
 		speed:               0.1,
 		flightSpeed:         0.05,
 		verticalFlightSpeed: 1.0,

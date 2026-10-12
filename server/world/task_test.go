@@ -3,6 +3,7 @@ package world
 import (
 	"context"
 	"errors"
+	"github.com/helix-bedrock/helix/server/hook"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -174,7 +175,7 @@ func TestDoQueuedBeforeCloseDoesNotRunAfterHandleClose(t *testing.T) {
 
 	var closeHandled atomic.Bool
 	var ranAfterClose atomic.Bool
-	w.Handle(closeOrderHandler{closed: &closeHandled})
+	w.Events().Close.Add(testOwner{}, closeOrderHandler{closed: &closeHandled}.handle, hook.Normal, false, nil)
 
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -260,11 +261,10 @@ func TestEntityDoBlockedBeforeWorldCloseFailsPromptly(t *testing.T) {
 type taskTestEntityConfig struct{}
 
 type closeOrderHandler struct {
-	NopHandler
 	closed *atomic.Bool
 }
 
-func (h closeOrderHandler) HandleClose(*Tx) { h.closed.Store(true) }
+func (h closeOrderHandler) handle(*CloseEvent) { h.closed.Store(true) }
 
 type closeSchedulingEntityConfig struct {
 	onClose func(*EntityHandle)

@@ -42,7 +42,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Build
-        run: go build -o helix_exe -v .
+        run: go build -o helix_exe -v ./cmd/helix
 
       - name: Set SSH info
         env:

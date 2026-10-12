@@ -50,6 +50,9 @@ type Controllable interface {
 
 	Chat(msg ...any)
 	ExecuteCommand(commandLine string)
+	// InventoryEvents returns the inventory event lists fired when the
+	// controllable moves items (Helix).
+	InventoryEvents() *inventory.Events
 	GameMode() world.GameMode
 	SetGameMode(mode world.GameMode)
 	Effects() []effect.Effect

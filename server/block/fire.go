@@ -176,13 +176,11 @@ func (f Fire) tick(pos cube.Pos, tx *world.Tx, r *rand.Rand) {
 // this might end up not happening.
 func (f Fire) spread(from, to cube.Pos, tx *world.Tx, r *rand.Rand) {
 	if _, air := tx.Block(to).(Air); !air {
-		ctx := tx.Event()
-		if tx.World().Handler().HandleBlockBurn(ctx, to); ctx.Cancelled() {
+		if world.BlockBurn(tx, to) {
 			return
 		}
 	}
-	ctx := tx.Event()
-	if tx.World().Handler().HandleFireSpread(ctx, from, to); ctx.Cancelled() {
+	if world.FireSpread(tx, from, to) {
 		return
 	}
 	spread := Fire{Type: f.Type, Age: min(15, f.Age+r.IntN(5)/4)}

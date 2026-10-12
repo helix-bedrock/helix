@@ -161,10 +161,9 @@ func (c ExplosionConfig) Explode(tx *world.Tx, src world.ExplosionSource) {
 		}
 	}
 
-	ctx := tx.Event()
 	spawnFire := c.SpawnFire
 	itemDropChance := c.ItemDropChance
-	if tx.World().Handler().HandleExplosion(ctx, src, &affectedEntities, &affectedBlocks, &itemDropChance, &spawnFire); ctx.Cancelled() {
+	if world.Explosion(tx, src, &affectedEntities, &affectedBlocks, &itemDropChance, &spawnFire) {
 		return
 	}
 

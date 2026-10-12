@@ -3,9 +3,7 @@ package session
 import (
 	"fmt"
 	"github.com/helix-bedrock/helix/server/block/cube"
-	"github.com/helix-bedrock/helix/server/event"
 	"github.com/helix-bedrock/helix/server/item"
-	"github.com/helix-bedrock/helix/server/item/inventory"
 	"github.com/helix-bedrock/helix/server/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -127,8 +125,8 @@ func (h *InventoryTransactionHandler) handleNormalTransaction(pk *packet.Invento
 	// logic in the Comparable() method was flawed, users would be able to cheat with item properties.
 	// Only grow or shrink the held item to prevent any such issues.
 	res := actual.Grow(count - actual.Count())
-	if err := call(event.C(inventory.Holder(c)), int(*s.heldSlot), res, s.inv.Handler().HandleDrop); err != nil {
-		return err
+	if c.InventoryEvents().FireDrop(c, s.inv, int(*s.heldSlot), res) {
+		return errCancelled
 	}
 
 	n := c.Drop(res)
