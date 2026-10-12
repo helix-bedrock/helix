@@ -33,10 +33,11 @@ so ticks never wait for each other. Set `RegionSize` under `[World]` in
 `config.toml` to change the section size; 1 or 2 makes region borders
 common, for testing them. The debug dashboard draws the region map.
 
-Known limits: a block update or entity reaching a chunk of another region
-sees it as unloaded until the regions merge; command targets (`@a`, player
-names) and sleeping through the night only see the region the command or
-sleeper is in.
+Work that needs the whole world at once (commands, which may target any
+player, and sleeping through the night) runs as a global task: every region
+merges into one first, and they split apart again on their own. Something
+that reaches into another region's chunk, such as a big explosion, sees it
+as unloaded that once and makes the two regions merge.
 
 ## Debugging
 

@@ -235,7 +235,11 @@ func (r *region) owns(pos ChunkPos) bool {
 // claim makes r the owner of the section of pos if it is free and no other
 // region is within the gap. If another region is too close, it asks for a
 // merge and returns false. Runs on r.
-func (r *region) claim(pos ChunkPos) bool {
+func (r *region) claim(pos ChunkPos) bool { return r.claimOrMerge(pos, true) }
+
+// claimOrMerge is claim; mergeOwner says whether to ask for a merge with
+// the region that already owns the section.
+func (r *region) claimOrMerge(pos ChunkPos, mergeOwner bool) bool {
 	if r.conf.Synchronous {
 		return true
 	}
@@ -243,6 +247,11 @@ func (r *region) claim(pos ChunkPos) bool {
 	r.layoutMu.Lock()
 	defer r.layoutMu.Unlock()
 	if o := r.sectionOwner[s]; o != nil {
+		if o != r && mergeOwner {
+			// Something here reached into another region's chunk: merge, so
+			// it works next time.
+			r.requestMergeLocked([]*region{r, o})
+		}
 		return o == r
 	}
 	near := r.regionsNearLocked(s, r)
@@ -466,6 +475,8 @@ func (r *region) isStopped() bool {
 // absorbLocked moves everything of o into r and retires o. Both run locks
 // and layoutMu are held.
 func (r *region) absorbLocked(o *region) {
+	// Do not split again straight away: a global task may be about to run.
+	r.ticked = 1
 	r.moveLocked(o, func(ChunkPos) bool { return true })
 	for s := range o.sections {
 		r.sectionOwner[s] = r
@@ -636,6 +647,41 @@ func (r *region) stopLocked() {
 			}
 		}()
 	}
+}
+
+// RegionCount returns how many regions the world has.
+func (w *World) RegionCount() int {
+	if w.conf.Synchronous {
+		return 1
+	}
+	w.layoutMu.Lock()
+	defer w.layoutMu.Unlock()
+	return len(w.regions)
+}
+
+// DoGlobal runs f with the whole world in one region: every region is
+// merged first, so f sees every chunk, entity and player. The regions split
+// apart again on their own afterwards. Merging costs time proportional to
+// the loaded world, so DoGlobal is for rare work: commands, sleeping
+// through the night. It is safe to call from anywhere and returns at once.
+func (w *World) DoGlobal(f func(tx *Tx)) *Task {
+	if w.conf.Synchronous || w.RegionCount() <= 1 {
+		return w.Do(f)
+	}
+	task := newTask()
+	go func() {
+		w.merge(w.allRegions())
+		rs := w.allRegions()
+		r := w.defaultRegion()
+		if len(rs) > 0 {
+			r = rs[0]
+		}
+		r.post(scheduledTransaction{task: task, f: func(tx *Tx) error {
+			f(tx)
+			return nil
+		}})
+	}()
+	return task
 }
 
 // RegionInfo describes one region, for debugging.

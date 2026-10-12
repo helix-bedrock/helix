@@ -340,6 +340,23 @@ func (p *Player) ExecuteCommand(commandLine string) {
 	if p.Dead() {
 		return
 	}
+	if w := p.tx.World(); w.RegionCount() > 1 {
+		// Helix: commands may target any player or entity in the world, so
+		// they run with the whole world in one region.
+		h := p.H()
+		w.DoGlobal(func(tx *world.Tx) {
+			if e, ok := h.Entity(tx); ok {
+				if pl, ok := e.(*Player); ok {
+					pl.executeCommand(commandLine)
+				}
+			}
+		})
+		return
+	}
+	p.executeCommand(commandLine)
+}
+
+func (p *Player) executeCommand(commandLine string) {
 	args := strings.Split(commandLine, " ")
 
 	name, ok := strings.CutPrefix(args[0], "/")

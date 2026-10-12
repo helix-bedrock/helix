@@ -132,3 +132,40 @@ func TestEntityAddedInAnotherRegionMovesThere(t *testing.T) {
 		t.Fatal("entity task ran on the wrong region")
 	}
 }
+
+func TestDoGlobalSeesTheWholeWorld(t *testing.T) {
+	w := regionWorld(t)
+	load(t, w, ChunkPos{0, 0})
+	load(t, w, ChunkPos{100, 0})
+	for _, x := range []float64{1, 100<<4 + 1} {
+		h := NewEntity(taskTestEntityType{}, taskTestEntityConfig{})
+		done := make(chan struct{})
+		w.postAt(chunkPosFromVec3(mgl64.Vec3{x, 0, 1}), func(tx *Tx) {
+			tx.AddEntityAt(h, mgl64.Vec3{x, 0, 1})
+			close(done)
+		})
+		<-done
+	}
+	if w.RegionCount() != 2 {
+		t.Fatalf("want 2 regions, got %d", w.RegionCount())
+	}
+	seen := make(chan int, 1)
+	w.DoGlobal(func(tx *Tx) {
+		n := 0
+		for range tx.Entities() {
+			n++
+		}
+		seen <- n
+	})
+	select {
+	case n := <-seen:
+		if n != 2 {
+			t.Fatalf("global task saw %d entities, want 2", n)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("global task did not run")
+	}
+	// The regions split apart again on their own.
+	<-w.exec(func(tx *Tx) { tx.r.ticked = 0; tx.r.trySplit() })
+	eventually(t, "split after the global task", func() bool { return w.RegionCount() == 2 })
+}

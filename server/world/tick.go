@@ -98,19 +98,18 @@ func (w *World) clockTick(first bool) {
 			}
 		}
 	}
-	var spawnRegion *region
 	if tryAdvanceDay {
-		spawnRegion = w.defaultRegion()
+		// Every player in the world has to be asleep: check them all at once.
+		w.DoGlobal(func(tx *Tx) { ticker{}.tryAdvanceDay(tx, cycle) })
 	}
 	for _, r := range w.allRegions() {
-		advanceDay := r == spawnRegion
-		r.postTick(func(tx *Tx) { ticker{}.tick(tx, tick, thunder, advanceDay, cycle) })
+		r.postTick(func(tx *Tx) { ticker{}.tick(tx, tick, thunder) })
 	}
 }
 
 // tick ticks one region: its entities, scheduled updates, random ticks,
 // neighbour updates and redstone.
-func (t ticker) tick(tx *Tx, tick int64, thunder, advanceDay, cycle bool) {
+func (t ticker) tick(tx *Tx, tick int64, thunder bool) {
 	w := tx.r
 	_, loaders := w.allViewers()
 	var dt *debug.Tick
@@ -119,11 +118,6 @@ func (t ticker) tick(tx *Tx, tick int64, thunder, advanceDay, cycle bool) {
 		defer dt.End()
 	}
 
-	// Sleeping through the night is only checked for the players in the
-	// region at the spawn (Helix: a known gap until sleeping is global).
-	if advanceDay {
-		t.tryAdvanceDay(tx, cycle)
-	}
 	if thunder {
 		w.tickLightning(tx)
 	}

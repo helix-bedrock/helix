@@ -824,7 +824,7 @@ func (w *region) addEntity(tx *Tx, handle *EntityHandle) Entity {
 func (w *region) addEntityAt(tx *Tx, handle *EntityHandle, pos mgl64.Vec3) Entity {
 	handle.setAndUnlockWorldAt(w.World, pos)
 	chunkPos := chunkPosFromVec3(handle.data.Pos)
-	if !w.claim(chunkPos) {
+	if !w.claimOrMerge(chunkPos, false) {
 		if o := w.World.regionAt(chunkPos); o != w {
 			// Helix: the entity's chunk belongs to another region, which
 			// adds it. The Entity returned may only be read in this

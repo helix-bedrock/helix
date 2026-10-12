@@ -321,6 +321,15 @@ func (tx *Tx) Sleepers() iter.Seq[Sleeper] {
 
 // BroadcastSleepingIndicator broadcasts a sleeping indicator to all sleepers in the world.
 func (tx *Tx) BroadcastSleepingIndicator() {
+	if tx.w.RegionCount() > 1 {
+		// Helix: count the sleepers of the whole world.
+		tx.w.DoGlobal(func(tx *Tx) { tx.broadcastSleepingIndicator() })
+		return
+	}
+	tx.broadcastSleepingIndicator()
+}
+
+func (tx *Tx) broadcastSleepingIndicator() {
 	sleepers := tx.Sleepers()
 
 	var sleeping, allSleepers int
@@ -339,6 +348,22 @@ func (tx *Tx) BroadcastSleepingIndicator() {
 // BroadcastSleepingReminder broadcasts a sleeping reminder message to all sleepers in the world, excluding the sleeper
 // passed.
 func (tx *Tx) BroadcastSleepingReminder(sleeper Sleeper) {
+	if tx.w.RegionCount() > 1 {
+		// Helix: remind the sleepers of the whole world.
+		h := sleeper.H()
+		tx.w.DoGlobal(func(tx *Tx) {
+			if e, ok := h.Entity(tx); ok {
+				if s, ok := e.(Sleeper); ok {
+					tx.broadcastSleepingReminder(s)
+				}
+			}
+		})
+		return
+	}
+	tx.broadcastSleepingReminder(sleeper)
+}
+
+func (tx *Tx) broadcastSleepingReminder(sleeper Sleeper) {
 	sleepers := tx.Sleepers()
 
 	var notSleeping int
