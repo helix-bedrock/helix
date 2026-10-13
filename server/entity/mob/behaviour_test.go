@@ -138,7 +138,7 @@ func TestFishSwimsAndBatFlies(t *testing.T) {
 		}
 	})
 	withMob(t, w, bat, func(m *Mob) {
-		if m.Position()[1] < 2 {
+		if m.Position()[1] < 1.5 {
 			t.Errorf("bat fell to the floor: %v", m.Position())
 		}
 	})

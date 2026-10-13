@@ -60,11 +60,19 @@ func (g *directGoal) CanStart(m *Mob) bool {
 		if _, liquid := m.tx.Liquid(p); liquid != g.water {
 			continue
 		}
+		if !g.water && path.Solid(m.tx, p.Side(cube.FaceDown)) {
+			// Flyers hover: never a point right on the ground.
+			continue
+		}
 		if !g.water && p[1] > m.tx.HighestBlock(p[0], p[2])+8 {
 			// Flyers keep near the ground, as they do in vanilla.
 			continue
 		}
 		dest := mgl64.Vec3{float64(p[0]) + 0.5, float64(p[1]) + 0.5, float64(p[2]) + 0.5}
+		if !clearLine(m, m.data.Pos.Add(mgl64.Vec3{0, 0.5}), dest) {
+			// Without a pathfinder the mob can only reach what it can see.
+			continue
+		}
 		m.s.dest = &dest
 		m.s.directSpeed = m.s.spec.directSpeed * g.speed
 		return true
@@ -87,4 +95,16 @@ func newDirectGoal(b behaviourSpec) Goal {
 			y: int(numberField(r, "y_dist", 4)), interval: int(numberField(r, "interval", 60))}
 	}
 	return nil
+}
+
+// clearLine reports whether nothing solid lies on the line from a to b.
+func clearLine(m *Mob, a, b mgl64.Vec3) bool {
+	d := b.Sub(a)
+	steps := int(math.Ceil(d.Len() * 4))
+	for i := 1; i <= steps; i++ {
+		if path.Solid(m.tx, cube.PosFromVec3(a.Add(d.Mul(float64(i)/float64(steps))))) {
+			return false
+		}
+	}
+	return true
 }
