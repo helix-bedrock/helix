@@ -372,6 +372,8 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 		return
 	}
 
+	// The pathfinder must know where the world ends; worlds reach below 0.
+	s.nav.Mob.MinY = tx.Range()[0]
 	s.targets.tick(m)
 	s.goals.tick(m)
 	if s.spec.walks {

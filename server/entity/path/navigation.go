@@ -14,7 +14,7 @@ const maxTurn = 90
 // to one mob and is used from that mob's tick only.
 type Navigator struct {
 	// Mob holds the mob's abilities and costs. Its position fields are set
-	// on every Tick.
+	// on every Tick; MinY must be set to the world's lowest block.
 	Mob Mob
 	// FollowRange is how far a path may reach, at least 16 blocks.
 	FollowRange float64
