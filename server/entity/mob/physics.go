@@ -30,7 +30,9 @@ type moved struct {
 // Send shows the movement to the mob's viewers, if it moved or turned.
 func (mv *moved) Send() {
 	m := mv.m
-	if m.data.Pos.ApproxEqualThreshold(mv.from, 1e-3) && m.data.Rot == mv.fromRot && m.s.headYaw == mv.fromHead {
+	// Compare absolutely: mgl64's ApproxEqual is relative, so far from the
+	// origin a whole walking step would count as standing still.
+	if m.data.Pos.Sub(mv.from).LenSqr() < 1e-6 && m.data.Rot == mv.fromRot && m.s.headYaw == mv.fromHead {
 		return
 	}
 	for _, v := range m.tx.Viewers(m.data.Pos) {
