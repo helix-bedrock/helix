@@ -1853,6 +1853,13 @@ func (p *Player) UseItemOnBlock(pos cube.Pos, face cube.Face, clickPos mgl64.Vec
 	}
 }
 
+// entityInteracter is an entity that reacts to a player using an item on
+// it, such as a mob that eats food (Helix). Interact reports whether it took
+// one of the item.
+type entityInteracter interface {
+	Interact(user world.Entity, held item.Stack) bool
+}
+
 // UseItemOnEntity uses the item held in the main hand of the player on the entity passed, provided it is
 // within range of the player.
 // If the item held in the main hand of the player does nothing when used on an entity, nothing will happen.
@@ -1863,7 +1870,15 @@ func (p *Player) UseItemOnEntity(e world.Entity) bool {
 	if l := &p.ev.ItemUseOnEntity; l.Active() && l.Fire(&ItemUseOnEntityEvent{Base: p.base(), Entity: e}) {
 		return false
 	}
-	i, _ := p.HeldItems()
+	i, left := p.HeldItems()
+	if in, ok := e.(entityInteracter); ok && in.Interact(p, i) {
+		// The entity took the item, such as an animal fed for breeding.
+		if !p.GameMode().CreativeInventory() {
+			p.SetHeldItems(i.Grow(-1), left)
+		}
+		p.SwingArm()
+		return true
+	}
 	usable, ok := i.Item().(item.UsableOnEntity)
 	if !ok {
 		return true

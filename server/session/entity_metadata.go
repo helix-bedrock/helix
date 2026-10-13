@@ -107,6 +107,12 @@ func (s *Session) addSpecificMetadata(e any, m protocol.EntityMetadata) {
 	if sc, ok := e.(scaled); ok {
 		m[protocol.EntityDataKeyScale] = float32(sc.Scale())
 	}
+	if f, ok := e.(fuseLit); ok {
+		if fuse, lit := f.FuseLit(); lit {
+			m[protocol.EntityDataKeyFuseTime] = int32(fuse.Milliseconds() / 50)
+			m.SetFlag(protocol.EntityDataKeyFlags, protocol.EntityDataFlagIgnited)
+		}
+	}
 	if t, ok := e.(tnt); ok {
 		m[protocol.EntityDataKeyFuseTime] = int32(t.Fuse().Milliseconds() / 50)
 		m.SetFlag(protocol.EntityDataKeyFlags, protocol.EntityDataFlagIgnited)
@@ -333,6 +339,11 @@ type gameMode interface {
 
 type sleeper interface {
 	Sleeping() (cube.Pos, bool)
+}
+
+// fuseLit is a mob, such as a creeper, whose fuse may or may not burn.
+type fuseLit interface {
+	FuseLit() (time.Duration, bool)
 }
 
 type tnt interface {

@@ -2,6 +2,7 @@ package mob
 
 import (
 	"encoding/json"
+	"github.com/helix-bedrock/helix/server/item"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -69,6 +70,20 @@ type state struct {
 	underground bool
 	// inactive counts ticks spent far from players, for despawning.
 	inactive int
+
+	// fuse counts down to an explosion, -1 when no fuse burns.
+	fuse          int
+	sensorInside  bool
+	age           int
+	love          int
+	breedCooldown int
+	// held is the item in the mob's hand, from its equipment table.
+	held     item.Stack
+	equipped bool
+
+	// dest is where a swimming or flying mob steers to.
+	dest        *mgl64.Vec3
+	directSpeed float64
 }
 
 func (t *Type) newState(seed [2]uint64, groups []string) *state {
@@ -77,6 +92,7 @@ func (t *Type) newState(seed [2]uint64, groups []string) *state {
 	s.health = entity.NewHealthManager(s.spec.health, s.spec.maxHealth)
 	s.effects = entity.NewEffectManager()
 	s.speed = s.spec.speed
+	s.fuse = -1
 	return s
 }
 
@@ -376,6 +392,10 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 	if m.despawn(tx) {
 		return
 	}
+	if !s.equipped {
+		s.equipped = true
+		m.equip()
+	}
 	s.effects.Tick(m, tx)
 	m.sense()
 	m.burn(current)
@@ -387,6 +407,10 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 	s.nav.Mob.MinY = tx.Range()[0]
 	s.targets.tick(m)
 	s.goals.tick(m)
+	m.tickComponents(tx)
+	if m.handle.Closed() {
+		return
+	}
 	if s.spec.walks {
 		st := s.nav.Tick(tx, m.data.Pos, s.onGround, s.inWater, s.speed, m.data.Rot.Yaw())
 		if !s.nav.Idle() {
@@ -396,6 +420,9 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 		} else {
 			s.forward = 0
 		}
+	}
+	if s.spec.swims || s.spec.flies {
+		m.steer()
 	}
 	s.headYaw, s.pitch = s.look.tick(m.eyePos(), s.headYaw, s.pitch, m.data.Rot.Yaw(), !s.nav.Idle())
 	m.data.Rot = cube.Rotation{m.data.Rot.Yaw(), s.pitch}

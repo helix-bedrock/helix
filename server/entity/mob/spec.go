@@ -3,6 +3,7 @@ package mob
 import (
 	"cmp"
 	"encoding/json"
+	"math"
 	"slices"
 	"strings"
 )
@@ -27,12 +28,23 @@ type spec struct {
 	// walks is set for mobs that walk with navigation.walk or .generic;
 	// other navigations (flying, swimming) are not ported yet, so such mobs
 	// do not pathfind.
-	walks                                   bool
+	walks bool
+	// swims and flies are set for mobs that move by steering straight at a
+	// point, at directSpeed blocks per tick.
+	swims, flies                            bool
+	directSpeed                             float64
 	canFloat, canOpenDoors, canPassDoors    bool
 	avoidSun, avoidWater, canWalkOverFences bool
 
 	behaviours []behaviourSpec
 	despawn    *despawnSpec
+	sensor     *sensorSpec
+	explode    *explodeSpec
+	ageable    *ageableSpec
+	breed      *breedSpec
+	// shooter is the projectile the mob shoots, such as "minecraft:arrow".
+	shooter   string
+	equipment string
 }
 
 type behaviourSpec struct {
@@ -162,6 +174,49 @@ func parseSpec(d *Def, c map[string]json.RawMessage) *spec {
 		s.avoidSun = boolField(raw, "avoid_sun", false)
 		s.avoidWater = boolField(raw, "avoid_water", false)
 		s.canWalkOverFences = boolField(raw, "can_walk_over_fences", false)
+	}
+	if raw, ok := c["minecraft:navigation.generic"]; ok && boolField(raw, "can_swim", false) && !boolField(raw, "can_walk", true) {
+		s.swims, s.walks = true, false
+		s.directSpeed = s.speed
+		if u, ok := c["minecraft:underwater_movement"]; ok {
+			s.directSpeed = numberField(u, "value", s.speed)
+		}
+	}
+	for _, nav := range []string{"minecraft:navigation.float", "minecraft:navigation.hover", "minecraft:navigation.fly"} {
+		if _, ok := c[nav]; ok {
+			s.flies, s.walks, s.gravity = true, false, false
+			s.directSpeed = s.speed
+			if f, ok := c["minecraft:flying_speed"]; ok {
+				s.directSpeed = numberField(f, "value", s.speed)
+			}
+			s.directSpeed = math.Min(s.directSpeed, 0.3)
+		}
+	}
+	if raw, ok := c["minecraft:target_nearby_sensor"]; ok {
+		s.sensor = parseSensor(raw)
+	}
+	if raw, ok := c["minecraft:explode"]; ok {
+		s.explode = parseExplode(raw)
+	}
+	if raw, ok := c["minecraft:ageable"]; ok {
+		s.ageable = parseAgeable(raw)
+	}
+	if raw, ok := c["minecraft:breedable"]; ok {
+		s.breed = parseBreedable(raw, d.ID)
+	}
+	if raw, ok := c["minecraft:shooter"]; ok {
+		var sh struct {
+			Def string `json:"def"`
+		}
+		_ = json.Unmarshal(raw, &sh)
+		s.shooter = sh.Def
+	}
+	if raw, ok := c["minecraft:equipment"]; ok {
+		var e struct {
+			Table string `json:"table"`
+		}
+		_ = json.Unmarshal(raw, &e)
+		s.equipment = e.Table
 	}
 	if raw, ok := c["minecraft:despawn"]; ok {
 		s.despawn = parseDespawn(raw)

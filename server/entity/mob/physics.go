@@ -58,7 +58,8 @@ func (m *Mob) travel(tx *world.Tx) *moved {
 	input := s.forward * s.speed
 	yaw := m.data.Rot.Yaw()
 	g := gravity
-	if !s.spec.gravity {
+	if !s.spec.gravity && !(s.spec.swims && !s.inWater) {
+		// Fish have no gravity in water but fall out of it.
 		g = 0
 	}
 

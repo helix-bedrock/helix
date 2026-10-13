@@ -96,10 +96,15 @@ pick variants such as baby animals as BDS does. Try `/summon zombie`.
 Behaviours run as goals, and walking mobs find paths with an A* pathfinder
 ported from Pumpkin. Ported so far: `float`, `random_stroll`,
 `random_look_around`, `look_at_player`, `panic`, `hurt_by_target`,
-`nearest_attackable_target`, `melee_attack`, `melee_box_attack`, `tempt` and
-`avoid_mob_type`. Other behaviours are skipped, so a mob may do less than in
-vanilla. Not done yet: breeding, flying and swimming navigation, ranged
-attacks, mob sounds and experience drops.
+`nearest_attackable_target`, `melee_attack`, `melee_box_attack`, `tempt`,
+`avoid_mob_type`, `swell`, `ranged_attack`, `breed`, `follow_parent`,
+`random_swim`, `swim_wander`, `random_hover`, `random_fly` and
+`float_wander`; and the components `target_nearby_sensor`, `explode`,
+`shooter` (arrows), `equipment`, `breedable` and `ageable`. So creepers
+explode, skeletons shoot, animals fed their food breed and their babies grow
+up, fish swim and bats fly. Swimming and flying mobs steer straight at their
+target rather than pathfinding. Other behaviours are skipped, so a mob may
+do less than in vanilla.
 
 Mobs spawn around players by BDS's spawn rules (biome, light, blocks,
 height, difficulty, herd size, weight, density) and despawn by their own

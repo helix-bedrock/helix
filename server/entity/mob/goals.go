@@ -81,7 +81,7 @@ func newGoal(b behaviourSpec) (g Goal, target bool) {
 	case "avoid_mob_type":
 		return newAvoidGoal(r), false
 	}
-	return nil, false
+	return newGoal2(b), false
 }
 
 func qualify(name string) string {

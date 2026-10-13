@@ -41,6 +41,7 @@ instead of Pumpkin's copies.
 | `server/entity/path/navigation.go` | `ai/pathfinder/mod.rs` (`PathNavigation`, `tick_ground`) | Following a path, stuck detection, corner cutting |
 | `server/entity/mob/goal.go` | `ai/goal/goal_selector.rs`, `ai/goal/mod.rs`, `ai/control/look_control.rs` | Goal selection by priority and controls, head turning |
 | `server/entity/mob/goals.go` | `ai/goal/swim.rs`, `wander_around.rs`, `look_around.rs`, `look_at_entity.rs`, `escape_danger.rs`, `revenge.rs`, `active_target.rs`, `track_target.rs`, `melee_attack.rs`, `tempt.rs`, `avoid_entity.rs`, `ai/util/default_random_pos.rs`, `random_pos.rs` | Each goal driven by the BDS behaviour component of the same purpose |
+| `server/entity/mob/goals2.go`, `direct.go` | `ai/goal/creeper_ignite.rs`, `ranged_attack.rs`, `breed.rs`, `follow_parent.rs`, `water_avoiding_random_flying.rs` | Swell, ranged attack, breeding, following parents, flying wander. Swimming wander and straight steering are Helix's own |
 | `server/entity/mob/physics.go` | `living.rs` (`travel_in_air`, `travel_in_fluid`, `jump`), `mod.rs` (`movement_input_to_velocity`) | Walking, swimming and jumping physics |
 
 What each mob is (health, speed, size, families, behaviours and their

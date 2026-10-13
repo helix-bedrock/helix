@@ -61,6 +61,10 @@ type TotemUseAction struct{ action }
 
 // action implements the Action interface. Structures in this package may embed it to gets its functionality
 // out of the box.
+// LoveAction is a world.EntityAction that shows hearts above an animal
+// that wants to breed (Helix).
+type LoveAction struct{ action }
+
 type action struct{}
 
 func (action) EntityAction() {}

@@ -74,21 +74,37 @@ type natural struct {
 }
 
 func (t *Type) spawn(pos mgl64.Vec3, yaw float64, n natural) *world.EntityHandle {
+	return t.spawnWith(pos, yaw, "minecraft:entity_spawned", n)
+}
+
+// spawnWith spawns a mob whose groups come from event: entity_spawned for
+// new mobs, entity_born for babies bred by their parents.
+func (t *Type) spawnWith(pos mgl64.Vec3, yaw float64, event string, n natural) *world.EntityHandle {
 	id := uuid.New()
 	clear(id[:8])
 	seed := [2]uint64{binary.LittleEndian.Uint64(id[8:]), 0x9e3779b97f4a7c15}
-	return world.EntitySpawnOpts{Position: pos, Rotation: cube.Rotation{yaw, 0}, ID: id}.New(t, spawnConfig{t: t, seed: seed, natural: n})
+	return world.EntitySpawnOpts{Position: pos, Rotation: cube.Rotation{yaw, 0}, ID: id}.New(t, spawnConfig{t: t, seed: seed, natural: n, event: event})
 }
 
 type spawnConfig struct {
 	t       *Type
 	seed    [2]uint64
 	natural natural
+	event   string
 }
 
 func (c spawnConfig) Apply(data *world.EntityData) {
 	r := rand.New(rand.NewPCG(c.seed[1], c.seed[0]))
-	s := c.t.newState(c.seed, c.t.spawnGroups(nil, r.Float64))
+	event := c.event
+	if event == "" {
+		event = "minecraft:entity_spawned"
+	}
+	groups := c.t.eventGroups(event, r.Float64)
+	if len(groups) == 0 && event != "minecraft:entity_spawned" {
+		// Some mobs have no entity_born event: they are born as spawned.
+		groups = c.t.eventGroups("minecraft:entity_spawned", r.Float64)
+	}
+	s := c.t.newState(c.seed, groups)
 	s.headYaw = data.Rot.Yaw()
 	s.natural, s.category, s.underground = c.natural.category != "", c.natural.category, c.natural.underground
 	data.Data = s
@@ -96,11 +112,16 @@ func (c spawnConfig) Apply(data *world.EntityData) {
 
 // spawnGroups runs the minecraft:entity_spawned event on groups.
 func (t *Type) spawnGroups(groups []string, rnd func() float64) []string {
+	return t.eventGroups("minecraft:entity_spawned", rnd, groups...)
+}
+
+// eventGroups runs an event on groups and returns the groups after it.
+func (t *Type) eventGroups(event string, rnd func() float64, groups ...string) []string {
 	if rnd == nil {
 		rnd = func() float64 { return 0.5 }
 	}
 	r := &eventRun{def: t.def, groups: groups, rand: rnd, filter: func(json.RawMessage) bool { return false }}
-	r.fire("minecraft:entity_spawned")
+	r.fire(event)
 	return r.groups
 }
 

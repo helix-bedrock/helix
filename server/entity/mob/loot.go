@@ -189,3 +189,30 @@ func (m *Mob) drop(s item.Stack) {
 		s = s.Grow(-n)
 	}
 }
+
+// equip rolls the mob's equipment table and puts the first item it gives
+// in the mob's hand, such as a skeleton's bow.
+func (m *Mob) equip() {
+	if m.s.spec.equipment == "" {
+		return
+	}
+	c := &lootCtx{m: m}
+	for _, s := range c.roll(m.s.spec.equipment) {
+		m.s.held = s
+		for _, v := range m.tx.Viewers(m.data.Pos) {
+			v.ViewEntityItems(m)
+		}
+		return
+	}
+}
+
+// HeldItems returns the item in the mob's hand. The off hand is empty.
+func (m *Mob) HeldItems() (item.Stack, item.Stack) { return m.s.held, item.Stack{} }
+
+// SetHeldItems puts an item in the mob's hand. The off hand is ignored.
+func (m *Mob) SetHeldItems(main, _ item.Stack) {
+	m.s.held = main
+	for _, v := range m.tx.Viewers(m.data.Pos) {
+		v.ViewEntityItems(m)
+	}
+}
