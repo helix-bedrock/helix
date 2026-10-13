@@ -203,7 +203,7 @@ func (n *Navigator) surfaceY(src Source, pos mgl64.Vec3, inWater bool) float64 {
 	if !inWater || !n.Mob.CanFloat {
 		return math.Floor(pos[1] + 0.5)
 	}
-	ctx := context{src: src}
+	ctx := context{src: guard(src)}
 	y := int(math.Floor(pos[1]))
 	for i := 0; ctx.isWater(cube.Pos{int(math.Floor(pos[0])), y, int(math.Floor(pos[2]))}); i++ {
 		if i > 16 {

@@ -171,7 +171,9 @@ func walkValue(m *Mob, p cube.Pos) float64 {
 	if m.s.spec.hasFamily("monster") {
 		return 0
 	}
-	if _, ok := m.tx.Block(p.Side(cube.FaceDown)).(block.Grass); ok {
+	if b, loaded := m.tx.BlockLoaded(p.Side(cube.FaceDown)); !loaded {
+		return math.Inf(-1)
+	} else if _, ok := b.(block.Grass); ok {
 		return 10
 	}
 	return 0

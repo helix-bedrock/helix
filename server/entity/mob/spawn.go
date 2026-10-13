@@ -42,6 +42,13 @@ var populationCaps = map[string][2]int{
 	"water_animal": {36, 0},
 }
 
+// structureOnly are mobs that spawn only in structures, which are not
+// generated yet: their spawn rules alone would put them anywhere.
+var structureOnly = map[string]bool{
+	"minecraft:guardian":       true,
+	"minecraft:elder_guardian": true,
+}
+
 // Spawner spawns mobs around players by BDS's spawn rules and despawns
 // them. Set its Tick as world.Config.RegionTick. It holds no state that
 // changes, so one Spawner serves every world and region at once.
@@ -83,6 +90,9 @@ func NewSpawner(reg world.EntityRegistry) (*Spawner, error) {
 	}
 	s := &Spawner{}
 	for id, r := range raw {
+		if structureOnly[id] {
+			continue
+		}
 		t, ok := reg.Lookup(id)
 		mt, isMob := t.(*Type)
 		if !ok || !isMob {
@@ -284,6 +294,21 @@ func pickSpot(tx *world.Tx, x, z int, r *rand.Rand) (spawnSpot, bool) {
 	rng := tx.Range()
 	y := top + 1
 	underground := false
+	if l, ok := tx.Liquid(cube.Pos{x, top, z}); ok {
+		if _, water := l.(block.Water); water {
+			// Open water: a random height in the water column, so fish and
+			// squid can spawn, not only the air above the sea.
+			floor := top
+			for floor > rng[0] {
+				if _, ok := tx.Liquid(cube.Pos{x, floor - 1, z}); !ok {
+					break
+				}
+				floor--
+			}
+			p := cube.Pos{x, floor + r.IntN(top-floor+1), z}
+			return spawnSpot{pos: p, underwater: true, biome: tx.Biome(p)}, true
+		}
+	}
 	if r.IntN(2) == 0 && top-rng[0] > 8 {
 		// A random height below the surface: caves.
 		y = rng[0] + 1 + r.IntN(top-rng[0])

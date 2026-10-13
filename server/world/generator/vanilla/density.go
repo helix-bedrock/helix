@@ -24,6 +24,10 @@ type node interface {
 type evalCtx struct {
 	cache  []cacheSlot
 	interp []interpSlot
+	// columns caches functions that do not depend on Y, per column;
+	// corners caches cell corner values, which neighbouring cells share.
+	columns []map[[2]int32]float64
+	corners []map[[3]int32]float64
 }
 
 type cacheSlot struct {
@@ -39,7 +43,15 @@ type interpSlot struct {
 }
 
 func (p *program) newCtx() *evalCtx {
-	return &evalCtx{cache: make([]cacheSlot, p.caches), interp: make([]interpSlot, p.interps)}
+	c := &evalCtx{cache: make([]cacheSlot, p.caches), interp: make([]interpSlot, p.interps),
+		columns: make([]map[[2]int32]float64, p.caches), corners: make([]map[[3]int32]float64, p.interps)}
+	for i := range c.columns {
+		c.columns[i] = make(map[[2]int32]float64)
+	}
+	for i := range c.corners {
+		c.corners[i] = make(map[[3]int32]float64, 2048)
+	}
+	return c
 }
 
 // program holds the density functions of one generator.
@@ -278,13 +290,25 @@ func (n blendedNode) eval(_ *evalCtx, x, y, z int32) float64 {
 	return n.b.get(float64(x), float64(y), float64(z))
 }
 
-// cache remembers its input's value at the last position.
+// cache remembers its input's value at the last position, or per column
+// if its input does not depend on Y.
 type cache struct {
 	in   node
 	slot int
+	flat bool
 }
 
 func (n cache) eval(c *evalCtx, x, y, z int32) float64 {
+	if n.flat {
+		k := [2]int32{x, z}
+		m := c.columns[n.slot]
+		if v, ok := m[k]; ok {
+			return v
+		}
+		v := n.in.eval(c, x, y, z)
+		m[k] = v
+		return v
+	}
 	s := &c.cache[n.slot]
 	if s.set && s.x == x && s.y == y && s.z == z {
 		return s.v
@@ -311,11 +335,18 @@ func (n interpolated) eval(c *evalCtx, x, y, z int32) float64 {
 	s := &c.interp[n.slot]
 	if !s.set || s.x != ox || s.y != oy || s.z != oz {
 		s.x, s.y, s.z, s.set = ox, oy, oz, true
+		m := c.corners[n.slot]
 		i := 0
 		for dz := range int32(2) {
 			for dy := range int32(2) {
 				for dx := range int32(2) {
-					s.corner[i] = n.in.eval(c, ox+dx*n.cxz, oy+dy*n.cy, oz+dz*n.cxz)
+					k := [3]int32{ox + dx*n.cxz, oy + dy*n.cy, oz + dz*n.cxz}
+					v, ok := m[k]
+					if !ok {
+						v = n.in.eval(c, k[0], k[1], k[2])
+						m[k] = v
+					}
+					s.corner[i] = v
 					i++
 				}
 			}
@@ -588,7 +619,7 @@ func (p *program) parse(raw json.RawMessage) (node, error) {
 			return nil, err
 		}
 		p.caches++
-		return cache{in: in, slot: p.caches - 1}, nil
+		return cache{in: in, slot: p.caches - 1, flat: !usesY(in)}, nil
 	case "interpolated":
 		in, err := sub("input", "argument")
 		if err != nil {
@@ -695,4 +726,64 @@ func (p *program) noise(name string) (*normalNoise, error) {
 	n := newNormalNoise(p.split.byName("minecraft:"+short), params)
 	p.noises[short] = n
 	return n, nil
+}
+
+// usesY reports whether a function's value can change with Y. Functions
+// that cannot are cached per column.
+func usesY(n node) bool {
+	switch v := n.(type) {
+	case constant, shift, findTopSurface:
+		return false
+	case gradient:
+		return v.axis == 1
+	case binaryOp:
+		return usesY(v.a) || usesY(v.b)
+	case unary:
+		return usesY(v.in)
+	case clampNode:
+		return usesY(v.in)
+	case lerpNode:
+		return usesY(v.alpha) || usesY(v.first) || usesY(v.second)
+	case rangeChoice:
+		return usesY(v.in) || usesY(v.whenIn) || usesY(v.whenOut)
+	case intervalSelect:
+		if usesY(v.in) {
+			return true
+		}
+		for _, f := range v.funcs {
+			if usesY(f) {
+				return true
+			}
+		}
+		return false
+	case slice:
+		return v.axis != 1 && usesY(v.in)
+	case noiseNode:
+		if v.y != 0 {
+			return true
+		}
+		return v.shifted && (usesY(v.sx) || usesY(v.sy) || usesY(v.sz))
+	case cache:
+		return !v.flat
+	case interpolated:
+		return true
+	case splineNode:
+		return splineUsesY(v.s)
+	}
+	return true
+}
+
+func splineUsesY(s *spline) bool {
+	if s.fixed {
+		return false
+	}
+	if usesY(s.location) {
+		return true
+	}
+	for _, v := range s.values {
+		if splineUsesY(v) {
+			return true
+		}
+	}
+	return false
 }

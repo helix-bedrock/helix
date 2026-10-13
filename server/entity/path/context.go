@@ -25,7 +25,7 @@ type context struct {
 }
 
 func newContext(src Source, minY int) *context {
-	return &context{src: src, minY: minY, types: make(map[cube.Pos]Type, 256)}
+	return &context{src: guard(src), minY: minY, types: make(map[cube.Pos]Type, 256)}
 }
 
 // rawType returns the path type of the block at pos alone.
@@ -191,5 +191,46 @@ func (c *context) collides(bb cube.BBox) bool {
 
 // Solid reports whether the block at pos has anything to collide with.
 func Solid(src Source, pos cube.Pos) bool {
+	src = guard(src)
 	return len(src.Block(pos).Model().BBox(pos, blockSource{src})) > 0
+}
+
+// loadedOnly reads blocks only from loaded chunks: an unloaded chunk counts
+// as solid and dry. Reading a block from an unloaded chunk would load and
+// generate it during the region's tick, which with terrain generation
+// stalls the region for tens of milliseconds.
+type loadedOnly struct {
+	Source
+	l interface {
+		BlockLoaded(cube.Pos) (world.Block, bool)
+	}
+}
+
+func (s loadedOnly) Block(pos cube.Pos) world.Block {
+	b, ok := s.l.BlockLoaded(pos)
+	if !ok {
+		return block.Stone{}
+	}
+	return b
+}
+
+func (s loadedOnly) Liquid(pos cube.Pos) (world.Liquid, bool) {
+	if _, ok := s.l.BlockLoaded(pos); !ok {
+		return nil, false
+	}
+	return s.Source.Liquid(pos)
+}
+
+// guard wraps a source that can tell loaded chunks apart, such as
+// *world.Tx, in loadedOnly.
+func guard(src Source) Source {
+	if _, ok := src.(loadedOnly); ok {
+		return src
+	}
+	if l, ok := src.(interface {
+		BlockLoaded(cube.Pos) (world.Block, bool)
+	}); ok {
+		return loadedOnly{Source: src, l: l}
+	}
+	return src
 }

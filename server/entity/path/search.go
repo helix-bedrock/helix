@@ -91,6 +91,7 @@ func Find(src Source, mob *Mob, dest mgl64.Vec3, reach int, followRange float64)
 // in, or the ground below an air position, as vanilla does before
 // searching to a target.
 func Surface(src Source, pos cube.Pos, minY, maxY int) cube.Pos {
+	src = guard(src)
 	if !Solid(src, pos) {
 		p := pos
 		for p[1] >= minY && !Solid(src, p) {

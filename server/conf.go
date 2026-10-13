@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -140,8 +141,8 @@ type Config struct {
 	// altogether. This should be done using a Loader with a custom Viewer.
 	ChunkUnloadInterval time.Duration
 	// ChunkLoadWorkers is the number of background workers that load and generate
-	// chunks in each world, defaulting to 1. Values above 1 generate chunks
-	// concurrently and require a concurrency-safe Generator.
+	// chunks in each world, defaulting to half the CPU cores. Values above 1
+	// generate chunks concurrently and require a concurrency-safe Generator.
 	ChunkLoadWorkers int
 	// Entities is a world.EntityRegistry with all entity types registered that
 	// may be added to the Server's worlds. If no entity types are registered,
@@ -192,6 +193,11 @@ func (conf Config) New() *Server {
 	}
 	if conf.Generator == nil {
 		conf.Generator = loadGenerator
+	}
+	if conf.ChunkLoadWorkers <= 0 {
+		// Terrain generation is the slow part of loading new chunks, and
+		// Helix's generators are safe to run in parallel.
+		conf.ChunkLoadWorkers = max(1, runtime.NumCPU()/2)
 	}
 	if conf.MaxChunkRadius == 0 {
 		conf.MaxChunkRadius = 12
