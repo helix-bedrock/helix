@@ -54,7 +54,10 @@ func TestMobMovesInRunningWorld(t *testing.T) {
 	}
 	time.Sleep(time.Second / 2)
 	_, _ = world.CallEntity(context.Background(), h, func(tx *world.Tx, e world.Entity) (struct{}, error) {
-		e.(*Mob).Navigator().MoveTo(mgl64.Vec3{8.5, 1, 0.5}, 1)
+		m := e.(*Mob)
+		// Only the order below may move it.
+		m.s.goals, m.s.targets = selector{}, selector{}
+		m.Navigator().MoveTo(mgl64.Vec3{8.5, 1, 0.5}, 1)
 		return struct{}{}, nil
 	})
 	time.Sleep(2 * time.Second)
