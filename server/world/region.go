@@ -80,8 +80,10 @@ type region struct {
 	q       []transaction
 	merged  *region // set when merged into another region, under qmu
 	stopped bool    // set when the region stops, under qmu
-	wake    chan struct{}
-	ticking bool // a tick is queued, under qmu
+	ticking bool    // a tick is queued, under qmu
+	// scheduled is set while the region waits in or runs on the pool,
+	// under qmu.
+	scheduled bool
 }
 
 func (w *World) newRegion() *region {
@@ -99,59 +101,16 @@ func (w *World) newRegion() *region {
 		redstone:         newRedstoneEngine(tick),
 		r:                rand.New(rand.NewPCG(w.seedRand.Uint64(), w.seedRand.Uint64())),
 		sections:         make(map[secPos]struct{}),
-		wake:             make(chan struct{}, 1),
 	}
 	w.regions[r] = struct{}{}
 	return r
 }
 
-// start runs the region's goroutine. Synchronous worlds run everything on
-// the caller instead.
-func (r *region) start() {
-	if r.conf.Synchronous {
-		return
-	}
-	r.running.Add(1)
-	go r.run()
-}
+// start is kept for the places that create regions: a region needs no
+// goroutine of its own, the world's Pool runs it when it has work.
+func (r *region) start() {}
 
 func (r *region) String() string { return fmt.Sprintf("%v region %d", r.conf.Dim, r.id) }
-
-func (r *region) run() {
-	defer r.running.Done()
-	for {
-		select {
-		case <-r.wake:
-		case <-r.closing:
-			return
-		}
-		for {
-			r.qmu.Lock()
-			if r.merged != nil || r.stopped {
-				r.qmu.Unlock()
-				return
-			}
-			if len(r.q) == 0 {
-				r.qmu.Unlock()
-				break
-			}
-			t := r.q[0]
-			r.q[0] = nil
-			r.q = r.q[1:]
-			r.qmu.Unlock()
-
-			r.mu.Lock()
-			if m := r.mergedInto(); m != nil {
-				// Merged between taking t and starting it: m runs it.
-				r.mu.Unlock()
-				m.post(t)
-				return
-			}
-			t.Run(r)
-			r.mu.Unlock()
-		}
-	}
-}
 
 // mergedInto returns the region r was merged into, or nil.
 func (r *region) mergedInto() *region {
@@ -181,10 +140,11 @@ func (r *region) post(t transaction) {
 			continue
 		}
 		r.q = append(r.q, t)
+		submit := !r.scheduled
+		r.scheduled = true
 		r.qmu.Unlock()
-		select {
-		case r.wake <- struct{}{}:
-		default:
+		if submit {
+			r.pool.submit(r)
 		}
 		return
 	}
@@ -490,10 +450,6 @@ func (r *region) absorbLocked(o *region) {
 	q := o.q
 	o.q = nil
 	o.qmu.Unlock()
-	select {
-	case o.wake <- struct{}{}:
-	default:
-	}
 	for _, t := range q {
 		r.post(t)
 	}
@@ -634,10 +590,6 @@ func (r *region) stopLocked() {
 	q := r.q
 	r.q = nil
 	r.qmu.Unlock()
-	select {
-	case r.wake <- struct{}{}:
-	default:
-	}
 	if len(q) > 0 {
 		// Run whatever was still queued at the spawn, after the lock is
 		// released.

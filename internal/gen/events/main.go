@@ -73,6 +73,7 @@ var events = []ev{
 	{"EntityDespawn", "world", "EntityDespawnEvent", "EntityDespawn", "an entity is removed from a world"},
 	{"Explosion", "world", "ExplosionEvent", "Explosion", "something explodes"},
 	{"RedstoneUpdate", "world", "RedstoneUpdateEvent", "RedstoneUpdate", "the redstone engine changes a block"},
+	{"SlowTick", "world", "SlowTickEvent", "SlowTick", "a region's tick took longer than 50ms"},
 	{"WorldClose", "world", "CloseEvent", "Close", "a world is about to close"},
 	{"InventoryTake", "inventory", "TakeEvent", "Take", "a stack is taken from an inventory slot"},
 	{"InventoryPlace", "inventory", "PlaceEvent", "Place", "a stack is placed in an inventory slot"},

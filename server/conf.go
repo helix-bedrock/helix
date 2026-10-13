@@ -236,13 +236,15 @@ func (conf Config) New() *Server {
 	creative_registerCreativeItems()
 	recipe_registerVanilla()
 
+	srv.pool = world.NewPool(0)
+	srv.extra = map[string]*world.World{}
 	srv.world = srv.createWorld(world.Overworld, &srv.nether, &srv.end)
 	srv.nether = srv.createWorld(world.Nether, &srv.world, &srv.end)
 	srv.end = srv.createWorld(world.End, &srv.nether, &srv.world)
 	conf.Debug.SetRegions(func() any {
 		out := map[string]any{}
-		for _, w := range []*world.World{srv.world, srv.nether, srv.end} {
-			out[fmt.Sprint(w.Dimension())] = map[string]any{"sectionSize": w.SectionSize(), "regions": w.Regions()}
+		for name, w := range srv.Worlds() {
+			out[name] = map[string]any{"sectionSize": w.SectionSize(), "regions": w.Regions()}
 		}
 		return out
 	})

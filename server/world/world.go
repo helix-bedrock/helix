@@ -48,7 +48,7 @@ type World struct {
 
 	o sync.Once
 
-	set     *Settings
+	set *Settings
 
 	weather
 
@@ -56,7 +56,12 @@ type World struct {
 	// transaction runs; closing closes once the world stops ticking.
 	closeStarted chan struct{}
 	closing      chan struct{}
-	running      sync.WaitGroup
+	// pool runs the regions; busy is read-locked while a region runs on it,
+	// so close can wait for the last run (Helix).
+	pool    *Pool
+	ownPool bool
+	busy    sync.RWMutex
+	running sync.WaitGroup
 
 	chunkWorkers *chunkWorkerPool
 
@@ -1194,7 +1199,6 @@ func (w *region) updateNeighbour(pos, changedNeighbour cube.Pos) {
 	w.neighbourUpdates = append(w.neighbourUpdates, neighbourUpdate{pos: pos, neighbour: changedNeighbour})
 }
 
-
 // viewersOf returns all viewers viewing the position passed.
 func (w *region) viewersOf(pos mgl64.Vec3) []Viewer {
 	c, ok := w.chunks[chunkPosFromVec3(pos)]
@@ -1367,6 +1371,12 @@ func (w *World) close() {
 
 	close(w.closing)
 	w.running.Wait()
+	w.busy.Lock()
+	//nolint:staticcheck // Empty critical section: waits for running regions.
+	w.busy.Unlock()
+	if w.ownPool {
+		w.pool.Close()
+	}
 	w.chunkWorkers.wg.Wait()
 
 	close(w.queueClosing)
@@ -1453,7 +1463,6 @@ func (w *region) removeViewer(tx *Tx, pos ChunkPos, loader *Loader, viewer Viewe
 		viewer.HideEntity(entity.mustEntity(tx))
 	}
 }
-
 
 // showEntity shows an Entity to a viewer of the world. It makes sure
 // everything of the Entity, including the items held, is shown.

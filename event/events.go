@@ -168,6 +168,9 @@ type Explosion = world.ExplosionEvent
 // RedstoneUpdate is called when the redstone engine changes a block.
 type RedstoneUpdate = world.RedstoneUpdateEvent
 
+// SlowTick is called when a region's tick took longer than 50ms.
+type SlowTick = world.SlowTickEvent
+
 // WorldClose is called when a world is about to close.
 type WorldClose = world.CloseEvent
 

@@ -269,6 +269,11 @@ func (r *Setup) RedstoneUpdate(fn func(*event.RedstoneUpdate), opts ...Option) {
 	register(r, &r.srv.worldEvents.RedstoneUpdate, fn, opts)
 }
 
+// SlowTick registers a listener for when a region's tick took longer than 50ms.
+func (r *Setup) SlowTick(fn func(*event.SlowTick), opts ...Option) {
+	register(r, &r.srv.worldEvents.SlowTick, fn, opts)
+}
+
 // WorldClose registers a listener for when a world is about to close.
 func (r *Setup) WorldClose(fn func(*event.WorldClose), opts ...Option) {
 	register(r, &r.srv.worldEvents.Close, fn, opts)

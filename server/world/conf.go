@@ -23,6 +23,14 @@ type Config struct {
 	// of. If 0, DefaultSectionSize. Small sections make region borders
 	// common, which is useful for testing them.
 	SectionSize int
+	// Pool runs the world's regions (Helix). Worlds of one server share a
+	// pool so the number of goroutines stays at the number of cores however
+	// many regions there are. If nil, the world starts and closes a pool of
+	// its own.
+	Pool *Pool
+	// TickBudget is how long a region's tick may take before a
+	// SlowTickEvent is fired. If 0, one tick: 50ms.
+	TickBudget time.Duration
 	// Debug records tick timings when set. Nil turns it off.
 	Debug *debug.Monitor
 	// Log is the Logger that will be used to log errors and debug messages to.
@@ -127,6 +135,9 @@ func (conf Config) New() *World {
 		s.Spawn = conf.Generator.DefaultSpawn(conf.Dim)
 		conf.Provider = NopProvider{Set: s}
 	}
+	if conf.TickBudget <= 0 {
+		conf.TickBudget = time.Second / 20
+	}
 	if conf.RandomTickSpeed == 0 {
 		conf.RandomTickSpeed = 3
 	}
@@ -182,6 +193,12 @@ func (conf Config) New() *World {
 		w.conf.Events = conf.Events
 	}
 
+	if !conf.Synchronous {
+		w.pool = conf.Pool
+		if w.pool == nil {
+			w.pool, w.ownPool = NewPool(0), true
+		}
+	}
 	if conf.Synchronous {
 		w.main = w.newRegion()
 	}

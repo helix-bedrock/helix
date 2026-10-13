@@ -61,8 +61,9 @@ it, the event or the player after it returns.
 
 ## Regions
 
-Each world is split into regions that tick in parallel, one goroutine each,
-like Folia. Chunks are grouped into sections (8 by 8 chunks by default) and
+Each world is split into regions that tick in parallel, like Folia. The
+regions of every world run on one shared pool with a worker per core, so a
+thousand idle regions cost no goroutines. Chunks are grouped into sections (8 by 8 chunks by default) and
 every section belongs to one region. Regions stay at least two sections
 apart: when players bring them closer, they merge; when a region's areas
 drift apart, it splits. A region only touches its own chunks and entities,
@@ -75,6 +76,15 @@ player, and sleeping through the night) runs as a global task: every region
 merges into one first, and they split apart again on their own. Something
 that reaches into another region's chunk, such as a big explosion, sees it
 as unloaded that once and makes the two regions merge.
+
+A region whose tick takes longer than 50ms fires `SlowTick`, with the time it
+took, so a plugin can find and deal with what crowds it.
+
+Plugins can open more worlds while the server runs with
+`Server.LoadWorld(name, server.WorldConfig{...})` and close them with
+`UnloadWorld(name)`, which first moves their players to the overworld spawn.
+Transactions run on pool workers, so they must never wait on another
+transaction (`world.Call`, `Task.Wait`): use `Do` and return.
 
 ## Debugging
 

@@ -46,6 +46,11 @@ type Server struct {
 	started atomic.Pointer[time.Time]
 
 	world, nether, end *world.World
+	// pool runs the regions of every world of the server.
+	pool *world.Pool
+	// extra holds the worlds loaded with LoadWorld, by name, under wmu.
+	wmu   sync.Mutex
+	extra map[string]*world.World
 
 	customBlocks     []protocol.BlockEntry
 	customItems      []protocol.ItemEntry
@@ -339,11 +344,17 @@ func (srv *Server) close() {
 	}
 
 	srv.conf.Log.Debug("Closing worlds...")
-	for _, w := range []*world.World{srv.end, srv.nether, srv.world} {
+	srv.wmu.Lock()
+	extra := slices.Collect(maps.Values(srv.extra))
+	clear(srv.extra)
+	srv.wmu.Unlock()
+	for _, w := range append(extra, srv.end, srv.nether, srv.world) {
 		if err := w.Close(); err != nil {
 			srv.conf.Log.Error(fmt.Sprintf("Close dimension %v: ", w.Dimension()) + err.Error())
 		}
 	}
+
+	srv.pool.Close()
 
 	srv.conf.Log.Debug("Closing listeners...")
 	for _, l := range srv.listeners {
@@ -624,6 +635,7 @@ func (srv *Server) createWorld(dim world.Dimension, nether, end **world.World) *
 		Blocks:              srv.conf.Blocks,
 		Events:              srv.conf.WorldEvents,
 		Debug:               srv.conf.Debug,
+		Pool:                srv.pool,
 		SectionSize:         srv.conf.RegionSectionSize,
 		PortalDestination: func(dim world.Dimension) *world.World {
 			switch dim {

@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/server/block/cube"
 	"github.com/helix-bedrock/helix/server/hook"
+	"time"
 )
 
 // Events holds the listener lists of world events (Helix, RFC 0001). The
@@ -28,6 +29,7 @@ type Events struct {
 	Explosion      hook.List[ExplosionEvent]
 	RedstoneUpdate hook.List[RedstoneUpdateEvent]
 	Close          hook.List[CloseEvent]
+	SlowTick       hook.List[SlowTickEvent]
 }
 
 // Events returns the world's event lists.
@@ -84,8 +86,8 @@ func (e *LiquidDecayEvent) BlockName() string { return nameOf(e.Before) }
 type LiquidHardenEvent struct {
 	hook.Cancellable
 	txWorld
-	Pos                         cube.Pos
-	Hardened, Other, NewBlock   Block
+	Pos                       cube.Pos
+	Hardened, Other, NewBlock Block
 }
 
 // BlockName returns the new block's name, for the OnlyBlock filter.
@@ -178,6 +180,16 @@ type RedstoneUpdateEvent struct {
 // for last work in it.
 type CloseEvent struct {
 	txWorld
+}
+
+// SlowTickEvent is called on a region whose tick took longer than
+// Config.TickBudget, one tick (50ms) by default, so the server can no longer keep up there. Took
+// is how long the tick took. Listeners can look at the region through Tx,
+// for example to find what crowds it.
+type SlowTickEvent struct {
+	txWorld
+	Region uint64
+	Took   time.Duration
 }
 
 // The functions below fire an event from code outside this package (blocks,

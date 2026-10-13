@@ -111,6 +111,10 @@ func (w *World) clockTick(first bool) {
 // neighbour updates and redstone.
 func (t ticker) tick(tx *Tx, tick int64, thunder bool) {
 	w := tx.r
+	if w.conf.Events.SlowTick.Active() {
+		start := time.Now()
+		defer func() { w.checkBudget(tx, time.Since(start)) }()
+	}
 	_, loaders := w.allViewers()
 	var dt *debug.Tick
 	if w.conf.Debug != nil {
@@ -138,6 +142,13 @@ func (t ticker) tick(tx *Tx, tick int64, thunder bool) {
 	if w.ticked%splitInterval == 0 {
 		w.trySplit()
 		dt.Phase("regions")
+	}
+}
+
+// checkBudget fires a SlowTickEvent if a tick took longer than the budget.
+func (r *region) checkBudget(tx *Tx, took time.Duration) {
+	if took > r.conf.TickBudget {
+		r.conf.Events.SlowTick.Fire(&SlowTickEvent{txWorld: txWorld{tx}, Region: r.id, Took: took})
 	}
 }
 
