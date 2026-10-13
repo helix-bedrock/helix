@@ -7,6 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/server/player/chat"
 	"github.com/pelletier/go-toml"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 )
 
@@ -33,6 +34,7 @@ func readConfig(log *slog.Logger) (server.Config, error) {
 	c := server.DefaultConfig()
 	var zero server.Config
 	if _, err := os.Stat("config.toml"); os.IsNotExist(err) {
+		c.World.Seed = rand.Int64()
 		data, err := toml.Marshal(c)
 		if err != nil {
 			return zero, fmt.Errorf("encode default config: %v", err)
@@ -52,6 +54,7 @@ func readConfig(log *slog.Logger) (server.Config, error) {
 	// Write settings added since the file was made, such as a new world
 	// seed, back to it, so they stay the same on the next start.
 	if tree, err := toml.LoadBytes(data); err == nil && !tree.Has("World.Seed") {
+		c.World.Seed = rand.Int64()
 		if out, err := toml.Marshal(c); err == nil {
 			if err := os.WriteFile("config.toml", out, 0644); err != nil {
 				log.Error("update config.toml", "err", err)

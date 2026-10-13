@@ -6,7 +6,6 @@ import (
 	"github.com/helix-bedrock/helix/server/item/inventory"
 	"github.com/helix-bedrock/helix/server/world/generator/vanilla"
 	"log/slog"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -511,7 +510,9 @@ func DefaultConfig() UserConfig {
 	c.World.Folder = "world"
 	c.World.RegionSize = world.DefaultSectionSize
 	c.World.Generator = "vanilla"
-	c.World.Seed = rand.Int64()
+	// Seed 0 by default, so a server without a config file keeps the same
+	// terrain on every start; cmd/helix writes a random one into a new
+	// config.toml.
 	c.Players.MaximumChunkRadius = 32
 	c.Players.SaveData = true
 	c.Players.Folder = "players"
