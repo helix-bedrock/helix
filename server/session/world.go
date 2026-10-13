@@ -160,9 +160,18 @@ func (s *Session) ViewEntity(e world.Entity) {
 		Velocity:        vec64To32(vel),
 		Pitch:           float32(pitch),
 		Yaw:             float32(yaw),
-		HeadYaw:         float32(yaw),
+		HeadYaw:         float32(headYaw(e, e.Rotation())),
 		BodyYaw:         float32(yaw),
 	})
+}
+
+// headYaw returns where an entity's head faces: mobs turn their heads apart
+// from their bodies (Helix).
+func headYaw(e world.Entity, rot cube.Rotation) float64 {
+	if h, ok := e.(interface{ HeadYaw() float64 }); ok {
+		return h.HeadYaw()
+	}
+	return rot.Yaw()
 }
 
 // ViewEntityGameMode ...
@@ -229,7 +238,7 @@ func (s *Session) viewEntityAbsoluteMovement(id uint64, e world.Entity, pos mgl6
 	s.writePacket(&packet.MoveActorAbsolute{
 		EntityRuntimeID: id,
 		Position:        vec64To32(entityNetworkPosition(e, pos)),
-		Rotation:        vec64To32(mgl64.Vec3{rot.Pitch(), rot.Yaw(), rot.Yaw()}),
+		Rotation:        vec64To32(mgl64.Vec3{rot.Pitch(), rot.Yaw(), headYaw(e, rot)}),
 		Flags:           flags,
 	})
 }

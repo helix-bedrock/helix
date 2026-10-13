@@ -1,10 +1,15 @@
 # Credits
 
+Helix is licensed under the GNU General Public License v3.0 ([LICENSE](LICENSE)),
+because it contains code ported from GPL-3.0 projects (see Pumpkin below).
+Code it took from MIT projects stays available under MIT as well, with the
+notices below.
+
 ## Dragonfly
 
 Helix is based on [Dragonfly](https://github.com/df-mc/dragonfly),
 Copyright (c) the df-mc contributors, used under the MIT licence in
-[LICENSE](LICENSE).
+[LICENSE-DRAGONFLY](LICENSE-DRAGONFLY).
 
 - Copied: 2026-10-12
 - Source commit: `1793369709ceed934675d69e86ff6c828e4216c8` (2026-09-20)
@@ -18,6 +23,29 @@ Every later commit is Helix's own and is listed in the git history.
 ## Data
 
 Block states come from [helix-data](https://github.com/helix-bedrock/helix-data), dumped from the Bedrock Dedicated Server, instead of Dragonfly's `block_states.nbt`. Item and creative data are still Dragonfly's (`server/world/vanilla_items.nbt`, `server/item/creative/creative_items.nbt`).
+
+## Pumpkin
+
+Mob AI and pathfinding are ported from [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin)
+(GPL-3.0, Copyright (c) the Pumpkin contributors), version `0.2.0+26.3-26.51`,
+from the `master` branch as downloaded on 2026-10-07 (no commit hash: it was a
+source archive). Translated from Rust to Go; nodes are pointers as in vanilla
+instead of Pumpkin's copies.
+
+| Helix path | Pumpkin path (`crates/pumpkin-core/src/entity/`) | Notes |
+|---|---|---|
+| `server/entity/path/node.go` | `ai/pathfinder/node.rs`, `path.rs`, `binary_heap.rs` | Path types and their costs, nodes, open set, paths |
+| `server/entity/path/context.go` | `ai/pathfinder/pathfinding_context.rs` | Block classification, mapped onto Helix's blocks |
+| `server/entity/path/walk.go` | `ai/pathfinder/walk_node_evaluator.rs`, `node_evaluator.rs` | Walking neighbours, jumping, falling, mob size |
+| `server/entity/path/search.go` | `ai/pathfinder/mod.rs` (`compute_path`, `find_surface_position`) | A* search |
+| `server/entity/path/navigation.go` | `ai/pathfinder/mod.rs` (`PathNavigation`, `tick_ground`) | Following a path, stuck detection, corner cutting |
+| `server/entity/mob/goal.go` | `ai/goal/goal_selector.rs`, `ai/goal/mod.rs`, `ai/control/look_control.rs` | Goal selection by priority and controls, head turning |
+| `server/entity/mob/goals.go` | `ai/goal/swim.rs`, `wander_around.rs`, `look_around.rs`, `look_at_entity.rs`, `escape_danger.rs`, `revenge.rs`, `active_target.rs`, `track_target.rs`, `melee_attack.rs`, `tempt.rs`, `avoid_entity.rs`, `ai/util/default_random_pos.rs`, `random_pos.rs` | Each goal driven by the BDS behaviour component of the same purpose |
+| `server/entity/mob/physics.go` | `living.rs` (`travel_in_air`, `travel_in_fluid`, `jump`), `mod.rs` (`movement_input_to_velocity`) | Walking, swimming and jumping physics |
+
+What each mob is (health, speed, size, families, behaviours and their
+settings, loot) comes from BDS 1.26.52.3's own definition files, through
+helix-data, not from Pumpkin, which follows Java Edition.
 
 ## gophertunnel
 

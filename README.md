@@ -86,6 +86,21 @@ Plugins can open more worlds while the server runs with
 Transactions run on pool workers, so they must never wait on another
 transaction (`world.Call`, `Task.Wait`): use `Do` and return.
 
+## Mobs
+
+All 92 vanilla mob types come from the definition files of BDS
+1.26.52.3, through helix-data: health, speed, size, families, loot, and the
+behaviours each mob has with their settings and priorities. Spawn events
+pick variants such as baby animals as BDS does. Try `/summon zombie`.
+
+Behaviours run as goals, and walking mobs find paths with an A* pathfinder
+ported from Pumpkin. Ported so far: `float`, `random_stroll`,
+`random_look_around`, `look_at_player`, `panic`, `hurt_by_target`,
+`nearest_attackable_target`, `melee_attack`, `melee_box_attack`, `tempt` and
+`avoid_mob_type`. Other behaviours are skipped, so a mob may do less than in
+vanilla. Not done yet: natural spawning, despawning, breeding, flying and
+swimming navigation, ranged attacks, mob sounds and experience drops.
+
 ## Debugging
 
 Set an address in `config.toml` to open the debug dashboard:
@@ -102,3 +117,9 @@ each world's tick time split into its parts, which blocks scheduled updates
 `/debug/pprof/`. `/record?seconds=60` downloads a recording of every packet
 for a minute (`&full=1` includes whole packets) to send with a bug report.
 Keep the address on localhost: the dashboard shows every player's packets.
+
+## Licence
+
+Helix is licensed under the GPL-3.0 ([LICENSE](LICENSE)). It is based on
+Dragonfly (MIT, [LICENSE-DRAGONFLY](LICENSE-DRAGONFLY)) and ports code from
+Pumpkin (GPL-3.0); see [CREDITS.md](CREDITS.md).

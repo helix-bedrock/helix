@@ -196,7 +196,7 @@ func (conf Config) New() *Server {
 		conf.ShutdownMessage = chat.MessageServerDisconnect
 	}
 	if len(conf.Entities.Types()) == 0 {
-		conf.Entities = entity.DefaultRegistry
+		conf.Entities = withMobs(entity.DefaultRegistry, conf.Log)
 	}
 	if conf.Blocks == nil {
 		conf.Blocks = world.DefaultBlockRegistry

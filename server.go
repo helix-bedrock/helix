@@ -61,6 +61,9 @@ func New(conf Config) (*Server, error) {
 	s.Server = conf.Server.New()
 	s.plugins = &Plugins{srv: s, byName: map[string]*pluginState{}}
 	cmd.Register(cmd.New("plugins", "Lists the server's plugins.", []string{"pl"}, pluginsRunnable{s: s}))
+	if _, taken := cmd.ByAlias("summon"); !taken {
+		cmd.Register(cmd.New("summon", "Summons a mob.", nil, summonRunnable{}))
+	}
 	err := s.plugins.load(conf.Plugins, s.log, conf.PanicLimit)
 	return s, err
 }
