@@ -14,6 +14,8 @@ type filterEnv struct {
 	tx    *world.Tx
 	self  *Mob
 	other world.Entity
+	// biome is the biome a spawn rule is checked in.
+	biome world.Biome
 }
 
 // evalFilter checks a BDS filter: a test, a list (all must pass) or
@@ -65,6 +67,22 @@ func evalFilter(raw json.RawMessage, env filterEnv) bool {
 	}
 	if json.Unmarshal(raw, &t) != nil || t.Test == "" {
 		return false
+	}
+	if t.Test == "has_biome_tag" {
+		var tag string
+		_ = json.Unmarshal(t.Value, &tag)
+		b := env.biome
+		if b == nil && env.self != nil {
+			b = env.tx.Biome(cube.PosFromVec3(env.self.Position()))
+		}
+		if b == nil {
+			return false
+		}
+		has := slices.Contains(b.Tags(), tag)
+		if o := operatorOf(t.Operator); o == "!=" || o == "not" {
+			return !has
+		}
+		return has
 	}
 	got, ok := testValue(t.Test, subjectOf(t.Subject, env), env, t.Value)
 	if !ok {
@@ -171,6 +189,24 @@ func testValue(test string, subject world.Entity, env filterEnv, arg json.RawMes
 		return mob.Health(), true
 	case "is_persistent":
 		return mob != nil && mob.s.persistent, true
+	case "distance_to_nearest_player":
+		return nearestPlayerDist(env.tx, subject.Position()), true
+	case "inactivity_timer":
+		if mob == nil {
+			return nil, false
+		}
+		// The test passes once the mob has been inactive for the seconds
+		// given.
+		var secs float64
+		_ = json.Unmarshal(arg, &secs)
+		return float64(mob.s.inactive) >= secs*20, true
+	case "random_chance":
+		if mob == nil {
+			return nil, false
+		}
+		var n float64
+		_ = json.Unmarshal(arg, &n)
+		return n <= 1 || mob.s.rand.IntN(int(n)) == 0, true
 	}
 	return nil, false
 }

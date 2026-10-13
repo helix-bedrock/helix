@@ -98,8 +98,16 @@ ported from Pumpkin. Ported so far: `float`, `random_stroll`,
 `random_look_around`, `look_at_player`, `panic`, `hurt_by_target`,
 `nearest_attackable_target`, `melee_attack`, `melee_box_attack`, `tempt` and
 `avoid_mob_type`. Other behaviours are skipped, so a mob may do less than in
-vanilla. Not done yet: natural spawning, despawning, breeding, flying and
-swimming navigation, ranged attacks, mob sounds and experience drops.
+vanilla. Not done yet: breeding, flying and swimming navigation, ranged
+attacks, mob sounds and experience drops.
+
+Mobs spawn around players by BDS's spawn rules (biome, light, blocks,
+height, difficulty, herd size, weight, density) and despawn by their own
+`minecraft:despawn` component. The spawning loop, caps and distances are
+the Minecraft Wiki's Bedrock figures, not yet checked against BDS. Slimes
+spawn in slime chunks below y=40; swamp slimes and spawn rules that need
+mob events, villages or delays are not done yet. Set
+`server.Config.DisableMobSpawning` to turn spawning off.
 
 ## Debugging
 

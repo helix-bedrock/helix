@@ -39,6 +39,9 @@ type Config struct {
 	InventoryEvents *inventory.Events
 	// PacketEvents are the packet event lists, fired on network goroutines.
 	PacketEvents *network.Events
+	// DisableMobSpawning turns off natural mob spawning (Helix). Mobs still
+	// despawn and can still be summoned.
+	DisableMobSpawning bool
 	// RegionSectionSize is the width in chunks of the sections that worlds
 	// split into regions with. If 0, world.DefaultSectionSize.
 	RegionSectionSize int
@@ -237,6 +240,7 @@ func (conf Config) New() *Server {
 	recipe_registerVanilla()
 
 	srv.pool = world.NewPool(0)
+	srv.regionTick = mobSpawner(conf)
 	srv.extra = map[string]*world.World{}
 	srv.world = srv.createWorld(world.Overworld, &srv.nether, &srv.end)
 	srv.nether = srv.createWorld(world.Nether, &srv.world, &srv.end)

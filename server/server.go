@@ -48,6 +48,8 @@ type Server struct {
 	world, nether, end *world.World
 	// pool runs the regions of every world of the server.
 	pool *world.Pool
+	// regionTick runs at the end of every region tick: mob spawning.
+	regionTick func(tx *world.Tx, tick int64)
 	// extra holds the worlds loaded with LoadWorld, by name, under wmu.
 	wmu   sync.Mutex
 	extra map[string]*world.World
@@ -636,6 +638,7 @@ func (srv *Server) createWorld(dim world.Dimension, nether, end **world.World) *
 		Events:              srv.conf.WorldEvents,
 		Debug:               srv.conf.Debug,
 		Pool:                srv.pool,
+		RegionTick:          srv.regionTick,
 		SectionSize:         srv.conf.RegionSectionSize,
 		PortalDestination: func(dim world.Dimension) *world.World {
 			switch dim {

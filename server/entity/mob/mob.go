@@ -61,6 +61,14 @@ type state struct {
 	ticks      int64
 	deathTicks int
 	persistent bool
+
+	// natural is set for mobs spawned by the Spawner, with their population
+	// category and whether they spawned in a cave, for the caps.
+	natural     bool
+	category    string
+	underground bool
+	// inactive counts ticks spent far from players, for despawning.
+	inactive int
 }
 
 func (t *Type) newState(seed [2]uint64, groups []string) *state {
@@ -364,6 +372,9 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 	}
 	if s.immuneTicks > 0 {
 		s.immuneTicks--
+	}
+	if m.despawn(tx) {
+		return
 	}
 	s.effects.Tick(m, tx)
 	m.sense()

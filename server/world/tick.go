@@ -137,6 +137,10 @@ func (t ticker) tick(tx *Tx, tick int64, thunder bool) {
 	dt.Phase("neighbour updates")
 	w.redstone.tick(tx, tick)
 	dt.Phase("redstone")
+	if w.conf.RegionTick != nil {
+		w.conf.RegionTick(tx, tick)
+		dt.Phase("region hook")
+	}
 
 	w.ticked++
 	if w.ticked%splitInterval == 0 {

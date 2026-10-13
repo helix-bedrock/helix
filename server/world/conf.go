@@ -28,6 +28,10 @@ type Config struct {
 	// many regions there are. If nil, the world starts and closes a pool of
 	// its own.
 	Pool *Pool
+	// RegionTick, if set, is called at the end of every tick of every
+	// region with that region's Tx (Helix). The server uses it to spawn and
+	// despawn mobs.
+	RegionTick func(tx *Tx, tick int64)
 	// TickBudget is how long a region's tick may take before a
 	// SlowTickEvent is fired. If 0, one tick: 50ms.
 	TickBudget time.Duration

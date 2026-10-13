@@ -63,21 +63,34 @@ func (t *Type) BBox(e world.Entity) cube.BBox {
 // Spawn returns a new mob of the type at pos, with the component groups
 // its spawn event picks, ready to be added to a world.
 func (t *Type) Spawn(pos mgl64.Vec3, yaw float64) *world.EntityHandle {
+	return t.spawn(pos, yaw, natural{})
+}
+
+// natural describes a naturally spawned mob: its population category and
+// whether it spawned in a cave. A zero category means it was not.
+type natural struct {
+	category    string
+	underground bool
+}
+
+func (t *Type) spawn(pos mgl64.Vec3, yaw float64, n natural) *world.EntityHandle {
 	id := uuid.New()
 	clear(id[:8])
 	seed := [2]uint64{binary.LittleEndian.Uint64(id[8:]), 0x9e3779b97f4a7c15}
-	return world.EntitySpawnOpts{Position: pos, Rotation: cube.Rotation{yaw, 0}, ID: id}.New(t, spawnConfig{t: t, seed: seed})
+	return world.EntitySpawnOpts{Position: pos, Rotation: cube.Rotation{yaw, 0}, ID: id}.New(t, spawnConfig{t: t, seed: seed, natural: n})
 }
 
 type spawnConfig struct {
-	t    *Type
-	seed [2]uint64
+	t       *Type
+	seed    [2]uint64
+	natural natural
 }
 
 func (c spawnConfig) Apply(data *world.EntityData) {
 	r := rand.New(rand.NewPCG(c.seed[1], c.seed[0]))
 	s := c.t.newState(c.seed, c.t.spawnGroups(nil, r.Float64))
 	s.headYaw = data.Rot.Yaw()
+	s.natural, s.category, s.underground = c.natural.category != "", c.natural.category, c.natural.underground
 	data.Data = s
 }
 

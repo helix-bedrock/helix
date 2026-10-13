@@ -32,6 +32,7 @@ type spec struct {
 	avoidSun, avoidWater, canWalkOverFences bool
 
 	behaviours []behaviourSpec
+	despawn    *despawnSpec
 }
 
 type behaviourSpec struct {
@@ -161,6 +162,9 @@ func parseSpec(d *Def, c map[string]json.RawMessage) *spec {
 		s.avoidSun = boolField(raw, "avoid_sun", false)
 		s.avoidWater = boolField(raw, "avoid_water", false)
 		s.canWalkOverFences = boolField(raw, "can_walk_over_fences", false)
+	}
+	if raw, ok := c["minecraft:despawn"]; ok {
+		s.despawn = parseDespawn(raw)
 	}
 	if _, ok := c["minecraft:behavior.float"]; ok {
 		s.canFloat = true

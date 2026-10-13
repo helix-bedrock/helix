@@ -65,6 +65,7 @@ func (srv *Server) LoadWorld(name string, c WorldConfig) (*world.World, error) {
 		Events:              srv.conf.WorldEvents,
 		Debug:               srv.conf.Debug,
 		Pool:                srv.pool,
+		RegionTick:          srv.regionTick,
 		SectionSize:         srv.conf.RegionSectionSize,
 	}.New()
 	srv.extra[name] = w

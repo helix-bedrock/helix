@@ -16,3 +16,17 @@ func withMobs(reg world.EntityRegistry, log *slog.Logger) world.EntityRegistry {
 	}
 	return out
 }
+
+// mobSpawner returns the region tick that spawns and despawns mobs, or nil
+// if natural spawning is off or the rules cannot be read.
+func mobSpawner(conf Config) func(tx *world.Tx, tick int64) {
+	if conf.DisableMobSpawning {
+		return nil
+	}
+	sp, err := mob.NewSpawner(conf.Entities)
+	if err != nil {
+		conf.Log.Error("load spawn rules; mobs do not spawn naturally", "err", err)
+		return nil
+	}
+	return sp.Tick
+}
