@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image/color"
+	"math"
 	"math/rand/v2"
 	"strings"
 	"time"
@@ -162,7 +163,22 @@ func (s *Session) ViewEntity(e world.Entity) {
 		Yaw:             float32(yaw),
 		HeadYaw:         float32(headYaw(e, e.Rotation())),
 		BodyYaw:         float32(yaw),
+		Attributes:      actorAttributes(e),
 	})
+}
+
+// actorAttributes returns the health and movement speed of a living
+// entity. Without a movement speed the client treats a mob as unable to
+// move and does not show it walking (Helix).
+func actorAttributes(e world.Entity) []protocol.AttributeValue {
+	l, ok := e.(entity.Living)
+	if !ok {
+		return nil
+	}
+	return []protocol.AttributeValue{
+		{Name: "minecraft:health", Value: float32(l.Health()), Max: float32(l.MaxHealth())},
+		{Name: "minecraft:movement", Value: float32(l.Speed()), Max: math.MaxFloat32},
+	}
 }
 
 // headYaw returns where an entity's head faces: mobs turn their heads apart
