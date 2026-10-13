@@ -44,6 +44,20 @@ instead of Pumpkin's copies.
 | `server/entity/mob/goals2.go`, `direct.go` | `ai/goal/creeper_ignite.rs`, `ranged_attack.rs`, `breed.rs`, `follow_parent.rs`, `water_avoiding_random_flying.rs` | Swell, ranged attack, breeding, following parents, flying wander. Swimming wander and straight steering are Helix's own |
 | `server/entity/mob/physics.go` | `living.rs` (`travel_in_air`, `travel_in_fluid`, `jump`), `mod.rs` (`movement_input_to_velocity`) | Walking, swimming and jumping physics |
 
+| `server/world/generator/vanilla/random.go` | `pumpkin-util/src/random/xoroshiro128.rs`, `mod.rs` | Xoroshiro128++, seeding and splitting |
+| `server/world/generator/vanilla/noise.go` | `pumpkin-util/src/noise/perlin.rs`, `pumpkin-world/src/generation/noise/router/density_function/noise.rs` | Perlin, octave, normal and old blended noise, in 64-bit floats |
+| `server/world/generator/vanilla/density.go`, `router.go` | `tools/pumpkin-codegen/src/noise_router.rs` (`parse_vanilla_df`, compiled evaluators), `pumpkin-world/src/generation/noise/router/` | Density functions read from the datapack and evaluated per block |
+| `server/world/generator/vanilla/biome.go` | `pumpkin-data` biome tree search | Biome search tree walk |
+| `server/world/generator/vanilla/surface.go` | `pumpkin-world/src/generation/surface/` | Material rules and conditions, terracotta bands |
+| `server/world/generator/vanilla/aquifer.go` | `pumpkin-world/src/generation/noise/aquifer_sampler.rs` | Aquifers |
+| `server/world/generator/vanilla/generator.go` | `pumpkin-world/src/generation/proto_chunk.rs` (`build_surface`) | Chunk generation and the surface pass |
+
+`server/world/generator/vanilla/biome_ids.go` maps Java biome names to Bedrock
+IDs, from GeyserMC/mappings (MIT, `biomes.json` at commit `ba81ded46ea9`),
+copied from Pumpkin's `assets/bedrock`. `testdata/climate_seed0.json` holds
+Java Edition's climate values for seed 0, from Pumpkin's
+`assets/multi_noise_sample_no_blend_no_beard_0_0_0.json`.
+
 What each mob is (health, speed, size, families, behaviours and their
 settings, loot) comes from BDS 1.26.52.3's own definition files, through
 helix-data, not from Pumpkin, which follows Java Edition.

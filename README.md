@@ -120,6 +120,21 @@ spawn in slime chunks below y=40; swamp slimes and spawn rules that need
 mob events, villages or delays are not done yet. Set
 `server.Config.DisableMobSpawning` to turn spawning off.
 
+## World generation
+
+New overworld chunks are made by the vanilla generator (`Generator =
+"vanilla"` under `[World]` in `config.toml`, with the world `Seed`; or
+`"flat"`). It generates vanilla terrain: the shape of the land and
+mountains, cave systems, aquifers (so most caves are dry), biomes and
+surface blocks (grass, sand, snow, terracotta bands and so on). It is
+ported from Pumpkin and reads Java Edition 26.3's world generation data
+from helix-data: since 1.18 Bedrock and Java generate the same terrain and
+biomes for a seed. Its climate values match Java's for seed 0.
+
+Not done yet: trees, plants, ores and ore veins, structures, the nether and
+end (still flat), Java's per-block biome blending at borders, and blending
+with chunks generated before.
+
 ## Debugging
 
 Set an address in `config.toml` to open the debug dashboard:

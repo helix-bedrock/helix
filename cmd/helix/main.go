@@ -49,5 +49,14 @@ func readConfig(log *slog.Logger) (server.Config, error) {
 	if err := toml.Unmarshal(data, &c); err != nil {
 		return zero, fmt.Errorf("decode config: %v", err)
 	}
+	// Write settings added since the file was made, such as a new world
+	// seed, back to it, so they stay the same on the next start.
+	if tree, err := toml.LoadBytes(data); err == nil && !tree.Has("World.Seed") {
+		if out, err := toml.Marshal(c); err == nil {
+			if err := os.WriteFile("config.toml", out, 0644); err != nil {
+				log.Error("update config.toml", "err", err)
+			}
+		}
+	}
 	return c.Config(log)
 }

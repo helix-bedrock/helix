@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/helix-bedrock/helix/debug"
 	"github.com/helix-bedrock/helix/server/item/inventory"
+	"github.com/helix-bedrock/helix/server/world/generator/vanilla"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -316,6 +318,13 @@ type UserConfig struct {
 		// into regions with. Regions tick in parallel. Leave it at 8; set it
 		// to 1 or 2 to make region borders common when testing them.
 		RegionSize int
+		// Generator is how new overworld chunks are made: "vanilla" for
+		// vanilla terrain (shape, caves, biomes and surface; no trees, ores
+		// or structures yet) or "flat" for a flat world. The nether and end
+		// are always flat for now.
+		Generator string
+		// Seed is the world seed of the vanilla generator.
+		Seed int64
 	}
 	Players struct {
 		// MaxCount is the maximum amount of players allowed to join the server
@@ -370,6 +379,7 @@ func (uc UserConfig) Config(log *slog.Logger) (Config, error) {
 		MaxChunkRadius:          uc.Players.MaximumChunkRadius,
 		DisableResourceBuilding: !uc.Resources.AutoBuildPack,
 		RegionSectionSize:       uc.World.RegionSize,
+		Generator:               generatorFor(uc.World.Generator, uc.World.Seed, log),
 	}
 	listeners, err := uc.transportListeners()
 	if err != nil {
@@ -452,6 +462,26 @@ func loadResources(dir string) ([]*resource.Pack, error) {
 	return packs, nil
 }
 
+// generatorFor returns the generator a user config asks for. A vanilla
+// generator that cannot be made falls back to flat, with the error logged.
+func generatorFor(name string, seed int64, log *slog.Logger) func(world.Dimension) world.Generator {
+	if name != "vanilla" {
+		return nil
+	}
+	world.DefaultBlockRegistry.Finalize()
+	v, err := vanilla.New(seed, world.DefaultBlockRegistry)
+	if err != nil {
+		log.Error("vanilla world generator; using flat", "err", err)
+		return nil
+	}
+	return func(dim world.Dimension) world.Generator {
+		if dim == world.Overworld {
+			return v
+		}
+		return loadGenerator(dim)
+	}
+}
+
 // loadGenerator loads a standard world.Generator for a world.Dimension. The
 // generators returned are flat generators with grass/dirt, netherrack or end
 // stone depending on the dimension passed.
@@ -480,6 +510,8 @@ func DefaultConfig() UserConfig {
 	c.World.SaveData = true
 	c.World.Folder = "world"
 	c.World.RegionSize = world.DefaultSectionSize
+	c.World.Generator = "vanilla"
+	c.World.Seed = rand.Int64()
 	c.Players.MaximumChunkRadius = 32
 	c.Players.SaveData = true
 	c.Players.Folder = "players"
