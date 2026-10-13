@@ -626,6 +626,8 @@ func (s *Session) playSound(pos mgl64.Vec3, t world.Sound, disableRelative bool)
 		return
 	case sound.Explosion:
 		pk.SoundType = packet.SoundEventExplode
+	case sound.MobEvent:
+		pk.SoundType, pk.EntityType, pk.BabyMob = so.Event, so.Entity, so.Baby
 	case sound.Thunder:
 		pk.SoundType, pk.EntityType = packet.SoundEventThunder, "minecraft:lightning_bolt"
 	case sound.Click:

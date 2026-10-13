@@ -3,6 +3,7 @@ package mob
 import (
 	"cmp"
 	"encoding/json"
+	"github.com/helix-bedrock/helix/server/molang"
 	"math"
 	"slices"
 	"strings"
@@ -45,6 +46,9 @@ type spec struct {
 	// shooter is the projectile the mob shoots, such as "minecraft:arrow".
 	shooter   string
 	equipment string
+	ambient   *ambientSpec
+	// xp is the experience_reward on_death expression.
+	xp *molang.Expr
 }
 
 type behaviourSpec struct {
@@ -217,6 +221,24 @@ func parseSpec(d *Def, c map[string]json.RawMessage) *spec {
 		}
 		_ = json.Unmarshal(raw, &e)
 		s.equipment = e.Table
+	}
+	if raw, ok := c["minecraft:ambient_sound_interval"]; ok {
+		s.ambient = parseAmbient(raw)
+	} else {
+		// Most mobs (cows, zombies) have no such component yet make idle
+		// sounds in BDS: assume the component's documented defaults.
+		s.ambient = parseAmbient(nil)
+	}
+	if raw, ok := c["minecraft:experience_reward"]; ok {
+		if f := field(raw, "on_death"); f != nil {
+			var src string
+			if json.Unmarshal(f, &src) != nil {
+				src = string(f) // a plain number
+			}
+			if e, err := molang.Parse(src); err == nil {
+				s.xp = e
+			}
+		}
 	}
 	if raw, ok := c["minecraft:despawn"]; ok {
 		s.despawn = parseDespawn(raw)

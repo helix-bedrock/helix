@@ -106,6 +106,12 @@ up, fish swim and bats fly. Swimming and flying mobs steer straight at their
 target rather than pathfinding. Other behaviours are skipped, so a mob may
 do less than in vanilla.
 
+Mobs make their idle, hurt and death sounds (idle timing and variants from
+`ambient_sound_interval`; mobs without it use its documented defaults, an
+assumption still to check against BDS) and drop the experience their
+`experience_reward` gives when a player kills them. `server/molang`
+evaluates the Molang expressions this needs.
+
 Mobs spawn around players by BDS's spawn rules (biome, light, blocks,
 height, difficulty, herd size, weight, density) and despawn by their own
 `minecraft:despawn` component. The spawning loop, caps and distances are

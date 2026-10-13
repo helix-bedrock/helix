@@ -84,6 +84,8 @@ type state struct {
 	// dest is where a swimming or flying mob steers to.
 	dest        *mgl64.Vec3
 	directSpeed float64
+	// ambientIn counts down to the next idle sound.
+	ambientIn int
 }
 
 func (t *Type) newState(seed [2]uint64, groups []string) *state {
@@ -298,6 +300,9 @@ func (m *Mob) Hurt(dmg float64, src world.DamageSource) (float64, bool) {
 	} else {
 		m.s.immuneTicks = immuneTicks
 		m.viewAction(entity.HurtAction{})
+		if m.s.health.Health() > n {
+			m.playSound("hurt")
+		}
 	}
 	m.s.lastDamage = dmg
 	m.s.health.AddHealth(-n)
@@ -345,6 +350,7 @@ func (m *Mob) die() {
 	m.SetTarget(nil)
 	m.Extinguish()
 	m.viewAction(entity.DeathAction{})
+	m.playSound("death")
 }
 
 // Close removes the mob from its world.
@@ -378,6 +384,7 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 		// The death animation takes a second; then the body goes.
 		if s.deathTicks++; s.deathTicks >= 20 {
 			m.dropLoot()
+			m.dropExperience()
 			_ = m.Close()
 		}
 		return
@@ -408,6 +415,7 @@ func (m *Mob) Tick(tx *world.Tx, current int64) {
 	s.targets.tick(m)
 	s.goals.tick(m)
 	m.tickComponents(tx)
+	m.tickAmbient()
 	if m.handle.Closed() {
 		return
 	}

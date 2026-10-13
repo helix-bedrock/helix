@@ -58,3 +58,17 @@ type FireworkBlast struct{ sound }
 
 // FireworkTwinkle is a sound played when a firework explodes and should twinkle.
 type FireworkTwinkle struct{ sound }
+
+// MobEvent is a sound of a mob, named by its BDS sound event such as
+// "ambient", "hurt" or "death" (Helix). The client picks the sound for the
+// entity type, so each mob sounds like itself.
+type MobEvent struct {
+	// Entity is the mob's identifier, such as "minecraft:zombie".
+	Entity string
+	// Event is the sound event name.
+	Event string
+	// Baby plays the higher baby version of the sound.
+	Baby bool
+
+	sound
+}
