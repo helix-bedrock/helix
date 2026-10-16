@@ -1517,8 +1517,12 @@ func (w *World) loadChunk(pos ChunkPos) (*chunk.Column, error) {
 			return nil, err
 		}
 		ch := chunk.New(w.conf.Blocks, w.Range())
-		w.conf.Generator.GenerateChunk(pos, ch)
 		column = &chunk.Column{Chunk: ch}
+		if cg, ok := w.conf.Generator.(ColumnGenerator); ok {
+			cg.GenerateColumn(pos, column)
+		} else {
+			w.conf.Generator.GenerateChunk(pos, ch)
+		}
 	}
 	chunk.LightArea([]*chunk.Chunk{column.Chunk}, int(pos[0]), int(pos[1])).Fill()
 	return column, nil

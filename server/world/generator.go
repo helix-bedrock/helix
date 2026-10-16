@@ -17,6 +17,16 @@ type Generator interface {
 	DefaultSpawn(dim Dimension) cube.Pos
 }
 
+// ColumnGenerator is a Generator that also fills in the block entities (and
+// entities) of the chunks it generates, such as the beds, bells and chests of
+// structures. A world uses GenerateColumn instead of GenerateChunk when its
+// generator implements it; col.Chunk is new and empty, as for GenerateChunk.
+// Block entity positions are world positions.
+type ColumnGenerator interface {
+	Generator
+	GenerateColumn(pos ChunkPos, col *chunk.Column)
+}
+
 // NopGenerator is the default generator a world. It places no blocks in the world which results in a void
 // world.
 type NopGenerator struct{}
@@ -38,6 +48,16 @@ func (l *lockedGenerator) GenerateChunk(pos ChunkPos, c *chunk.Chunk) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.g.GenerateChunk(pos, c)
+}
+
+func (l *lockedGenerator) GenerateColumn(pos ChunkPos, col *chunk.Column) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if cg, ok := l.g.(ColumnGenerator); ok {
+		cg.GenerateColumn(pos, col)
+		return
+	}
+	l.g.GenerateChunk(pos, col.Chunk)
 }
 
 func (l *lockedGenerator) DefaultSpawn(dim Dimension) cube.Pos {
