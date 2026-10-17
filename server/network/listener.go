@@ -183,7 +183,10 @@ func (l *Listener) accept() {
 		l.count.Add(1)
 		c := newConn(t, l)
 		if l.conf.Hooks != nil {
-			c.c = conn.New(t, conn.Config{Log: c.log, FlushInterval: l.conf.FlushRate, Shared: l.conf.Hooks})
+			// The client can send more than the protocol library's slice cap of 1024
+			// entries: a ClientCacheBlobStatus with 1309 hashes closed the
+			// connection. Slices stay bounded by the packet's own length.
+			c.c = conn.New(t, conn.Config{Log: c.log, FlushInterval: l.conf.FlushRate, Shared: l.conf.Hooks, DisableLimits: true})
 		}
 		go l.login(c)
 	}

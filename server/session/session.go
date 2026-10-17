@@ -410,6 +410,11 @@ func (s *Session) handlePackets() {
 	for {
 		pk, err := s.conn.ReadPacket()
 		if err != nil {
+			// A packet that fails to decode also ends up here and closes the
+			// connection, so log the reason unless the connection was closed.
+			if !errors.Is(err, net.ErrClosed) {
+				s.conf.Log.Debug("read packet: " + err.Error())
+			}
 			return
 		}
 		err = s.withControllable(context.Background(), func(tx *world.Tx, c Controllable) error {
@@ -499,11 +504,16 @@ func (s *Session) sendChunks(tx *world.Tx, c Controllable) {
 	}
 
 	s.blobMu.Lock()
-	const maxChunkTransactions = 8
+	// At 4 chunks per tick (80/s) a 12-chunk view took 6+ seconds to fill
+	// even though generating a chunk takes ~5 ms on many workers.
+	const (
+		maxChunkTransactions = 24
+		maxChunksPerTick     = 12
+	)
 	toLoad := maxChunkTransactions - len(s.openChunkTransactions)
 	s.blobMu.Unlock()
-	if toLoad > 4 {
-		toLoad = 4
+	if toLoad > maxChunksPerTick {
+		toLoad = maxChunksPerTick
 	}
 	s.chunkLoader.Load(tx, toLoad)
 }

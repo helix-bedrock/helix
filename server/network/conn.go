@@ -75,7 +75,8 @@ func newConn(t conn.Transport, l *Listener) *Conn {
 	log := l.conf.Log.With("addr", t.RemoteAddr())
 	return &Conn{
 		l: l, log: log,
-		c: conn.New(t, conn.Config{Log: log, FlushInterval: l.conf.FlushRate}),
+		// DisableLimits: see accept.
+		c: conn.New(t, conn.Config{Log: log, FlushInterval: l.conf.FlushRate, DisableLimits: true}),
 	}
 }
 
