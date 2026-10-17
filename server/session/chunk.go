@@ -174,12 +174,16 @@ func (s *Session) sendBlobHashes(pos world.ChunkPos, dim world.Dimension, c *chu
 	}
 
 	s.blobMu.Lock()
-	s.openChunkTransactions = append(s.openChunkTransactions, m)
 	if l := len(s.blobs); l > 4096 {
 		s.blobMu.Unlock()
-		s.conf.Log.Error("too many blobs pending", "n", l)
+		// The client has not acknowledged enough blobs yet. Send the chunk
+		// without the cache rather than dropping it, which left the client
+		// waiting for a chunk that never came.
+		s.conf.Log.Debug("too many blobs pending, sending chunk uncached", "n", l)
+		s.sendNetworkChunk(pos, dim, c, blockEntities)
 		return
 	}
+	s.openChunkTransactions = append(s.openChunkTransactions, m)
 	for i := range hashes {
 		s.blobs[hashes[i]] = blobs[i]
 	}
@@ -252,13 +256,13 @@ func (s *Session) sendNetworkChunk(pos world.ChunkPos, dim world.Dimension, c *c
 	})
 }
 
-// trackBlob attempts to track the given blob. If the player has too many pending blobs, it returns false and closes the
-// connection.
+// trackBlob attempts to track the given blob. If the player has too many pending blobs, it returns false and the
+// caller sends the data without the cache.
 func (s *Session) trackBlob(hash uint64, blob []byte) bool {
 	s.blobMu.Lock()
 	if l := len(s.blobs); l > 4096 {
 		s.blobMu.Unlock()
-		s.conf.Log.Error("too many blobs pending", "n", l)
+		s.conf.Log.Debug("too many blobs pending", "n", l)
 		return false
 	}
 	s.blobs[hash] = blob
