@@ -1531,7 +1531,11 @@ func (w *World) loadChunk(pos ChunkPos) (*chunk.Column, error) {
 // emptyColumn returns an empty column, used as a stand-in when a chunk could
 // not be loaded.
 func (w *region) emptyColumn() *Column {
-	return w.columnFrom(&chunk.Column{Chunk: chunk.New(w.conf.Blocks, w.Range())}, ChunkPos{})
+	ch := chunk.New(w.conf.Blocks, w.Range())
+	// Light reads on the stand-in (a random tick next to another region's
+	// chunk) index its light slices, which are nil until filled.
+	chunk.LightArea([]*chunk.Chunk{ch}, 0, 0).Fill()
+	return w.columnFrom(&chunk.Column{Chunk: ch}, ChunkPos{})
 }
 
 // loadChunkAsync loads or generates the chunk at pos in the background,
