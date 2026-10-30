@@ -66,14 +66,22 @@ type Config struct {
 	// stay within the gap regions keep between them (MergeDistance
 	// sections), so no player misses an entity in another region.
 	EntityViewRadius2 int32
+	// RandomTickSpeed is BDS's randomtickspeed game rule: how many random
+	// ticks each sub chunk gets per tick, 2.5 at speed 1. 0 turns random
+	// ticks off.
+	RandomTickSpeed int32
+	// Ticker gives blocks their random and queued ticks. Nil ticks nothing,
+	// though scheduled ticks are still kept and saved.
+	Ticker BlockTicker
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
 // entity view disc (squared radius 17, 57 chunks), a 64 MiB chunk cache,
-// sections of 8 by 8 chunks and a merge distance of one section. The section size and merge distance are placeholders until
+// sections of 8 by 8 chunks, a merge distance of one section and BDS's
+// random tick speed of 1. The section size and merge distance are placeholders until
 // helix-bench picks them.
 func DefaultConfig() Config {
-	return Config{SimulationDistance: 4, CacheBytes: 64 << 20, SectionShift: 3, MergeDistance: 1, EntityViewRadius2: 17}
+	return Config{SimulationDistance: 4, CacheBytes: 64 << 20, SectionShift: 3, MergeDistance: 1, EntityViewRadius2: 17, RandomTickSpeed: DefaultRandomTickSpeed}
 }
 
 // TickDuration is the length of a tick: 20 ticks a second, as BDS.
@@ -120,6 +128,8 @@ type Dimension struct {
 
 	// entityView is the live EntityViewRadius2.
 	entityView atomic.Int32
+	// randomTickSpeed is the live RandomTickSpeed.
+	randomTickSpeed atomic.Int32
 
 	closeOnce sync.Once
 	closeErr  error
@@ -138,6 +148,13 @@ type Chunk struct {
 	encoding bool
 	// version counts changes, so a stale encode is recognised.
 	version uint64
+	// ticks and randomTicks are the chunk's tick queues; ticksDirty means
+	// they changed since the chunk was last saved, saved with its next
+	// save or when it unloads.
+	ticks, randomTicks tickQueue
+	ticksDirty         bool
+	// tickedAt is the world tick the chunk last ticked in.
+	tickedAt int64
 }
 
 // New opens a dimension. Call Close to save and stop it.
@@ -169,6 +186,7 @@ func New(conf Config) (*Dimension, error) {
 	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
 		return nil, err
 	}
+	d.SetRandomTickSpeed(conf.RandomTickSpeed)
 	d.idle = sync.NewCond(&d.mu)
 	if d.sched == nil {
 		d.sched, d.ownSched = NewScheduler(0), true
@@ -188,6 +206,17 @@ func (d *Dimension) SetEntityViewRadius2(r2 int32) error {
 	return nil
 }
 
+// SetRandomTickSpeed changes the random tick speed (see
+// Config.RandomTickSpeed) from the next tick on; negative is taken as 0.
+// Safe from any goroutine.
+func (d *Dimension) SetRandomTickSpeed(speed int32) {
+	d.randomTickSpeed.Store(max(speed, 0))
+}
+
+// CurrentTick returns the world's tick, from the dimension's scheduler.
+// Runs: anywhere.
+func (d *Dimension) CurrentTick() int64 { return d.sched.CurrentTick() }
+
 // Range is the dimension's height range.
 func (d *Dimension) Range() cube.Range { return d.r }
 
@@ -206,7 +235,7 @@ func (d *Dimension) Close() error {
 		for _, r := range regions {
 			r.ticking.Store(true)
 			r.drain()
-			r.saveChanged()
+			r.saveChanged(true)
 			r.ticking.Store(false)
 		}
 		d.pool.close()

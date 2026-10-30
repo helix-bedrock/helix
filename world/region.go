@@ -71,7 +71,11 @@ type Region struct {
 	// leaving are the entities that moved out of the region's sections this
 	// tick, handed off at its end.
 	leaving []*Entity
-	ticks   uint64
+	// lcg is BDS's random tick position generator, one per region so
+	// regions tick in parallel; due is reused by runQueue.
+	lcg   uint32
+	due   []scheduledTick
+	ticks uint64
 }
 
 // RegionInfo describes a region, as of the end of its last tick.
@@ -141,7 +145,8 @@ func (r *Region) post(e entry) {
 
 // tick runs one tick, in RFC 0002's order. Only the phases that exist so
 // far: queued work (finished loads, RunAt), player input, chunk sending,
-// then what players see (BDS's order: entities entering and leaving view,
+// block ticks, then what players see (BDS's order: entities entering and
+// leaving view,
 // then movement), one flush per player, saving, and handing the entities
 // that left to their new region.
 func (r *Region) tick() {
@@ -149,6 +154,7 @@ func (r *Region) tick() {
 	r.drain()
 	r.tickEntities()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
+	r.tickBlocks()
 	r.updateVisibility()
 	r.sendMovement()
 	for _, v := range r.viewers {
@@ -157,7 +163,7 @@ func (r *Region) tick() {
 			v.flush()
 		}
 	}
-	r.saveChanged()
+	r.saveChanged(false)
 	r.handOff()
 }
 
@@ -208,7 +214,7 @@ func (r *Region) release(pos mcdb.ChunkPos) {
 	delete(r.holds, pos)
 	if c, ok := r.chunks[pos]; ok {
 		r.unloadChunkEntities(pos)
-		r.save(c)
+		r.save(c, true)
 		delete(r.chunks, pos)
 	}
 	s := r.d.sectionOf(pos)
@@ -250,7 +256,11 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
 	}
-	r.chunks[pos] = &Chunk{pos: pos, col: col, net: nc, discard: discard}
+	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1}
+	c.ticks.load(col.ScheduledBlocks, col.Tick)
+	c.randomTicks.load(col.RandomTicks, col.RandomTick)
+	col.ScheduledBlocks, col.RandomTicks = nil, nil
+	r.chunks[pos] = c
 	if fns, ok := r.awaiting[pos]; ok {
 		delete(r.awaiting, pos)
 		for _, fn := range fns {
@@ -330,21 +340,27 @@ func (r *Region) encoded(c *Chunk, nc *NetChunk, version uint64) {
 	}
 }
 
-// saveChanged saves every chunk changed this tick. Only the sub chunks
+// saveChanged saves every chunk whose blocks changed this tick, and with
+// ticks set, every chunk whose tick queues changed. Only the sub chunks
 // changed since the last save are copied: the snapshot shares the rest.
-func (r *Region) saveChanged() {
+func (r *Region) saveChanged(ticks bool) {
 	for _, c := range r.chunks {
-		r.save(c)
+		r.save(c, ticks)
 	}
 }
 
-func (r *Region) save(c *Chunk) {
-	if !c.dirty || c.discard {
+// save saves c if its blocks changed, or with ticks set, if its tick queues
+// changed: they are saved with the blocks but do not make a save of their
+// own every tick.
+func (r *Region) save(c *Chunk, ticks bool) {
+	if !c.dirty && (!ticks || !c.ticksDirty) || c.discard {
 		return
 	}
-	c.dirty = false
+	c.dirty, c.ticksDirty = false, false
 	d, pos, snap := r.d, c.pos, *c.col
 	snap.Chunk = c.col.Chunk.Snapshot()
+	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
+	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	d.pool.do(pos, func() {
 		if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, &snap); err != nil {
 			d.log.Error("save chunk", "pos", pos, "err", err)

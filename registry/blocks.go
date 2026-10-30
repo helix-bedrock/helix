@@ -208,6 +208,16 @@ func (b *Blocks) StateID(name string, states map[string]any) (uint32, bool) {
 	return id, ok
 }
 
+// Type returns the block a state belongs to, as an index into the
+// registry's blocks: two states of one block have the same type. An unknown
+// ID returns false.
+func (b *Blocks) Type(id uint32) (uint32, bool) {
+	if int(id) >= len(b.stateBlock) {
+		return 0, false
+	}
+	return b.stateBlock[id], true
+}
+
 // Name returns the block name of a state, or "" for an unknown ID.
 func (b *Blocks) Name(id uint32) string {
 	if int(id) >= len(b.stateBlock) {

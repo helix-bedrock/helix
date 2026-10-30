@@ -65,8 +65,16 @@ sibling library folders, so unreleased library changes are used.
   is handed to it at the end of the tick, and one whose chunk unloads is
   unloaded with it (`EntityConfig.Unloaded`).
   Regions tick only the phases that exist so far (queued work, player
-  input, chunk sending, visibility, movement, one flush per player,
-  saving). Loads, generation, network encoding and
+  input, chunk sending, block ticks, visibility, movement, one flush per
+  player, saving). Block ticks (`ticks.go`) are BDS 1.26.60's: each chunk
+  in a simulation zone ticks once per world tick, random ticks first
+  (BDS's count and position generator, `RandomTickSpeed`), then its two
+  queues (pending ticks and the random ticking queue, up to 100 each, in
+  time then priority order, waiting while chunks within 8 blocks are not
+  loaded, run only if the block type is still there). Blocks get their
+  behaviour through `Config.Ticker` (`BlockTicker`); `Region.ScheduleTick`
+  adds ticks. The queues are saved with the chunk; the world tick clock
+  lives on the `Scheduler` and in level.dat's currentTick. Loads, generation, network encoding and
   saves run on a worker pool, jobs for one chunk in order on one worker. Each player is a `Viewer`
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every

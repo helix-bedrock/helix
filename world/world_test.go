@@ -31,6 +31,12 @@ func vanillaRegistry(t *testing.T) *registry.Registry {
 // openDim opens the overworld of the world in dir as a flat world.
 func openDim(t *testing.T, reg *registry.Registry, dir string) (*Dimension, *mcdb.DB) {
 	t.Helper()
+	return openDimWith(t, reg, dir, nil)
+}
+
+// openDimWith is openDim with edit applied to the configuration.
+func openDimWith(t *testing.T, reg *registry.Registry, dir string, edit func(*Config)) (*Dimension, *mcdb.DB) {
+	t.Helper()
 	db, err := mcdb.Config{Blocks: reg.Blocks}.Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -42,6 +48,9 @@ func openDim(t *testing.T, reg *registry.Registry, dir string) (*Dimension, *mcd
 	}
 	conf := DefaultConfig()
 	conf.Store, conf.Blocks, conf.Biomes, conf.Generator = db, reg.Blocks, reg.Biomes, flat
+	if edit != nil {
+		edit(&conf)
+	}
 	d, err := New(conf)
 	if err != nil {
 		t.Fatal(err)

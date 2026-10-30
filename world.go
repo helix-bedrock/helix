@@ -74,7 +74,10 @@ func (s *Server) openWorld() error {
 		name: ldat.LevelName, seed: ldat.RandomSeed, gameMode: ldat.GameType, difficulty: ldat.Difficulty,
 		spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ}, generator: ldat.Generator,
 	}
-	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers); err != nil {
+	s.ticker = world.NewScheduler(s.conf.TickCores)
+	s.ticker.SetCurrentTick(ldat.CurrentTick)
+	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers, ldat.RandomTickSpeed); err != nil {
+		s.ticker.Close()
 		_ = db.Close()
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
@@ -86,15 +89,12 @@ func (s *Server) openWorld() error {
 // Vanilla terrain generation is not hooked up yet: until it is, chunks an
 // infinite world has not saved are empty and never saved, so the world
 // still gets real terrain once the generator is there.
-func (s *Server) openOverworld(generator int32, flatLayers string) error {
+func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpeed int32) error {
 	conf := world.DefaultConfig()
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
 	conf.EntityViewRadius2 = s.conf.EntityViewRadius2
-	if s.ticker == nil {
-		s.ticker = world.NewScheduler(s.conf.TickCores)
-	}
-	conf.Scheduler = s.ticker
+	conf.Scheduler, conf.RandomTickSpeed = s.ticker, randomTickSpeed
 	r, _ := mcdb.Overworld.Range()
 	switch {
 	case s.conf.Generator != nil:
@@ -132,6 +132,10 @@ func (s *Server) closeWorld() error {
 		errs = append(errs, s.overworld.Close())
 	}
 	if s.ticker != nil {
+		// level.dat keeps the world's tick, which saved tick times count in.
+		if s.db != nil {
+			s.db.LevelDat().CurrentTick = s.ticker.CurrentTick()
+		}
 		s.ticker.Close()
 	}
 	if st := s.conf.Storage.World; st != nil {

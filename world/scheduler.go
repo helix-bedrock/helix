@@ -21,6 +21,27 @@ type Scheduler struct {
 	wg    sync.WaitGroup
 	once  sync.Once
 	seq   atomic.Uint64
+	// clock is the world's tick clock: a tick count and when it was set.
+	clock atomic.Pointer[tickClock]
+}
+
+type tickClock struct {
+	tick  int64
+	start time.Time
+}
+
+// SetCurrentTick sets the world's tick, level.dat's currentTick, to tick
+// now; it then advances one every TickDuration. Safe from any goroutine.
+func (s *Scheduler) SetCurrentTick(tick int64) {
+	s.clock.Store(&tickClock{tick: tick, start: time.Now()})
+}
+
+// CurrentTick returns the world's tick: the one set plus the ticks since.
+// Every region and dimension ticking on s shares it, so tick times stay
+// valid when chunks move between regions. Safe from any goroutine.
+func (s *Scheduler) CurrentTick() int64 {
+	c := s.clock.Load()
+	return c.tick + int64(time.Since(c.start)/TickDuration)
 }
 
 // NewScheduler starts a scheduler with n tick goroutines; 0 means one per
@@ -31,6 +52,7 @@ func NewScheduler(n int) *Scheduler {
 		n = runtime.GOMAXPROCS(0)
 	}
 	s := &Scheduler{wake: make(chan struct{}, 1), work: make(chan *Region), stop: make(chan struct{})}
+	s.SetCurrentTick(0)
 	s.wg.Add(n + 1)
 	go s.dispatch()
 	for range n {

@@ -25,7 +25,7 @@ func (d *Dimension) newRegion(next time.Time) *Region {
 		d: d, id: d.nextID, seq: d.sched.seq.Add(1), next: next,
 		sections: map[sectionPos]struct{}{}, chunks: map[mcdb.ChunkPos]*Chunk{}, holds: map[mcdb.ChunkPos]int{},
 		sectionHolds: map[sectionPos]int{}, loading: map[mcdb.ChunkPos]bool{}, awaiting: map[mcdb.ChunkPos][]func(*Region){},
-		byChunk: map[mcdb.ChunkPos][]*Entity{},
+		byChunk: map[mcdb.ChunkPos][]*Entity{}, lcg: randomTickSeed,
 	}
 	d.regions = append(d.regions, r)
 	return r
