@@ -13,6 +13,9 @@ func TestNewWorld(t *testing.T) {
 	conf := DefaultConfig()
 	conf.WorldsDir, conf.LevelName, conf.Log = t.TempDir(), "Test level", slog.New(slog.DiscardHandler)
 	s := &Server{conf: conf, log: conf.Log}
+	if err := s.buildRegistry(); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.openWorld(); err != nil {
 		t.Fatal(err)
 	}

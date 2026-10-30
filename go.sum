@@ -10,6 +10,8 @@ github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/helix-bedrock/helix-data v0.0.0-20261030054050-c63dc696061c h1:d1LtenoVIrbfQIgrYb1Hybb4tvPQX5LiyXTlDN2WgkE=
+github.com/helix-bedrock/helix-data v0.0.0-20261030054050-c63dc696061c/go.mod h1:PXONJI5Vag90BsByDA3wVhDw/edESqhAbLY6Z47lQE0=
 github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca h1:9+s3TkTTsPDcnpIH3Oj5Mp2IkC1O53fwpHtvKikWqSQ=
 github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca/go.mod h1:VG7/D0ZD96mBSXIWCpynz0SDid0AEtpM/VclYhDAjRw=
 github.com/helix-bedrock/protocol v0.0.0-20261030050828-29574cd0fb81 h1:XU8AhIgBW9wErKejdN3/Y9G0ev80Y8hz4ItWGKniS3Q=
@@ -18,6 +20,8 @@ github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24 h1:LfqBsExOqu
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24/go.mod h1:yQ1PGHcnA4woFMDY+OWLn49Rwp81/oZzcceMTNYCRms=
 github.com/helix-bedrock/world v0.0.0-20261030052843-f1de3770ddb5 h1:Dk0CR7mKlxGUizhanIDdy1YXHGUwIyhhB++9fSnhIsU=
 github.com/helix-bedrock/world v0.0.0-20261030052843-f1de3770ddb5/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
+github.com/helix-bedrock/world v0.0.0-20261030054106-69f7dd075a9b h1:EN3YlYlSvCyaUVEYKnp7atQq+r/5oMDabXXf67qTwMA=
+github.com/helix-bedrock/world v0.0.0-20261030054106-69f7dd075a9b/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
 github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=

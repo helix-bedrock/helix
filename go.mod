@@ -8,7 +8,7 @@ require (
 	github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca
 	github.com/helix-bedrock/protocol v0.0.0-20261030050828-29574cd0fb81
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
-	github.com/helix-bedrock/world v0.0.0-20261030052843-f1de3770ddb5
+	github.com/helix-bedrock/world v0.0.0-20261030054106-69f7dd075a9b
 	github.com/pion/ice/v4 v4.4.8
 	github.com/pion/webrtc/v4 v4.2.26
 )
@@ -16,6 +16,7 @@ require (
 require (
 	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
+	github.com/helix-bedrock/helix-data v0.0.0-20261030054050-c63dc696061c // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
 	github.com/pion/dtls/v3 v3.1.15 // indirect

@@ -7,7 +7,11 @@ Networking works: NetherNet and RakNet, and the login the way BDS 1.26.60 does
 it (Xbox Live checks, encryption, resource packs). The world folder
 (`worlds/Bedrock level`, BDS's layout) opens at boot through the `world`
 library's stores; players spawn at the level.dat spawn, or where a BDS world
-saved them, in an empty world until chunks are added after the registry.
+saved them, in an empty world until chunks are sent. The block registry is
+built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with
+their network hashes and BDS's runtime numbers (light, flammability,
+explosion resistance, friction, destroy time); plugins can add, replace and
+delete blocks in `Config.Setup`.
 
 Part of [Helix](https://github.com/helix-bedrock), an open-source Minecraft: Bedrock
 Edition server engine in Go.

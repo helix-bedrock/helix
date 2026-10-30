@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/network"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/nethernet"
 	"github.com/helix-bedrock/protocol/auth"
 	"github.com/helix-bedrock/protocol/packet"
@@ -36,6 +37,10 @@ type Config struct {
 	WorldsDir string
 	// Storage replaces where the world and players are kept.
 	Storage StorageConfig
+	// Setup runs at boot after vanilla is registered, before the registry
+	// is frozen: plugins register, replace and delete blocks here. Nil
+	// means vanilla only.
+	Setup func(s *registry.Setup) error
 	// MaxPlayers is how many players may be online at once.
 	MaxPlayers int
 	// OnlineMode requires every player to be signed in to Xbox Live.
@@ -107,6 +112,7 @@ type Server struct {
 	auth     *auth.Service
 	listener *network.Listener
 	serverID int64
+	blocks   *registry.Blocks
 
 	db          *mcdb.DB
 	worldStore  mcdb.WorldStore
@@ -134,6 +140,9 @@ func New(conf Config) (*Server, error) {
 		return nil, fmt.Errorf("helix: server ID: %w", err)
 	}
 	s := &Server{conf: conf, log: conf.Log, players: map[uuid.UUID]*network.Conn{}, serverID: int64(binary.LittleEndian.Uint64(id[:]))}
+	if err := s.buildRegistry(); err != nil {
+		return nil, err
+	}
 
 	nc := conf.Network
 	nc.Log = conf.Log.With("part", "network")
@@ -324,6 +333,30 @@ func (s *Server) admit(c *network.Conn) {
 		s.updateStatus()
 	}()
 }
+
+// buildRegistry registers vanilla, runs Config.Setup and freezes the
+// registry. It runs once, in New, before any transport can open.
+func (s *Server) buildRegistry() error {
+	setup := registry.NewSetup(s.log.With("part", "registry"), "minecraft")
+	if err := registry.Vanilla(setup); err != nil {
+		return err
+	}
+	if s.conf.Setup != nil {
+		if err := s.conf.Setup(setup.As("server")); err != nil {
+			return fmt.Errorf("helix: setup: %w", err)
+		}
+	}
+	b, err := setup.Freeze()
+	if err != nil {
+		return err
+	}
+	s.blocks = b
+	s.log.Info("Registry frozen", "block states", b.Count())
+	return nil
+}
+
+// Blocks is the frozen block table.
+func (s *Server) Blocks() *registry.Blocks { return s.blocks }
 
 // PlayerCount returns how many players are online.
 func (s *Server) PlayerCount() int {

@@ -31,10 +31,14 @@ sibling library folders, so unreleased library changes are used.
 - `helix` (root): `Server`, the main struct, and its `Config`.
 - `network`: transports (NetherNet, RakNet) and the login sequence as named,
   replaceable steps, in BDS 1.26.60's order.
+- `registry`: the one boot `Setup` (register, replace, delete) and the
+  frozen tables. Blocks so far: dense state IDs, network hashes, a per-state
+  property table swapped whole on live changes, and `chunk.BlockRegistry`
+  for the world library. `Vanilla` loads helix-data. Items, biomes and
+  entity types come next.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
-  world and player stores can be replaced through `Config.Storage`). The DB
-  opens without a block registry until the registry exists, so chunks are
-  not loaded yet.
+  world and player stores can be replaced through `Config.Storage`) with
+  the block registry.
 - `cmd/helix`: the server program.
 - `play.go`: TEMPORARY empty-world spawn until the world and player designs
   exist. It reads level.dat and saved player positions but saves nothing.
