@@ -15,7 +15,9 @@ chunks belong to regions that tick in parallel at 20 TPS each and merge
 and split as players move (`TickCores` sets how many cores tick). Players
 see each other: AddPlayer within BDS's 57-chunk disc, MovePlayer for
 their movement, and the player list; where they were is saved when they
-leave. World packets go through a handler table plugins can replace or
+leave. Abilities, permission levels, game mode and attributes follow BDS
+1.26.60 (layered abilities, its per-game-mode rules, its saved format) and
+are sent at join in BDS's order. World packets go through a handler table plugins can replace or
 wrap, per packet or per system (movement so far), on the player's region
 tick. Flat and
 void worlds generate; vanilla terrain generation is not hooked up yet, so

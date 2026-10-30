@@ -84,8 +84,12 @@ sibling library folders, so unreleased library changes are used.
   saved data. Joins in BDS's order as far as built (PlayerList broadcast,
   StartGame, registry packets, full PlayerList), shows players to each
   other with AddPlayer and MovePlayer, and saves Pos, Rotation,
-  DimensionId and UniqueID back into the player's BDS data on leave. No
-  inventory, abilities, game mode changes or block changes yet.
+  DimensionId and UniqueID back into the player's BDS data on leave.
+  `abilities.go`: BDS's layered abilities (base and spectator layers),
+  permission levels and the per-game-mode rules, read from and saved in
+  the player's BDS data; `attributes.go`: BDS's 17 player attributes in
+  its join order. `SetGameMode` exists; its packets are a first pass. No
+  inventory or block changes yet.
 - `cmd/helix`: the server program.
 
 ## Design

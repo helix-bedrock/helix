@@ -51,8 +51,12 @@ type Player struct {
 
 	// saved is the player's data as BDS saved it, written back with what
 	// Helix changed so nothing Helix does not use yet is lost.
-	saved    map[string]any
-	gameMode int32
+	saved map[string]any
+
+	// Owned by the player's region once it joined.
+	gameMode   int32
+	abilities  Abilities
+	attributes Attributes
 }
 
 // Name returns the player's display name. Runs: anywhere.
@@ -86,7 +90,7 @@ func (s *Server) newPlayer(c *network.Conn, id uuid.UUID) (*Player, error) {
 	p := &Player{
 		s: s, conn: c, uuid: id, name: ident.DisplayName, xuid: ident.XUID, skin: skin,
 		ids: playerIDs(ident.Identity, c.Client().SelfSignedID, ident.XUID), runtimeID: s.runtimeIDs.Add(1),
-		gameMode: s.level.gameMode,
+		gameMode: s.level.gameMode, abilities: DefaultAbilities(), attributes: DefaultAttributes(),
 	}
 	p.uniqueID = int64(p.runtimeID) //nolint:gosec // runtime IDs are small
 	return p, nil
@@ -112,6 +116,11 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 		return pos, rot, false
 	}
 	p.saved = data
+	if mode, isInt := data["PlayerGameMode"].(int32); isInt {
+		p.gameMode = mode
+	}
+	p.abilities.load(data)
+	p.attributes.load(data)
 	if id, isInt := data["UniqueID"].(int64); isInt {
 		p.uniqueID = id
 	}
@@ -155,6 +164,9 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data["DimensionId"] = int32(mcdb.Overworld)
 	data["UniqueID"] = p.uniqueID
+	data["PlayerGameMode"] = p.gameMode
+	p.abilities.save(data)
+	p.attributes.save(data)
 	if err := p.s.playerStore.StorePlayer(p.ids, data); err != nil {
 		p.s.log.Error("save player", "name", p.name, "err", err)
 	}
@@ -177,21 +189,41 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		UUID: p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
 		Position: pos.Sub(mgl32.Vec3{0, eyeHeight, 0}), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		GameType: p.gameMode, EntityMetadata: meta,
-		AbilityData: protocol.AbilityData{
-			EntityUniqueID: p.uniqueID, PlayerPermissions: packet.PermissionLevelMember,
-			Layers: []protocol.AbilityLayer{{
-				Type: protocol.AbilityLayerTypeBase, Abilities: protocol.AbilityCount - 1, Values: survivalAbilities,
-				FlySpeed: 0.05, VerticalFlySpeed: 1, WalkSpeed: 0.1,
-			}},
-		},
-		DeviceID: string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
+		AbilityData: p.abilities.Data(p.uniqueID),
+		DeviceID:    string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
 	}}
 }
 
-// survivalAbilities are what a member in survival may do.
-const survivalAbilities = protocol.AbilityBuild | protocol.AbilityMine | protocol.AbilityDoorsAndSwitches |
-	protocol.AbilityOpenContainers | protocol.AbilityAttackPlayers | protocol.AbilityAttackMobs |
-	protocol.AbilityWalkSpeed | protocol.AbilityFlySpeed | protocol.AbilityVerticalFlySpeed
+// SetGameMode changes the player's game mode and the abilities that come
+// with it, and tells the player and everyone online. The packets are a
+// first pass, not yet checked against what BDS sends on a change. Runs:
+// owner of the player's entity.
+func (p *Player) SetGameMode(mode int32) {
+	p.gameMode = mode
+	p.abilities.SetGameMode(mode, p.s.level.gameMode)
+	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
+	_ = p.conn.WritePacket(&packet.SetPlayerGameType{GameType: mode})
+	_ = p.conn.WritePacket(abilities)
+	p.flush()
+	p.broadcast(&packet.UpdatePlayerGameType{GameType: mode, PlayerUniqueID: p.uniqueID}, abilities)
+}
+
+// broadcast sends packets to every other player online, from the global
+// owner so the caller never waits on the network. Runs: anywhere.
+func (p *Player) broadcast(pks ...packet.Packet) {
+	g := p.s.global
+	g.run(func() {
+		for _, o := range g.order {
+			if o == p {
+				continue
+			}
+			for _, pk := range pks {
+				_ = o.conn.WritePacket(pk)
+			}
+			_ = o.conn.Flush()
+		}
+	})
+}
 
 // movePacket moves the player for the players who see it: MovePlayer, as
 // BDS sends another player's movement.
@@ -226,6 +258,7 @@ func (p *Player) play() {
 	if pos, r, ok := p.load(); ok {
 		spawn, rot = pos, r
 	}
+	p.abilities.SetGameMode(p.gameMode, lv.gameMode)
 
 	// Everyone else hears of the player before it gets StartGame, as BDS
 	// broadcasts PlayerList; the player gets the whole list after it.
@@ -246,20 +279,28 @@ func (p *Player) play() {
 		WorldSeed: lv.seed, Generator: lv.generator, WorldGameMode: lv.gameMode, Difficulty: lv.difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
 		PlayerPermissions: packet.PermissionLevelMember, BaseGameVersion: protocol.CurrentVersion,
-		WorldName: lv.name, PlayerMovementSettings: protocol.PlayerMovementSettings{ServerAuthoritativeBlockBreaking: true},
+		WorldName: lv.name, PlayerMovementSettings: protocol.PlayerMovementSettings{RewindHistorySize: 40, ServerAuthoritativeBlockBreaking: true},
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0, Blocks: s.reg.Blocks.Definitions(),
 	})
-	// The registry packets and the player list, in the order BDS 1.26.60
-	// sends them (other join packets between them are not sent yet).
+	// The join packets in the order BDS 1.26.60 sends them (others between
+	// them are not sent yet). The adventure settings and abilities are
+	// broadcast, so the player gets its abilities twice, as from BDS.
 	_ = c.WritePacket(s.reg.Items.RegistryPacket())
+	adventure := &packet.UpdateAdventureSettings{AutoJump: true}
+	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
+	p.broadcast(adventure, abilities)
+	_ = c.WritePacket(adventure)
+	_ = c.WritePacket(abilities)
 	list := &packet.PlayerList{}
 	for _, o := range s.global.online() {
 		list.Entries = append(list.Entries, o.listEntry())
 	}
 	_ = c.WritePacket(list)
+	_ = c.WritePacket(abilities)
 	_ = c.WritePacket(s.reg.Biomes.DefinitionPacket())
 	_ = c.WritePacket(s.reg.EntityTypes.IdentifiersPacket())
+	_ = c.WritePacket(&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()})
 	_ = c.WritePacket(s.reg.Creative.Packet())
 	_ = c.WritePacket(s.reg.Crafting.Packet())
 	if c.Flush() != nil {
