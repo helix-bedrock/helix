@@ -64,6 +64,12 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handlePlayerAuthInput); err != nil {
 		return err
 	}
+	if err := Handle(s, handleItemStackRequest); err != nil {
+		return err
+	}
+	if err := Handle(s, handleMobEquipment); err != nil {
+		return err
+	}
 	return s.Movement(applyMovement)
 }
 

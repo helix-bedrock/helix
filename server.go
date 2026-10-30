@@ -148,7 +148,10 @@ type Server struct {
 	handlers   handlers
 	global     *global
 	runtimeIDs atomic.Uint64
-	wg         sync.WaitGroup
+	// stackIDs numbers item stacks for the network, as BDS does with one
+	// counter for the whole server.
+	stackIDs atomic.Int32
+	wg       sync.WaitGroup
 }
 
 // New returns a Server. It listens on nothing until [Server.Run].

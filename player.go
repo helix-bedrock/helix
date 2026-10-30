@@ -57,6 +57,8 @@ type Player struct {
 	gameMode   int32
 	abilities  Abilities
 	attributes Attributes
+	inventory  Inventory
+	requests   requestState
 }
 
 // Name returns the player's display name. Runs: anywhere.
@@ -121,6 +123,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 	}
 	p.abilities.load(data)
 	p.attributes.load(data)
+	p.inventory.load(data, func() int32 { return p.s.stackIDs.Add(1) })
 	if id, isInt := data["UniqueID"].(int64); isInt {
 		p.uniqueID = id
 	}
@@ -167,6 +170,7 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	data["PlayerGameMode"] = p.gameMode
 	p.abilities.save(data)
 	p.attributes.save(data)
+	p.inventory.save(data)
 	if err := p.s.playerStore.StorePlayer(p.ids, data); err != nil {
 		p.s.log.Error("save player", "name", p.name, "err", err)
 	}
@@ -189,8 +193,8 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		UUID: p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
 		Position: pos.Sub(mgl32.Vec3{0, eyeHeight, 0}), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		GameType: p.gameMode, EntityMetadata: meta,
-		AbilityData: p.abilities.Data(p.uniqueID),
-		DeviceID:    string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
+		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().network(p.s.reg),
+		DeviceID: string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
 	}}
 }
 
@@ -302,6 +306,9 @@ func (p *Player) play() {
 	_ = c.WritePacket(s.reg.EntityTypes.IdentifiersPacket())
 	_ = c.WritePacket(&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()})
 	_ = c.WritePacket(s.reg.Creative.Packet())
+	for _, pk := range p.inventory.contentPackets(s.reg) {
+		_ = c.WritePacket(pk)
+	}
 	_ = c.WritePacket(s.reg.Crafting.Packet())
 	if c.Flush() != nil {
 		return

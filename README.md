@@ -17,7 +17,12 @@ see each other: AddPlayer within BDS's 57-chunk disc, MovePlayer for
 their movement, and the player list; where they were is saved when they
 leave. Abilities, permission levels, game mode and attributes follow BDS
 1.26.60 (layered abilities, its per-game-mode rules, its saved format) and
-are sent at join in BDS's order. World packets go through a handler table plugins can replace or
+are sent at join in BDS's order. The inventory is the server's:
+items are loaded from and saved in BDS's format, and every inventory
+change the client asks for is checked as BDS checks it (stack network
+IDs, counts, stack sizes, creative-only destroy and creative items) before
+it happens; armour and offhand slots, dropping and crafting are not done
+yet. World packets go through a handler table plugins can replace or
 wrap, per packet or per system (movement so far), on the player's region
 tick. Flat and
 void worlds generate; vanilla terrain generation is not hooked up yet, so

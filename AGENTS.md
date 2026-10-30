@@ -88,8 +88,13 @@ sibling library folders, so unreleased library changes are used.
   `abilities.go`: BDS's layered abilities (base and spectator layers),
   permission levels and the per-game-mode rules, read from and saved in
   the player's BDS data; `attributes.go`: BDS's 17 player attributes in
-  its join order. `SetGameMode` exists; its packets are a first pass. No
-  inventory or block changes yet.
+  its join order. `SetGameMode` exists; its packets are a first pass.
+  `item.go`, `inventory.go`, `stackrequest.go`: the server-held inventory
+  (BDS's saved format and join packets) and BDS's checks on stack
+  requests (take, place, swap, destroy, creative items), applied all or
+  nothing on a copy. The client's view of its items is never read back.
+  Armour and offhand placement, drops and crafting are refused until
+  built. No block changes yet.
 - `cmd/helix`: the server program.
 
 ## Design
