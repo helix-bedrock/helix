@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Steps check for go.mod so this workflow passes in repo-template itself and in
+# new repos before `go mod init`. hashFiles is not allowed in job-level `if`.
+
+jobs:
+  test:
+    name: Test (Go ${{ matrix.go }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [oldstable, stable]
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('go.mod') != ''
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Build
+        if: hashFiles('go.mod') != ''
+        run: go build ./...
+      - name: Vet
+        if: hashFiles('go.mod') != ''
+        run: go vet ./...
+      - name: Test
+        if: hashFiles('go.mod') != ''
+        run: go test -race -count=1 ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('go.mod') != ''
+        with:
+          go-version: stable
+      - uses: golangci/golangci-lint-action@v8
+        if: hashFiles('go.mod') != ''
+        with:
+          version: latest
+
+  tidy:
+    name: go.mod tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: hashFiles('go.mod') != ''
+        with:
+          go-version: stable
+      - name: Check go.mod is tidy
+        if: hashFiles('go.mod') != ''
+        run: go mod tidy -diff

@@ -1,0 +1,7 @@
+# TEMPLATE: replace with the teams or people who own this repo.
+# Later lines win. See https://docs.github.com/articles/about-code-owners
+
+*                   @helix-bedrock/core
+/.github/           @helix-bedrock/core
+/LICENSE            @helix-bedrock/core
+/CREDITS.md         @helix-bedrock/core

@@ -1,0 +1,37 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+
+# Test and profiling output
+*.test
+*.out
+*.prof
+coverage.*
+
+# Local Go workspace (never committed; see SETUP.md)
+go.work
+go.work.sum
+
+# Local servers, worlds and BDS files (BDS may not be redistributed)
+/run/
+/worlds/
+bedrock_server*
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.pem
+*.key
+
+# Server identity key and local runs
+/keys/

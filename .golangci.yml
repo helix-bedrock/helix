@@ -1,0 +1,45 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - forbidigo
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr
+    - prealloc
+    - revive
+    - unconvert
+    - unparam
+  settings:
+    forbidigo:
+      # Never panic, anywhere: see AGENT_RULES.md in helix-bedrock/.github.
+      forbid:
+        - pattern: ^panic$
+          msg: never panic; return an error instead
+        - pattern: ^log\.Fatal.*$
+          msg: never exit the process; return an error instead
+        - pattern: ^os\.Exit$
+          msg: never exit the process; return an error instead
+    gosec:
+      excludes:
+        - G115 # integer conversions are everywhere in binary formats; review them instead
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - unparam
+          - forbidigo
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

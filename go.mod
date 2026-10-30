@@ -1,0 +1,41 @@
+module github.com/helix-bedrock/helix
+
+go 1.26.0
+
+require (
+	github.com/go-gl/mathgl v1.2.0
+	github.com/google/uuid v1.6.0
+	github.com/helix-bedrock/nethernet v0.0.0-20261027234519-80c09e60cb83
+	github.com/helix-bedrock/protocol v0.0.0-20261027172700-7e1596867172
+	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
+	github.com/pion/ice/v4 v4.4.8
+	github.com/pion/webrtc/v4 v4.2.26
+)
+
+require (
+	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
+	github.com/pion/datachannel v1.6.3 // indirect
+	github.com/pion/dtls/v3 v3.1.15 // indirect
+	github.com/pion/interceptor v0.1.51 // indirect
+	github.com/pion/logging v0.2.4 // indirect
+	github.com/pion/mdns/v2 v2.2.2 // indirect
+	github.com/pion/randutil v0.1.0 // indirect
+	github.com/pion/rtcp v1.2.20 // indirect
+	github.com/pion/rtp v1.10.6 // indirect
+	github.com/pion/sctp v1.12.0 // indirect
+	github.com/pion/sdp/v3 v3.0.20 // indirect
+	github.com/pion/srtp/v3 v3.1.3 // indirect
+	github.com/pion/stun/v4 v4.0.1 // indirect
+	github.com/pion/transport/v5 v5.1.4 // indirect
+	github.com/pion/turn/v5 v5.1.3 // indirect
+	github.com/wlynxg/anet v0.0.5 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
+)
