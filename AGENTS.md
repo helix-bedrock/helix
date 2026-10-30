@@ -35,14 +35,40 @@ sibling library folders, so unreleased library changes are used.
 - `play.go`: TEMPORARY empty-world spawn until the world and player designs
   exist.
 
+## Design
+
+The engine's design is in the "Engine design" section of
+`../.github/API_DESIGN.md` (registry, world in memory, regions, players and
+entities, events, storage, build order). Read it before adding anything. In
+short:
+
+- One `Setup` at boot; blocks, items, biomes and entity types are frozen
+  then; behaviour and properties can be replaced or wrapped while running.
+- Two zones per player: the simulation zone is loaded and ticked, the view
+  zone is sent and released. Client-side chunk generation on for vanilla
+  worlds.
+- Regions per RFC 0002, with parallel work inside crowded regions and
+  fixed-order apply; encode once, send to many.
+- A player is session + entity + profile.
+- Events: priorities `First` to `Last` then `Monitor`, no allocations,
+  parallel listeners by default.
+- Storage: one BDS-layout LevelDB per world by default, pluggable stores.
+
+Build order: storage (`world` library), registry, world in memory, regions,
+players (replaces `play.go`).
+
 ## Invariants: do not break these
 
-1. Behaviour matches BDS 1.26.60; extra checks beyond BDS are allowed only
-   when they never refuse what BDS accepts, and are documented as such.
+1. Vanilla behaviour is one-to-one with BDS 1.26.60 (redstone included,
+   required). Extra checks beyond BDS are allowed only when they never refuse
+   what BDS accepts, and are documented as such.
 2. Every login refusal uses BDS's disconnect reason for that case.
 3. Never panic. Bad input from clients returns an error.
+4. No felt lag with 400 players in one spot: no steady-state allocations on
+   hot paths, no waiting inside a tick, proven by benchmarks.
 
 ## Gotchas
 
-- The engine API is still being designed in chat with the owner; ask before
-  adding public packages.
+- Topics `API_DESIGN.md` does not mark as decided (event list, custom
+  events, entity visibility API, commands, permissions, config file) are
+  designed with the owner first; ask before adding public packages for them.
