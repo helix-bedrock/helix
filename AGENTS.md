@@ -46,9 +46,20 @@ sibling library folders, so unreleased library changes are used.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.
+- `world` (package): the world in memory. A `Dimension` per dimension,
+  with one tick goroutine owning its loaded chunks until regions exist;
+  loads, generation, network encoding and saves run on a worker pool,
+  jobs for one chunk in order on one worker. Each player is a `Viewer`
+  with two zones: the simulation zone is held loaded, the view zone is
+  sent and released. Encoded chunks (`NetChunk`) are shared by every
+  player and kept in a byte-budget cache. Changed chunks are saved at the
+  end of each tick from a copy-on-write snapshot. Generators: `Flat`
+  (level.dat's layers), `Empty`; vanilla generation is not hooked up, so
+  an infinite world's unsaved chunks are empty and never saved.
 - `cmd/helix`: the server program.
-- `play.go`: TEMPORARY empty-world spawn until the world and player designs
-  exist. It reads level.dat and saved player positions but saves nothing.
+- `play.go`: TEMPORARY spawn until players exist (step 5). It sends the
+  join packets and the world's chunks and answers sub chunk requests; no
+  entity, inventory or block changes, and it saves nothing.
 
 ## Design
 

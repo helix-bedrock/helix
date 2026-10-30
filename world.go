@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -32,7 +33,18 @@ type level struct {
 	gameMode   int32
 	difficulty int32
 	spawn      [3]int32
+	generator  int32
+	// surface is the Y a player stands on in a flat world, used while the
+	// spawn has no height yet; 0 when unknown.
+	surface int32
 }
+
+// Generator types level.dat stores, as BDS numbers them.
+const (
+	generatorOverworld int32 = 1
+	generatorFlat      int32 = 2
+	generatorVoid      int32 = 5
+)
 
 // openWorld opens the world folder WorldsDir/LevelName, as BDS keeps its
 // worlds, and the stores. A new world gets LevelName as its name.
@@ -60,9 +72,50 @@ func (s *Server) openWorld() error {
 	}
 	s.level = level{
 		name: ldat.LevelName, seed: ldat.RandomSeed, gameMode: ldat.GameType, difficulty: ldat.Difficulty,
-		spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ},
+		spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ}, generator: ldat.Generator,
+	}
+	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
 	s.log.Info("World opened", "dir", dir, "name", s.level.name, "new", isNew)
+	return nil
+}
+
+// openOverworld starts the overworld with the generator level.dat names.
+// Vanilla terrain generation is not hooked up yet: until it is, chunks an
+// infinite world has not saved are empty and never saved, so the world
+// still gets real terrain once the generator is there.
+func (s *Server) openOverworld(generator int32, flatLayers string) error {
+	conf := world.DefaultConfig()
+	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
+	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
+	r, _ := mcdb.Overworld.Range()
+	switch {
+	case s.conf.Generator != nil:
+		conf.Generator = s.conf.Generator
+	case generator == generatorFlat:
+		flat, err := world.ParseFlat(flatLayers, s.reg.Blocks, s.reg.Biomes, r)
+		if err != nil {
+			return err
+		}
+		conf.Generator = flat
+		top := int32(flat.Bottom)
+		for _, l := range flat.Layers {
+			top += int32(l.Count) //nolint:gosec // layer counts are small
+		}
+		s.level.surface = top
+	case generator == generatorVoid:
+		conf.Generator = world.Empty{}
+	default:
+		conf.Generator, conf.DiscardGenerated = world.Empty{}, true
+		s.log.Warn("vanilla world generation is not hooked up yet: chunks this world has not saved are empty and are not saved", "generator", generator)
+	}
+	d, err := world.New(conf)
+	if err != nil {
+		return err
+	}
+	s.overworld = d
 	return nil
 }
 
@@ -70,6 +123,9 @@ func (s *Server) openWorld() error {
 // the server owns every store it was given.
 func (s *Server) closeWorld() error {
 	var errs []error
+	if s.overworld != nil {
+		errs = append(errs, s.overworld.Close())
+	}
 	if st := s.conf.Storage.World; st != nil {
 		errs = append(errs, st.Close())
 	}

@@ -7,7 +7,12 @@ Networking works: NetherNet and RakNet, and the login the way BDS 1.26.60 does
 it (Xbox Live checks, encryption, resource packs). The world folder
 (`worlds/Bedrock level`, BDS's layout) opens at boot through the `world`
 library's stores; players spawn at the level.dat spawn, or where a BDS world
-saved them, in an empty world until chunks are sent. The block registry is
+saved them, and get the world's chunks: the `world` package keeps each
+player's simulation zone (tick-distance) loaded and saves changed chunks
+at the end of each tick, while the view zone (view-distance) is loaded,
+encoded once, sent in BDS's sub-chunk request mode and released. Flat and
+void worlds generate; vanilla terrain generation is not hooked up yet, so
+an infinite world shows only what it has saved. The block registry is
 built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with
 their network hashes and BDS's runtime numbers (light, flammability,
 explosion resistance, friction, destroy time), 2,080 items, 89 biomes with

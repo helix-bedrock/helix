@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/nethernet"
 	"github.com/helix-bedrock/protocol/auth"
 	"github.com/helix-bedrock/protocol/packet"
@@ -37,6 +38,15 @@ type Config struct {
 	WorldsDir string
 	// Storage replaces where the world and players are kept.
 	Storage StorageConfig
+	// Generator makes the overworld's chunks the world has not saved. Nil
+	// means the generator level.dat names.
+	Generator world.Generator
+	// ViewDistance is the largest view radius in chunks a player gets,
+	// BDS's view-distance.
+	ViewDistance int32
+	// TickDistance is the radius in chunks kept loaded and ticked around
+	// each player, BDS's tick-distance.
+	TickDistance int32
 	// Setup runs at boot after vanilla is registered, before the registry
 	// is frozen: plugins register, replace and delete blocks here. Nil
 	// means vanilla only.
@@ -87,18 +97,20 @@ type RakNetConfig struct {
 }
 
 // DefaultConfig returns BDS 1.26.60's defaults where Helix has the same
-// setting: the name, the world worlds/Bedrock level, 10 players, online
-// mode, NetherNet on port 19132 with the identity key in
+// setting: the name, the world worlds/Bedrock level, 10 players, a view
+// distance of 32 chunks and a tick distance of 4, online mode, NetherNet on port 19132 with the identity key in
 // keys/server_identity_key.pem. RakNet is on as well, on
 // UDP port 19132 next to NetherNet's TCP port, for clients that cannot use
 // NetherNet.
 func DefaultConfig() Config {
 	return Config{
-		Name:       "Dedicated Server",
-		LevelName:  "Bedrock level",
-		WorldsDir:  "worlds",
-		MaxPlayers: 10,
-		OnlineMode: true,
+		Name:         "Dedicated Server",
+		LevelName:    "Bedrock level",
+		WorldsDir:    "worlds",
+		MaxPlayers:   10,
+		ViewDistance: 32,
+		TickDistance: world.DefaultConfig().SimulationDistance,
+		OnlineMode:   true,
 		NetherNet: NetherNetConfig{
 			Enabled:         true,
 			Address:         ":19132",
@@ -123,6 +135,7 @@ type Server struct {
 	worldStore  mcdb.WorldStore
 	playerStore mcdb.PlayerStore
 	level       level
+	overworld   *world.Dimension
 
 	mu      sync.Mutex
 	players map[uuid.UUID]*network.Conn
@@ -136,6 +149,9 @@ func New(conf Config) (*Server, error) {
 	}
 	if conf.MaxPlayers < 1 {
 		return nil, errors.New("helix: MaxPlayers must be at least 1")
+	}
+	if conf.ViewDistance < 1 || conf.TickDistance < 1 {
+		return nil, errors.New("helix: ViewDistance and TickDistance must be at least 1")
 	}
 	if !conf.NetherNet.Enabled && !conf.RakNet.Enabled {
 		return nil, errors.New("helix: no transport enabled")

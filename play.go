@@ -1,46 +1,35 @@
 package helix
 
 import (
+	"math"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/network"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// TEMPORARY: until the world and player designs exist, a player who joins
-// floats in an empty world, so the networking can be tested in game. Only
-// the level.dat values (name, seed, game mode, difficulty, spawn), a saved
-// player's position and the registry packets are real; nothing else
-// follows BDS yet, and nothing is saved. It is replaced as soon as there is a world.
+// TEMPORARY: until players exist (build step 5), a player who joins gets
+// the world's chunks around them, sent by the world package, and nothing
+// else: no entity, no inventory, no block changes, nothing saved. Only the
+// level.dat values, a saved player's position, the registry packets and
+// the chunks are real.
 
-// voidRadius is the chunk radius of the empty world.
-const voidRadius = 4
-
-// overworldSections is the number of 16-block sections from y=-64 to 320.
-const overworldSections = 24
-
-// emptyChunk is a chunk with no blocks: every section's biome is plains
-// (one palette entry, 0 bits per value; network palettes hold zigzag
-// varints, plains is 1), then no border blocks.
-var emptyChunk = func() []byte {
-	b := make([]byte, 0, overworldSections*2+1)
-	for range overworldSections {
-		b = append(b, 1, 2)
-	}
-	return append(b, 0)
-}()
-
-// play spawns the player in the empty world and reads its packets until it
-// leaves.
+// play spawns the player and reads its packets until it leaves.
 func (s *Server) play(c *network.Conn) {
 	const runtimeID = 1
 	lv := s.level
 	worldSpawn := protocol.BlockPos{lv.spawn[0], lv.spawn[1], lv.spawn[2]}
-	if worldSpawn[1] < -64 || worldSpawn[1] > 320 {
+	if r := s.overworld.Range(); int(worldSpawn[1]) < r[0] || int(worldSpawn[1]) > r[1] {
 		// BDS stores a height out of range ("find the surface") until it
-		// has placed the spawn; with no terrain there is no surface.
+		// has placed the spawn. Flat worlds know their surface; anywhere
+		// else the player starts high up until spawning is built.
 		worldSpawn[1] = 100
+		if lv.surface != 0 {
+			worldSpawn[1] = lv.surface
+		}
 	}
 	spawn := mgl32.Vec3{float32(worldSpawn[0]) + 0.5, float32(worldSpawn[1]) + 1.62, float32(worldSpawn[2]) + 0.5}
 	if pos, ok := s.savedPosition(c); ok {
@@ -48,7 +37,7 @@ func (s *Server) play(c *network.Conn) {
 	}
 	_ = c.WritePacket(&packet.StartGame{
 		EntityUniqueID: runtimeID, EntityRuntimeID: runtimeID, PlayerGameMode: lv.gameMode, PlayerPosition: spawn,
-		WorldSeed: lv.seed, Generator: 1, WorldGameMode: lv.gameMode, Difficulty: lv.difficulty, WorldSpawn: worldSpawn,
+		WorldSeed: lv.seed, Generator: lv.generator, WorldGameMode: lv.gameMode, Difficulty: lv.difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
 		PlayerPermissions: packet.PermissionLevelMember, BaseGameVersion: protocol.CurrentVersion,
 		WorldName: lv.name, PlayerMovementSettings: protocol.PlayerMovementSettings{ServerAuthoritativeBlockBreaking: true},
@@ -65,6 +54,39 @@ func (s *Server) play(c *network.Conn) {
 	if c.Flush() != nil {
 		return
 	}
+
+	// The world queues chunks on its tick goroutine, which must not wait
+	// for the network: a flusher sends them.
+	kick, done := make(chan struct{}, 1), make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-kick:
+				_ = c.Flush()
+			}
+		}
+	}()
+	flush := func() {
+		select {
+		case kick <- struct{}{}:
+		default:
+		}
+	}
+	v := s.overworld.AddViewer(func(pk *packet.LevelChunk) { _ = c.WritePacket(pk) }, flush)
+	defer v.Close()
+
+	var radius int32
+	centre := world.ChunkPos(int32(spawn[0]), int32(spawn[2]))
+	publish := func(pos mgl32.Vec3) {
+		_ = c.WritePacket(&packet.NetworkChunkPublisherUpdate{
+			Position: protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, Radius: uint32(radius) * 16, //nolint:gosec // radius is positive
+		})
+		v.Move(centre, radius)
+	}
+	spawned := false
 	for {
 		pk, err := c.ReadPacket()
 		if err != nil {
@@ -75,20 +97,31 @@ func (s *Server) play(c *network.Conn) {
 		}
 		switch pk := pk.(type) {
 		case *packet.RequestChunkRadius:
-			r := min(pk.ChunkRadius, voidRadius)
-			_ = c.WritePacket(&packet.ChunkRadiusUpdated{ChunkRadius: r})
-			centre := protocol.BlockPos{int32(spawn[0]), int32(spawn[1]), int32(spawn[2])}
-			_ = c.WritePacket(&packet.NetworkChunkPublisherUpdate{Position: centre, Radius: uint32(r) * 16})
-			cx, cz := centre[0]>>4, centre[2]>>4
-			for x := cx - r; x <= cx+r; x++ {
-				for z := cz - r; z <= cz+r; z++ {
-					_ = c.WritePacket(&packet.LevelChunk{Position: protocol.ChunkPos{x, z}, RawPayload: emptyChunk})
-				}
+			radius = max(min(pk.ChunkRadius, s.conf.ViewDistance), 1)
+			_ = c.WritePacket(&packet.ChunkRadiusUpdated{ChunkRadius: radius})
+			publish(spawn)
+			flush()
+			if !spawned {
+				spawned = true
+				go func() {
+					select {
+					case <-v.Ready():
+						_ = c.WritePacket(&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn})
+						flush()
+					case <-done:
+					}
+				}()
 			}
-			_ = c.WritePacket(&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn})
-			if c.Flush() != nil {
-				return
+		case *packet.PlayerAuthInput:
+			spawn = pk.Position
+			if cp := world.ChunkPos(int32(math.Floor(float64(pk.Position[0]))), int32(math.Floor(float64(pk.Position[2])))); cp != centre && radius > 0 {
+				centre = cp
+				publish(pk.Position)
+				flush()
 			}
+		case *packet.SubChunkRequest:
+			_ = c.WritePacket(v.SubChunks(pk))
+			flush()
 		case *packet.SetLocalPlayerAsInitialised:
 			s.log.Info("Player spawned", "name", c.Identity().DisplayName)
 		}
