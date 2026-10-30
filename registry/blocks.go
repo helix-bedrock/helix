@@ -59,6 +59,11 @@ type Registry struct {
 	Creative *Live[packet.CreativeContent]
 	// Crafting is the recipes; they may change while running.
 	Crafting *Live[packet.CraftingData]
+	// VoxelShapes and JigsawStructures are sent right before StartGame, as
+	// BDS sends them: the client needs both to join. Vanilla's are BDS's
+	// own; shared, do not change them.
+	VoxelShapes      *packet.VoxelShapes
+	JigsawStructures *packet.JigsawStructureData
 }
 
 // Freeze builds the tables from everything registered and ends the Setup:
@@ -84,6 +89,12 @@ func (s *Setup) Freeze() (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
+	if s.s.voxelShapes == nil {
+		s.s.voxelShapes = &packet.VoxelShapes{}
+	}
+	if s.s.jigsaw == nil {
+		s.s.jigsaw = &packet.JigsawStructureData{}
+	}
 	creative, crafting := s.s.creative, s.s.crafting
 	if creative == nil {
 		creative = &packet.CreativeContent{}
@@ -95,6 +106,7 @@ func (s *Setup) Freeze() (*Registry, error) {
 	return &Registry{
 		Blocks: b, Items: it, Biomes: bs, EntityTypes: et,
 		Creative: newLive(creative, cloneCreative), Crafting: newLive(crafting, cloneCrafting),
+		VoxelShapes: s.s.voxelShapes, JigsawStructures: s.s.jigsaw,
 	}, nil
 }
 

@@ -114,6 +114,9 @@ type setupState struct {
 	creative *packet.CreativeContent
 	crafting *packet.CraftingData
 
+	voxelShapes *packet.VoxelShapes
+	jigsaw      *packet.JigsawStructureData
+
 	// vanillaOwner is the owner of the Setup NewSetup returned: changes by
 	// anyone else make the registry differ from BDS's packets.
 	vanillaOwner string

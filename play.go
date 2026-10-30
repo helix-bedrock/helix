@@ -36,6 +36,8 @@ func (s *Server) play(c *network.Conn) {
 	if pos, ok := s.savedPosition(c); ok {
 		spawn = pos
 	}
+	_ = c.WritePacket(s.reg.JigsawStructures)
+	_ = c.WritePacket(s.reg.VoxelShapes)
 	_ = c.WritePacket(&packet.StartGame{
 		EntityUniqueID: runtimeID, EntityRuntimeID: runtimeID, PlayerGameMode: lv.gameMode, PlayerPosition: spawn,
 		WorldSeed: lv.seed, Generator: lv.generator, WorldGameMode: lv.gameMode, Difficulty: lv.difficulty, WorldSpawn: worldSpawn,
