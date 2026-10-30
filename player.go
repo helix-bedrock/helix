@@ -2,7 +2,7 @@ package helix
 
 import (
 	"fmt"
-	"math"
+	"sync"
 	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -34,6 +34,20 @@ type Player struct {
 	// Entity: the player's body in the world.
 	entity *world.Entity
 	viewer *world.Viewer
+
+	// input carries world packets from the network goroutine to the
+	// region's tick.
+	input inputQueue
+	// flush sends what was queued for the client. Runs: anywhere.
+	flush func()
+
+	// The zones' centre and radius, set from the region (movement) and the
+	// network goroutine (RequestChunkRadius).
+	zoneMu    sync.Mutex
+	pos       mgl32.Vec3
+	centre    mcdb.ChunkPos
+	radius    int32
+	published bool
 
 	// saved is the player's data as BDS saved it, written back with what
 	// Helix changed so nothing Helix does not use yet is lost.
@@ -266,13 +280,14 @@ func (p *Player) play() {
 			}
 		}
 	}()
-	flush := func() {
+	p.flush = func() {
 		select {
 		case kick <- struct{}{}:
 		default:
 		}
 	}
-	p.viewer = s.overworld.AddViewer(func(pk packet.Packet) { _ = c.WritePacket(pk) }, flush)
+	p.pos = spawn
+	p.viewer = s.overworld.AddViewer(func(pk packet.Packet) { _ = c.WritePacket(pk) }, p.flush)
 	defer p.viewer.Close()
 	type last struct {
 		pos mgl32.Vec3
@@ -281,7 +296,7 @@ func (p *Player) play() {
 	removed := make(chan last, 1)
 	p.entity = s.overworld.AddEntity(world.EntityConfig{
 		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: spawn, Rot: rot, Viewer: p.viewer,
-		Spawn: p.spawnPackets, Move: p.movePacket,
+		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,
 		Removed: func(e *world.Entity) { removed <- last{e.Position(), e.Rotation()} },
 	})
 	pos := spawn
@@ -296,20 +311,14 @@ func (p *Player) play() {
 		p.save(pos, rot)
 	}()
 
-	p.readLoop(spawn, flush, done)
+	p.readLoop(done)
 }
 
-// readLoop handles the player's packets until the connection closes.
-func (p *Player) readLoop(spawn mgl32.Vec3, flush func(), done <-chan struct{}) {
+// readLoop reads the player's packets until the connection closes. Packets
+// with a world handler are queued for the region; the session's own are
+// answered here, on the network goroutine.
+func (p *Player) readLoop(done <-chan struct{}) {
 	s, c := p.s, p.conn
-	var radius int32
-	centre := world.ChunkPos(int32(spawn[0]), int32(spawn[2]))
-	publish := func(pos mgl32.Vec3) {
-		_ = c.WritePacket(&packet.NetworkChunkPublisherUpdate{
-			Position: protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, Radius: uint32(radius) * 16, //nolint:gosec // radius is positive
-		})
-		p.viewer.Move(centre, radius)
-	}
 	spawned := false
 	for {
 		pk, err := c.ReadPacket()
@@ -319,42 +328,34 @@ func (p *Player) readLoop(spawn mgl32.Vec3, flush func(), done <-chan struct{}) 
 			}
 			return
 		}
-		if _, input := pk.(*packet.PlayerAuthInput); !input {
-			s.log.Debug("packet from player", "name", p.name, "packet", fmt.Sprintf("%T", pk))
+		if s.handlers.handler(pk.ID()) != nil {
+			if !p.input.push(pk) {
+				s.log.Debug("input queue full, packet dropped", "name", p.name, "packet", fmt.Sprintf("%T", pk))
+			}
+			continue
 		}
+		s.log.Debug("packet from player", "name", p.name, "packet", fmt.Sprintf("%T", pk))
 		switch pk := pk.(type) {
 		case *packet.Disconnect:
 			s.log.Info("Player left", "name", p.name, "reason", pk.Reason, "message", pk.Message)
 		case *packet.RequestChunkRadius:
-			radius = max(min(pk.ChunkRadius, s.conf.ViewDistance), 1)
+			radius := max(min(pk.ChunkRadius, s.conf.ViewDistance), 1)
 			_ = c.WritePacket(&packet.ChunkRadiusUpdated{ChunkRadius: radius})
-			publish(spawn)
-			flush()
+			p.setRadius(radius)
 			if !spawned {
 				spawned = true
 				go func() {
 					select {
 					case <-p.viewer.Ready():
 						_ = c.WritePacket(&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn})
-						flush()
+						p.flush()
 					case <-done:
 					}
 				}()
 			}
-		case *packet.PlayerAuthInput:
-			spawn = pk.Position
-			p.entity.Move(world.Movement{
-				Pos: pk.Position, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
-				OnGround: pk.InputData.Load(packet.InputFlagVerticalCollision), Tick: pk.Tick,
-			})
-			if cp := world.ChunkPos(int32(math.Floor(float64(pk.Position[0]))), int32(math.Floor(float64(pk.Position[2])))); cp != centre && radius > 0 {
-				centre = cp
-				publish(pk.Position)
-				flush()
-			}
 		case *packet.SubChunkRequest:
 			_ = c.WritePacket(p.viewer.SubChunks(pk))
-			flush()
+			p.flush()
 		case *packet.SetLocalPlayerAsInitialised:
 			s.log.Info("Player spawned", "name", p.name)
 		}

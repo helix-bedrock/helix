@@ -53,10 +53,11 @@ type Config struct {
 	// every dimension. 0 means one per CPU; 1 ticks regions one after
 	// another in a fixed order, for debugging and exact reproduction.
 	TickCores int
-	// Setup runs at boot after vanilla is registered, before the registry
-	// is frozen: plugins register, replace and delete blocks here. Nil
-	// means vanilla only.
-	Setup func(s *registry.Setup) error
+	// Setup runs at boot after vanilla is registered, before everything is
+	// frozen: plugins register, replace and delete blocks, items, biomes
+	// and entity types, and replace or wrap packet handlers here. Nil means
+	// vanilla only.
+	Setup func(s *Setup) error
 	// MaxPlayers is how many players may be online at once.
 	MaxPlayers int
 	// OnlineMode requires every player to be signed in to Xbox Live.
@@ -144,6 +145,7 @@ type Server struct {
 	ticker      *world.Scheduler
 	overworld   *world.Dimension
 
+	handlers   handlers
 	global     *global
 	runtimeIDs atomic.Uint64
 	wg         sync.WaitGroup
@@ -381,11 +383,16 @@ func (s *Server) admit(c *network.Conn) {
 	}()
 }
 
-// buildRegistry registers vanilla, runs Config.Setup and freezes the
-// registry. It runs once, in New, before any transport can open.
+// buildRegistry registers vanilla (the registry and the packet handlers),
+// runs Config.Setup and freezes it all. It runs once, in New, before any
+// transport can open.
 func (s *Server) buildRegistry() error {
-	setup := registry.NewSetup(s.log.With("part", "registry"), "minecraft")
-	if err := registry.Vanilla(setup); err != nil {
+	reg := registry.NewSetup(s.log.With("part", "registry"), "minecraft")
+	if err := registry.Vanilla(reg); err != nil {
+		return err
+	}
+	setup := newSetup(reg, s.log.With("part", "setup"))
+	if err := vanillaHandlers(setup); err != nil {
 		return err
 	}
 	if s.conf.Setup != nil {
@@ -393,11 +400,11 @@ func (s *Server) buildRegistry() error {
 			return fmt.Errorf("helix: setup: %w", err)
 		}
 	}
-	r, err := setup.Freeze()
+	r, err := reg.Freeze()
 	if err != nil {
 		return err
 	}
-	s.reg = r
+	s.reg, s.handlers = r, setup.freeze()
 	// Changes to the creative inventory or recipes reach players already
 	// online at once. Whether BDS re-sends these packets the same way is
 	// still to be checked per packet.

@@ -21,11 +21,8 @@ type Entity struct {
 	// region is the region the entity belongs to. Guarded by d.mu.
 	region *Region
 
-	// The latest movement from outside the tick (a player's input), applied
-	// at the start of the next tick.
+	// removed is set from anywhere by Remove.
 	inMu    sync.Mutex
-	in      Movement
-	hasIn   bool
 	removed bool
 
 	// Owned by the entity's region.
@@ -79,6 +76,9 @@ type EntityConfig struct {
 	// Move returns the packet that moves the entity for the players who see
 	// it, built once per tick it moved; nil sends nothing.
 	Move func(e *Entity) packet.Packet
+	// Input runs every tick in the region's player input phase, entities
+	// in runtime ID order: a player handles the packets it queued here.
+	Input func(e *Entity)
 	// Removed runs once the entity was removed, with its last state.
 	Removed func(e *Entity)
 }
@@ -115,13 +115,22 @@ func (e *Entity) OnGround() bool { return e.onGround }
 // Tick returns the client tick of a player's last movement. Runs: owner.
 func (e *Entity) Tick() uint64 { return e.tick }
 
-// Move moves the entity at the start of its region's next tick; only the
-// latest movement counts. It is how a player's input reaches the world.
-// Runs: anywhere.
-func (e *Entity) Move(m Movement) {
-	e.inMu.Lock()
-	e.in, e.hasIn = m, true
-	e.inMu.Unlock()
+// Apply moves the entity; the players who see it get the movement at the
+// end of the tick. Runs: owner.
+func (e *Entity) Apply(m Movement) {
+	r := e.region
+	if r == nil || !r.ticking.Load() || e.gone {
+		return
+	}
+	if m.Pos != e.pos || m.Rot != e.rot || m.OnGround != e.onGround {
+		e.moved = true
+	}
+	e.pos, e.rot, e.onGround, e.tick = m.Pos, m.Rot, m.OnGround, m.Tick
+	if c := chunkOf(m.Pos); c != e.chunk {
+		r.unindex(e)
+		e.chunk = c
+		r.byChunk[c] = append(r.byChunk[c], e)
+	}
 }
 
 // Remove removes the entity on its region's next tick; the players who see
@@ -180,31 +189,14 @@ func (r *Region) unindex(e *Entity) {
 	r.byChunk[e.chunk] = list
 }
 
-// tickEntities applies the movement and removals queued since the last
-// tick.
+// tickEntities removes the entities removed since the last tick, then runs
+// the player input phase.
 func (r *Region) tickEntities() {
 	removed := false
 	for _, e := range r.entities {
 		e.inMu.Lock()
-		m, has, rem := e.in, e.hasIn, e.removed
-		e.hasIn = false
+		removed = removed || e.removed
 		e.inMu.Unlock()
-		if rem {
-			removed = true
-			continue
-		}
-		if !has {
-			continue
-		}
-		if m.Pos != e.pos || m.Rot != e.rot || m.OnGround != e.onGround {
-			e.moved = true
-		}
-		e.pos, e.rot, e.onGround, e.tick = m.Pos, m.Rot, m.OnGround, m.Tick
-		if c := chunkOf(m.Pos); c != e.chunk {
-			r.unindex(e)
-			e.chunk = c
-			r.byChunk[c] = append(r.byChunk[c], e)
-		}
 	}
 	if removed {
 		r.entities = slices.DeleteFunc(r.entities, func(e *Entity) bool {
@@ -216,6 +208,12 @@ func (r *Region) tickEntities() {
 			}
 			return rem
 		})
+	}
+	// Input may move entities between chunks, never add or remove them.
+	for _, e := range r.entities {
+		if e.conf.Input != nil {
+			e.conf.Input(e)
+		}
 	}
 }
 

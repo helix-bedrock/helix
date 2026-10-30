@@ -15,7 +15,9 @@ chunks belong to regions that tick in parallel at 20 TPS each and merge
 and split as players move (`TickCores` sets how many cores tick). Players
 see each other: AddPlayer within BDS's 57-chunk disc, MovePlayer for
 their movement, and the player list; where they were is saved when they
-leave. Flat and
+leave. World packets go through a handler table plugins can replace or
+wrap, per packet or per system (movement so far), on the player's region
+tick; nothing a client sends is trusted. Flat and
 void worlds generate; vanilla terrain generation is not hooked up yet, so
 an infinite world shows only what it has saved. The block registry is
 built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with

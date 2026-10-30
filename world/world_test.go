@@ -279,7 +279,10 @@ func TestEntities(t *testing.T) {
 	waitFor(t, "a to see b", sees(recA, 2))
 	waitFor(t, "b to see a", sees(recB, 1))
 
-	b.Move(Movement{Pos: mgl32.Vec3{3*16 + 1, 0, 0}})
+	move := func(pos mgl32.Vec3) {
+		runAt(t, d, mcdb.ChunkPos{3, 0}, func(*Region) { b.Apply(Movement{Pos: pos}) })
+	}
+	move(mgl32.Vec3{3*16 + 1, 0, 0})
 	waitFor(t, "a to get b's movement", func() bool {
 		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.MovePlayer); return ok && pk.Position[0] == 3*16+1 })
 	})
@@ -288,7 +291,7 @@ func TestEntities(t *testing.T) {
 	}
 
 	// Out of the disc: b at 5 chunks is removed for a.
-	b.Move(Movement{Pos: mgl32.Vec3{5 * 16, 0, 0}})
+	move(mgl32.Vec3{5 * 16, 0, 0})
 	waitFor(t, "a to lose b", func() bool {
 		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.RemoveActor); return ok && pk.EntityUniqueID == 2 })
 	})
