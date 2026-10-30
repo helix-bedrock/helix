@@ -112,7 +112,7 @@ type Server struct {
 	auth     *auth.Service
 	listener *network.Listener
 	serverID int64
-	blocks   *registry.Blocks
+	reg      *registry.Registry
 
 	db          *mcdb.DB
 	worldStore  mcdb.WorldStore
@@ -346,17 +346,17 @@ func (s *Server) buildRegistry() error {
 			return fmt.Errorf("helix: setup: %w", err)
 		}
 	}
-	b, err := setup.Freeze()
+	r, err := setup.Freeze()
 	if err != nil {
 		return err
 	}
-	s.blocks = b
-	s.log.Info("Registry frozen", "block states", b.Count())
+	s.reg = r
+	s.log.Info("Registry frozen", "block states", r.Blocks.Count(), "items", r.Items.Count())
 	return nil
 }
 
-// Blocks is the frozen block table.
-func (s *Server) Blocks() *registry.Blocks { return s.blocks }
+// Registry is everything frozen at boot: blocks and items.
+func (s *Server) Registry() *registry.Registry { return s.reg }
 
 // PlayerCount returns how many players are online.
 func (s *Server) PlayerCount() int {

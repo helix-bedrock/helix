@@ -1,5 +1,5 @@
 // Package registry holds every type the client learns once when it joins.
-// For now that is blocks; items, biomes and entity types follow.
+// For now that is blocks and items; biomes and entity types follow.
 //
 // Everything is registered through one [Setup] at boot: vanilla, built-in
 // features and plugins alike. [Setup.Freeze] then builds the tables the
@@ -80,7 +80,13 @@ type setupState struct {
 	blocks  map[string]BlockType
 	owners  map[string]string
 	deleted map[string]string
-	frozen  bool
+
+	itemOrder    []string
+	items        map[string]ItemType
+	itemOwners   map[string]string
+	deletedItems map[string]bool
+
+	frozen bool
 }
 
 // NewSetup returns an empty Setup. Registrations made through it are
@@ -91,6 +97,7 @@ func NewSetup(log *slog.Logger, owner string) *Setup {
 	}
 	return &Setup{log: log, owner: owner, s: &setupState{
 		blocks: map[string]BlockType{}, owners: map[string]string{}, deleted: map[string]string{},
+		items: map[string]ItemType{}, itemOwners: map[string]string{}, deletedItems: map[string]bool{},
 	}}
 }
 

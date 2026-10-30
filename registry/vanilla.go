@@ -6,10 +6,46 @@ import (
 	"github.com/helix-bedrock/helix-data/data"
 )
 
-// Vanilla registers every vanilla block of BDS 1.26.60 from helix-data:
-// each state as BDS saves it, its numbers as BDS holds them at runtime,
-// and its default state.
+// Vanilla registers every vanilla block and item of BDS 1.26.60 from
+// helix-data.
 func Vanilla(s *Setup) error {
+	if err := vanillaBlocks(s); err != nil {
+		return err
+	}
+	return vanillaItems(s)
+}
+
+// vanillaItems registers every item BDS tells joining players about, with
+// its network ID, version and components as BDS sends them, and its stack
+// size and tags as BDS reports them.
+func vanillaItems(s *Setup) error {
+	reg, err := data.ItemRegistry()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	list, err := data.Items()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	info := make(map[string]int, len(list))
+	for i, it := range list {
+		info[it.Name] = i
+	}
+	for _, e := range reg {
+		t := ItemType{Name: e.Name, ID: e.RuntimeID, Version: e.Version, ComponentBased: e.ComponentBased, Components: e.Data}
+		if i, ok := info[e.Name]; ok {
+			t.MaxStack, t.Tags = uint8(min(max(list[i].MaxStack, 0), 255)), list[i].Tags //nolint:gosec // clamped
+		}
+		if err := s.RegisterItem(t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// vanillaBlocks registers every vanilla block: each state as BDS saves
+// it, its numbers as BDS holds them at runtime, and its default state.
+func vanillaBlocks(s *Setup) error {
 	states, err := data.BlockStates()
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)

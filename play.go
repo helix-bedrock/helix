@@ -55,7 +55,7 @@ func (s *Server) play(c *network.Conn) {
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0,
 	})
-	_ = c.WritePacket(&packet.ItemRegistry{})
+	_ = c.WritePacket(s.reg.Items.RegistryPacket())
 	if c.Flush() != nil {
 		return
 	}

@@ -40,13 +40,35 @@ type Blocks struct {
 
 var _ chunk.BlockRegistry = (*Blocks)(nil)
 
-// Freeze builds the block table from everything registered and ends the
-// Setup: later calls return ErrFrozen. States get IDs in registration
-// order.
-func (s *Setup) Freeze() (*Blocks, error) {
+// Registry is everything frozen at boot.
+type Registry struct {
+	// Blocks is the block table.
+	Blocks *Blocks
+	// Items is the item table.
+	Items *Items
+}
+
+// Freeze builds the tables from everything registered and ends the Setup:
+// later calls return ErrFrozen. Block states and items get IDs in
+// registration order.
+func (s *Setup) Freeze() (*Registry, error) {
 	if s.s.frozen {
 		return nil, ErrFrozen
 	}
+	b, err := s.freezeBlocks()
+	if err != nil {
+		return nil, err
+	}
+	it, err := s.freezeItems()
+	if err != nil {
+		return nil, err
+	}
+	s.s.frozen = true
+	return &Registry{Blocks: b, Items: it}, nil
+}
+
+// freezeBlocks builds the block table.
+func (s *Setup) freezeBlocks() (*Blocks, error) {
 	b := &Blocks{byName: map[string]uint32{}, byHash: map[uint32]uint32{}, byKey: map[string]uint32{}, replaced: map[string]uint32{}}
 	var props []Properties
 	for _, name := range s.s.order {
@@ -103,7 +125,6 @@ func (s *Setup) Freeze() (*Blocks, error) {
 		b.replaced[name] = id
 	}
 	b.props.Store(&props)
-	s.s.frozen = true
 	return b, nil
 }
 

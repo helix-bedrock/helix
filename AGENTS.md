@@ -34,8 +34,9 @@ sibling library folders, so unreleased library changes are used.
 - `registry`: the one boot `Setup` (register, replace, delete) and the
   frozen tables. Blocks so far: dense state IDs, network hashes, a per-state
   property table swapped whole on live changes, and `chunk.BlockRegistry`
-  for the world library. `Vanilla` loads helix-data. Items, biomes and
-  entity types come next.
+  for the world library. Items: BDS's network IDs, versions and
+  components, stack sizes and tags, and the ItemRegistry packet built once.
+  `Vanilla` loads helix-data. Biomes and entity types come next.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.

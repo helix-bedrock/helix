@@ -43,7 +43,7 @@ func (s *Server) openWorld() error {
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
 	isNew := err != nil
-	db, err := mcdb.Config{Log: s.log.With("part", "storage"), KV: s.conf.Storage.KV, Blocks: s.blocks}.Open(dir)
+	db, err := mcdb.Config{Log: s.log.With("part", "storage"), KV: s.conf.Storage.KV, Blocks: s.reg.Blocks}.Open(dir)
 	if err != nil {
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
