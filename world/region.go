@@ -68,7 +68,10 @@ type Region struct {
 	viewers      []*Viewer
 	entities     []*Entity // ordered by runtime ID
 	byChunk      map[mcdb.ChunkPos][]*Entity
-	ticks        uint64
+	// leaving are the entities that moved out of the region's sections this
+	// tick, handed off at its end.
+	leaving []*Entity
+	ticks   uint64
 }
 
 // RegionInfo describes a region, as of the end of its last tick.
@@ -139,7 +142,8 @@ func (r *Region) post(e entry) {
 // tick runs one tick, in RFC 0002's order. Only the phases that exist so
 // far: queued work (finished loads, RunAt), player input, chunk sending,
 // then what players see (BDS's order: entities entering and leaving view,
-// then movement), one flush per player, and saving.
+// then movement), one flush per player, saving, and handing the entities
+// that left to their new region.
 func (r *Region) tick() {
 	r.ticks++
 	r.drain()
@@ -154,6 +158,7 @@ func (r *Region) tick() {
 		}
 	}
 	r.saveChanged()
+	r.handOff()
 }
 
 // drain runs the work queued for this tick. It reuses its buffers.
@@ -202,6 +207,7 @@ func (r *Region) release(pos mcdb.ChunkPos) {
 	}
 	delete(r.holds, pos)
 	if c, ok := r.chunks[pos]; ok {
+		r.unloadChunkEntities(pos)
 		r.save(c)
 		delete(r.chunks, pos)
 	}

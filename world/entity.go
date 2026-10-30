@@ -14,6 +14,11 @@ import (
 // entities"): its IDs, position and rotation. It belongs to the region of
 // the chunk it stands in; a player's entity belongs to the region of its
 // Viewer and sees the entities around it.
+//
+// Any other entity lives in loaded chunks only, as in BDS: it cannot move
+// into a chunk that is not loaded, goes to the region that owns its new
+// chunk at the end of the tick it moved there, and is unloaded with its
+// chunk (the Unloaded hook keeps it, to be added again later).
 type Entity struct {
 	d    *Dimension
 	conf EntityConfig
@@ -81,11 +86,17 @@ type EntityConfig struct {
 	Input func(e *Entity)
 	// Removed runs once the entity was removed, with its last state.
 	Removed func(e *Entity)
+	// Unloaded runs when the chunk of an entity that is not a player's
+	// unloads, with its last state. The entity is then gone from the world,
+	// as if removed, and is added again with AddEntity when wanted. Nil
+	// drops it.
+	Unloaded func(e *Entity)
 }
 
 // AddEntity adds an entity, in its viewer's region for a player, else in
-// the region that owns its chunk, on that region's next tick. Runs:
-// anywhere.
+// the region that owns its chunk, on that region's next tick. An entity
+// that is not a player's is unloaded at once (see EntityConfig.Unloaded)
+// if nothing else keeps its chunk loaded. Runs: anywhere.
 func (d *Dimension) AddEntity(conf EntityConfig) *Entity {
 	e := &Entity{d: d, conf: conf, pos: conf.Pos, rot: conf.Rot, chunk: chunkOf(conf.Pos)}
 	if conf.Viewer != nil {
@@ -116,21 +127,47 @@ func (e *Entity) OnGround() bool { return e.onGround }
 func (e *Entity) Tick() uint64 { return e.tick }
 
 // Apply moves the entity; the players who see it get the movement at the
-// end of the tick. Runs: owner.
-func (e *Entity) Apply(m Movement) {
+// end of the tick. An entity that is not a player's stays where it is, and
+// Apply returns false, if the new chunk is neither loaded here nor in a
+// section another region owns. Runs: owner.
+func (e *Entity) Apply(m Movement) bool {
 	r := e.region
 	if r == nil || !r.ticking.Load() || e.gone {
-		return
+		return false
+	}
+	c := chunkOf(m.Pos)
+	if c != e.chunk && e.conf.Viewer == nil && !r.canEnter(c) {
+		return false
 	}
 	if m.Pos != e.pos || m.Rot != e.rot || m.OnGround != e.onGround {
 		e.moved = true
 	}
 	e.pos, e.rot, e.onGround, e.tick = m.Pos, m.Rot, m.OnGround, m.Tick
-	if c := chunkOf(m.Pos); c != e.chunk {
+	if c != e.chunk {
 		r.unindex(e)
 		e.chunk = c
 		r.byChunk[c] = append(r.byChunk[c], e)
+		if e.conf.Viewer == nil && !r.owns(c) {
+			r.leaving = append(r.leaving, e)
+		}
 	}
+	return true
+}
+
+// canEnter reports whether an entity may move into the chunk at pos: it is
+// loaded here, or its section belongs to another region, which checks the
+// chunk when the entity arrives.
+func (r *Region) canEnter(pos mcdb.ChunkPos) bool {
+	if _, ok := r.chunks[pos]; ok {
+		return true
+	}
+	if r.owns(pos) {
+		return false
+	}
+	r.d.mu.Lock()
+	_, ok := r.d.sections[r.d.sectionOf(pos)]
+	r.d.mu.Unlock()
+	return ok
 }
 
 // Remove removes the entity on its region's next tick; the players who see
@@ -184,6 +221,67 @@ func (r *Region) unindex(e *Entity) {
 	r.byChunk[e.chunk] = list
 }
 
+// handOff gives the entities that moved into another region's section this
+// tick to that region, for its next tick. The players here who saw them
+// lose them in the next visibility pass. Runs at the end of the tick.
+func (r *Region) handOff() {
+	for i, e := range r.leaving {
+		r.leaving[i] = nil
+		if e.gone || e.region != r || r.owns(e.chunk) {
+			continue
+		}
+		r.unindex(e)
+		r.entities = slices.DeleteFunc(r.entities, func(o *Entity) bool { return o == e })
+		r.d.mu.Lock()
+		e.region = nil
+		r.d.mu.Unlock()
+		if !r.d.postAt(e.chunk, func(o *Region) { o.arriveEntity(e) }) {
+			unload(e)
+		}
+	}
+	r.leaving = r.leaving[:0]
+}
+
+// arriveEntity takes an entity handed over by another region. One whose
+// chunk is not loaded here is unloaded.
+func (r *Region) arriveEntity(e *Entity) {
+	if _, ok := r.chunks[e.chunk]; !ok || !r.owns(e.chunk) {
+		unload(e)
+		return
+	}
+	r.addEntity(e)
+}
+
+// unloadChunkEntities unloads the entities of a chunk that unloads, except
+// players', which go with their viewers.
+func (r *Region) unloadChunkEntities(pos mcdb.ChunkPos) {
+	var out []*Entity
+	for _, e := range r.byChunk[pos] {
+		if e.conf.Viewer == nil {
+			out = append(out, e)
+		}
+	}
+	if len(out) == 0 {
+		return
+	}
+	r.entities = slices.DeleteFunc(r.entities, func(e *Entity) bool { return slices.Contains(out, e) })
+	for _, e := range out {
+		r.removeEntity(e)
+		r.d.mu.Lock()
+		e.region = nil
+		r.d.mu.Unlock()
+		unload(e)
+	}
+}
+
+// unload ends an entity that is in no region's lists any more.
+func unload(e *Entity) {
+	e.gone = true
+	if e.conf.Unloaded != nil {
+		e.conf.Unloaded(e)
+	}
+}
+
 // tickEntities removes the entities removed since the last tick, then runs
 // the player input phase.
 func (r *Region) tickEntities() {
@@ -200,6 +298,9 @@ func (r *Region) tickEntities() {
 			e.inMu.Unlock()
 			if rem {
 				r.removeEntity(e)
+				if e.conf.Removed != nil {
+					e.conf.Removed(e)
+				}
 			}
 			return rem
 		})
@@ -212,7 +313,7 @@ func (r *Region) tickEntities() {
 	}
 }
 
-// removeEntity tells the players who see e, and runs its Removed hook.
+// removeEntity takes e out of the world and tells the players who see it.
 func (r *Region) removeEntity(e *Entity) {
 	e.gone = true
 	r.unindex(e)
@@ -224,9 +325,6 @@ func (r *Region) removeEntity(e *Entity) {
 		}
 	}
 	clear(e.known)
-	if e.conf.Removed != nil {
-		e.conf.Removed(e)
-	}
 }
 
 // updateVisibility shows each player the entities that came into its disc

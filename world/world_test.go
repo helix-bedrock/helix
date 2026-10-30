@@ -321,6 +321,62 @@ func TestEntities(t *testing.T) {
 	_ = a
 }
 
+// TestEntityHandOff checks that an entity cannot move into an unloaded
+// chunk, goes to the region of the chunk it moved to, and unloads with its
+// chunk.
+func TestEntityHandOff(t *testing.T) {
+	reg := vanillaRegistry(t)
+	d, db := openDim(t, reg, t.TempDir())
+	defer func() { _ = db.Close() }()
+	defer func() { _ = d.Close() }()
+	spawn := func(e *Entity) []packet.Packet {
+		return []packet.Packet{&packet.AddPlayer{EntityRuntimeID: e.RuntimeID()}}
+	}
+	player := func(id uint64, chunkX int32) (*recorder, *Viewer) {
+		rec := &recorder{}
+		v := d.AddViewer(rec.send, func() {})
+		v.Move(mcdb.ChunkPos{chunkX, 0}, 2)
+		d.AddEntity(EntityConfig{UniqueID: int64(id), RuntimeID: id, Pos: mgl32.Vec3{float32(chunkX*16 + 8), 0, 8}, Viewer: v, Spawn: spawn}) //nolint:gosec // test IDs
+		return rec, v
+	}
+	recA, va := player(1, 0)
+	recB, vb := player(2, 100)
+	defer va.Close()
+	waitFor(t, "two regions", func() bool { return len(d.Regions()) == 2 })
+	sees := func(rec *recorder, id uint64) func() bool {
+		return func() bool {
+			return rec.has(func(p packet.Packet) bool { pk, ok := p.(*packet.AddPlayer); return ok && pk.EntityRuntimeID == id })
+		}
+	}
+	unloaded := make(chan struct{})
+	mob := d.AddEntity(EntityConfig{
+		UniqueID: 10, RuntimeID: 10, Pos: mgl32.Vec3{24, 0, 8}, Spawn: spawn,
+		Unloaded: func(*Entity) { close(unloaded) },
+	})
+	waitFor(t, "a to see the mob", sees(recA, 10))
+
+	var intoUnloaded, intoB bool
+	runAt(t, d, mcdb.ChunkPos{1, 0}, func(*Region) {
+		intoUnloaded = mob.Apply(Movement{Pos: mgl32.Vec3{50 * 16, 0, 8}})
+		intoB = mob.Apply(Movement{Pos: mgl32.Vec3{101*16 + 8, 0, 8}})
+	})
+	if intoUnloaded || !intoB {
+		t.Fatalf("moved into an unloaded chunk: %v, into b's region: %v", intoUnloaded, intoB)
+	}
+	waitFor(t, "b to see the mob", sees(recB, 10))
+	waitFor(t, "a to lose the mob", func() bool {
+		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.RemoveActor); return ok && pk.EntityUniqueID == 10 })
+	})
+
+	// b leaves: the mob's chunk unloads and the mob with it.
+	vb.Close()
+	select {
+	case <-unloaded:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the mob never unloaded with its chunk")
+	}
+}
+
 func TestNetCache(t *testing.T) {
 	c := newNetCache(100)
 	for i := range int32(5) {

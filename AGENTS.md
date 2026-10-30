@@ -60,6 +60,10 @@ sibling library folders, so unreleased library changes are used.
   through `SetEntityViewRadius2`, never wider than the gap between
   regions; spawn packets on entering, RemoveActor on leaving), and
   each entity's movement is built once per tick for everyone who sees it.
+  Other entities live in loaded chunks only: `Apply` refuses a move into
+  an unloaded chunk, an entity that moved into another region's section
+  is handed to it at the end of the tick, and one whose chunk unloads is
+  unloaded with it (`EntityConfig.Unloaded`).
   Regions tick only the phases that exist so far (queued work, player
   input, chunk sending, visibility, movement, one flush per player,
   saving). Loads, generation, network encoding and
