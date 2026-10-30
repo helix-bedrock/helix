@@ -154,6 +154,15 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
+	defs, err := data.BlockDefinitions()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	definitions := make(map[string]map[string]any, len(defs))
+	for _, d := range defs {
+		definitions[d.Name] = d.Properties
+		s.s.definitionOrder = append(s.s.definitionOrder, d.Name)
+	}
 	// block_states.nbt lists each block's states together, in the order
 	// the per-state property arrays use.
 	var t BlockType
@@ -175,6 +184,7 @@ func vanillaBlocks(s *Setup) error {
 		if t.Default < 0 {
 			return fmt.Errorf("registry: vanilla: default state of %s is not one of its states", t.Name)
 		}
+		t.Definition = definitions[t.Name]
 		return s.RegisterBlock(t)
 	}
 	for _, st := range states {

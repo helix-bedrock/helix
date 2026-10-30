@@ -43,7 +43,7 @@ func (s *Server) play(c *network.Conn) {
 		PlayerPermissions: packet.PermissionLevelMember, BaseGameVersion: protocol.CurrentVersion,
 		WorldName: lv.name, PlayerMovementSettings: protocol.PlayerMovementSettings{ServerAuthoritativeBlockBreaking: true},
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
-		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0,
+		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0, Blocks: s.reg.Blocks.Definitions(),
 	})
 	// The registry packets, in the order BDS 1.26.60 sends them (other
 	// join packets between them are not sent yet).

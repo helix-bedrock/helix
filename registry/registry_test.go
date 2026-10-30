@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -249,5 +250,27 @@ func TestLive(t *testing.T) {
 	}
 	if len(r.Creative.Packet().Items) == 0 {
 		t.Fatal("no creative items")
+	}
+}
+
+// TestBlockDefinitions checks that vanilla carries BDS's StartGame block
+// definitions in BDS's order.
+func TestBlockDefinitions(t *testing.T) {
+	r, err := vanilla(t).Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := data.BlockDefinitions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := r.Blocks.Definitions()
+	if len(got) != len(want) {
+		t.Fatalf("%d definitions, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].Name != want[i].Name {
+			t.Fatalf("definition %d is %s, want %s", i, got[i].Name, want[i].Name)
+		}
 	}
 }

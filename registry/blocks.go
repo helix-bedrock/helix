@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/helix-bedrock/helix-data/blockstate"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 )
@@ -28,6 +29,9 @@ type Blocks struct {
 	hashes     []uint32
 	byHash     map[uint32]uint32
 	byKey      map[string]uint32
+
+	// definitions are the StartGame block definitions, BDS's order first.
+	definitions []protocol.BlockEntry
 
 	// replaced maps deleted block names to their replacement's default
 	// state.
@@ -151,9 +155,21 @@ func (s *Setup) freezeBlocks() (*Blocks, error) {
 		}
 		b.replaced[name] = id
 	}
+	seen := map[string]bool{}
+	for _, name := range append(slices.Clone(s.s.definitionOrder), s.s.order...) {
+		if t, ok := s.s.blocks[name]; ok && t.Definition != nil && !seen[name] {
+			seen[name] = true
+			b.definitions = append(b.definitions, protocol.BlockEntry{Name: name, Properties: t.Definition})
+		}
+	}
 	b.props.Store(&props)
 	return b, nil
 }
+
+// Definitions returns the block definitions StartGame carries, for blocks
+// the client does not have built in. The slice is shared: do not change
+// it.
+func (b *Blocks) Definitions() []protocol.BlockEntry { return b.definitions }
 
 // Count returns the number of block states.
 func (b *Blocks) Count() int { return len(b.states) }

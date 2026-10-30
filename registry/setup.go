@@ -66,6 +66,10 @@ type BlockType struct {
 	// Default is the index in States of the state the block is placed in
 	// and that replaces it when it is deleted.
 	Default int
+	// Definition is what the client is told about a block it does not
+	// have built in, in StartGame: components, states, geometry. BDS
+	// sends one for each data-driven vanilla block; nil for the others.
+	Definition map[string]any
 }
 
 // ErrFrozen is returned by Setup calls after Freeze.
@@ -80,10 +84,12 @@ type Setup struct {
 }
 
 type setupState struct {
-	order   []string
-	blocks  map[string]BlockType
-	owners  map[string]string
-	deleted map[string]string
+	// definitionOrder is the order BDS sends block definitions in.
+	definitionOrder []string
+	order           []string
+	blocks          map[string]BlockType
+	owners          map[string]string
+	deleted         map[string]string
 
 	itemOrder    []string
 	items        map[string]ItemType
