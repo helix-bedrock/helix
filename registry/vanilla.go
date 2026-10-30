@@ -118,8 +118,9 @@ func vanillaLive(s *Setup) error {
 }
 
 // vanillaItems registers every item BDS tells joining players about, with
-// its network ID, version and components as BDS sends them, and its stack
-// size and tags as BDS reports them.
+// its network ID, version and components as BDS sends them, its stack
+// size and tags as BDS reports them, and where BDS lets players wear or
+// hold it.
 func vanillaItems(s *Setup) error {
 	reg, err := data.ItemRegistry()
 	if err != nil {
@@ -128,6 +129,14 @@ func vanillaItems(s *Setup) error {
 	list, err := data.Items()
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	armorSlots, offhandList, err := data.ItemEquipment()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	offhand := make(map[string]bool, len(offhandList))
+	for _, name := range offhandList {
+		offhand[name] = true
 	}
 	info := make(map[string]int, len(list))
 	for i, it := range list {
@@ -138,6 +147,8 @@ func vanillaItems(s *Setup) error {
 		if i, ok := info[e.Name]; ok {
 			t.MaxStack, t.Tags = uint8(min(max(list[i].MaxStack, 0), 255)), list[i].Tags //nolint:gosec // clamped
 		}
+		t.ArmorSlot, t.Wearable = armorSlots[e.Name]
+		t.Offhand = offhand[e.Name]
 		if err := s.RegisterItem(t); err != nil {
 			return err
 		}

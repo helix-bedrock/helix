@@ -379,10 +379,9 @@ func (p *Player) mayRemove(r slotRef, s ItemStack) bool {
 	return r.kind != containerArmor || p.creative() || !hasEnchant(s, bindingCurse)
 }
 
-// mayPlace applies BDS's rules for putting an item in a slot. Armour and
-// offhand need to know which items are wearable where and which go in the
-// offhand, which the registry does not have yet: until it does, only
-// emptying those slots is allowed.
+// mayPlace applies BDS's rules for putting an item in a slot: armour takes
+// one wearable item in its own slot, the offhand only the items it
+// accepts.
 func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	if s.Empty() {
 		return true
@@ -390,7 +389,14 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	if lock, _ := s.Tag["minecraft:item_lock"].(uint8); lock == itemLockInSlot {
 		return false
 	}
-	return r.kind != containerArmor && r.kind != containerOffhand
+	t, _ := p.s.reg.Items.ByName(s.Name)
+	switch r.kind {
+	case containerArmor:
+		return s.Count == 1 && t.Wearable && t.ArmorSlot == r.slot
+	case containerOffhand:
+		return t.Offhand
+	}
+	return true
 }
 
 // hasEnchant reports whether the item has an enchantment, read from the

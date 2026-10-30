@@ -93,8 +93,9 @@ sibling library folders, so unreleased library changes are used.
   (BDS's saved format and join packets) and BDS's checks on stack
   requests (take, place, swap, destroy, creative items), applied all or
   nothing on a copy. The client's view of its items is never read back.
-  Armour and offhand placement, drops and crafting are refused until
-  built. No block changes yet.
+  Armour and offhand take the items BDS allows (registry `Wearable`,
+  `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
+  Drops and crafting are refused until built. No block changes yet.
 - `cmd/helix`: the server program.
 
 ## Design

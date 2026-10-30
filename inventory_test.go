@@ -24,6 +24,7 @@ func testPlayer(t *testing.T) *Player {
 	p.inventory.load(map[string]any{"Inventory": []any{
 		map[string]any{"Name": "minecraft:netherite_sword", "Count": uint8(1), "Damage": int16(0), "Slot": uint8(0), "WasPickedUp": uint8(0)},
 		map[string]any{"Name": "minecraft:emerald", "Count": uint8(64), "Damage": int16(0), "Slot": uint8(2), "WasPickedUp": uint8(0)},
+		map[string]any{"Name": "minecraft:diamond_helmet", "Count": uint8(1), "Damage": int16(0), "Slot": uint8(5), "WasPickedUp": uint8(0)},
 	}}, func() int32 { return s.stackIDs.Add(1) })
 	return p
 }
@@ -102,6 +103,27 @@ func TestStackRequests(t *testing.T) {
 	}})
 	if r.Status != protocol.ItemStackResponseStatusOK || p.inventory.main[0].Count != 1 || !p.inventory.ui[createdOutputSlot].Empty() {
 		t.Fatalf("creative: %+v", r)
+	}
+}
+
+// TestEquipment checks BDS's armour and offhand rules.
+func TestEquipment(t *testing.T) {
+	p := testPlayer(t)
+	helmet, emeralds := p.inventory.main[5].netID, p.inventory.main[2].netID
+	try := func(count byte, src, dst protocol.StackRequestSlotInfo) uint8 {
+		return p.stackRequest(protocol.ItemStackRequest{RequestID: -1, Actions: []protocol.StackRequestAction{take(count, src, dst)}}).Status
+	}
+	if try(1, slotInfo(containerHotbar, 5, helmet), slotInfo(containerArmor, 1, 0)) == protocol.ItemStackResponseStatusOK {
+		t.Fatal("helmet worn on the chest")
+	}
+	if try(1, slotInfo(containerHotbar, 2, emeralds), slotInfo(containerOffhand, 1, 0)) == protocol.ItemStackResponseStatusOK {
+		t.Fatal("emerald in the offhand")
+	}
+	if try(1, slotInfo(containerHotbar, 2, emeralds), slotInfo(containerArmor, 0, 0)) == protocol.ItemStackResponseStatusOK {
+		t.Fatal("emerald worn")
+	}
+	if s := try(1, slotInfo(containerHotbar, 5, helmet), slotInfo(containerArmor, 0, 0)); s != protocol.ItemStackResponseStatusOK || p.inventory.armor[0].Name != "minecraft:diamond_helmet" {
+		t.Fatalf("helmet not worn: %d", s)
 	}
 }
 

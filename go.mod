@@ -5,9 +5,9 @@ go 1.26.0
 require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/google/uuid v1.6.0
-	github.com/helix-bedrock/helix-data v0.0.0-20261030140432-351220d436c0
+	github.com/helix-bedrock/helix-data v0.0.0-20261030160355-7dc6f20e6eac
 	github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca
-	github.com/helix-bedrock/protocol v0.0.0-20261030050828-29574cd0fb81
+	github.com/helix-bedrock/protocol v0.0.0-20261030143825-76aaa389cdca
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
 	github.com/helix-bedrock/world v0.0.0-20261030134827-0f93afcaa01c
 	github.com/pion/ice/v4 v4.4.8

@@ -20,9 +20,9 @@ leave. Abilities, permission levels, game mode and attributes follow BDS
 are sent at join in BDS's order. The inventory is the server's:
 items are loaded from and saved in BDS's format, and every inventory
 change the client asks for is checked as BDS checks it (stack network
-IDs, counts, stack sizes, creative-only destroy and creative items) before
-it happens; armour and offhand slots, dropping and crafting are not done
-yet. World packets go through a handler table plugins can replace or
+IDs, counts, stack sizes, armour slots and offhand items as BDS lists
+them, creative-only destroy and creative items) before it happens;
+dropping and crafting are not done yet. World packets go through a handler table plugins can replace or
 wrap, per packet or per system (movement so far), on the player's region
 tick. Flat and
 void worlds generate; vanilla terrain generation is not hooked up yet, so

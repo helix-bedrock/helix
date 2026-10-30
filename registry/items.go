@@ -32,6 +32,12 @@ type ItemType struct {
 	MaxStack uint8
 	// Tags are the item's tags, such as "minecraft:boats".
 	Tags []string
+	// Wearable marks items a player may wear, in ArmorSlot (0 head, 1
+	// chest, 2 legs, 3 feet), as BDS's armour container checks.
+	Wearable  bool
+	ArmorSlot uint8
+	// Offhand marks items the offhand accepts.
+	Offhand bool
 }
 
 // RegisterItem adds an item type. Registering a name that exists replaces
