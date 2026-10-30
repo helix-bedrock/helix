@@ -3,10 +3,8 @@ package helix
 import (
 	"errors"
 	"log/slog"
-	"math"
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -68,24 +66,5 @@ func TestInputQueue(t *testing.T) {
 	}
 	if n := len(q.take()); n != maxQueuedInput || len(q.take()) != 0 {
 		t.Fatalf("took %d", n)
-	}
-}
-
-func TestValidMovement(t *testing.T) {
-	nan := float32(math.NaN())
-	for _, tc := range []struct {
-		pk *packet.PlayerAuthInput
-		ok bool
-	}{
-		{&packet.PlayerAuthInput{Position: mgl32.Vec3{1, 64, 1}, Pitch: 90, Yaw: 720}, true},
-		{&packet.PlayerAuthInput{Position: mgl32.Vec3{nan, 64, 1}}, false},
-		{&packet.PlayerAuthInput{Position: mgl32.Vec3{float32(math.Inf(1)), 64, 1}}, false},
-		{&packet.PlayerAuthInput{Position: mgl32.Vec3{1, 64, 4e7}}, false},
-		{&packet.PlayerAuthInput{Pitch: 91}, false},
-		{&packet.PlayerAuthInput{HeadYaw: nan}, false},
-	} {
-		if got := validMovement(tc.pk); got != tc.ok {
-			t.Errorf("%+v: valid %v, want %v", tc.pk.Position, got, tc.ok)
-		}
 	}
 }

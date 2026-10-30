@@ -1,7 +1,6 @@
 package helix
 
 import (
-	"math"
 	"sync"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -72,11 +71,6 @@ func vanillaHandlers(s *Setup) error {
 // packet apart and hands each part to its system. So far only movement;
 // block actions and item use come with block breaking and inventory.
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
-	// Never trust the client: a position or rotation no real client can
-	// send is dropped before any system sees it.
-	if !validMovement(pk) {
-		return
-	}
 	p.s.handlers.movement(p, world.Movement{
 		Pos: pk.Position, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
 		OnGround: pk.InputData.Load(packet.InputFlagVerticalCollision), Tick: pk.Tick,
@@ -117,27 +111,6 @@ func (p *Player) setRadius(radius int32) {
 	pos := p.pos
 	p.zoneMu.Unlock()
 	p.moveZones(pos)
-}
-
-// maxCoordinate bounds positions: past Bedrock's 30 million block world
-// limit no real client can be, and int32 chunk maths stays exact.
-const maxCoordinate = 30_000_000
-
-// validMovement reports whether a PlayerAuthInput's position and rotation
-// are values a real client can send: finite, inside the world limit, and a
-// pitch within straight up and straight down.
-func validMovement(pk *packet.PlayerAuthInput) bool {
-	for _, f := range [...]float32{pk.Position[0], pk.Position[1], pk.Position[2], pk.Pitch, pk.Yaw, pk.HeadYaw} {
-		if f != f || f > math.MaxFloat32 || f < -math.MaxFloat32 { // NaN or infinite
-			return false
-		}
-	}
-	for _, c := range pk.Position {
-		if c > maxCoordinate || c < -maxCoordinate {
-			return false
-		}
-	}
-	return pk.Pitch >= -90 && pk.Pitch <= 90
 }
 
 func floorInt(f float32) int32 {

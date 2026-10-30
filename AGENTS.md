@@ -77,8 +77,7 @@ sibling library folders, so unreleased library changes are used.
 - `input.go`: each player's ordered input queue (network goroutine to
   region tick, bounded, two swapped buffers), drained in the region's
   player input phase through the frozen handlers. Vanilla's
-  PlayerAuthInput handler drops impossible values (NaN, infinite, beyond
-  the world limit) and hands movement to the movement hook.
+  PlayerAuthInput handler hands movement to the movement hook.
 - `global.go`: the global owner (RFC 0002), one goroutine at 20 TPS that
   owns the player list and publishes a copy for readers.
 - `player.go`: `Player` = session (connection, identity, skin) + entity +
@@ -120,11 +119,11 @@ players (replaces `play.go`).
 3. Never panic. Bad input from clients returns an error.
 4. No felt lag with 400 players in one spot: no steady-state allocations on
    hot paths, no waiting inside a tick, proven by benchmarks.
-5. Never trust a player. Every packet and every field in it is assumed to
-   be a lie until checked against server state: values (NaN, ranges,
-   sizes, IDs), rates and claims (where it is, what it broke or used).
-   BDS's own checks are the baseline; a stricter check must never refuse
-   what BDS accepts. The optional anti-cheat is separate.
+5. Never assume the player is right. What a client says is a request, not
+   the truth: the server's state decides, the way BDS does it, with BDS's
+   own checks and corrections. This is not an anti-cheat: no checks beyond
+   BDS's by default and nothing strict. An anti-cheat comes later as a
+   separate, optional module.
 
 ## Gotchas
 
