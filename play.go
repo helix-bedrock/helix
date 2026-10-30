@@ -1,6 +1,7 @@
 package helix
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -91,11 +92,16 @@ func (s *Server) play(c *network.Conn) {
 		pk, err := c.ReadPacket()
 		if err != nil {
 			if !isClosed(err) {
-				s.log.Debug("read failed", "name", c.Identity().DisplayName, "err", err)
+				s.log.Info("read failed", "name", c.Identity().DisplayName, "err", err)
 			}
 			return
 		}
+		if _, input := pk.(*packet.PlayerAuthInput); !input {
+			s.log.Debug("packet from player", "name", c.Identity().DisplayName, "packet", fmt.Sprintf("%T", pk))
+		}
 		switch pk := pk.(type) {
+		case *packet.Disconnect:
+			s.log.Info("Player left", "name", c.Identity().DisplayName, "reason", pk.Reason, "message", pk.Message)
 		case *packet.RequestChunkRadius:
 			radius = max(min(pk.ChunkRadius, s.conf.ViewDistance), 1)
 			_ = c.WritePacket(&packet.ChunkRadiusUpdated{ChunkRadius: radius})

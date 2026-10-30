@@ -12,6 +12,7 @@ import (
 //
 // Chunks go out in BDS's sub-chunk request mode: LevelChunk carries the
 // biomes, then the client asks for each sub chunk with SubChunkRequest.
+// The packet fields follow a capture of BDS 1.26.60 sending chunks.
 type NetChunk struct {
 	pos    mcdb.ChunkPos
 	dim    int32
@@ -23,7 +24,7 @@ type NetChunk struct {
 
 // netSub is one sub chunk as SubChunk answers it.
 type netSub struct {
-	payload []byte // nil when all air
+	payload []byte
 	hmType  byte
 	hm      protocol.HeightMap
 }
@@ -37,21 +38,20 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk) *NetC
 	// Biomes, then no border blocks. Block entities are sent with block
 	// behaviour, which knows what the client may see of them.
 	payload := append(chunk.EncodeBiomes(c, chunk.NetworkHashEncoding), 0)
+	// BDS sends no sub chunks in the packet (count 0) and tells the
+	// client how many to request, from the bottom, as the limit.
 	nc.level = &packet.LevelChunk{
 		Position: protocol.ChunkPos{pos[0], pos[1]}, Dimension: nc.dim,
-		SubChunkCount: uint32(count), SubChunkLimit: protocol.Option(int32(count)),
-		RawPayload: payload,
+		SubChunkLimit: protocol.Option(int32(count)), RawPayload: payload,
 	}
 	nc.size = len(payload)
 	heights := c.HeightMap()
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
-	for i, sub := range subs {
+	for i := range subs {
 		s := &nc.subs[i]
-		if !sub.Empty() {
-			s.payload = chunk.EncodeSubChunk(c, chunk.NetworkHashEncoding, i)
-			nc.size += len(s.payload)
-		}
+		s.payload = chunk.EncodeSubChunk(c, chunk.NetworkHashEncoding, i)
+		nc.size += len(s.payload)
 		s.hmType, s.hm = subHeightMap(heights, int(c.SubY(int16(i)))) //nolint:gosec // few sections
 	}
 	return nc
@@ -105,15 +105,14 @@ func (nc *NetChunk) entry(off protocol.SubChunkOffset, y int32) protocol.SubChun
 		return e
 	}
 	s := &nc.subs[i]
-	e.Result = protocol.SubChunkResultSuccessAllAir
-	if s.payload != nil {
-		e.Result = protocol.SubChunkResultSuccess
-		e.RawPayload = protocol.Option(s.payload)
-	}
-	e.HeightMapType = s.hmType
+	// BDS answers Success for every sub chunk, air ones included. The
+	// render height map repeats an "all too high/low" type and is "all
+	// copied" from the height map when that has data.
+	e.Result, e.RawPayload = protocol.SubChunkResultSuccess, protocol.Option(s.payload)
+	e.HeightMapType, e.RenderHeightMapType = s.hmType, s.hmType
 	if s.hmType == protocol.HeightMapDataHasData {
 		e.HeightMapData = protocol.Option(s.hm)
+		e.RenderHeightMapType = protocol.HeightMapDataAllCopied
 	}
-	e.RenderHeightMapType = protocol.HeightMapDataAllCopied
 	return e
 }

@@ -88,6 +88,14 @@ func TestViewerAndSave(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
+	// As BDS: no sub chunks in LevelChunk, the count to request as limit.
+	mu.Lock()
+	pk := sent[protocol.ChunkPos{0, 0}]
+	mu.Unlock()
+	if limit, ok := pk.SubChunkLimit.Value(); pk.SubChunkCount != 0 || !ok || limit != 1 {
+		t.Errorf("LevelChunk count %d, limit %v, want 0 and 1", pk.SubChunkCount, pk.SubChunkLimit)
+	}
+
 	// Only the simulation zone stays loaded.
 	onTick(d, func() {
 		simChunks := len(chunksInRadius(nil, mcdb.ChunkPos{}, d.conf.SimulationDistance))
@@ -101,7 +109,7 @@ func TestViewerAndSave(t *testing.T) {
 		Position: protocol.SubChunkPos{0, -4, 0},
 		Offsets:  []protocol.SubChunkOffset{{0, 0, 0}, {0, 1, 0}, {0, 30, 0}, {40, 0, 0}},
 	})
-	results := []byte{protocol.SubChunkResultSuccess, protocol.SubChunkResultSuccessAllAir,
+	results := []byte{protocol.SubChunkResultSuccess, protocol.SubChunkResultSuccess,
 		protocol.SubChunkResultIndexOutOfBounds, protocol.SubChunkResultChunkNotFound}
 	for i, e := range resp.SubChunkEntries {
 		if e.Result != results[i] {
