@@ -356,11 +356,33 @@ func (s *Server) buildRegistry() error {
 		return err
 	}
 	s.reg = r
-	s.log.Info("Registry frozen", "block states", r.Blocks.Count(), "items", r.Items.Count())
+	// Changes to the creative inventory or recipes reach players already
+	// online at once. Whether BDS re-sends these packets the same way is
+	// still to be checked per packet.
+	r.Creative.OnChange(func(p *packet.CreativeContent) { s.broadcast(p) })
+	r.Crafting.OnChange(func(p *packet.CraftingData) { s.broadcast(p) })
+	s.log.Info("Registry frozen", "block states", r.Blocks.Count(), "items", r.Items.Count(),
+		"biomes", r.Biomes.Count(), "entity types", r.EntityTypes.Count())
 	return nil
 }
 
-// Registry is everything frozen at boot: blocks and items.
+// broadcast sends a packet to every player online.
+func (s *Server) broadcast(pk packet.Packet) {
+	s.mu.Lock()
+	conns := make([]*network.Conn, 0, len(s.players))
+	for _, c := range s.players {
+		conns = append(conns, c)
+	}
+	s.mu.Unlock()
+	for _, c := range conns {
+		if c.WritePacket(pk) == nil {
+			_ = c.Flush()
+		}
+	}
+}
+
+// Registry is everything built at boot: blocks, items, biomes and entity
+// types (frozen), and the creative inventory and recipes (changeable).
 func (s *Server) Registry() *registry.Registry { return s.reg }
 
 // PlayerCount returns how many players are online.

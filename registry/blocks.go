@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/helix-bedrock/helix-data/blockstate"
+	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 )
 
@@ -40,12 +41,20 @@ type Blocks struct {
 
 var _ chunk.BlockRegistry = (*Blocks)(nil)
 
-// Registry is everything frozen at boot.
+// Registry is everything built at boot.
 type Registry struct {
 	// Blocks is the block table.
 	Blocks *Blocks
 	// Items is the item table.
 	Items *Items
+	// Biomes is the biome table.
+	Biomes *Biomes
+	// EntityTypes is the entity type table.
+	EntityTypes *EntityTypes
+	// Creative is the creative inventory; it may change while running.
+	Creative *Live[packet.CreativeContent]
+	// Crafting is the recipes; they may change while running.
+	Crafting *Live[packet.CraftingData]
 }
 
 // Freeze builds the tables from everything registered and ends the Setup:
@@ -63,8 +72,26 @@ func (s *Setup) Freeze() (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
+	bs, err := s.freezeBiomes()
+	if err != nil {
+		return nil, err
+	}
+	et, err := s.freezeEntityTypes()
+	if err != nil {
+		return nil, err
+	}
+	creative, crafting := s.s.creative, s.s.crafting
+	if creative == nil {
+		creative = &packet.CreativeContent{}
+	}
+	if crafting == nil {
+		crafting = &packet.CraftingData{ClearRecipes: true}
+	}
 	s.s.frozen = true
-	return &Registry{Blocks: b, Items: it}, nil
+	return &Registry{
+		Blocks: b, Items: it, Biomes: bs, EntityTypes: et,
+		Creative: newLive(creative, cloneCreative), Crafting: newLive(crafting, cloneCrafting),
+	}, nil
 }
 
 // freezeBlocks builds the block table.

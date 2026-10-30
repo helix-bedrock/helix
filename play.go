@@ -10,9 +10,9 @@ import (
 
 // TEMPORARY: until the world and player designs exist, a player who joins
 // floats in an empty world, so the networking can be tested in game. Only
-// the level.dat values (name, seed, game mode, difficulty, spawn) and a
-// saved player's position come from the world; nothing else follows BDS
-// yet, and nothing is saved. It is replaced as soon as there is a world.
+// the level.dat values (name, seed, game mode, difficulty, spawn), a saved
+// player's position and the registry packets are real; nothing else
+// follows BDS yet, and nothing is saved. It is replaced as soon as there is a world.
 
 // voidRadius is the chunk radius of the empty world.
 const voidRadius = 4
@@ -55,7 +55,13 @@ func (s *Server) play(c *network.Conn) {
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0,
 	})
+	// The registry packets, in the order BDS 1.26.60 sends them (other
+	// join packets between them are not sent yet).
 	_ = c.WritePacket(s.reg.Items.RegistryPacket())
+	_ = c.WritePacket(s.reg.Biomes.DefinitionPacket())
+	_ = c.WritePacket(s.reg.EntityTypes.IdentifiersPacket())
+	_ = c.WritePacket(s.reg.Creative.Packet())
+	_ = c.WritePacket(s.reg.Crafting.Packet())
 	if c.Flush() != nil {
 		return
 	}

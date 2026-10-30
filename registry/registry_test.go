@@ -1,8 +1,12 @@
 package registry
 
 import (
+	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 func vanilla(t *testing.T) *Setup {
@@ -152,5 +156,98 @@ func TestItems(t *testing.T) {
 	}
 	if len(it.RegistryPacket().Items) != it.Count() {
 		t.Fatal("registry packet is missing items")
+	}
+}
+
+// encode returns a packet's payload bytes.
+func encode(t *testing.T, pk packet.Packet) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	pk.Marshal(protocol.NewWriter(&buf, 0))
+	return buf.Bytes()
+}
+
+// TestRebuiltPacketsMatchBDS checks that the packets the registry builds
+// from its own tables, as it does once a plugin changes something, are
+// byte for byte BDS's when nothing was changed.
+func TestRebuiltPacketsMatchBDS(t *testing.T) {
+	s := vanilla(t)
+	r, err := s.Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(encode(t, s.buildBiomePacket(r.Biomes.biomes)), encode(t, s.s.vanillaBiomes)) {
+		t.Fatal("rebuilt BiomeDefinitionList differs from BDS's")
+	}
+	s2 := vanilla(t)
+	s2.s.entitiesChanged = true
+	r2, err := s2.Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(r2.EntityTypes.IdentifiersPacket().SerialisedEntityIdentifiers, s2.s.vanillaEntities.SerialisedEntityIdentifiers) {
+		t.Fatal("rebuilt AvailableActorIdentifiers differs from BDS's")
+	}
+}
+
+// TestBiomesAndEntities checks custom and deleted biomes and entity types.
+func TestBiomesAndEntities(t *testing.T) {
+	s := vanilla(t)
+	p := s.As("plugin")
+	if err := p.RegisterBiome(Biome{Name: "plugin:glow_fields", ID: -1, Temperature: 0.5, Rain: true, Tags: []string{"overworld"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.DeleteBiome("minecraft:desert", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.RegisterEntityType(EntityType{Name: "plugin:ghost", BaseID: "minecraft:"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.DeleteEntityType(Player); err == nil {
+		t.Fatal("player was deleted")
+	}
+	r, err := s.Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plains, _ := r.Biomes.ByName(Plains)
+	desert := int16(2) // BDS's ID
+	if got := r.Biomes.Resolve(desert); got != plains.ID {
+		t.Fatalf("deleted desert loads as %d, want plains %d", got, plains.ID)
+	}
+	glow, ok := r.Biomes.ByName("plugin:glow_fields")
+	if !ok || glow.ID < 0 || glow.ID == desert {
+		t.Fatalf("custom biome ID %d", glow.ID)
+	}
+	if n := len(r.Biomes.DefinitionPacket().BiomeDefinitions); n != 89 {
+		t.Fatalf("%d biome definitions, want 89", n)
+	}
+	ghost, ok := r.EntityTypes.ByName("plugin:ghost")
+	if !ok || ghost.RuntimeID <= 0 {
+		t.Fatalf("custom entity runtime ID %d", ghost.RuntimeID)
+	}
+	if zombie, _ := r.EntityTypes.ByName("minecraft:zombie"); len(zombie.Definition) == 0 {
+		t.Fatal("zombie has no definition")
+	}
+}
+
+// TestLive checks live updates and their listeners.
+func TestLive(t *testing.T) {
+	r, err := vanilla(t).Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := r.Crafting.Packet()
+	n := len(before.ShapedRecipes)
+	heard := 0
+	remove := r.Crafting.OnChange(func(p *packet.CraftingData) { heard = len(p.ShapedRecipes) })
+	r.Crafting.Update(func(p *packet.CraftingData) { p.ShapedRecipes = p.ShapedRecipes[:n-1] })
+	remove()
+	r.Crafting.Update(func(p *packet.CraftingData) { p.ShapedRecipes = nil })
+	if heard != n-1 || len(before.ShapedRecipes) != n || len(r.Crafting.Packet().ShapedRecipes) != 0 {
+		t.Fatalf("heard %d, old packet %d, new %d", heard, len(before.ShapedRecipes), len(r.Crafting.Packet().ShapedRecipes))
+	}
+	if len(r.Creative.Packet().Items) == 0 {
+		t.Fatal("no creative items")
 	}
 }

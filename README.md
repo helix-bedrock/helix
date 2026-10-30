@@ -10,9 +10,11 @@ library's stores; players spawn at the level.dat spawn, or where a BDS world
 saved them, in an empty world until chunks are sent. The block registry is
 built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with
 their network hashes and BDS's runtime numbers (light, flammability,
-explosion resistance, friction, destroy time), and 2,080 items with the
-network IDs, versions and components BDS sends; plugins can add, replace
-and delete both in `Config.Setup`. Joining players get BDS's item list.
+explosion resistance, friction, destroy time), 2,080 items, 89 biomes with
+BDS's numeric IDs and 138 entity types with their definitions, plus the
+creative inventory and recipes, which can change while running. Plugins
+can add, replace and delete any of them in `Config.Setup`. Joining players
+get the registry packets; untouched, each is byte for byte BDS's.
 
 Part of [Helix](https://github.com/helix-bedrock), an open-source Minecraft: Bedrock
 Edition server engine in Go.

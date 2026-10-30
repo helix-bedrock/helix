@@ -1,11 +1,13 @@
 // Package registry holds every type the client learns once when it joins.
-// For now that is blocks and items; biomes and entity types follow.
+// That is blocks, items, biomes and entity types, frozen at boot, plus the
+// creative inventory and recipes, which may change while the server runs.
 //
 // Everything is registered through one [Setup] at boot: vanilla, built-in
 // features and plugins alike. [Setup.Freeze] then builds the tables the
-// server runs on. What the client is told at join (block states) cannot
-// change after that; the numbers BDS keeps per state (light, friction,
-// hardness, ...) can, through [Blocks.UpdateProperties].
+// server runs on. What the client is told once at join (block states,
+// items, biomes, entity types) cannot change after that; the numbers BDS
+// keeps per block state can, through [Blocks.UpdateProperties], and so can
+// the creative inventory and recipes, through [Live.Update].
 package registry
 
 import (
@@ -13,6 +15,8 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // Names of blocks the registry needs. Neither can be deleted.
@@ -86,7 +90,28 @@ type setupState struct {
 	itemOwners   map[string]string
 	deletedItems map[string]bool
 
-	frozen bool
+	biomeOrder        []string
+	biomes            map[string]Biome
+	biomeOwners       map[string]string
+	deletedBiomes     map[string]deletedBiome
+	biomesChanged     bool
+	vanillaBiomes     *packet.BiomeDefinitionList
+	vanillaBiomeNames map[string]bool
+
+	entityOrder     []string
+	entities        map[string]EntityType
+	entityOwners    map[string]string
+	deletedEntities map[string]bool
+	entitiesChanged bool
+	vanillaEntities *packet.AvailableActorIdentifiers
+
+	creative *packet.CreativeContent
+	crafting *packet.CraftingData
+
+	// vanillaOwner is the owner of the Setup NewSetup returned: changes by
+	// anyone else make the registry differ from BDS's packets.
+	vanillaOwner string
+	frozen       bool
 }
 
 // NewSetup returns an empty Setup. Registrations made through it are
@@ -98,6 +123,9 @@ func NewSetup(log *slog.Logger, owner string) *Setup {
 	return &Setup{log: log, owner: owner, s: &setupState{
 		blocks: map[string]BlockType{}, owners: map[string]string{}, deleted: map[string]string{},
 		items: map[string]ItemType{}, itemOwners: map[string]string{}, deletedItems: map[string]bool{},
+		biomes: map[string]Biome{}, biomeOwners: map[string]string{}, deletedBiomes: map[string]deletedBiome{}, vanillaBiomeNames: map[string]bool{},
+		entities: map[string]EntityType{}, entityOwners: map[string]string{}, deletedEntities: map[string]bool{},
+		vanillaOwner: owner,
 	}}
 }
 
