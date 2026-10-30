@@ -238,6 +238,12 @@ func (d *Dimension) absorb(dst, src *Region) {
 	dst.reshaped = dst.reshaped || src.reshaped
 	dst.contested = dst.contested || src.contested
 	src.inMu.Lock()
+	// A viewer on its way here follows its queued work.
+	for _, q := range src.in {
+		if q.v != nil && q.v.region == src {
+			q.v.region = dst
+		}
+	}
 	dst.inMu.Lock()
 	dst.in = append(dst.in, src.in...)
 	src.in = nil

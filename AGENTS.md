@@ -81,7 +81,11 @@ sibling library folders, so unreleased library changes are used.
   `Ticket.Release`; a ticking ticket's chunks get block ticks after the
   players' zones, a frozen one's only stay loaded. A region keeps its
   ticket holds in ticket order; they move with their sections on merges
-  and splits, and the release goes to every region. Loads, generation, network encoding and
+  and splits, and the release goes to every region. A viewer whose centre
+  moves more than `MergeDistance` sections from every section of its
+  region (a teleport) is handed, with its player's entity and its queued
+  work, to the region owning the new section or a new one, as entities
+  are handed off, instead of merging the two regions. Loads, generation, network encoding and
   saves run on a worker pool, jobs for one chunk in order on one worker. Each player is a `Viewer`
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every

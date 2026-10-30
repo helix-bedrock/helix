@@ -395,3 +395,67 @@ func TestNetCache(t *testing.T) {
 		t.Fatalf("cache kept the wrong chunks (used %d)", c.used)
 	}
 }
+
+// TestTeleport checks that a player moving far away goes straight to the
+// region there: the regions keep their IDs (no merge and split), the
+// players it left lose it, and it sees the players it joined.
+func TestTeleport(t *testing.T) {
+	reg := vanillaRegistry(t)
+	d, db := openDim(t, reg, t.TempDir())
+	defer func() { _ = db.Close() }()
+	defer func() { _ = d.Close() }()
+	add := func(id uint64, pos mgl32.Vec3) (*Entity, *recorder, *Viewer) {
+		rec := &recorder{}
+		v := d.AddViewer(rec.send, func() {})
+		v.Move(chunkOf(pos), 2)
+		e := d.AddEntity(EntityConfig{
+			UniqueID: int64(id), RuntimeID: id, Pos: pos, Viewer: v, //nolint:gosec // test IDs
+			Spawn: func(e *Entity) []packet.Packet {
+				return []packet.Packet{&packet.AddPlayer{EntityRuntimeID: e.RuntimeID()}}
+			},
+		})
+		return e, rec, v
+	}
+	a, recA, va := add(1, mgl32.Vec3{0, 0, 0})
+	_, recC, vc := add(3, mgl32.Vec3{16, 0, 0})
+	_, _, vb := add(2, mgl32.Vec3{100 * 16, 0, 0})
+	defer va.Close()
+	defer vb.Close()
+	defer vc.Close()
+	sees := func(rec *recorder, id uint64) func() bool {
+		return func() bool {
+			return rec.has(func(p packet.Packet) bool { pk, ok := p.(*packet.AddPlayer); return ok && pk.EntityRuntimeID == id })
+		}
+	}
+	lost := func(rec *recorder, id int64) func() bool {
+		return func() bool {
+			return rec.has(func(p packet.Packet) bool { pk, ok := p.(*packet.RemoveActor); return ok && pk.EntityUniqueID == id })
+		}
+	}
+	waitFor(t, "a and c to see each other", func() bool { return sees(recA, 3)() && sees(recC, 1)() })
+	ids := func() []uint64 {
+		regions := d.Regions()
+		out := make([]uint64, 0, len(regions))
+		for _, r := range regions {
+			out = append(out, r.ID)
+		}
+		return out
+	}
+	waitFor(t, "two regions", func() bool { return len(ids()) == 2 })
+	before := ids()
+
+	far := mgl32.Vec3{100 * 16, 0, 16}
+	runAt(t, d, mcdb.ChunkPos{}, func(*Region) { a.Apply(Movement{Pos: far}) })
+	va.Move(chunkOf(far), 2)
+	waitFor(t, "a to see b", sees(recA, 2))
+	waitFor(t, "c to lose a", lost(recC, 1))
+	waitFor(t, "a to lose c", lost(recA, 3))
+	if got := ids(); !slices.Equal(got, before) {
+		t.Errorf("regions %v after the teleport, want %v kept", got, before)
+	}
+	for _, r := range d.Regions() {
+		if r.Viewers != 1 && r.Viewers != 2 {
+			t.Errorf("region %d has %d viewers", r.ID, r.Viewers)
+		}
+	}
+}

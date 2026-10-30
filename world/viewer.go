@@ -1,6 +1,8 @@
 package world
 
 import (
+	"cmp"
+	"slices"
 	"sync"
 	"time"
 
@@ -130,6 +132,10 @@ func (r *Region) updateViewer(v *Viewer) bool {
 	if !placed {
 		return true
 	}
+	if centre != v.lastCentre && r.far(centre) {
+		r.moveViewer(v, centre)
+		return false
+	}
 	sim := min(r.d.conf.SimulationDistance, radius)
 	if centre != v.lastCentre || radius != v.lastRadius || v.queue == nil {
 		v.lastCentre, v.lastRadius = centre, radius
@@ -184,6 +190,79 @@ func (r *Region) updateViewer(v *Viewer) bool {
 		close(v.ready)
 	}
 	return true
+}
+
+// far reports whether the section of pos is more than MergeDistance
+// sections from every section of the region: a viewer moving there would
+// make the region claim sections that only merge it with another region
+// to split again. A region with no sections yet claims its first.
+func (r *Region) far(pos mcdb.ChunkPos) bool {
+	if len(r.sections) == 0 {
+		return false
+	}
+	s, m := r.d.sectionOf(pos), r.d.conf.MergeDistance
+	for dx := -m; dx <= m; dx++ {
+		for dz := -m; dz <= m; dz++ {
+			if _, ok := r.sections[sectionPos{s[0] + dx, s[1] + dz}]; ok {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// moveViewer hands a viewer that moved far away, with its player's
+// entity, to the region that owns its new section, or to a new region, as
+// entities are handed off: its chunks here are released, the players here
+// lose its entity in the next visibility pass, and the work queued for it
+// goes with it. The caller drops it from the region's viewers.
+func (r *Region) moveViewer(v *Viewer, centre mcdb.ChunkPos) {
+	for pos := range v.held {
+		r.release(pos)
+	}
+	clear(v.held)
+	var e *Entity
+	if i := slices.IndexFunc(r.entities, func(o *Entity) bool { return o.conf.Viewer == v }); i >= 0 {
+		e = r.entities[i]
+		r.entities = slices.Delete(r.entities, i, i+1)
+		r.unindex(e)
+	}
+	d := r.d
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	dst, ok := d.sections[d.sectionOf(centre)]
+	if !ok {
+		dst = d.newRegion(time.Now())
+		d.schedule(dst)
+	}
+	v.region = dst
+	if e != nil {
+		e.region = nil
+	}
+	r.inMu.Lock()
+	var queued []entry
+	r.in = slices.DeleteFunc(r.in, func(q entry) bool {
+		if q.v == v {
+			queued = append(queued, q)
+			return true
+		}
+		return false
+	})
+	r.inMu.Unlock()
+	dst.post(entry{fn: func(o *Region) { o.arriveViewer(v, e) }, v: v})
+	for _, q := range queued {
+		dst.post(q)
+	}
+}
+
+// arriveViewer takes a viewer, and its player's entity, handed over by
+// another region.
+func (r *Region) arriveViewer(v *Viewer, e *Entity) {
+	i, _ := slices.BinarySearchFunc(r.viewers, v.id, func(o *Viewer, id uint64) int { return cmp.Compare(o.id, id) })
+	r.viewers = slices.Insert(r.viewers, i, v)
+	if e != nil {
+		r.addEntity(e)
+	}
 }
 
 // simulationSent reports whether every chunk of v's simulation zone around

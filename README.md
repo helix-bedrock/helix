@@ -17,7 +17,9 @@ the level's random tick speed and the two scheduled tick queues, loaded
 from and saved to the chunk, on a world tick kept in level.dat (no
 vanilla block has tick behaviour yet). Chunks can be kept loaded without
 a player by a ticket (`KeepLoaded` on an area: a box, a radius or a
-list of chunks), ticking or frozen, until it is released. Players
+list of chunks), ticking or frozen, until it is released. A player who moves far away, such as by a
+teleport, goes straight to the region there instead of merging the two.
+Players
 see each other: AddPlayer within BDS's 57-chunk disc (a setting,
 `EntityViewRadius2`, changeable while running), MovePlayer for
 their movement, and the player list; other entities stay in loaded
