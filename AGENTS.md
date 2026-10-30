@@ -56,7 +56,9 @@ sibling library folders, so unreleased library changes are used.
   of a chunk, loading it. `Entity` is the part every entity shares (IDs,
   position, rotation), owned by its region and indexed by chunk; a
   player's entity follows its viewer and sees every entity in BDS's
-  57-chunk disc (spawn packets on entering, RemoveActor on leaving), and
+  57-chunk disc by default (`EntityViewRadius2`, changeable while running
+  through `SetEntityViewRadius2`, never wider than the gap between
+  regions; spawn packets on entering, RemoveActor on leaving), and
   each entity's movement is built once per tick for everyone who sees it.
   Regions tick only the phases that exist so far (queued work, player
   input, chunk sending, visibility, movement, one flush per player,

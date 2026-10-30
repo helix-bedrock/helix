@@ -153,11 +153,6 @@ func floor(f float32) int32 {
 	return i
 }
 
-// viewDisc are the chunk offsets around a player whose entities it sees:
-// BDS 1.26.60's 57 chunks with dx*dx+dz*dz <= 17, whatever the view and tick
-// distances.
-const viewDiscRadius2 = 17
-
 // addEntity takes an entity into the region.
 func (r *Region) addEntity(e *Entity) {
 	if e.gone {
@@ -237,13 +232,18 @@ func (r *Region) removeEntity(e *Entity) {
 // updateVisibility shows each player the entities that came into its disc
 // and removes those that left it, as BDS does every tick.
 func (r *Region) updateVisibility() {
+	r2 := r.d.entityView.Load()
+	n := int32(0)
+	for (n+1)*(n+1) <= r2 {
+		n++
+	}
 	for _, p := range r.entities {
 		if p.known == nil {
 			continue
 		}
-		for dx := int32(-4); dx <= 4; dx++ {
-			for dz := int32(-4); dz <= 4; dz++ {
-				if dx*dx+dz*dz > viewDiscRadius2 {
+		for dx := -n; dx <= n; dx++ {
+			for dz := -n; dz <= n; dz++ {
+				if dx*dx+dz*dz > r2 {
 					continue
 				}
 				for _, o := range r.byChunk[mcdb.ChunkPos{p.chunk[0] + dx, p.chunk[1] + dz}] {

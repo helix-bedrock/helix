@@ -90,6 +90,7 @@ func (s *Server) openOverworld(generator int32, flatLayers string) error {
 	conf := world.DefaultConfig()
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
+	conf.EntityViewRadius2 = s.conf.EntityViewRadius2
 	if s.ticker == nil {
 		s.ticker = world.NewScheduler(s.conf.TickCores)
 	}

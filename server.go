@@ -49,6 +49,10 @@ type Config struct {
 	// TickDistance is the radius in chunks kept loaded and ticked around
 	// each player, BDS's tick-distance.
 	TickDistance int32
+	// EntityViewRadius2 is the square of the radius in chunks within which
+	// players see other players and entities, whatever the view and tick
+	// distances; see world.Config.EntityViewRadius2.
+	EntityViewRadius2 int32
 	// TickCores is how many goroutines tick the world's regions, shared by
 	// every dimension. 0 means one per CPU; 1 ticks regions one after
 	// another in a fixed order, for debugging and exact reproduction.
@@ -105,19 +109,21 @@ type RakNetConfig struct {
 
 // DefaultConfig returns BDS 1.26.60's defaults where Helix has the same
 // setting: the name, the world worlds/Bedrock level, 10 players, a view
-// distance of 32 chunks and a tick distance of 4, online mode, NetherNet on port 19132 with the identity key in
+// distance of 32 chunks, a tick distance of 4, entities seen within BDS's
+// 57-chunk disc, online mode, NetherNet on port 19132 with the identity key in
 // keys/server_identity_key.pem. RakNet is on as well, on
 // UDP port 19132 next to NetherNet's TCP port, for clients that cannot use
 // NetherNet.
 func DefaultConfig() Config {
 	return Config{
-		Name:         "Dedicated Server",
-		LevelName:    "Bedrock level",
-		WorldsDir:    "worlds",
-		MaxPlayers:   10,
-		ViewDistance: 32,
-		TickDistance: world.DefaultConfig().SimulationDistance,
-		OnlineMode:   true,
+		Name:              "Dedicated Server",
+		LevelName:         "Bedrock level",
+		WorldsDir:         "worlds",
+		MaxPlayers:        10,
+		ViewDistance:      32,
+		TickDistance:      world.DefaultConfig().SimulationDistance,
+		EntityViewRadius2: world.DefaultConfig().EntityViewRadius2,
+		OnlineMode:        true,
 		NetherNet: NetherNetConfig{
 			Enabled:         true,
 			Address:         ":19132",

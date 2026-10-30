@@ -13,7 +13,8 @@ at the end of each tick, while the view zone (view-distance) is loaded,
 encoded once, sent in BDS's sub-chunk request mode and released. Loaded
 chunks belong to regions that tick in parallel at 20 TPS each and merge
 and split as players move (`TickCores` sets how many cores tick). Players
-see each other: AddPlayer within BDS's 57-chunk disc, MovePlayer for
+see each other: AddPlayer within BDS's 57-chunk disc (a setting,
+`EntityViewRadius2`, changeable while running), MovePlayer for
 their movement, and the player list; where they were is saved when they
 leave. Abilities, permission levels, game mode and attributes follow BDS
 1.26.60 (layered abilities, its per-game-mode rules, its saved format) and

@@ -246,7 +246,8 @@ func (r *recorder) has(fn func(packet.Packet) bool) bool {
 }
 
 // TestEntities checks that players see each other within BDS's 57-chunk
-// disc, get each other's movement, and are told when one leaves.
+// disc, or one set while running, get each other's movement, and are told
+// when one leaves.
 func TestEntities(t *testing.T) {
 	reg := vanillaRegistry(t)
 	d, db := openDim(t, reg, t.TempDir())
@@ -295,6 +296,20 @@ func TestEntities(t *testing.T) {
 	waitFor(t, "a to lose b", func() bool {
 		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.RemoveActor); return ok && pk.EntityUniqueID == 2 })
 	})
+
+	// A wider disc set while running shows b again; one wider than the
+	// gap between regions is refused.
+	recA.mu.Lock()
+	recA.pks = nil
+	recA.mu.Unlock()
+	if err := d.SetEntityViewRadius2(65); err == nil {
+		t.Fatal("a disc wider than the gap between regions was accepted")
+	}
+	if err := d.SetEntityViewRadius2(36); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "a to see b in a wider disc", sees(recA, 2))
+
 	removed := make(chan struct{})
 	b.conf.Removed = func(*Entity) { close(removed) }
 	b.Remove()

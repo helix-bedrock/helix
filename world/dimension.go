@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/helix-bedrock/helix/registry"
@@ -59,14 +60,20 @@ type Config struct {
 	// they merge, at least 1. Regions are always at least that many empty
 	// sections apart, so nothing in one reaches the other within a tick.
 	MergeDistance int32
+	// EntityViewRadius2 is the square of the radius, in chunks, within which
+	// a player sees entities: every chunk with dx*dx+dz*dz at most this.
+	// It is separate from the view and tick distances, as in BDS. It must
+	// stay within the gap regions keep between them (MergeDistance
+	// sections), so no player misses an entity in another region.
+	EntityViewRadius2 int32
 }
 
-// DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks, a 64 MiB
-// chunk cache, sections of 8 by 8 chunks and a merge distance of one
-// section. The section size and merge distance are placeholders until
+// DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
+// entity view disc (squared radius 17, 57 chunks), a 64 MiB chunk cache,
+// sections of 8 by 8 chunks and a merge distance of one section. The section size and merge distance are placeholders until
 // helix-bench picks them.
 func DefaultConfig() Config {
-	return Config{SimulationDistance: 4, CacheBytes: 64 << 20, SectionShift: 3, MergeDistance: 1}
+	return Config{SimulationDistance: 4, CacheBytes: 64 << 20, SectionShift: 3, MergeDistance: 1, EntityViewRadius2: 17}
 }
 
 // TickDuration is the length of a tick: 20 ticks a second, as BDS.
@@ -110,6 +117,9 @@ type Dimension struct {
 	loadMu  sync.Mutex
 	pending map[mcdb.ChunkPos]bool
 	waiters map[mcdb.ChunkPos][]*Viewer
+
+	// entityView is the live EntityViewRadius2.
+	entityView atomic.Int32
 
 	closeOnce sync.Once
 	closeErr  error
@@ -156,11 +166,26 @@ func New(conf Config) (*Dimension, error) {
 		cache: newNetCache(conf.CacheBytes), sched: conf.Scheduler,
 		sections: map[sectionPos]*Region{}, pending: map[mcdb.ChunkPos]bool{}, waiters: map[mcdb.ChunkPos][]*Viewer{},
 	}
+	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
+		return nil, err
+	}
 	d.idle = sync.NewCond(&d.mu)
 	if d.sched == nil {
 		d.sched, d.ownSched = NewScheduler(0), true
 	}
 	return d, nil
+}
+
+// SetEntityViewRadius2 changes how far players see entities (see
+// Config.EntityViewRadius2), from the next tick on. Safe from any
+// goroutine.
+func (d *Dimension) SetEntityViewRadius2(r2 int32) error {
+	gap := int64(d.conf.MergeDistance) << d.conf.SectionShift
+	if r2 < 0 || int64(r2) > gap*gap {
+		return fmt.Errorf("world: EntityViewRadius2 must be between 0 and %d, the gap between regions squared", gap*gap)
+	}
+	d.entityView.Store(r2)
+	return nil
 }
 
 // Range is the dimension's height range.
