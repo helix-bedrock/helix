@@ -64,6 +64,10 @@ type Config struct {
 	// MaxBatchSize is the largest decompressed batch a client may send.
 	// BDS allows 10 MiB.
 	MaxBatchSize int
+	// ShieldID is the shield's item network ID. Item stacks of the shield
+	// carry an extra field, so packets with items cannot be read or written
+	// right without it. The server sets it from its item registry.
+	ShieldID int32
 	// ReadTimeout is how long the login waits for each packet from the
 	// client before giving up. 0 waits forever.
 	ReadTimeout time.Duration
@@ -243,7 +247,7 @@ func (l *Listener) login(t conn.Transport) {
 		}
 	}
 	log := l.log.With("addr", t.RemoteAddr())
-	c := conn.New(t, conn.Config{Log: log, FlushInterval: l.conf.FlushInterval, Shared: l.conf.Hooks, MaxBatchSize: l.conf.MaxBatchSize})
+	c := conn.New(t, conn.Config{Log: log, FlushInterval: l.conf.FlushInterval, Shared: l.conf.Hooks, MaxBatchSize: l.conf.MaxBatchSize, ShieldID: l.conf.ShieldID})
 	// Closing the Listener stops a read the login is blocked in.
 	stop := context.AfterFunc(l.ctx, func() { _ = t.SetReadDeadline(time.Now()) })
 	defer stop()

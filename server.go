@@ -167,6 +167,9 @@ func New(conf Config) (*Server, error) {
 
 	nc := conf.Network
 	nc.Log = conf.Log.With("part", "network")
+	if shield, ok := s.reg.Items.ByName("minecraft:shield"); ok {
+		nc.ShieldID = int32(shield.ID)
+	}
 	if conf.OnlineMode {
 		s.auth = auth.New(conf.Auth)
 		nc.Verifier = s.auth
