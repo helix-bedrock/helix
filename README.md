@@ -15,7 +15,9 @@ chunks belong to regions that tick in parallel at 20 TPS each and merge
 and split as players move (`TickCores` sets how many cores tick). Blocks tick as in BDS 1.26.60: random ticks at
 the level's random tick speed and the two scheduled tick queues, loaded
 from and saved to the chunk, on a world tick kept in level.dat (no
-vanilla block has tick behaviour yet). Players
+vanilla block has tick behaviour yet). Chunks can be kept loaded without
+a player by a ticket (`KeepLoaded` on an area: a box, a radius or a
+list of chunks), ticking or frozen, until it is released. Players
 see each other: AddPlayer within BDS's 57-chunk disc (a setting,
 `EntityViewRadius2`, changeable while running), MovePlayer for
 their movement, and the player list; other entities stay in loaded

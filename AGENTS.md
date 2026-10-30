@@ -74,7 +74,14 @@ sibling library folders, so unreleased library changes are used.
   loaded, run only if the block type is still there). Blocks get their
   behaviour through `Config.Ticker` (`BlockTicker`); `Region.ScheduleTick`
   adds ticks. The queues are saved with the chunk; the world tick clock
-  lives on the `Scheduler` and in level.dat's currentTick. Loads, generation, network encoding and
+  lives on the `Scheduler` and in level.dat's currentTick. Tickets
+  (`ticket.go`, RFC 0003): `Dimension.KeepLoaded(area, ticking)` holds
+  every chunk of an `Area` (`Chunks`, `Box`, `Radius`) as a simulation
+  zone does, claiming sections so regions form around it, until
+  `Ticket.Release`; a ticking ticket's chunks get block ticks after the
+  players' zones, a frozen one's only stay loaded. A region keeps its
+  ticket holds in ticket order; they move with their sections on merges
+  and splits, and the release goes to every region. Loads, generation, network encoding and
   saves run on a worker pool, jobs for one chunk in order on one worker. Each player is a `Viewer`
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every

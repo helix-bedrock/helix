@@ -118,6 +118,7 @@ type Dimension struct {
 	parked    []*Region
 	nextID    uint64
 	viewerSeq uint64
+	ticketSeq uint64
 	ticking   int
 	closing   bool
 

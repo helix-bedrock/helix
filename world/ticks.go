@@ -7,8 +7,8 @@ import (
 )
 
 // Block ticks, as BDS 1.26.60 runs them (API_DESIGN.md, "Regions and
-// ticking"). Every chunk a player's simulation zone holds ticks once per
-// tick: random ticks first, then its two tick queues. The queues are
+// ticking"). Every chunk a player's simulation zone or a ticking ticket
+// holds ticks once per tick: random ticks first, then its two tick queues. The queues are
 // BDS's: the pending ticks, on the world's tick clock, and the random
 // ticking queue, whose clock advances by the random tick speed each tick.
 // Both are saved with the chunk in BDS's format.
@@ -237,8 +237,9 @@ func (r *Region) runQueue(c *Chunk, q *tickQueue, now int64) {
 	}
 }
 
-// tickBlocks ticks every chunk in a player's simulation zone once, in the
-// order of the players and their zones.
+// tickBlocks ticks every chunk in a player's simulation zone or held by a
+// ticking ticket once, in the order of the players and their zones, then
+// of the tickets.
 func (r *Region) tickBlocks() {
 	now := r.d.sched.CurrentTick()
 	speed := r.d.randomTickSpeed.Load()
@@ -247,16 +248,29 @@ func (r *Region) tickBlocks() {
 			continue
 		}
 		for _, pos := range v.scratch {
-			c, ok := r.chunks[pos]
-			if !ok || c.tickedAt == now {
-				continue
-			}
-			c.tickedAt = now
-			r.randomTicks(c, speed)
-			r.runQueue(c, &c.ticks, now)
-			r.runQueue(c, &c.randomTicks, c.randomTicks.clock+int64(speed))
+			r.tickChunk(pos, now, speed)
 		}
 	}
+	for _, h := range r.tickets {
+		if !h.t.ticking {
+			continue
+		}
+		for _, pos := range h.chunks {
+			r.tickChunk(pos, now, speed)
+		}
+	}
+}
+
+// tickChunk gives the chunk at pos its block ticks, once per world tick.
+func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
+	c, ok := r.chunks[pos]
+	if !ok || c.tickedAt == now {
+		return
+	}
+	c.tickedAt = now
+	r.randomTicks(c, speed)
+	r.runQueue(c, &c.ticks, now)
+	r.runQueue(c, &c.randomTicks, c.randomTicks.clock+int64(speed))
 }
 
 // randomTicks gives random blocks of c a random tick: speed times 2.5 per

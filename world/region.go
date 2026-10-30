@@ -71,6 +71,8 @@ type Region struct {
 	// leaving are the entities that moved out of the region's sections this
 	// tick, handed off at its end.
 	leaving []*Entity
+	// tickets are the ticket holds in the region's sections, by ticket.
+	tickets []ticketHold
 	// lcg is BDS's random tick position generator, one per region so
 	// regions tick in parallel; due is reused by runQueue.
 	lcg   uint32
@@ -94,6 +96,8 @@ type entry struct {
 	pos mcdb.ChunkPos
 	at  bool
 	v   *Viewer
+	// every goes to each region a split makes, as well as staying.
+	every bool
 }
 
 // ID returns the region's ID, unique within its dimension. Runs: anywhere.
@@ -373,6 +377,6 @@ func (r *Region) idle() bool {
 	r.inMu.Lock()
 	queued := len(r.in)
 	r.inMu.Unlock()
-	return len(r.sections) == 0 && len(r.sectionHolds) == 0 && len(r.viewers) == 0 && len(r.entities) == 0 &&
+	return len(r.sections) == 0 && len(r.sectionHolds) == 0 && len(r.viewers) == 0 && len(r.entities) == 0 && len(r.tickets) == 0 &&
 		len(r.awaiting) == 0 && queued == 0
 }

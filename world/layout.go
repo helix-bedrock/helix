@@ -221,6 +221,10 @@ func (d *Dimension) absorb(dst, src *Region) {
 	for pos, fns := range src.awaiting {
 		dst.awaiting[pos] = append(dst.awaiting[pos], fns...)
 	}
+	for _, h := range src.tickets {
+		dst.addTicketHold(h)
+	}
+	src.tickets = nil
 	for _, v := range src.viewers {
 		v.region = dst
 	}
@@ -302,6 +306,25 @@ func (d *Dimension) split(r *Region) {
 		moveIf(n.holds, r.holds, in)
 		moveIf(n.loading, r.loading, in)
 		moveIf(n.awaiting, r.awaiting, in)
+		kept := r.tickets[:0]
+		for _, h := range r.tickets {
+			var mine, theirs []mcdb.ChunkPos
+			for _, pos := range h.chunks {
+				if in(pos) {
+					theirs = append(theirs, pos)
+				} else {
+					mine = append(mine, pos)
+				}
+			}
+			if len(theirs) > 0 {
+				n.tickets = append(n.tickets, ticketHold{t: h.t, chunks: theirs})
+			}
+			if len(mine) > 0 {
+				kept = append(kept, ticketHold{t: h.t, chunks: mine})
+			}
+		}
+		clear(r.tickets[len(kept):])
+		r.tickets = kept
 		r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool {
 			if v.lastRadius < 0 || !in(v.lastCentre) {
 				return false
@@ -322,6 +345,10 @@ func (d *Dimension) split(r *Region) {
 		})
 		r.inMu.Lock()
 		r.in = slices.DeleteFunc(r.in, func(e entry) bool {
+			if e.every {
+				n.in = append(n.in, e)
+				return false
+			}
 			if (e.at && in(e.pos)) || (e.v != nil && e.v.region == n) {
 				n.in = append(n.in, e)
 				return true
