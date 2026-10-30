@@ -44,6 +44,13 @@ func (m *memConn) ReadPacket() ([]byte, error) {
 	m.mu.Lock()
 	d := m.deadline
 	m.mu.Unlock()
+	// Packets sent before the close are read first, as a real connection
+	// delivers them: select alone picks at random when both are ready.
+	select {
+	case b := <-m.in:
+		return b, nil
+	default:
+	}
 	select {
 	case b := <-m.in:
 		return b, nil
