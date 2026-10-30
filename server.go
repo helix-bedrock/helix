@@ -71,6 +71,11 @@ type NetherNetConfig struct {
 	SaveIdentityKey bool
 	// UDPPort carries every connection over one UDP port when not 0.
 	UDPPort uint16
+	// AllowAnonymous accepts clients that send no NetherNet identity. BDS
+	// 1.26.60 refuses them (signaling error 37, IdentityNotAllowed) even
+	// with online mode off, so it is off by default; turn it on only for
+	// custom clients on a trusted network.
+	AllowAnonymous bool
 }
 
 // RakNetConfig configures the RakNet transport.
@@ -221,7 +226,7 @@ func (s *Server) openTransports() error {
 		}
 		t, err := network.NetherNet(network.NetherNetConfig{
 			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort,
-			AllowAnonymous: !s.conf.OnlineMode, Log: s.log.With("part", "nethernet"),
+			AllowAnonymous: s.conf.NetherNet.AllowAnonymous, Log: s.log.With("part", "nethernet"),
 		})
 		if err != nil {
 			return err

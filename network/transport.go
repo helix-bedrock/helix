@@ -47,8 +47,8 @@ type NetherNetConfig struct {
 	// UDPPort, when not 0, carries every connection over one UDP port. Else
 	// the operating system picks a port per connection.
 	UDPPort uint16
-	// AllowAnonymous accepts clients without a NetherNet identity, for
-	// offline servers.
+	// AllowAnonymous accepts clients without a NetherNet identity. BDS
+	// refuses them, online or offline.
 	AllowAnonymous bool
 	// Log receives transport events. If nil, nothing is logged.
 	Log *slog.Logger
