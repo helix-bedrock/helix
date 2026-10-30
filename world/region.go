@@ -66,6 +66,9 @@ type Region struct {
 	loading      map[mcdb.ChunkPos]bool
 	awaiting     map[mcdb.ChunkPos][]func(*Region)
 	viewers      []*Viewer
+	entities     []*Entity // ordered by runtime ID
+	byChunk      map[mcdb.ChunkPos][]*Entity
+	ticks        uint64
 }
 
 // RegionInfo describes a region, as of the end of its last tick.
@@ -134,10 +137,22 @@ func (r *Region) post(e entry) {
 }
 
 // tick runs one tick, in RFC 0002's order. Only the phases that exist so
-// far: queued work (finished loads, RunAt), then viewers, then saving.
+// far: queued work (finished loads, RunAt), player input, chunk sending,
+// then what players see (BDS's order: entities entering and leaving view,
+// then movement), one flush per player, and saving.
 func (r *Region) tick() {
+	r.ticks++
 	r.drain()
+	r.tickEntities()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
+	r.updateVisibility()
+	r.sendMovement()
+	for _, v := range r.viewers {
+		if v.unflushed {
+			v.unflushed = false
+			v.flush()
+		}
+	}
 	r.saveChanged()
 }
 
@@ -336,5 +351,6 @@ func (r *Region) idle() bool {
 	r.inMu.Lock()
 	queued := len(r.in)
 	r.inMu.Unlock()
-	return len(r.sections) == 0 && len(r.sectionHolds) == 0 && len(r.viewers) == 0 && len(r.awaiting) == 0 && queued == 0
+	return len(r.sections) == 0 && len(r.sectionHolds) == 0 && len(r.viewers) == 0 && len(r.entities) == 0 &&
+		len(r.awaiting) == 0 && queued == 0
 }

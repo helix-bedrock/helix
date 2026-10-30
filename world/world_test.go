@@ -1,9 +1,12 @@
 package world
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
@@ -86,10 +89,12 @@ func TestViewerAndSave(t *testing.T) {
 
 	var mu sync.Mutex
 	sent := map[protocol.ChunkPos]*packet.LevelChunk{}
-	v := d.AddViewer(func(pk *packet.LevelChunk) {
-		mu.Lock()
-		sent[pk.Position] = pk
-		mu.Unlock()
+	v := d.AddViewer(func(p packet.Packet) {
+		if pk, ok := p.(*packet.LevelChunk); ok {
+			mu.Lock()
+			sent[pk.Position] = pk
+			mu.Unlock()
+		}
 	}, func() {})
 	const radius = 6
 	v.Move(mcdb.ChunkPos{0, 0}, radius)
@@ -190,7 +195,7 @@ func TestRegions(t *testing.T) {
 	d, db := openDim(t, reg, t.TempDir())
 	defer func() { _ = db.Close() }()
 	defer func() { _ = d.Close() }()
-	nop := func(*packet.LevelChunk) {}
+	nop := func(packet.Packet) {}
 	a := d.AddViewer(nop, func() {})
 	b := d.AddViewer(nop, func() {})
 	defer a.Close()
@@ -216,6 +221,86 @@ func TestRegions(t *testing.T) {
 		}
 	})
 	waitFor(t, "the RunAt region to go", count(2))
+}
+
+// recorder keeps the entity packets a viewer was sent.
+type recorder struct {
+	mu  sync.Mutex
+	pks []packet.Packet
+}
+
+func (r *recorder) send(pk packet.Packet) {
+	if _, chunk := pk.(*packet.LevelChunk); chunk {
+		return
+	}
+	r.mu.Lock()
+	r.pks = append(r.pks, pk)
+	r.mu.Unlock()
+}
+
+// has reports whether a packet matching fn was sent.
+func (r *recorder) has(fn func(packet.Packet) bool) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.ContainsFunc(r.pks, fn)
+}
+
+// TestEntities checks that players see each other within BDS's 57-chunk
+// disc, get each other's movement, and are told when one leaves.
+func TestEntities(t *testing.T) {
+	reg := vanillaRegistry(t)
+	d, db := openDim(t, reg, t.TempDir())
+	defer func() { _ = db.Close() }()
+	defer func() { _ = d.Close() }()
+	add := func(id uint64, pos mgl32.Vec3) (*Entity, *recorder, *Viewer) {
+		rec := &recorder{}
+		v := d.AddViewer(rec.send, func() {})
+		v.Move(chunkOf(pos), 2)
+		e := d.AddEntity(EntityConfig{
+			UniqueID: int64(id), RuntimeID: id, Pos: pos, Viewer: v, //nolint:gosec // test IDs
+			Spawn: func(e *Entity) []packet.Packet {
+				return []packet.Packet{&packet.AddPlayer{EntityRuntimeID: e.RuntimeID()}}
+			},
+			Move: func(e *Entity) packet.Packet {
+				return &packet.MovePlayer{EntityRuntimeID: e.RuntimeID(), Position: e.Position()}
+			},
+		})
+		return e, rec, v
+	}
+	a, recA, va := add(1, mgl32.Vec3{0, 0, 0})
+	b, recB, vb := add(2, mgl32.Vec3{3 * 16, 0, 0})
+	defer va.Close()
+	defer vb.Close()
+	sees := func(rec *recorder, id uint64) func() bool {
+		return func() bool {
+			return rec.has(func(p packet.Packet) bool { pk, ok := p.(*packet.AddPlayer); return ok && pk.EntityRuntimeID == id })
+		}
+	}
+	waitFor(t, "a to see b", sees(recA, 2))
+	waitFor(t, "b to see a", sees(recB, 1))
+
+	b.Move(Movement{Pos: mgl32.Vec3{3*16 + 1, 0, 0}})
+	waitFor(t, "a to get b's movement", func() bool {
+		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.MovePlayer); return ok && pk.Position[0] == 3*16+1 })
+	})
+	if recB.has(func(p packet.Packet) bool { _, ok := p.(*packet.MovePlayer); return ok }) {
+		t.Fatal("b was sent its own movement")
+	}
+
+	// Out of the disc: b at 5 chunks is removed for a.
+	b.Move(Movement{Pos: mgl32.Vec3{5 * 16, 0, 0}})
+	waitFor(t, "a to lose b", func() bool {
+		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.RemoveActor); return ok && pk.EntityUniqueID == 2 })
+	})
+	removed := make(chan struct{})
+	b.conf.Removed = func(*Entity) { close(removed) }
+	b.Remove()
+	select {
+	case <-removed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("b never removed")
+	}
+	_ = a
 }
 
 func TestNetCache(t *testing.T) {

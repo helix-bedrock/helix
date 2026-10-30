@@ -25,6 +25,7 @@ func (d *Dimension) newRegion(next time.Time) *Region {
 		d: d, id: d.nextID, seq: d.sched.seq.Add(1), next: next,
 		sections: map[sectionPos]struct{}{}, chunks: map[mcdb.ChunkPos]*Chunk{}, holds: map[mcdb.ChunkPos]int{},
 		sectionHolds: map[sectionPos]int{}, loading: map[mcdb.ChunkPos]bool{}, awaiting: map[mcdb.ChunkPos][]func(*Region){},
+		byChunk: map[mcdb.ChunkPos][]*Entity{},
 	}
 	d.regions = append(d.regions, r)
 	return r
@@ -225,6 +226,10 @@ func (d *Dimension) absorb(dst, src *Region) {
 	}
 	dst.viewers = append(dst.viewers, src.viewers...)
 	slices.SortFunc(dst.viewers, func(a, b *Viewer) int { return cmp.Compare(a.id, b.id) })
+	for _, e := range src.entities {
+		e.region = dst
+		dst.insertEntity(e)
+	}
 	dst.added = append(dst.added, src.added...)
 	dst.reshaped = dst.reshaped || src.reshaped
 	dst.contested = dst.contested || src.contested
@@ -303,6 +308,16 @@ func (d *Dimension) split(r *Region) {
 			}
 			v.region = n
 			n.viewers = append(n.viewers, v)
+			return true
+		})
+		// A player's entity goes with its viewer, any other with its chunk.
+		r.entities = slices.DeleteFunc(r.entities, func(e *Entity) bool {
+			if v := e.conf.Viewer; (v != nil && v.region != n) || (v == nil && !in(e.chunk)) {
+				return false
+			}
+			r.unindex(e)
+			e.region = n
+			n.insertEntity(e)
 			return true
 		})
 		r.inMu.Lock()

@@ -17,7 +17,7 @@ type Viewer struct {
 	// id orders the viewers of a region, so they are updated in a fixed
 	// order.
 	id    uint64
-	send  func(pk *packet.LevelChunk)
+	send  func(pk packet.Packet)
 	flush func()
 
 	// region is the region the viewer stands in. Guarded by d.mu.
@@ -50,10 +50,10 @@ type Viewer struct {
 
 // AddViewer adds a player's zones in a region of their own, which merges
 // with the regions nearby once the first Move places it. send queues a
-// LevelChunk packet for the player and flush sends what was queued; both
-// are called on the region's tick and must not block. Nothing is loaded
+// packet for the player (chunks, and the entities it sees) and flush sends
+// what was queued; both are called on the region's tick and must not block. Nothing is loaded
 // until the first Move. Runs: anywhere.
-func (d *Dimension) AddViewer(send func(pk *packet.LevelChunk), flush func()) *Viewer {
+func (d *Dimension) AddViewer(send func(pk packet.Packet), flush func()) *Viewer {
 	v := &Viewer{
 		d: d, send: send, flush: flush, ready: make(chan struct{}), lastRadius: -1,
 		nets: map[mcdb.ChunkPos]*NetChunk{}, known: map[mcdb.ChunkPos]bool{},
@@ -176,9 +176,8 @@ func (r *Region) updateViewer(v *Viewer) bool {
 		v.waiting[pos] = true
 		r.d.want(pos, v)
 	}
-	if sent > 0 || v.unflushed {
-		v.unflushed = false
-		v.flush()
+	if sent > 0 {
+		v.unflushed = true
 	}
 	if !v.readyDone && simulationSent(v, centre, sim) {
 		v.readyDone = true
@@ -202,13 +201,20 @@ func simulationSent(v *Viewer, centre mcdb.ChunkPos, sim int32) bool {
 }
 
 // arrived gives v a chunk it may be waiting for, on its region's tick. It
-// is flushed when the viewer is updated later in the same tick.
+// is flushed at the end of the tick.
 func (v *Viewer) arrived(pos mcdb.ChunkPos, nc *NetChunk) {
 	if !v.waiting[pos] {
 		return
 	}
 	delete(v.waiting, pos)
 	v.deliver(nc)
+	v.unflushed = true
+}
+
+// sendEntity queues an entity packet for the client, flushed at the end of
+// the tick.
+func (v *Viewer) sendEntity(pk packet.Packet) {
+	v.send(pk)
 	v.unflushed = true
 }
 

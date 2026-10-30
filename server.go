@@ -14,12 +14,14 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/nethernet"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/auth"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/mcdb"
@@ -142,9 +144,9 @@ type Server struct {
 	ticker      *world.Scheduler
 	overworld   *world.Dimension
 
-	mu      sync.Mutex
-	players map[uuid.UUID]*network.Conn
-	wg      sync.WaitGroup
+	global     *global
+	runtimeIDs atomic.Uint64
+	wg         sync.WaitGroup
 }
 
 // New returns a Server. It listens on nothing until [Server.Run].
@@ -168,7 +170,7 @@ func New(conf Config) (*Server, error) {
 	if _, err := rand.Read(id[:]); err != nil {
 		return nil, fmt.Errorf("helix: server ID: %w", err)
 	}
-	s := &Server{conf: conf, log: conf.Log, players: map[uuid.UUID]*network.Conn{}, serverID: int64(binary.LittleEndian.Uint64(id[:]))}
+	s := &Server{conf: conf, log: conf.Log, global: newGlobal(), serverID: int64(binary.LittleEndian.Uint64(id[:]))}
 	if err := s.buildRegistry(); err != nil {
 		return nil, err
 	}
@@ -236,12 +238,11 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		s.admit(c)
 	}
 	_ = s.listener.Close()
-	s.mu.Lock()
-	for _, c := range s.players {
-		c.Disconnect(packet.DisconnectReasonShutdown, "")
+	for _, p := range s.global.online() {
+		p.conn.Disconnect(packet.DisconnectReasonShutdown, "")
 	}
-	s.mu.Unlock()
 	s.wg.Wait()
+	s.global.close()
 	return nil
 }
 
@@ -321,28 +322,37 @@ func (s *Server) online(identity string) bool {
 	if err != nil {
 		return false
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, ok := s.players[id]
-	return ok
+	for _, p := range s.global.online() {
+		if p.uuid == id {
+			return true
+		}
+	}
+	return false
 }
 
-// admit takes a player that finished the login. The checks run again here,
-// on the one goroutine that adds players, because two logins of the same
-// player, or for the last free slot, may pass their steps at once.
+// admit takes a player that finished the login. The checks run again on
+// the global owner, which owns the player list, because two logins of the
+// same player, or for the last free slot, may pass their steps at once.
 func (s *Server) admit(c *network.Conn) {
 	id, err := uuid.Parse(c.Identity().Identity)
 	if err != nil {
 		c.Disconnect(packet.DisconnectReasonNotAuthenticated, "")
 		return
 	}
-	s.mu.Lock()
-	_, dup := s.players[id]
-	full := len(s.players) >= s.conf.MaxPlayers
-	if !dup && !full {
-		s.players[id] = c
+	p, err := s.newPlayer(c, id)
+	if err != nil {
+		s.log.Info("player refused", "name", c.Identity().DisplayName, "err", err)
+		c.Disconnect(packet.DisconnectReasonInvalidPlayer, "")
+		return
 	}
-	s.mu.Unlock()
+	var dup, full bool
+	s.global.call(func() {
+		_, dup = s.global.players[id]
+		full = len(s.global.players) >= s.conf.MaxPlayers
+		if !dup && !full {
+			s.global.add(p)
+		}
+	})
 	switch {
 	case dup:
 		c.Disconnect(packet.DisconnectReasonServerIdConflict, "")
@@ -351,17 +361,22 @@ func (s *Server) admit(c *network.Conn) {
 		c.Disconnect(packet.DisconnectReasonServerFull, "")
 		return
 	}
-	s.log.Info("Player connected", "name", c.Identity().DisplayName, "xuid", c.Identity().XUID, "addr", c.RemoteAddr())
+	s.log.Info("Player connected", "name", p.name, "xuid", p.xuid, "addr", c.RemoteAddr())
 	s.updateStatus()
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.play(c)
-		s.mu.Lock()
-		delete(s.players, id)
-		s.mu.Unlock()
+		p.play()
+		s.global.call(func() {
+			s.global.remove(p)
+			pk := &packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionRemove, UUID: p.uuid}}}
+			for _, o := range s.global.order {
+				_ = o.conn.WritePacket(pk)
+				_ = o.conn.Flush()
+			}
+		})
 		_ = c.Close()
-		s.log.Info("Player disconnected", "name", c.Identity().DisplayName, "xuid", c.Identity().XUID)
+		s.log.Info("Player disconnected", "name", p.name, "xuid", p.xuid)
 		s.updateStatus()
 	}()
 }
@@ -395,15 +410,9 @@ func (s *Server) buildRegistry() error {
 
 // broadcast sends a packet to every player online.
 func (s *Server) broadcast(pk packet.Packet) {
-	s.mu.Lock()
-	conns := make([]*network.Conn, 0, len(s.players))
-	for _, c := range s.players {
-		conns = append(conns, c)
-	}
-	s.mu.Unlock()
-	for _, c := range conns {
-		if c.WritePacket(pk) == nil {
-			_ = c.Flush()
+	for _, p := range s.global.online() {
+		if p.conn.WritePacket(pk) == nil {
+			_ = p.conn.Flush()
 		}
 	}
 }
@@ -413,11 +422,7 @@ func (s *Server) broadcast(pk packet.Packet) {
 func (s *Server) Registry() *registry.Registry { return s.reg }
 
 // PlayerCount returns how many players are online.
-func (s *Server) PlayerCount() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.players)
-}
+func (s *Server) PlayerCount() int { return len(s.global.online()) }
 
 func (s *Server) updateStatus() {
 	st := network.Status{

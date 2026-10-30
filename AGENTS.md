@@ -53,8 +53,14 @@ sibling library folders, so unreleased library changes are used.
   within `MergeDistance` sections and split when their sections part,
   only between ticks: a region that must merge with one still ticking
   parks until it ends, so no tick waits. `RunAt` runs code on the owner
-  of a chunk, loading it. Regions tick only the phases that exist so far
-  (queued work, viewers, saving). Loads, generation, network encoding and
+  of a chunk, loading it. `Entity` is the part every entity shares (IDs,
+  position, rotation), owned by its region and indexed by chunk; a
+  player's entity follows its viewer and sees every entity in BDS's
+  57-chunk disc (spawn packets on entering, RemoveActor on leaving), and
+  each entity's movement is built once per tick for everyone who sees it.
+  Regions tick only the phases that exist so far (queued work, player
+  input, chunk sending, visibility, movement, one flush per player,
+  saving). Loads, generation, network encoding and
   saves run on a worker pool, jobs for one chunk in order on one worker. Each player is a `Viewer`
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every
@@ -62,10 +68,15 @@ sibling library folders, so unreleased library changes are used.
   end of each tick from a copy-on-write snapshot. Generators: `Flat`
   (level.dat's layers), `Empty`; vanilla generation is not hooked up, so
   an infinite world's unsaved chunks are empty and never saved.
+- `global.go`: the global owner (RFC 0002), one goroutine at 20 TPS that
+  owns the player list and publishes a copy for readers.
+- `player.go`: `Player` = session (connection, identity, skin) + entity +
+  saved data. Joins in BDS's order as far as built (PlayerList broadcast,
+  StartGame, registry packets, full PlayerList), shows players to each
+  other with AddPlayer and MovePlayer, and saves Pos, Rotation,
+  DimensionId and UniqueID back into the player's BDS data on leave. No
+  inventory, abilities, game mode changes or block changes yet.
 - `cmd/helix`: the server program.
-- `play.go`: TEMPORARY spawn until players exist (step 5). It sends the
-  join packets and the world's chunks and answers sub chunk requests; no
-  entity, inventory or block changes, and it saves nothing.
 
 ## Design
 
