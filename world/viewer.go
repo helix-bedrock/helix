@@ -2,6 +2,7 @@ package world
 
 import (
 	"sync"
+	"time"
 
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -12,9 +13,15 @@ import (
 // kept loaded, and the view zone, sent to the client and released. Its
 // methods are safe for use by many goroutines at once.
 type Viewer struct {
-	d     *Dimension
+	d *Dimension
+	// id orders the viewers of a region, so they are updated in a fixed
+	// order.
+	id    uint64
 	send  func(pk *packet.LevelChunk)
 	flush func()
+
+	// region is the region the viewer stands in. Guarded by d.mu.
+	region *Region
 
 	mu      sync.Mutex
 	centre  mcdb.ChunkPos
@@ -28,7 +35,8 @@ type Viewer struct {
 	netMu sync.Mutex
 	nets  map[mcdb.ChunkPos]*NetChunk
 
-	// Owned by the tick goroutine.
+	// Owned by the viewer's region. lastRadius is -1 until the first Move
+	// was seen.
 	lastCentre mcdb.ChunkPos
 	lastRadius int32
 	known      map[mcdb.ChunkPos]bool // sent, or asked for (waiting)
@@ -36,24 +44,34 @@ type Viewer struct {
 	queue      []mcdb.ChunkPos
 	held       map[mcdb.ChunkPos]bool
 	readyDone  bool
+	unflushed  bool
 	scratch    []mcdb.ChunkPos
 }
 
-// AddViewer adds a player's zones. send queues a LevelChunk packet for the
-// player and flush sends what was queued; both are called on the tick
-// goroutine and must not block. Nothing is loaded until the first Move.
+// AddViewer adds a player's zones in a region of their own, which merges
+// with the regions nearby once the first Move places it. send queues a
+// LevelChunk packet for the player and flush sends what was queued; both
+// are called on the region's tick and must not block. Nothing is loaded
+// until the first Move. Runs: anywhere.
 func (d *Dimension) AddViewer(send func(pk *packet.LevelChunk), flush func()) *Viewer {
 	v := &Viewer{
-		d: d, send: send, flush: flush, ready: make(chan struct{}),
+		d: d, send: send, flush: flush, ready: make(chan struct{}), lastRadius: -1,
 		nets: map[mcdb.ChunkPos]*NetChunk{}, known: map[mcdb.ChunkPos]bool{},
 		waiting: map[mcdb.ChunkPos]bool{}, held: map[mcdb.ChunkPos]bool{},
 	}
-	d.post(func() { d.viewers[v] = struct{}{} })
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.viewerSeq++
+	v.id = d.viewerSeq
+	r := d.newRegion(time.Now())
+	r.viewers = append(r.viewers, v)
+	v.region = r
+	d.schedule(r)
 	return v
 }
 
 // Move sets the centre of the zones, a chunk position, and the view
-// radius in chunks.
+// radius in chunks. Runs: anywhere.
 func (v *Viewer) Move(centre mcdb.ChunkPos, radius int32) {
 	v.mu.Lock()
 	v.centre, v.radius, v.placed = centre, max(radius, 0), true
@@ -61,10 +79,11 @@ func (v *Viewer) Move(centre mcdb.ChunkPos, radius int32) {
 }
 
 // Ready is closed once every chunk of the simulation zone around the first
-// position was sent, when the player can be spawned.
+// position was sent, when the player can be spawned. Runs: anywhere.
 func (v *Viewer) Ready() <-chan struct{} { return v.ready }
 
-// Close removes the zones; the chunks they held are released.
+// Close removes the zones; the chunks they held are released. Runs:
+// anywhere.
 func (v *Viewer) Close() {
 	v.mu.Lock()
 	v.removed = true
@@ -94,22 +113,24 @@ func (v *Viewer) SubChunks(pk *packet.SubChunkRequest) *packet.SubChunk {
 	return resp
 }
 
-// update runs every tick on the tick goroutine.
-func (d *Dimension) updateViewer(v *Viewer) {
+// updateViewer runs every tick on the viewer's region; false once the
+// viewer was removed.
+func (r *Region) updateViewer(v *Viewer) bool {
 	v.mu.Lock()
 	centre, radius, placed, removed := v.centre, v.radius, v.placed, v.removed
 	v.mu.Unlock()
 	if removed {
 		for pos := range v.held {
-			d.release(pos)
+			r.release(pos)
 		}
-		delete(d.viewers, v)
-		return
+		clear(v.held)
+		clear(v.waiting)
+		return false
 	}
 	if !placed {
-		return
+		return true
 	}
-	sim := min(d.conf.SimulationDistance, radius)
+	sim := min(r.d.conf.SimulationDistance, radius)
 	if centre != v.lastCentre || radius != v.lastRadius || v.queue == nil {
 		v.lastCentre, v.lastRadius = centre, radius
 		v.netMu.Lock()
@@ -128,13 +149,13 @@ func (d *Dimension) updateViewer(v *Viewer) {
 			inSim[pos] = true
 			if !v.held[pos] {
 				v.held[pos] = true
-				d.hold(pos)
+				r.hold(pos)
 			}
 		}
 		for pos := range v.held {
 			if !inSim[pos] {
 				delete(v.held, pos)
-				d.release(pos)
+				r.release(pos)
 			}
 		}
 	}
@@ -147,28 +168,28 @@ func (d *Dimension) updateViewer(v *Viewer) {
 		}
 		n++
 		v.known[pos] = true
-		if nc := d.netChunk(pos); nc != nil {
+		if nc := r.netChunk(pos); nc != nil {
 			v.deliver(nc)
 			sent++
 			continue
 		}
 		v.waiting[pos] = true
-		if _, loaded := d.chunks[pos]; !loaded {
-			d.request(pos)
-		}
+		r.d.want(pos, v)
 	}
-	if sent > 0 {
+	if sent > 0 || v.unflushed {
+		v.unflushed = false
 		v.flush()
 	}
-	if !v.readyDone && d.simulationSent(v, centre, sim) {
+	if !v.readyDone && simulationSent(v, centre, sim) {
 		v.readyDone = true
 		close(v.ready)
 	}
+	return true
 }
 
 // simulationSent reports whether every chunk of v's simulation zone around
 // centre was sent.
-func (d *Dimension) simulationSent(v *Viewer, centre mcdb.ChunkPos, sim int32) bool {
+func simulationSent(v *Viewer, centre mcdb.ChunkPos, sim int32) bool {
 	for x := -sim; x <= sim; x++ {
 		for z := -sim; z <= sim; z++ {
 			pos := mcdb.ChunkPos{centre[0] + x, centre[1] + z}
@@ -180,14 +201,15 @@ func (d *Dimension) simulationSent(v *Viewer, centre mcdb.ChunkPos, sim int32) b
 	return true
 }
 
-// arrived gives v a chunk it may be waiting for. Tick goroutine only.
+// arrived gives v a chunk it may be waiting for, on its region's tick. It
+// is flushed when the viewer is updated later in the same tick.
 func (v *Viewer) arrived(pos mcdb.ChunkPos, nc *NetChunk) {
 	if !v.waiting[pos] {
 		return
 	}
 	delete(v.waiting, pos)
 	v.deliver(nc)
-	v.flush()
+	v.unflushed = true
 }
 
 // deliver sends the chunk to the client.

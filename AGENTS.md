@@ -47,9 +47,15 @@ sibling library folders, so unreleased library changes are used.
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.
 - `world` (package): the world in memory. A `Dimension` per dimension,
-  with one tick goroutine owning its loaded chunks until regions exist;
-  loads, generation, network encoding and saves run on a worker pool,
-  jobs for one chunk in order on one worker. Each player is a `Viewer`
+  split into regions (RFC 0002): groups of sections (8 by 8 chunks) that
+  each own their chunks and viewers and tick at 20 TPS on a shared
+  `Scheduler`, earliest deadline first. Regions merge when they come
+  within `MergeDistance` sections and split when their sections part,
+  only between ticks: a region that must merge with one still ticking
+  parks until it ends, so no tick waits. `RunAt` runs code on the owner
+  of a chunk, loading it. Regions tick only the phases that exist so far
+  (queued work, viewers, saving). Loads, generation, network encoding and
+  saves run on a worker pool, jobs for one chunk in order on one worker. Each player is a `Viewer`
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the

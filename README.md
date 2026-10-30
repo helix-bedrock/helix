@@ -10,7 +10,9 @@ library's stores; players spawn at the level.dat spawn, or where a BDS world
 saved them, and get the world's chunks: the `world` package keeps each
 player's simulation zone (tick-distance) loaded and saves changed chunks
 at the end of each tick, while the view zone (view-distance) is loaded,
-encoded once, sent in BDS's sub-chunk request mode and released. Flat and
+encoded once, sent in BDS's sub-chunk request mode and released. Loaded
+chunks belong to regions that tick in parallel at 20 TPS each and merge
+and split as players move (`TickCores` sets how many cores tick). Flat and
 void worlds generate; vanilla terrain generation is not hooked up yet, so
 an infinite world shows only what it has saved. The block registry is
 built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with

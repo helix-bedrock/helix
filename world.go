@@ -90,6 +90,10 @@ func (s *Server) openOverworld(generator int32, flatLayers string) error {
 	conf := world.DefaultConfig()
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
+	if s.ticker == nil {
+		s.ticker = world.NewScheduler(s.conf.TickCores)
+	}
+	conf.Scheduler = s.ticker
 	r, _ := mcdb.Overworld.Range()
 	switch {
 	case s.conf.Generator != nil:
@@ -125,6 +129,9 @@ func (s *Server) closeWorld() error {
 	var errs []error
 	if s.overworld != nil {
 		errs = append(errs, s.overworld.Close())
+	}
+	if s.ticker != nil {
+		s.ticker.Close()
 	}
 	if st := s.conf.Storage.World; st != nil {
 		errs = append(errs, st.Close())

@@ -47,6 +47,10 @@ type Config struct {
 	// TickDistance is the radius in chunks kept loaded and ticked around
 	// each player, BDS's tick-distance.
 	TickDistance int32
+	// TickCores is how many goroutines tick the world's regions, shared by
+	// every dimension. 0 means one per CPU; 1 ticks regions one after
+	// another in a fixed order, for debugging and exact reproduction.
+	TickCores int
 	// Setup runs at boot after vanilla is registered, before the registry
 	// is frozen: plugins register, replace and delete blocks here. Nil
 	// means vanilla only.
@@ -135,6 +139,7 @@ type Server struct {
 	worldStore  mcdb.WorldStore
 	playerStore mcdb.PlayerStore
 	level       level
+	ticker      *world.Scheduler
 	overworld   *world.Dimension
 
 	mu      sync.Mutex
@@ -152,6 +157,9 @@ func New(conf Config) (*Server, error) {
 	}
 	if conf.ViewDistance < 1 || conf.TickDistance < 1 {
 		return nil, errors.New("helix: ViewDistance and TickDistance must be at least 1")
+	}
+	if conf.TickCores < 0 {
+		return nil, errors.New("helix: TickCores must not be negative")
 	}
 	if !conf.NetherNet.Enabled && !conf.RakNet.Enabled {
 		return nil, errors.New("helix: no transport enabled")

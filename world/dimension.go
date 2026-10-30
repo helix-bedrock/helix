@@ -2,11 +2,12 @@
 // loaded, generated, encoded and saved on worker pools, and the two zones
 // every player has (see API_DESIGN.md, "World in memory").
 //
-// Until regions exist (build step 4), each dimension runs one tick
-// goroutine that owns its loaded chunks; regions take that over.
+// Each dimension is split into regions (RFC 0002) that tick in parallel on
+// a shared Scheduler; every loaded chunk belongs to exactly one region.
 package world
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -48,12 +49,24 @@ type Config struct {
 	// CacheBytes is the memory budget of encoded chunks kept after they
 	// were sent, so players nearby get them without another load.
 	CacheBytes int
+	// Scheduler ticks the dimension's regions. If nil, the dimension starts
+	// its own with one goroutine per CPU and stops it on Close.
+	Scheduler *Scheduler
+	// SectionShift sets the size of a section, 1<<SectionShift chunks a
+	// side, at most 10.
+	SectionShift uint
+	// MergeDistance is how close, in sections, two regions may come before
+	// they merge, at least 1. Regions are always at least that many empty
+	// sections apart, so nothing in one reaches the other within a tick.
+	MergeDistance int32
 }
 
-// DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and a
-// 64 MiB chunk cache.
+// DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks, a 64 MiB
+// chunk cache, sections of 8 by 8 chunks and a merge distance of one
+// section. The section size and merge distance are placeholders until
+// helix-bench picks them.
 func DefaultConfig() Config {
-	return Config{SimulationDistance: 4, CacheBytes: 64 << 20}
+	return Config{SimulationDistance: 4, CacheBytes: 64 << 20, SectionShift: 3, MergeDistance: 1}
 }
 
 // TickDuration is the length of a tick: 20 ticks a second, as BDS.
@@ -65,34 +78,47 @@ const (
 	chunksPerTick = 16
 	// maxWaiting is how many chunk loads a player may have outstanding.
 	maxWaiting = 64
+	// maxSectionShift keeps sections within a sane size.
+	maxSectionShift = 10
 )
 
-// Dimension holds the loaded chunks of one dimension. Its methods are safe
-// for use by many goroutines at once.
+// Dimension holds the regions of one dimension and the chunk work shared
+// by them. Its methods are safe for use by many goroutines at once.
 type Dimension struct {
-	conf Config
-	log  *slog.Logger
-	r    cube.Range
-	pool *pool
+	conf     Config
+	log      *slog.Logger
+	r        cube.Range
+	pool     *pool
+	cache    *netCache
+	sched    *Scheduler
+	ownSched bool
 
-	inMu sync.Mutex
-	in   []func()
+	// mu guards the layout of the regions (which region owns each section)
+	// and every region's state. It is held between ticks, or for a moment
+	// inside one when a region claims or gives up a section.
+	mu        sync.Mutex
+	idle      *sync.Cond
+	sections  map[sectionPos]*Region
+	regions   []*Region
+	parked    []*Region
+	nextID    uint64
+	viewerSeq uint64
+	ticking   int
+	closing   bool
 
-	stop    chan struct{}
-	stopped chan struct{}
-	once    sync.Once
+	// loadMu guards the players waiting for encoded chunks.
+	loadMu  sync.Mutex
+	pending map[mcdb.ChunkPos]bool
+	waiters map[mcdb.ChunkPos][]*Viewer
 
-	// Owned by the tick goroutine.
-	chunks  map[mcdb.ChunkPos]*Chunk
-	holds   map[mcdb.ChunkPos]int
-	loading map[mcdb.ChunkPos]bool
-	viewers map[*Viewer]struct{}
-	cache   *netCache
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // Chunk is a loaded chunk with what is saved alongside it. It belongs to
-// the tick goroutine.
+// its region and moves between regions by pointer.
 type Chunk struct {
+	pos mcdb.ChunkPos
 	col *chunk.Column
 	net *NetChunk // nil while the network form is out of date
 	// dirty means changed since it was last saved.
@@ -104,14 +130,16 @@ type Chunk struct {
 	version uint64
 }
 
-// New opens a dimension and starts its tick goroutine. Call Close to save
-// and stop it.
+// New opens a dimension. Call Close to save and stop it.
 func New(conf Config) (*Dimension, error) {
 	if conf.Log == nil {
 		conf.Log = slog.Default()
 	}
 	if conf.Store == nil || conf.Blocks == nil || conf.Biomes == nil {
 		return nil, errors.New("world: Store, Blocks and Biomes are required")
+	}
+	if conf.SectionShift > maxSectionShift || conf.MergeDistance < 1 {
+		return nil, fmt.Errorf("world: SectionShift must be at most %d and MergeDistance at least 1", maxSectionShift)
 	}
 	if conf.Generator == nil {
 		conf.Generator = Empty{}
@@ -125,91 +153,148 @@ func New(conf Config) (*Dimension, error) {
 	}
 	d := &Dimension{
 		conf: conf, log: conf.Log.With("dimension", conf.Dim.String()), r: r, pool: newPool(conf.Workers),
-		stop: make(chan struct{}), stopped: make(chan struct{}),
-		chunks: map[mcdb.ChunkPos]*Chunk{}, holds: map[mcdb.ChunkPos]int{}, loading: map[mcdb.ChunkPos]bool{},
-		viewers: map[*Viewer]struct{}{}, cache: newNetCache(conf.CacheBytes),
+		cache: newNetCache(conf.CacheBytes), sched: conf.Scheduler,
+		sections: map[sectionPos]*Region{}, pending: map[mcdb.ChunkPos]bool{}, waiters: map[mcdb.ChunkPos][]*Viewer{},
 	}
-	go d.run()
+	d.idle = sync.NewCond(&d.mu)
+	if d.sched == nil {
+		d.sched, d.ownSched = NewScheduler(0), true
+	}
 	return d, nil
 }
 
 // Range is the dimension's height range.
 func (d *Dimension) Range() cube.Range { return d.r }
 
-// Close saves every changed chunk, waits for the store writes and stops
-// the dimension. The store itself is left open.
+// Close stops the regions after their current tick, runs the work queued
+// for them, saves every changed chunk and waits for the store writes. The
+// store itself is left open.
 func (d *Dimension) Close() error {
-	d.once.Do(func() { close(d.stop) })
-	<-d.stopped
-	d.pool.close()
-	if err := d.conf.Store.Flush(); err != nil {
-		return fmt.Errorf("world: %v: flush: %w", d.conf.Dim, err)
-	}
-	return nil
-}
-
-// post runs fn on the tick goroutine at the start of the next tick.
-func (d *Dimension) post(fn func()) {
-	d.inMu.Lock()
-	d.in = append(d.in, fn)
-	d.inMu.Unlock()
-}
-
-func (d *Dimension) run() {
-	defer close(d.stopped)
-	t := time.NewTicker(TickDuration)
-	defer t.Stop()
-	var in []func()
-	for {
-		select {
-		case <-d.stop:
-			d.drain(in)
-			d.saveChanged()
-			return
-		case <-t.C:
+	d.closeOnce.Do(func() {
+		d.mu.Lock()
+		d.closing = true
+		for d.ticking > 0 {
+			d.idle.Wait()
 		}
-		in = d.drain(in)
-		for v := range d.viewers {
-			d.updateViewer(v)
+		regions := slices.Clone(d.regions)
+		d.mu.Unlock()
+		for _, r := range regions {
+			r.ticking.Store(true)
+			r.drain()
+			r.saveChanged()
+			r.ticking.Store(false)
 		}
-		d.saveChanged()
-	}
-}
-
-// drain runs what other goroutines posted. It reuses in's memory.
-func (d *Dimension) drain(in []func()) []func() {
-	d.inMu.Lock()
-	in, d.in = d.in, in[:0]
-	d.inMu.Unlock()
-	for i, fn := range in {
-		fn()
-		in[i] = nil
-	}
-	return in
-}
-
-// netChunk returns the encoded chunk at pos if one is ready.
-func (d *Dimension) netChunk(pos mcdb.ChunkPos) *NetChunk {
-	if c, ok := d.chunks[pos]; ok {
-		if c.net == nil && !c.encoding {
-			d.encode(pos, c)
+		d.pool.close()
+		if d.ownSched {
+			d.sched.Close()
 		}
-		return c.net
-	}
-	return d.cache.get(pos)
+		if err := d.conf.Store.Flush(); err != nil {
+			d.closeErr = fmt.Errorf("world: %v: flush: %w", d.conf.Dim, err)
+		}
+	})
+	return d.closeErr
 }
 
-// request loads the chunk at pos if it is not loaded or loading.
-func (d *Dimension) request(pos mcdb.ChunkPos) {
-	if _, ok := d.chunks[pos]; ok || d.loading[pos] {
+// RunAt runs fn on the region that owns the chunk at pos, on its next tick
+// once the chunk is loaded, loading it if needed. After Close it does
+// nothing. Runs: anywhere.
+func (d *Dimension) RunAt(pos mcdb.ChunkPos, fn func(*Region)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closing {
 		return
 	}
-	d.loading[pos] = true
+	o, ok := d.sections[d.sectionOf(pos)]
+	if !ok {
+		o = d.newRegion(time.Now())
+		d.schedule(o)
+	}
+	o.post(entry{fn: func(r *Region) { r.runAt(pos, fn) }, pos: pos, at: true})
+}
+
+// Regions describes the dimension's regions, ordered by ID. Runs: anywhere.
+func (d *Dimension) Regions() []RegionInfo {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make([]RegionInfo, 0, len(d.regions))
+	for _, r := range d.regions {
+		info := r.info
+		info.ID, info.Sections = r.id, len(r.sections)
+		out = append(out, info)
+	}
+	slices.SortFunc(out, func(a, b RegionInfo) int { return cmp.Compare(a.ID, b.ID) })
+	return out
+}
+
+func (d *Dimension) sectionOf(pos mcdb.ChunkPos) sectionPos {
+	return sectionPos{pos[0] >> d.conf.SectionShift, pos[1] >> d.conf.SectionShift}
+}
+
+// postAt queues fn for the region that owns the section of pos; false if
+// none does.
+func (d *Dimension) postAt(pos mcdb.ChunkPos, fn func(*Region)) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	o, ok := d.sections[d.sectionOf(pos)]
+	if !ok {
+		return false
+	}
+	o.post(entry{fn: fn, pos: pos, at: true})
+	return true
+}
+
+// postViewer queues fn for the region v is in.
+func (d *Dimension) postViewer(v *Viewer, fn func(*Region)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if r := v.region; r != nil && r.state != stateDead {
+		r.post(entry{fn: fn, v: v})
+	}
+}
+
+// want registers v as waiting for the encoded chunk at pos and starts
+// making it if nobody has.
+func (d *Dimension) want(pos mcdb.ChunkPos, v *Viewer) {
+	d.loadMu.Lock()
+	d.waiters[pos] = append(d.waiters[pos], v)
+	start := !d.pending[pos]
+	d.pending[pos] = true
+	d.loadMu.Unlock()
+	if start && !d.postAt(pos, func(o *Region) { o.produce(pos) }) {
+		d.poolLoad(pos)
+	}
+}
+
+// publish caches an encoded chunk and gives it to the players waiting.
+func (d *Dimension) publish(pos mcdb.ChunkPos, nc *NetChunk) {
+	d.cache.put(pos, nc)
+	d.loadMu.Lock()
+	vs := d.waiters[pos]
+	delete(d.waiters, pos)
+	delete(d.pending, pos)
+	d.loadMu.Unlock()
+	for _, v := range vs {
+		d.postViewer(v, func(*Region) { v.arrived(pos, nc) })
+	}
+}
+
+// encodedUnloaded takes an encode of a chunk unloaded meanwhile: still
+// right if it did not change after the snapshot, else loaded again, after
+// its save on the same worker.
+func (d *Dimension) encodedUnloaded(c *Chunk, nc *NetChunk, version uint64) {
+	if c.version == version {
+		d.publish(c.pos, nc)
+		return
+	}
+	d.poolLoad(c.pos)
+}
+
+func (d *Dimension) poolLoad(pos mcdb.ChunkPos) {
 	d.pool.do(pos, func() { d.load(pos) })
 }
 
-// load runs on a worker: it reads the chunk, or generates it, and encodes
-// it for the network.
+// load runs on a worker: it reads the chunk, or generates it, encodes it
+// for the network, and hands it to the region that owns it.
 func (d *Dimension) load(pos mcdb.ChunkPos) {
 	col, err := d.conf.Store.LoadColumn(pos, d.conf.Dim)
 	discard := false
@@ -229,7 +314,8 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 		col.Chunk.ReplaceBiomes(d.resolveBiome)
 	}
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk)
-	d.post(func() { d.loaded(pos, col, nc, discard) })
+	d.publish(pos, nc)
+	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard) })
 }
 
 // resolveBiome maps a saved biome ID to the one it loads as.
@@ -238,108 +324,6 @@ func (d *Dimension) resolveBiome(b uint32) uint32 {
 		return uint32(d.conf.Biomes.Resolve(-1)) //nolint:gosec // registered IDs are not negative
 	}
 	return uint32(d.conf.Biomes.Resolve(int16(b))) //nolint:gosec // as above
-}
-
-// loaded takes a chunk a worker loaded: it is kept while a simulation zone
-// holds it, cached, and sent to the players waiting for it.
-func (d *Dimension) loaded(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool) {
-	delete(d.loading, pos)
-	d.cache.put(pos, nc)
-	if d.holds[pos] > 0 {
-		d.chunks[pos] = &Chunk{col: col, net: nc, discard: discard}
-	}
-	for v := range d.viewers {
-		v.arrived(pos, nc)
-	}
-}
-
-// encode rebuilds the network form of a changed chunk on a worker, from a
-// snapshot, so the tick never waits for it.
-func (d *Dimension) encode(pos mcdb.ChunkPos, c *Chunk) {
-	c.encoding = true
-	snap, version := c.col.Chunk.Snapshot(), c.version
-	d.pool.do(pos, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap)
-		d.post(func() {
-			cur, ok := d.chunks[pos]
-			switch {
-			case !ok:
-				// Unloaded meanwhile: load it again, after its save on the
-				// same worker, for the players still waiting.
-				d.request(pos)
-				return
-			case cur != c:
-				return // reloaded meanwhile, with its own network form
-			case c.version != version:
-				d.encode(pos, c) // changed again: encode the newer state
-				return
-			}
-			c.encoding, c.net = false, nc
-			d.cache.put(pos, nc)
-			for v := range d.viewers {
-				v.arrived(pos, nc)
-			}
-		})
-	})
-}
-
-// hold keeps the chunk at pos loaded for a simulation zone.
-func (d *Dimension) hold(pos mcdb.ChunkPos) {
-	d.holds[pos]++
-	if d.holds[pos] == 1 {
-		d.request(pos)
-	}
-}
-
-// release drops a simulation zone's hold; the last one unloads the chunk,
-// saving it first if it changed.
-func (d *Dimension) release(pos mcdb.ChunkPos) {
-	d.holds[pos]--
-	if d.holds[pos] > 0 {
-		return
-	}
-	delete(d.holds, pos)
-	if c, ok := d.chunks[pos]; ok {
-		d.save(pos, c)
-		delete(d.chunks, pos)
-	}
-}
-
-// saveChanged saves every chunk changed this tick. Only the sub chunks
-// changed since the last save are copied: the snapshot shares the rest.
-func (d *Dimension) saveChanged() {
-	for pos, c := range d.chunks {
-		d.save(pos, c)
-	}
-}
-
-func (d *Dimension) save(pos mcdb.ChunkPos, c *Chunk) {
-	if !c.dirty || c.discard {
-		return
-	}
-	c.dirty = false
-	snap := *c.col
-	snap.Chunk = c.col.Chunk.Snapshot()
-	d.pool.do(pos, func() {
-		if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, &snap); err != nil {
-			d.log.Error("save chunk", "pos", pos, "err", err)
-		}
-	})
-}
-
-// setBlock changes a block of a loaded chunk; false if it is not loaded.
-// Tick goroutine only. The block API comes with regions.
-func (d *Dimension) setBlock(pos cube.Pos, layer uint8, block uint32) bool {
-	cp := mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)} //nolint:gosec // block X and Z fit int32 chunks
-	c, ok := d.chunks[cp]
-	if !ok || pos[1] < d.r[0] || pos[1] > d.r[1] {
-		return false
-	}
-	c.col.Chunk.SetBlock(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer, block) //nolint:gosec // masked and range-checked
-	c.dirty, c.net = true, nil
-	c.version++
-	d.cache.drop(cp)
-	return true
 }
 
 // chunksInRadius returns the chunk positions within r of centre, nearest

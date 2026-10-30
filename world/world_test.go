@@ -46,11 +46,37 @@ func openDim(t *testing.T, reg *registry.Registry, dir string) (*Dimension, *mcd
 	return d, db
 }
 
-// onTick runs fn on d's tick goroutine and waits for it.
-func onTick(d *Dimension, fn func()) {
+// runAt runs fn on the region owning pos and waits for it.
+func runAt(t *testing.T, d *Dimension, pos mcdb.ChunkPos, fn func(*Region)) {
+	t.Helper()
 	done := make(chan struct{})
-	d.post(func() { fn(); close(done) })
-	<-done
+	d.RunAt(pos, func(r *Region) { fn(r); close(done) })
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("RunAt %v never ran", pos)
+	}
+}
+
+// waitFor polls cond until it holds.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// loadedChunks counts the chunks loaded in every region.
+func loadedChunks(d *Dimension) int {
+	n := 0
+	for _, r := range d.Regions() {
+		n += r.Chunks
+	}
+	return n
 }
 
 func TestViewerAndSave(t *testing.T) {
@@ -97,12 +123,8 @@ func TestViewerAndSave(t *testing.T) {
 	}
 
 	// Only the simulation zone stays loaded.
-	onTick(d, func() {
-		simChunks := len(chunksInRadius(nil, mcdb.ChunkPos{}, d.conf.SimulationDistance))
-		if len(d.chunks) != simChunks {
-			t.Errorf("%d chunks loaded, want the simulation zone's %d", len(d.chunks), simChunks)
-		}
-	})
+	simChunks := len(chunksInRadius(nil, mcdb.ChunkPos{}, d.conf.SimulationDistance))
+	waitFor(t, "the simulation zone alone loaded", func() bool { return loadedChunks(d) == simChunks })
 
 	// Flat world: grass at -61 is in the lowest sub chunk, air above.
 	resp := v.SubChunks(&packet.SubChunkRequest{
@@ -124,11 +146,11 @@ func TestViewerAndSave(t *testing.T) {
 	}
 
 	stone, _ := reg.Blocks.Block("minecraft:stone")
-	onTick(d, func() {
-		if !d.setBlock(cube.Pos{1, 100, 1}, 0, stone) {
+	runAt(t, d, mcdb.ChunkPos{0, 0}, func(r *Region) {
+		if !r.SetBlock(cube.Pos{1, 100, 1}, 0, stone) {
 			t.Error("chunk at the centre not loaded")
 		}
-		if d.setBlock(cube.Pos{16 * 5, 100, 0}, 0, stone) {
+		if r.SetBlock(cube.Pos{16 * 5, 100, 0}, 0, stone) {
 			t.Error("chunk outside the simulation zone is loaded")
 		}
 	})
@@ -159,6 +181,41 @@ func TestViewerAndSave(t *testing.T) {
 	if _, err := db.LoadColumn(mcdb.ChunkPos{1, 0}, mcdb.Overworld); err == nil {
 		t.Fatal("an unchanged generated chunk was saved")
 	}
+}
+
+// TestRegions checks that regions merge when players come close and split
+// when they part, and that RunAt loads a chunk nobody holds.
+func TestRegions(t *testing.T) {
+	reg := vanillaRegistry(t)
+	d, db := openDim(t, reg, t.TempDir())
+	defer func() { _ = db.Close() }()
+	defer func() { _ = d.Close() }()
+	nop := func(*packet.LevelChunk) {}
+	a := d.AddViewer(nop, func() {})
+	b := d.AddViewer(nop, func() {})
+	defer a.Close()
+	defer b.Close()
+	count := func(n int) func() bool { return func() bool { return len(d.Regions()) == n } }
+
+	a.Move(mcdb.ChunkPos{0, 0}, 2)
+	b.Move(mcdb.ChunkPos{1000, 0}, 2)
+	waitFor(t, "two regions", count(2))
+	b.Move(mcdb.ChunkPos{3, 0}, 2)
+	waitFor(t, "a merge", count(1))
+	waitFor(t, "both zones loaded", func() bool {
+		r := d.Regions()
+		return len(r) == 1 && r[0].Viewers == 2 && r[0].Chunks > 0
+	})
+	b.Move(mcdb.ChunkPos{1000, 0}, 2)
+	waitFor(t, "a split", count(2))
+
+	stone, _ := reg.Blocks.Block("minecraft:stone")
+	runAt(t, d, mcdb.ChunkPos{-500, 0}, func(r *Region) {
+		if !r.SetBlock(cube.Pos{-500 * 16, 0, 0}, 0, stone) {
+			t.Error("RunAt ran before its chunk was loaded")
+		}
+	})
+	waitFor(t, "the RunAt region to go", count(2))
 }
 
 func TestNetCache(t *testing.T) {
