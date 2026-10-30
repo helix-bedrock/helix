@@ -78,8 +78,10 @@ type Config struct {
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
 // entity view disc (squared radius 17, 57 chunks), a 64 MiB chunk cache,
 // sections of 8 by 8 chunks, a merge distance of one section and BDS's
-// random tick speed of 1. The section size and merge distance are placeholders until
-// helix-bench picks them.
+// random tick speed of 1. The section size and merge distance were picked
+// with BenchmarkRegionLayout: of the layouts the entity view disc allows,
+// it had the fewest slow ticks overall, split towns into the most regions
+// and made no regions by merges and splits.
 func DefaultConfig() Config {
 	return Config{SimulationDistance: 4, CacheBytes: 64 << 20, SectionShift: 3, MergeDistance: 1, EntityViewRadius2: 17, RandomTickSpeed: DefaultRandomTickSpeed}
 }

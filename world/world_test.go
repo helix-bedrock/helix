@@ -15,7 +15,7 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-func vanillaRegistry(t *testing.T) *registry.Registry {
+func vanillaRegistry(t testing.TB) *registry.Registry {
 	t.Helper()
 	s := registry.NewSetup(nil, "minecraft")
 	if err := registry.Vanilla(s); err != nil {
@@ -35,7 +35,7 @@ func openDim(t *testing.T, reg *registry.Registry, dir string) (*Dimension, *mcd
 }
 
 // openDimWith is openDim with edit applied to the configuration.
-func openDimWith(t *testing.T, reg *registry.Registry, dir string, edit func(*Config)) (*Dimension, *mcdb.DB) {
+func openDimWith(t testing.TB, reg *registry.Registry, dir string, edit func(*Config)) (*Dimension, *mcdb.DB) {
 	t.Helper()
 	db, err := mcdb.Config{Blocks: reg.Blocks}.Open(dir)
 	if err != nil {

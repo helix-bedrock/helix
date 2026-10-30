@@ -21,6 +21,7 @@ go vet ./...
 golangci-lint run
 go test -race ./...
 go run ./cmd/helix   # start a server with the default configuration
+go test ./world -run '^$' -bench RegionLayout -benchtime 1x   # 400 fake players per region layout (~4 min)
 ```
 
 Local development uses a `go.work` (never committed) that points at the
