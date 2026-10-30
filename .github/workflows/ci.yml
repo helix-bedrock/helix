@@ -45,7 +45,7 @@ jobs:
         if: hashFiles('go.mod') != ''
         with:
           go-version: stable
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         if: hashFiles('go.mod') != ''
         with:
           version: latest
