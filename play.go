@@ -9,8 +9,10 @@ import (
 )
 
 // TEMPORARY: until the world and player designs exist, a player who joins
-// floats in an empty world, so the networking can be tested in game. None
-// of this follows BDS yet; it is replaced as soon as there is a world.
+// floats in an empty world, so the networking can be tested in game. Only
+// the level.dat values (name, seed, game mode, difficulty, spawn) and a
+// saved player's position come from the world; nothing else follows BDS
+// yet, and nothing is saved. It is replaced as soon as there is a world.
 
 // voidRadius is the chunk radius of the empty world.
 const voidRadius = 4
@@ -33,13 +35,23 @@ var emptyChunk = func() []byte {
 // leaves.
 func (s *Server) play(c *network.Conn) {
 	const runtimeID = 1
-	spawn := mgl32.Vec3{0.5, 100 + 1.62, 0.5}
+	lv := s.level
+	worldSpawn := protocol.BlockPos{lv.spawn[0], lv.spawn[1], lv.spawn[2]}
+	if worldSpawn[1] < -64 || worldSpawn[1] > 320 {
+		// BDS stores a height out of range ("find the surface") until it
+		// has placed the spawn; with no terrain there is no surface.
+		worldSpawn[1] = 100
+	}
+	spawn := mgl32.Vec3{float32(worldSpawn[0]) + 0.5, float32(worldSpawn[1]) + 1.62, float32(worldSpawn[2]) + 0.5}
+	if pos, ok := s.savedPosition(c); ok {
+		spawn = pos
+	}
 	_ = c.WritePacket(&packet.StartGame{
-		EntityUniqueID: runtimeID, EntityRuntimeID: runtimeID, PlayerGameMode: 1, PlayerPosition: spawn,
-		Generator: 1, WorldGameMode: 1, Difficulty: 1, WorldSpawn: protocol.BlockPos{0, 100, 0},
+		EntityUniqueID: runtimeID, EntityRuntimeID: runtimeID, PlayerGameMode: lv.gameMode, PlayerPosition: spawn,
+		WorldSeed: lv.seed, Generator: 1, WorldGameMode: lv.gameMode, Difficulty: lv.difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
 		PlayerPermissions: packet.PermissionLevelMember, BaseGameVersion: protocol.CurrentVersion,
-		WorldName: s.conf.LevelName, PlayerMovementSettings: protocol.PlayerMovementSettings{ServerAuthoritativeBlockBreaking: true},
+		WorldName: lv.name, PlayerMovementSettings: protocol.PlayerMovementSettings{ServerAuthoritativeBlockBreaking: true},
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0,
 	})
@@ -59,9 +71,11 @@ func (s *Server) play(c *network.Conn) {
 		case *packet.RequestChunkRadius:
 			r := min(pk.ChunkRadius, voidRadius)
 			_ = c.WritePacket(&packet.ChunkRadiusUpdated{ChunkRadius: r})
-			_ = c.WritePacket(&packet.NetworkChunkPublisherUpdate{Position: protocol.BlockPos{0, 100, 0}, Radius: uint32(r) * 16})
-			for x := -r; x <= r; x++ {
-				for z := -r; z <= r; z++ {
+			centre := protocol.BlockPos{int32(spawn[0]), int32(spawn[1]), int32(spawn[2])}
+			_ = c.WritePacket(&packet.NetworkChunkPublisherUpdate{Position: centre, Radius: uint32(r) * 16})
+			cx, cz := centre[0]>>4, centre[2]>>4
+			for x := cx - r; x <= cx+r; x++ {
+				for z := cz - r; z <= cz+r; z++ {
 					_ = c.WritePacket(&packet.LevelChunk{Position: protocol.ChunkPos{x, z}, RawPayload: emptyChunk})
 				}
 			}
@@ -73,4 +87,32 @@ func (s *Server) play(c *network.Conn) {
 			s.log.Info("Player spawned", "name", c.Identity().DisplayName)
 		}
 	}
+}
+
+// savedPosition returns the position the player was saved at, if the
+// player store has them. The saved Pos is used as it is; whether BDS saves
+// the feet or the eyes is settled with the player design.
+func (s *Server) savedPosition(c *network.Conn) (mgl32.Vec3, bool) {
+	id := c.Identity()
+	data, ok, err := s.playerStore.LoadPlayer(playerIDs(id.Identity, c.Client().SelfSignedID, id.XUID))
+	if err != nil {
+		s.log.Error("load player", "name", id.DisplayName, "err", err)
+		return mgl32.Vec3{}, false
+	}
+	if !ok {
+		return mgl32.Vec3{}, false
+	}
+	pos, _ := data["Pos"].([]any)
+	if len(pos) != 3 {
+		return mgl32.Vec3{}, false
+	}
+	var v mgl32.Vec3
+	for i, p := range pos {
+		f, ok := p.(float32)
+		if !ok {
+			return mgl32.Vec3{}, false
+		}
+		v[i] = f
+	}
+	return v, true
 }

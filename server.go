@@ -20,6 +20,7 @@ import (
 	"github.com/helix-bedrock/nethernet"
 	"github.com/helix-bedrock/protocol/auth"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // Config configures a Server. Start from [DefaultConfig].
@@ -28,8 +29,13 @@ type Config struct {
 	Log *slog.Logger
 	// Name is the server name in the server list.
 	Name string
-	// LevelName is the world name in the server list on LAN.
+	// LevelName is the world's name: its folder in WorldsDir, the name a
+	// new world gets, and the name in the server list on LAN.
 	LevelName string
+	// WorldsDir is the folder worlds are kept in, as BDS's worlds folder.
+	WorldsDir string
+	// Storage replaces where the world and players are kept.
+	Storage StorageConfig
 	// MaxPlayers is how many players may be online at once.
 	MaxPlayers int
 	// OnlineMode requires every player to be signed in to Xbox Live.
@@ -71,14 +77,16 @@ type RakNetConfig struct {
 }
 
 // DefaultConfig returns BDS 1.26.60's defaults where Helix has the same
-// setting: the name, 10 players, online mode, NetherNet on port 19132 with
-// the identity key in keys/server_identity_key.pem. RakNet is on as well, on
+// setting: the name, the world worlds/Bedrock level, 10 players, online
+// mode, NetherNet on port 19132 with the identity key in
+// keys/server_identity_key.pem. RakNet is on as well, on
 // UDP port 19132 next to NetherNet's TCP port, for clients that cannot use
 // NetherNet.
 func DefaultConfig() Config {
 	return Config{
 		Name:       "Dedicated Server",
 		LevelName:  "Bedrock level",
+		WorldsDir:  "worlds",
 		MaxPlayers: 10,
 		OnlineMode: true,
 		NetherNet: NetherNetConfig{
@@ -99,6 +107,11 @@ type Server struct {
 	auth     *auth.Service
 	listener *network.Listener
 	serverID int64
+
+	db          *mcdb.DB
+	worldStore  mcdb.WorldStore
+	playerStore mcdb.PlayerStore
+	level       level
 
 	mu      sync.Mutex
 	players map[uuid.UUID]*network.Conn
@@ -143,9 +156,19 @@ func New(conf Config) (*Server, error) {
 	return s, nil
 }
 
-// Run starts the server and runs it until ctx is cancelled or a transport
-// fails to open. It closes every connection before it returns.
-func (s *Server) Run(ctx context.Context) error {
+// Run opens the world, starts the server and runs it until ctx is
+// cancelled or a transport fails to open. It closes every connection, then
+// saves and closes the world, before it returns.
+func (s *Server) Run(ctx context.Context) (err error) {
+	if err := s.openWorld(); err != nil {
+		_ = s.listener.Close()
+		return err
+	}
+	defer func() {
+		if cerr := s.closeWorld(); cerr != nil {
+			err = errors.Join(err, cerr)
+		}
+	}()
 	if s.auth != nil {
 		// BDS sets up its token checks at startup. If Microsoft's services
 		// are down, players are refused with HostWithoutKeys until a retry
