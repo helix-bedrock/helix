@@ -4,7 +4,7 @@
 
 <p>
   <b>An open-source Minecraft: Bedrock Edition server engine in Go</b><br>
-  One-to-one with vanilla, every part replaceable, built for many cores
+  Mechanics one-to-one with BDS, a rich API, every part replaceable
 </p>
 
 [![Minecraft](https://img.shields.io/badge/minecraft-v1.26.60_(Bedrock)-black)](https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs)
@@ -23,12 +23,16 @@ repo; it was only used to read how the game works.
 
 ## Why Helix?
 
-Custom Bedrock servers usually behave only roughly like vanilla, and are hard to change past what
-their API was built for. Helix aims to be one-to-one with BDS, so a survival server plays the same as
-vanilla, while every part of the engine stays reachable and replaceable. Vanilla features are
-modules built on the same public API plugins use, so a Skyblock or minigame server can turn them off,
-keep the fast core and replace anything. Regions tick on many cores at once, so large servers stay
-smooth.
+No Bedrock server software matches the official Bedrock Dedicated Server (BDS) one-to-one yet.
+Helix aims to be the first: every mechanic works exactly as it does in BDS, so a survival server
+plays the same as vanilla.
+
+At the same time, Helix is built to run any kind of server. Every mechanic is the BDS one by default
+but can be replaced, and the API aims to be as rich as possible: richer than PocketMine-MP,
+PowerNukkitX and Allay on Bedrock, and on par with what Paper gives Java Edition servers. Vanilla
+features are modules built on the same public API plugins use, so a Skyblock or minigame server can
+turn them off, keep the fast core and replace anything, down to the engine's fundamentals. Regions
+tick on many cores at once, so large servers stay smooth.
 
 ## Quick Start
 
