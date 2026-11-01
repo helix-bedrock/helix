@@ -62,7 +62,9 @@ type Player struct {
 	// brk is the block being broken; brokeCount counts blocks broken.
 	brk        breakState
 	brokeCount uint64
-	effects    []ActiveEffect
+	// hitWait counts the ticks until the next hit sound.
+	hitWait int
+	effects []ActiveEffect
 	// breakSpeed multiplies the player's break speed; reachScale its
 	// reach. Both 1 by default.
 	breakSpeed float32

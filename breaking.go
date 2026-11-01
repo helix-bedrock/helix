@@ -24,6 +24,10 @@ const (
 	levelEventDestroyParticles = 2001
 )
 
+// hitSoundTicks is how often the hit sound plays while breaking: BDS's
+// GameMode waits 200 ms between them.
+const hitSoundTicks = 4
+
 // breakState is a player's block breaking, BDS's "destroying" flag and the
 // GameMode's position, face and progress. Owned by the player's region.
 type breakState struct {
@@ -231,6 +235,7 @@ func vanillaBreakTick(p *Player) {
 		return
 	}
 	p.brk.progress += p.breakRate(r, p.brk.pos)
+	p.hitSound(r)
 	if p.brk.progress >= breakEnd {
 		if p.s.game.sys.BreakFinish(p, p.brk.pos) {
 			p.stopBreak()
@@ -240,7 +245,9 @@ func vanillaBreakTick(p *Player) {
 
 // vanillaBreakFinish is BDS's GameMode destroy: a survival player must have
 // finished breaking (or the block breaks at once), then the BlockBreak
-// event, the block becomes air, and the destroy particles show.
+// event, the block becomes air, and LevelEvent 2001 at the block's centre
+// with its ID, from which clients play the break particles and sound (BDS
+// sends no separate break sound).
 func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	r := p.entity.Region()
 	if r == nil {
@@ -285,4 +292,24 @@ func (p *Player) resendAround(r *world.Region, pos cube.Pos, face int32) {
 		})
 	}
 	p.flush()
+}
+
+// hitSound plays BDS's hit sound of the block being broken, at most every
+// hitSoundTicks, to everyone near but the breaking player, whose client
+// plays it itself (BDS's predictive synchronised sound). The wait carries
+// over from block to block, as BDS's timer does.
+func (p *Player) hitSound(r *world.Region) {
+	if p.hitWait > 0 {
+		p.hitWait--
+		return
+	}
+	p.hitWait = hitSoundTicks - 1
+	b, ok := r.Block(p.brk.pos, 0)
+	if !ok {
+		return
+	}
+	r.Broadcast(p.brk.pos, &packet.LevelSoundEvent{
+		SoundType: packet.SoundEventHit, Position: blockVec(p.brk.pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}),
+		ExtraData: int32(p.s.reg.Blocks.Hash(b)), //nolint:gosec // hashes are sent as int32
+	}, p.viewer)
 }

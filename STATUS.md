@@ -38,7 +38,7 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
   on the player's region tick.
 
 - **Breaking and placing (first pass, not yet tested in game):** block breaking the way BDS
-  1.26.60 does it with server-authoritative breaking: cracks shown to everyone near, the reach,
+  1.26.60 does it with server-authoritative breaking: cracks and BDS's hit, break and place sounds for everyone near, the reach,
   the break speed from the tool, Efficiency, Aqua Affinity, Haste, Conduit Power, Mining Fatigue,
   being in the air or under water, and BDS's resend when the client got it wrong. Placing puts the
   held block item's block where the player clicked, with the place sound, and uses up one item.
@@ -52,8 +52,7 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
 - **Block behaviour:** blocks tick, but no vanilla block has tick behaviour yet. Blocks are
   placed in their item's state: facing, halves and other placement rules are not done, nor is
   clicking blocks that open or toggle (chests, doors, levers).
-- **Breaking leftovers:** no drops (no item entities yet), no tool durability, no hit sound or
-  hunger cost, effects never run out, and only the placing player blocks a placement.
+- **Breaking leftovers:** no drops (no item entities yet), no tool durability, no hunger cost, effects never run out, and only the placing player blocks a placement.
 - **Dropping and crafting** items are not done yet.
 - **Everything else** (mobs, combat, redstone, commands, UI) comes after core player gameplay.
   [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which

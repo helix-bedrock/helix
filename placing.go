@@ -165,8 +165,9 @@ func vanillaPlaceState(pl *Placement) (uint32, bool) {
 }
 
 // vanillaPlace is BDS's BlockItem placing after the checks: the BlockPlace
-// event, the block set, the place sound, and one item used up outside
-// creative.
+// event, the block set, the place sound (LevelSoundEvent "place" with the
+// block, at its centre, to everyone near, the placer too), and one item used
+// up outside creative.
 func vanillaPlace(pl *Placement) bool {
 	p := pl.Player
 	r := p.entity.Region()
@@ -188,7 +189,7 @@ func vanillaPlace(pl *Placement) bool {
 	r.Broadcast(pl.Pos, &packet.LevelSoundEvent{
 		SoundType: packet.SoundEventPlace, Position: blockVec(pl.Pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}),
 		ExtraData: int32(p.s.reg.Blocks.Hash(pl.Block)), //nolint:gosec // hashes are sent as int32
-	}, p.viewer)
+	}, nil)
 	if !p.creative() {
 		p.useHeld()
 	}
