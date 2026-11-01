@@ -17,6 +17,11 @@ const fenceHeight = 1.5
 var (
 	cardinalOrder = []string{"south", "west", "north", "east"}
 	cornerOrder   = []string{"none", "inner_left", "inner_right", "outer_left", "outer_right"}
+	axisOrder     = []string{"y", "x", "z"}
+	faceOrder     = []string{"down", "up", "north", "south", "west", "east"}
+	attachOrder   = []string{"standing", "hanging", "side", "multiple"}
+	dripOrder     = []string{"tip", "frustum", "middle", "base", "merge"}
+	tiltOrder     = []string{"none", "unstable", "partial_tilt", "full_tilt"}
 )
 
 // The stair corners by index.
@@ -45,7 +50,7 @@ func stateRule(rule string) func(name string, s map[string]any) []Box {
 	case "carpet":
 		return carpetShape
 	}
-	return nil
+	return moreRule(rule)
 }
 
 // num returns an integer or boolean state's value, 0 when missing.

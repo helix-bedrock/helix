@@ -30,9 +30,10 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
   offhand items as BDS lists them, creative-only destroy and creative items) before it happens.
 - **Registry:** built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with their
   network hashes and BDS's runtime numbers (light, flammability, explosion resistance, friction,
-  destroy time, and BDS's collision boxes: data for the 851 blocks whose shape is fixed, and
-  BDS's own rules ported for stairs, slabs, walls, panes, fences, fence gates, carpets and doors;
-  about 40 rarer shapes are not ported yet), 2,080 items, 89 biomes with BDS's numeric IDs and 138 entity types with their
+  destroy time, and BDS's collision boxes for every state: data for the 888 blocks whose shape is
+  fixed and BDS's own rules for the rest (stairs, slabs, walls, fences, trapdoors, cauldrons and
+  about 40 more). Doors, shulker boxes, scaffolding, powder snow, end gateways and piston parts
+  need the world or the colliding entity and are only marked so far), 2,080 items, 89 biomes with BDS's numeric IDs and 138 entity types with their
   definitions, plus the creative inventory and recipes, which can change while running. Joining
   players get the registry packets; untouched, each is byte for byte BDS's.
 - **Plugins:** can add, replace and delete any registry entry in `Config.Setup`. World packets go

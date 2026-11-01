@@ -3,6 +3,7 @@ package registry
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/helix-bedrock/helix-data/data"
@@ -312,5 +313,28 @@ func TestShapeRules(t *testing.T) {
 	}
 	if f := fenceShape("", map[string]any{"minecraft:connection_north": uint8(1)}); len(f) != 1 || f[0] != (Box{0.375, 0, 0, 0.625, 1.5, 0.625}) {
 		t.Fatalf("fence: %v", f)
+	}
+}
+
+// TestCollisionComputed checks that only shapes needing the world, a block
+// entity or the colliding entity are left to compute.
+func TestCollisionComputed(t *testing.T) {
+	r, err := vanilla(t).Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	left := map[string]bool{}
+	for id, p := range r.Blocks.PropertyTable() {
+		if p.CollisionComputed {
+			left[r.Blocks.Name(uint32(id))] = true
+		}
+	}
+	for n := range left {
+		door := strings.HasSuffix(n, "door") && !strings.HasSuffix(n, "trapdoor")
+		if !door && !strings.Contains(n, "shulker_box") && n != "minecraft:powder_snow" &&
+			n != "minecraft:end_gateway" && n != "minecraft:scaffolding" && !strings.Contains(n, "piston_arm") &&
+			n != "minecraft:moving_block" {
+			t.Errorf("%s left to compute", n)
+		}
 	}
 }

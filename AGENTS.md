@@ -36,9 +36,10 @@ sibling library folders, so unreleased library changes are used.
   frozen tables. Blocks so far: dense state IDs, network hashes, a per-state
   property table swapped whole on live changes (collision boxes
   from helix-data's `bds/collision.json` included, plus BDS's shape rules
-  that read only the state, in `collision.go`; `CollisionComputed` marks
-  states that need the world, such as doors (`Door`), or whose rule is
-  not ported yet), and `chunk.BlockRegistry`
+  that read only the state, in `collision.go` and `collision_more.go`;
+  `CollisionComputed` marks the states that need the world, a block
+  entity or the colliding entity: doors (`Door`), shulker boxes,
+  scaffolding, powder snow, end gateways, piston parts), and `chunk.BlockRegistry`
   for the world library. Items: BDS's network IDs, versions and
   components, stack sizes and tags, and the ItemRegistry packet built once.
   Biomes: BDS's numeric IDs, climate and tags, `Resolve` for deleted or
