@@ -48,9 +48,10 @@ type Properties struct {
 	// stores them; none means nothing collides with it. Shared between
 	// states: never change the slice, replace it.
 	Collision []Box
-	// CollisionComputed is set when BDS computes the state's shape in code
-	// (stairs, fences, slabs...); Collision is then empty and the block's
-	// collision rule gives the shape.
+	// CollisionComputed is set when the state's shape depends on more than
+	// its own state (doors need their other half) or BDS's rule for it is
+	// not ported yet; Collision is then empty. Shapes BDS computes from
+	// the state alone (stairs, slabs, fences, walls...) are in Collision.
 	CollisionComputed bool
 }
 

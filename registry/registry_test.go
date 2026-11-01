@@ -290,7 +290,27 @@ func TestCollision(t *testing.T) {
 	if p := b.Properties(b.Air()); len(p.Collision) != 0 {
 		t.Fatalf("air collides: %+v", p)
 	}
-	if !b.Properties(stairs).CollisionComputed {
-		t.Fatal("stairs not marked computed")
+	if p := b.Properties(stairs); p.CollisionComputed || len(p.Collision) != 2 {
+		t.Fatalf("stairs: %+v", p)
+	}
+	door, _ := b.Block("minecraft:wooden_door")
+	if !b.Properties(door).CollisionComputed {
+		t.Fatal("door not marked computed")
+	}
+}
+
+// TestShapeRules checks a few rules against BDS's code.
+func TestShapeRules(t *testing.T) {
+	st := stairsShape("", map[string]any{"upside_down_bit": uint8(0), "weirdo_direction": int32(0), "minecraft:corner": "inner_left"})
+	want := []Box{{0, 0, 0, 1, 0.5, 1}, {0.5, 0.5, 0, 1, 1, 1}, {0, 0.5, 0, 0.5, 1, 0.5}}
+	if len(st) != 3 || st[0] != want[0] || st[1] != want[1] || st[2] != want[2] {
+		t.Fatalf("stairs: %v", st)
+	}
+	lower := map[string]any{"minecraft:cardinal_direction": "south", "open_bit": uint8(0)}
+	if d := Door(lower, map[string]any{"door_hinge_bit": uint8(0)}); d != (Box{0, 0, 0, 0.1825, 1, 1}) {
+		t.Fatalf("door: %v", d)
+	}
+	if f := fenceShape("", map[string]any{"minecraft:connection_north": uint8(1)}); len(f) != 1 || f[0] != (Box{0.375, 0, 0, 0.625, 1.5, 0.625}) {
+		t.Fatalf("fence: %v", f)
 	}
 }

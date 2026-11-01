@@ -35,8 +35,10 @@ sibling library folders, so unreleased library changes are used.
 - `registry`: the one boot `Setup` (register, replace, delete) and the
   frozen tables. Blocks so far: dense state IDs, network hashes, a per-state
   property table swapped whole on live changes (collision boxes
-  from helix-data's `bds/collision.json` included; `CollisionComputed`
-  marks the states whose shape BDS computes in code), and `chunk.BlockRegistry`
+  from helix-data's `bds/collision.json` included, plus BDS's shape rules
+  that read only the state, in `collision.go`; `CollisionComputed` marks
+  states that need the world, such as doors (`Door`), or whose rule is
+  not ported yet), and `chunk.BlockRegistry`
   for the world library. Items: BDS's network IDs, versions and
   components, stack sizes and tags, and the ItemRegistry packet built once.
   Biomes: BDS's numeric IDs, climate and tags, `Resolve` for deleted or

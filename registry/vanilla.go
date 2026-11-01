@@ -268,7 +268,10 @@ func sameStates(st map[string]any, def map[string]any) bool {
 // collisionOf returns a state's collision boxes from helix-data's
 // bds/collision.json, and whether BDS computes them in code instead.
 func collisionOf(c *data.Collision, name string, props map[string]any) ([]Box, bool, error) {
-	if _, ok := c.Computed[name]; ok {
+	if comp, ok := c.Computed[name]; ok {
+		if rule := stateRule(comp.Rule); rule != nil {
+			return rule(name, props), false, nil
+		}
 		return nil, true, nil
 	}
 	b, ok := c.Blocks[name]
