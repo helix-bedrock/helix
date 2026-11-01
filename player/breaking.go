@@ -171,7 +171,9 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 		pos := toCube(a.BlockPos)
 		switch a.Action {
 		case protocol.PlayerActionStartBreak:
-			p.startBreak(r, pos, a.Face)
+			if p.startBreak(r, pos, a.Face) {
+				destroyed = true
+			}
 		case protocol.PlayerActionAbortBreak:
 			p.stopBreak()
 			levelEvent(r, pos, blockVec(pos), levelEventStopCracking, 0)
@@ -208,18 +210,28 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 
 // startBreak is BDS's StartDestroyBlock: the crack starts for everyone
 // near, and in reach the breaking starts if the BreakStart hook allows.
-func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) {
+// True if the block broke at once (creative).
+func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
 	if !p.creative() {
 		levelEvent(r, pos, blockVec(pos), levelEventStartCracking, crackData(p.breakRate(r, pos)))
 	}
 	if !p.inReach(pos) {
-		return
+		return false
 	}
 	if !p.s.game.sys.BreakStart(p, pos, face) {
 		p.stopBreak()
-		return
+		return false
 	}
 	p.brk.active, p.brk.pos, p.brk.face, p.brk.progress = true, pos, face, 0
+	// In creative BDS destroys the block as soon as breaking starts (its
+	// GameMode start; a player-input check for touch controls that skips
+	// this is not ported, nor putting out fire on the clicked face).
+	if p.creative() {
+		if b, ok := r.Block(pos, 0); ok && b != p.s.reg.Blocks.Air() {
+			return p.s.game.sys.BreakFinish(p, pos)
+		}
+	}
+	return false
 }
 
 // stopBreak clears the breaking.

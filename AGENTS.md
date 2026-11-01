@@ -147,7 +147,8 @@ sibling library folders, so unreleased library changes are used.
   private). PlayerAuthInput's block actions run before movement, in BDS's
   order (server-authoritative breaking: crack LevelEvents, reach 6.7 / 12
   to the block corner, progress per input tick, break at 0.99999, the
-  resend of four blocks after a refused prediction). Every step is a hook
+  resend of four blocks after a refused prediction; in creative the block
+  breaks as soon as breaking starts, as BDS's GameMode start does). Every step is a hook
   in `Setup.Systems()` (BreakStart, BreakTime, ToolSpeed, BreakTick,
   BreakFinish, PlaceState, PlaceCheck, Place) to replace or wrap. The
   break speed is assembled from parts that can each be changed:
@@ -169,7 +170,8 @@ sibling library folders, so unreleased library changes are used.
   changes, and any packet given to `Region.Broadcast`, reach every
   player whose client has the chunk, in other regions too.
 - `cmd/helix`: the server program. `-testcmds` adds a stand-in /gamemode
-  for in-game testing until commands are designed.
+  (and /gm), listed to the client with an AvailableCommands packet on its
+  first input, for in-game testing until commands are designed.
 
 ## Design
 
