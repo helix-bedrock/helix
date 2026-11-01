@@ -76,7 +76,7 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3) bool 
 		return false
 	}
 	pl := &Placement{Player: p, Clicked: clicked, Face: face, ClickPos: click, Pos: clicked.Side(cube.Face(face)), Item: held, Block: block}
-	if b, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, b) {
+	if b, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, b, block) {
 		pl.Pos = clicked
 	}
 	sys := p.s.game.sys
@@ -105,19 +105,16 @@ func (p *Player) itemBlock(s ItemStack) (uint32, bool) {
 	return blocks.Block(s.Name)
 }
 
-// replaceable reports whether a block placed on b replaces it. First pass:
-// air and liquids, or what the block's behaviour says; BDS's full list
-// (canBeBuiltOver) is not read yet.
-func (g *gameplay) replaceable(p *Player, b uint32) bool {
+// replaceable reports whether placing block on b replaces b: what b's
+// behaviour says, else BDS's replaceable component (helix-data's list),
+// except where BDS's own rule refuses the block placed (light blocks are
+// not replaced by light blocks).
+func (g *gameplay) replaceable(p *Player, b, block uint32) bool {
 	name := p.s.reg.Blocks.Name(b)
 	if r, ok := g.blocks[name].(Replaceable); ok {
 		return r.Replaceable(b)
 	}
-	switch name {
-	case "minecraft:air", "minecraft:water", "minecraft:flowing_water", "minecraft:lava", "minecraft:flowing_lava":
-		return true
-	}
-	return false
+	return g.replaceables[name] && !g.notReplacedBy[name][p.s.reg.Blocks.Name(block)]
 }
 
 // vanillaPlaceCheck is BDS's mayPlace as far as built: the target is in the
@@ -130,7 +127,7 @@ func vanillaPlaceCheck(pl *Placement) bool {
 		return false
 	}
 	b, ok := r.Block(pl.Pos, 0)
-	if !ok || !p.s.game.replaceable(p, b) {
+	if !ok || !p.s.game.replaceable(p, b, pl.Block) {
 		return false
 	}
 	return !p.inside(pl.Pos)

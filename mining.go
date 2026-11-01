@@ -39,6 +39,10 @@ type Enchantment struct {
 	ToolSpeed func(b *BreakInfo, level int16, speed float32) float32
 	// Underwater, on the worn helmet, lifts the under-water slowdown.
 	Underwater bool
+	// DamageChance is the percent chance, at level, that an item with the
+	// enchantment takes damage when it would (Unbreaking). Nil always
+	// takes it.
+	DamageChance func(level int16) int32
 }
 
 // Effect is a status effect's entry. Vanilla's carry BDS's numbers.
@@ -65,10 +69,11 @@ const (
 	EffectConduitPower  int32 = 26
 )
 
-// ActiveEffect is an effect a player has.
+// ActiveEffect is an effect a player has; Duration is the ticks left.
 type ActiveEffect struct {
 	ID        int32
 	Amplifier int32
+	Duration  int32
 }
 
 // breakEnd is the progress at which BDS counts a block as broken.
@@ -79,6 +84,7 @@ func vanillaEnchantments() []Enchantment {
 	return []Enchantment{
 		{ID: EnchantAquaAffinity, Name: "minecraft:aqua_affinity", Underwater: true},
 		{ID: EnchantEfficiency, Name: "minecraft:efficiency", ToolSpeed: efficiencySpeed},
+		{ID: EnchantUnbreaking, Name: "minecraft:unbreaking", DamageChance: unbreakingChance},
 	}
 }
 

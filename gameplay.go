@@ -3,6 +3,7 @@ package helix
 import (
 	"maps"
 
+	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -23,6 +24,7 @@ type Systems struct {
 	ToolSpeed   ToolSpeedFunc
 	BreakTick   BreakTickFunc
 	BreakFinish BreakFinishFunc
+	Wear        WearFunc
 	// Placing.
 	PlaceState PlaceStateFunc
 	PlaceCheck PlaceCheckFunc
@@ -53,8 +55,13 @@ type gameplay struct {
 	effects  map[int32]*Effect
 	blocks   map[string]BlockBehaviour
 	mining   *mining
-	breakEv  listeners[BlockBreakEvent]
-	placeEv  listeners[BlockPlaceEvent]
+	// durability, replaceables and notReplacedBy are helix-data's
+	// bds/break_place.json.
+	durability    map[string]data.Durability
+	replaceables  map[string]bool
+	notReplacedBy map[string]map[string]bool
+	breakEv       listeners[BlockBreakEvent]
+	placeEv       listeners[BlockPlaceEvent]
 }
 
 // gameState is the gameplay part of the Setup while it is open.
@@ -165,6 +172,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
 	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }
 	sys.BreakTime = g.vanillaBreakTime
+	sys.Wear = func(b *BreakInfo) int32 { return g.wear(b) }
 	sys.BreakTick = vanillaBreakTick
 	sys.BreakFinish = vanillaBreakFinish
 	sys.PlaceState = vanillaPlaceState
@@ -179,11 +187,19 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	if err != nil {
 		return nil, err
 	}
+	bp, err := data.BreakPlaceData()
+	if err != nil {
+		return nil, err
+	}
 	gs := s.h.game
 	g := gs.out
 	*g = gameplay{
 		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
+		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
+	}
+	for name, by := range bp.NotReplacedBy {
+		g.notReplacedBy[name] = set(by)
 	}
 	g.breakEv.freeze()
 	g.placeEv.freeze()

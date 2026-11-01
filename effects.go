@@ -21,15 +21,14 @@ func (p *Player) Effect(id int32) (int32, bool) {
 func (p *Player) Effects() []ActiveEffect { return slices.Clone(p.effects) }
 
 // AddEffect gives the player effect id at amplifier (0 is level I), for
-// duration ticks shown on the client, replacing the same effect. Effects do
-// not run out yet. Runs: the player's region.
+// duration ticks, replacing the same effect. Runs: the player's region.
 func (p *Player) AddEffect(id, amplifier, duration int32) {
 	op := byte(packet.MobEffectAdd)
 	if i := slices.IndexFunc(p.effects, func(e ActiveEffect) bool { return e.ID == id }); i >= 0 {
-		p.effects[i].Amplifier = amplifier
+		p.effects[i].Amplifier, p.effects[i].Duration = amplifier, duration
 		op = packet.MobEffectModify
 	} else {
-		p.effects = append(p.effects, ActiveEffect{ID: id, Amplifier: amplifier})
+		p.effects = append(p.effects, ActiveEffect{ID: id, Amplifier: amplifier, Duration: duration})
 	}
 	_ = p.conn.WritePacket(&packet.MobEffect{
 		EntityRuntimeID: p.runtimeID, Operation: op, EffectType: id, Amplifier: amplifier,
@@ -58,3 +57,16 @@ func (p *Player) SetBreakSpeed(m float32) { p.breakSpeed = m }
 // placing (6.7 blocks, 12 in creative), 1 by default. Runs: the player's
 // region.
 func (p *Player) SetReachScale(m float32) { p.reachScale = m }
+
+// tickEffects counts the player's effects down one tick and removes those
+// that ran out. Runs: the player's region, once per tick.
+func (p *Player) tickEffects() {
+	for i := 0; i < len(p.effects); {
+		p.effects[i].Duration--
+		if p.effects[i].Duration > 0 {
+			i++
+			continue
+		}
+		p.RemoveEffect(p.effects[i].ID)
+	}
+}

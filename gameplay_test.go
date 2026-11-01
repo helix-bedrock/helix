@@ -3,6 +3,8 @@ package helix
 import (
 	"log/slog"
 	"testing"
+
+	"github.com/helix-bedrock/helix-data/data"
 )
 
 // TestToolSpeed checks the digger rules against BDS 1.26.60's mining table.
@@ -80,5 +82,34 @@ func TestEventOrder(t *testing.T) {
 	l.fire(slog.New(slog.DiscardHandler), &e)
 	if len(order) != 3 || order[0] != 1 || order[1] != 2 || order[2] != 3 || !e.Cancelled() {
 		t.Errorf("order %v cancelled %v", order, e.Cancelled())
+	}
+}
+
+// TestWear checks BDS's durability rules from the dumped table.
+func TestWear(t *testing.T) {
+	bp, err := data.BreakPlaceData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &gameplay{durability: bp.Items}
+	cases := []struct {
+		item string
+		time float32
+		want int32
+	}{
+		{"minecraft:iron_pickaxe", 1.5, 1},
+		{"minecraft:iron_pickaxe", 0, 0},
+		{"minecraft:diamond_sword", 1.5, 2},
+		{"minecraft:shears", 0, 1},
+		{"minecraft:bow", 1.5, 0},
+		{"minecraft:stick", 1.5, 0},
+	}
+	for _, c := range cases {
+		if got := g.wear(&BreakInfo{Item: ItemStack{Name: c.item, Count: 1}, DestroyTime: c.time}); got != c.want {
+			t.Errorf("%s on time %v: %d, want %d", c.item, c.time, got, c.want)
+		}
+	}
+	if unbreakingChance(3) != 25 {
+		t.Error("unbreaking III must be 25%")
 	}
 }

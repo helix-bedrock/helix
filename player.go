@@ -2,6 +2,7 @@ package helix
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -69,6 +70,8 @@ type Player struct {
 	// reach. Both 1 by default.
 	breakSpeed float32
 	reachScale float32
+	// rng is the player's random source (item wear).
+	rng *rand.Rand
 }
 
 // Name returns the player's display name. Runs: anywhere.
@@ -103,7 +106,7 @@ func (s *Server) newPlayer(c *network.Conn, id uuid.UUID) (*Player, error) {
 		s: s, conn: c, uuid: id, name: ident.DisplayName, xuid: ident.XUID, skin: skin,
 		ids: playerIDs(ident.Identity, c.Client().SelfSignedID, ident.XUID), runtimeID: s.runtimeIDs.Add(1),
 		gameMode: s.level.gameMode, abilities: DefaultAbilities(), attributes: DefaultAttributes(),
-		breakSpeed: 1, reachScale: 1,
+		breakSpeed: 1, reachScale: 1, rng: rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())), //nolint:gosec // gameplay randomness
 	}
 	p.uniqueID = int64(p.runtimeID) //nolint:gosec // runtime IDs are small
 	return p, nil

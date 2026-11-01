@@ -138,7 +138,12 @@ sibling library folders, so unreleased library changes are used.
   and `SetReachScale`. Enchantments and effects are registered entries
   (`RegisterEnchantment`, `RegisterEffect`). Per-block behaviour is set
   with `SetBlockBehaviour` (optional interfaces: `PlacementStater`,
-  `Replaceable`). Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
+  `Replaceable`; without one, a block is built over if it carries BDS's
+  replaceable component, from helix-data's `bds/break_place.json`). Held
+  tools wear by BDS's rule per item from the same table (the `Wear`
+  hook; Unbreaking is the enchantment's `DamageChance`), and break with
+  the break sound. Effects count down each tick and are removed when
+  they run out. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
   on the minimal event core (named priorities, registration order, no
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every

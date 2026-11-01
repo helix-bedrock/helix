@@ -49,6 +49,7 @@ func (q *inputQueue) take() []packet.Packet {
 // handleInput runs the player's queued world packets through the frozen
 // handlers, in order, on its region's tick (world.EntityConfig.Input).
 func (p *Player) handleInput(*world.Entity) {
+	p.tickEffects()
 	run := p.input.take()
 	for i, pk := range run {
 		if h := p.s.handlers.handler(pk.ID()); h != nil {

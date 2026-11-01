@@ -103,6 +103,12 @@ func (p *Player) underWater() bool {
 	return false
 }
 
+// blockPos is the block the player's position is in.
+func (p *Player) blockPos() cube.Pos {
+	pos := p.entity.Position()
+	return cube.Pos{int(math.Floor(float64(pos[0]))), int(math.Floor(float64(pos[1]))), int(math.Floor(float64(pos[2])))}
+}
+
 // breakInfo describes breaking the block at pos with the held item.
 func (p *Player) breakInfo(r *world.Region, pos cube.Pos) (BreakInfo, bool) {
 	b, ok := r.Block(pos, 0)
@@ -267,6 +273,9 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		if e.Cancelled() {
 			return false
 		}
+	}
+	if !p.creative() {
+		p.hurtHeld(g.sys.Wear(&b))
 	}
 	if !r.SetBlock(pos, 0, p.s.reg.Blocks.Air()) {
 		return false
