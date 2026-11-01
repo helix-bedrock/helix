@@ -1,4 +1,4 @@
-package helix
+package player
 
 import (
 	"slices"
@@ -30,7 +30,7 @@ func (p *Player) AddEffect(id, amplifier, duration int32) {
 	} else {
 		p.effects = append(p.effects, ActiveEffect{ID: id, Amplifier: amplifier, Duration: duration})
 	}
-	_ = p.conn.WritePacket(&packet.MobEffect{
+	p.send(&packet.MobEffect{
 		EntityRuntimeID: p.runtimeID, Operation: op, EffectType: id, Amplifier: amplifier,
 		Particles: true, Duration: duration,
 	})
@@ -45,18 +45,9 @@ func (p *Player) RemoveEffect(id int32) {
 	if len(p.effects) == n {
 		return
 	}
-	_ = p.conn.WritePacket(&packet.MobEffect{EntityRuntimeID: p.runtimeID, Operation: packet.MobEffectRemove, EffectType: id})
+	p.send(&packet.MobEffect{EntityRuntimeID: p.runtimeID, Operation: packet.MobEffectRemove, EffectType: id})
 	p.flush()
 }
-
-// SetBreakSpeed sets the multiplier of the player's break speed, 1 by
-// default. Runs: the player's region.
-func (p *Player) SetBreakSpeed(m float32) { p.breakSpeed = m }
-
-// SetReachScale sets the multiplier of the player's reach for breaking and
-// placing (6.7 blocks, 12 in creative), 1 by default. Runs: the player's
-// region.
-func (p *Player) SetReachScale(m float32) { p.reachScale = m }
 
 // tickEffects counts the player's effects down one tick and removes those
 // that ran out. Runs: the player's region, once per tick.

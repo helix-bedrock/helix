@@ -1,4 +1,4 @@
-package helix
+package player
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 // TestHandlers checks replacing and wrapping handlers, their order, and
 // that nothing can be added after boot.
 func TestHandlers(t *testing.T) {
-	s := newSetup(registry.NewSetup(nil, "minecraft"), slog.New(slog.DiscardHandler))
+	s := newSetup(slog.New(slog.DiscardHandler))
 	if err := vanillaHandlers(s); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestHandlers(t *testing.T) {
 	}
 	// The wrap does not call vanilla's movement, so the player needs no
 	// entity.
-	p := &Player{s: &Server{handlers: h}}
+	p := &Player{s: &Host{handlers: h}}
 	h.handler(packet.IDPlayerAuthInput)(p, &packet.PlayerAuthInput{})
 	if !moved {
 		t.Fatal("movement wrap not called by vanilla's PlayerAuthInput handler")

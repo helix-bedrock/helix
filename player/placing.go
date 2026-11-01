@@ -1,8 +1,7 @@
-package helix
+package player
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -203,7 +202,7 @@ func (p *Player) useHeld() {
 	if s.Count == 0 {
 		*s = ItemStack{}
 	}
-	_ = p.conn.WritePacket(&packet.InventorySlot{WindowID: protocol.WindowIDInventory, Slot: uint32(inv.held), NewItem: s.network(p.s.reg)})
+	p.sendHeld()
 	p.flush()
 }
 
@@ -216,12 +215,7 @@ func (p *Player) resendPlace(clicked cube.Pos, face int32) {
 		return
 	}
 	for _, at := range [...]cube.Pos{clicked, clicked.Side(cube.Face(face))} {
-		if b, ok := r.Block(at, 0); ok {
-			_ = p.conn.WritePacket(&packet.UpdateBlock{
-				Position:          protocol.BlockPos{int32(at[0]), int32(at[1]), int32(at[2])}, //nolint:gosec // block coordinates fit int32
-				NewBlockRuntimeID: p.s.reg.Blocks.Hash(b), Flags: world.UpdateBlockFlags,
-			})
-		}
+		p.sendBlock(r, at)
 	}
 	p.flush()
 }

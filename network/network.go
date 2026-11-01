@@ -265,7 +265,10 @@ func (l *Listener) login(t conn.Transport) {
 	select {
 	case l.incoming <- pc:
 	case <-l.closed:
-		pc.Disconnect(packet.DisconnectReasonShutdown, "")
-		_ = c.Close()
+		// The server is stopping: the player may already be gone, so a
+		// failed send is only worth a debug line.
+		if err := pc.Disconnect(packet.DisconnectReasonShutdown, ""); err != nil {
+			l.log.Debug("disconnect on shutdown", "err", err)
+		}
 	}
 }

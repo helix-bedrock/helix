@@ -1,8 +1,7 @@
-package helix
+package player
 
 import (
 	"github.com/helix-bedrock/helix-data/data"
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -97,7 +96,7 @@ func (p *Player) hurtHeld(n int32) {
 			delete(s.Tag, "Damage")
 		}
 	}
-	_ = p.conn.WritePacket(&packet.InventorySlot{WindowID: protocol.WindowIDInventory, Slot: uint32(inv.held), NewItem: s.network(p.s.reg)})
+	p.sendHeld()
 	p.flush()
 }
 

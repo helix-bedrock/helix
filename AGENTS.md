@@ -95,18 +95,33 @@ sibling library folders, so unreleased library changes are used.
   (level.dat's layers), `Empty`; vanilla generation is not hooked up, so
   an infinite world's unsaved chunks are empty and never saved.
 - `setup.go`: `Setup`, the one boot builder: the registry's `Setup` plus
-  the packet handler table. `Handle[T]` replaces the handler of a packet
-  type, `WrapHandle[T]` wraps it; system hooks (`Movement`,
-  `WrapMovement`) swap one vanilla system without rewriting the packet.
-  Vanilla registers through it first (`vanillaHandlers`), then
-  `Config.Setup`; frozen into a slice indexed by packet ID.
-- `input.go`: each player's ordered input queue (network goroutine to
-  region tick, bounded, two swapped buffers), drained in the region's
-  player input phase through the frozen handlers. Vanilla's
-  PlayerAuthInput handler hands movement to the movement hook.
-- `global.go`: the global owner (RFC 0002), one goroutine at 20 TPS that
-  owns the player list and publishes a copy for readers.
-- `player.go`: `Player` = session (connection, identity, skin) + entity +
+  `Player`, the player package's Setup. Vanilla registers through both
+  first, then `Config.Setup`.
+- `player` (package): everything a player is and does, one file per job.
+  `host.go`: the `Host` the server builds once the world is open
+  (`NewHost`, from the frozen player Setup); it admits players
+  (`Admit`, with the duplicate and full checks on the global owner),
+  finds and broadcasts to them, and disconnects and saves them on
+  `Close`. `list.go`: the global owner (RFC 0002), one goroutine at 20
+  TPS that owns the player list and publishes a copy for readers.
+  `setup.go`: the packet handler table: `Handle[T]` replaces the handler
+  of a packet type, `WrapHandle[T]` wraps it; system hooks (`Movement`,
+  `WrapMovement`) swap one vanilla system without rewriting the packet;
+  frozen into a slice indexed by packet ID. `input.go`: each player's
+  ordered input queue (network goroutine to region tick, bounded, two
+  swapped buffers), drained in the region's player input phase through
+  the frozen handlers; vanilla's PlayerAuthInput handler hands movement
+  to the movement hook. `join.go`: the join in BDS's order and the read
+  loop. `send.go`: every packet to a player goes through `send` /
+  `sendNow`, which check the write and log the first failure (a closed
+  connection at debug level). `data.go`: the player's BDS data, loaded
+  and saved. `view.go`: what other players see (AddPlayer, MovePlayer)
+  and the synched actor data BDS sends a joining player about itself
+  (gravity, collision, hitbox), which the client's physics run on.
+  `zones.go`: the chunks published around the player. `container.go`:
+  opening the inventory (Interact) and ContainerClose as BDS answers
+  them, with BDS's window ID counter.
+  `player.go`: `Player` = session (connection, identity, skin) + entity +
   saved data. Joins in BDS's order as far as built (PlayerList broadcast,
   StartGame, registry packets, full PlayerList), shows players to each
   other with AddPlayer and MovePlayer, and saves Pos, Rotation,
@@ -148,10 +163,6 @@ sibling library folders, so unreleased library changes are used.
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every
   player whose client has the chunk, in other regions too.
-  `metadata.go`: the synched actor data BDS sends a joining player about
-  itself (gravity, collision, hitbox), which the client's physics run on.
-  `container.go`: opening the inventory (Interact) and ContainerClose as
-  BDS answers them, with BDS's window ID counter.
 - `cmd/helix`: the server program. `-testcmds` adds a stand-in /gamemode
   for in-game testing until commands are designed.
 

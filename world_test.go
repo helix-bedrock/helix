@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // TestNewWorld checks that a new world is made in WorldsDir/LevelName with
@@ -19,10 +21,10 @@ func TestNewWorld(t *testing.T) {
 	if err := s.openWorld(); err != nil {
 		t.Fatal(err)
 	}
-	if s.level.name != "Test level" {
-		t.Fatalf("name %q, want %q", s.level.name, "Test level")
+	if s.level.Name != "Test level" {
+		t.Fatalf("name %q, want %q", s.level.Name, "Test level")
 	}
-	if _, ok, err := s.PlayerStore().LoadPlayer(playerIDs("a", "b", "1")); ok || err != nil {
+	if _, ok, err := s.PlayerStore().LoadPlayer(mcdb.PlayerIDs{MsaID: "a", SelfSignedID: "b"}); ok || err != nil {
 		t.Fatalf("LoadPlayer of an unknown player: %v %v", ok, err)
 	}
 	if err := s.closeWorld(); err != nil {

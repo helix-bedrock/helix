@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -23,20 +24,6 @@ type StorageConfig struct {
 	// Players replaces the default player store, for example with one
 	// database shared by every server of a network.
 	Players mcdb.PlayerStore
-}
-
-// level holds the level.dat values the server reads, copied once when the
-// world opens so player goroutines never touch the DB's level.dat.
-type level struct {
-	name       string
-	seed       int64
-	gameMode   int32
-	difficulty int32
-	spawn      [3]int32
-	generator  int32
-	// surface is the Y a player stands on in a flat world, used while the
-	// spawn has no height yet; 0 when unknown.
-	surface int32
 }
 
 // Generator types level.dat stores, as BDS numbers them.
@@ -70,9 +57,9 @@ func (s *Server) openWorld() error {
 	if st := s.conf.Storage.Players; st != nil {
 		s.playerStore = st
 	}
-	s.level = level{
-		name: ldat.LevelName, seed: ldat.RandomSeed, gameMode: ldat.GameType, difficulty: ldat.Difficulty,
-		spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ}, generator: ldat.Generator,
+	s.level = player.Level{
+		Name: ldat.LevelName, Seed: ldat.RandomSeed, GameMode: ldat.GameType, Difficulty: ldat.Difficulty,
+		Spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ}, Generator: ldat.Generator,
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
@@ -81,7 +68,7 @@ func (s *Server) openWorld() error {
 		_ = db.Close()
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
-	s.log.Info("World opened", "dir", dir, "name", s.level.name, "new", isNew)
+	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew)
 	return nil
 }
 
@@ -109,7 +96,7 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		for _, l := range flat.Layers {
 			top += int32(l.Count) //nolint:gosec // layer counts are small
 		}
-		s.level.surface = top
+		s.level.Surface = top
 	case generator == generatorVoid:
 		conf.Generator = world.Empty{}
 	default:
@@ -160,14 +147,3 @@ func (s *Server) WorldStore() mcdb.WorldStore { return s.worldStore }
 // PlayerStore is the store of the players' saved data. It is set while Run
 // runs.
 func (s *Server) PlayerStore() mcdb.PlayerStore { return s.playerStore }
-
-// playerIDs are the IDs BDS files a player's data under: the Xbox identity
-// (derived from the XUID, so only signed-in players have it) and the UUID
-// the client signs itself.
-func playerIDs(identity, selfSigned, xuid string) mcdb.PlayerIDs {
-	ids := mcdb.PlayerIDs{SelfSignedID: selfSigned}
-	if xuid != "" {
-		ids.MsaID = identity
-	}
-	return ids
-}

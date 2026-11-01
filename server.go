@@ -12,16 +12,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
-	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/network"
+	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/nethernet"
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/auth"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/mcdb"
@@ -147,18 +145,14 @@ type Server struct {
 	db          *mcdb.DB
 	worldStore  mcdb.WorldStore
 	playerStore mcdb.PlayerStore
-	level       level
+	level       player.Level
 	ticker      *world.Scheduler
 	overworld   *world.Dimension
 
-	handlers   handlers
-	game       *gameplay
-	global     *global
-	runtimeIDs atomic.Uint64
-	// stackIDs numbers item stacks for the network, as BDS does with one
-	// counter for the whole server.
-	stackIDs atomic.Int32
-	wg       sync.WaitGroup
+	// setup is the frozen-at-Run player setup; players runs them once the
+	// world is open.
+	setup   *player.Setup
+	players atomic.Pointer[player.Host]
 }
 
 // New returns a Server. It listens on nothing until [Server.Run].
@@ -182,7 +176,7 @@ func New(conf Config) (*Server, error) {
 	if _, err := rand.Read(id[:]); err != nil {
 		return nil, fmt.Errorf("helix: server ID: %w", err)
 	}
-	s := &Server{conf: conf, log: conf.Log, global: newGlobal(), serverID: int64(binary.LittleEndian.Uint64(id[:]))}
+	s := &Server{conf: conf, log: conf.Log, serverID: int64(binary.LittleEndian.Uint64(id[:]))}
 	if err := s.buildRegistry(); err != nil {
 		return nil, err
 	}
@@ -234,6 +228,16 @@ func (s *Server) Run(ctx context.Context) (err error) {
 			s.log.Info("Xbox Live checks ready", "issuer", s.auth.Issuer(), "clock offset", s.auth.Offset())
 		}
 	}
+	host, err := player.NewHost(player.HostConfig{
+		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Store: s.playerStore,
+		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers,
+	}, s.setup)
+	if err != nil {
+		_ = s.listener.Close()
+		return err
+	}
+	s.players.Store(host)
+	defer host.Close(packet.DisconnectReasonShutdown)
 	if err := s.openTransports(); err != nil {
 		_ = s.listener.Close()
 		return err
@@ -247,14 +251,9 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		if err != nil {
 			break
 		}
-		s.admit(c)
+		host.Admit(c, s.updateStatus)
 	}
 	_ = s.listener.Close()
-	for _, p := range s.global.online() {
-		p.conn.Disconnect(packet.DisconnectReasonShutdown, "")
-	}
-	s.wg.Wait()
-	s.global.close()
 	return nil
 }
 
@@ -334,77 +333,28 @@ func (s *Server) online(identity string) bool {
 	if err != nil {
 		return false
 	}
-	for _, p := range s.global.online() {
-		if p.uuid == id {
-			return true
-		}
+	host := s.players.Load()
+	if host == nil {
+		return false
 	}
-	return false
+	_, ok := host.Find(id)
+	return ok
 }
 
-// admit takes a player that finished the login. The checks run again on
-// the global owner, which owns the player list, because two logins of the
-// same player, or for the last free slot, may pass their steps at once.
-func (s *Server) admit(c *network.Conn) {
-	id, err := uuid.Parse(c.Identity().Identity)
-	if err != nil {
-		c.Disconnect(packet.DisconnectReasonNotAuthenticated, "")
-		return
-	}
-	p, err := s.newPlayer(c, id)
-	if err != nil {
-		s.log.Info("player refused", "name", c.Identity().DisplayName, "err", err)
-		c.Disconnect(packet.DisconnectReasonInvalidPlayer, "")
-		return
-	}
-	var dup, full bool
-	s.global.call(func() {
-		_, dup = s.global.players[id]
-		full = len(s.global.players) >= s.conf.MaxPlayers
-		if !dup && !full {
-			s.global.add(p)
-		}
-	})
-	switch {
-	case dup:
-		c.Disconnect(packet.DisconnectReasonServerIdConflict, "")
-		return
-	case full:
-		c.Disconnect(packet.DisconnectReasonServerFull, "")
-		return
-	}
-	s.log.Info("Player connected", "name", p.name, "xuid", p.xuid, "addr", c.RemoteAddr())
-	s.updateStatus()
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		p.play()
-		s.global.call(func() {
-			s.global.remove(p)
-			pk := &packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionRemove, UUID: p.uuid}}}
-			for _, o := range s.global.order {
-				_ = o.conn.WritePacket(pk)
-				_ = o.conn.Flush()
-			}
-		})
-		_ = c.Close()
-		s.log.Info("Player disconnected", "name", p.name, "xuid", p.xuid)
-		s.updateStatus()
-	}()
-}
-
-// buildRegistry registers vanilla (the registry and the packet handlers),
-// runs Config.Setup and freezes it all. It runs once, in New, before any
-// transport can open.
+// buildRegistry registers vanilla (the registry and the player setup),
+// runs Config.Setup and freezes the registry. The player setup is frozen
+// when Run starts the players. It runs once, in New, before any transport
+// can open.
 func (s *Server) buildRegistry() error {
 	reg := registry.NewSetup(s.log.With("part", "registry"), "minecraft")
 	if err := registry.Vanilla(reg); err != nil {
 		return err
 	}
-	setup := newSetup(reg, s.log.With("part", "setup"))
-	if err := vanillaHandlers(setup); err != nil {
+	ps, err := player.NewSetup(s.log.With("part", "setup"))
+	if err != nil {
 		return err
 	}
+	setup := &Setup{Setup: reg, Player: ps}
 	if s.conf.Setup != nil {
 		if err := s.conf.Setup(setup.As("server")); err != nil {
 			return fmt.Errorf("helix: setup: %w", err)
@@ -414,11 +364,7 @@ func (s *Server) buildRegistry() error {
 	if err != nil {
 		return err
 	}
-	g, err := setup.freezeGameplay()
-	if err != nil {
-		return err
-	}
-	s.reg, s.game, s.handlers = r, g, setup.freeze()
+	s.reg, s.setup = r, ps
 	// Changes to the creative inventory or recipes reach players already
 	// online at once. Whether BDS re-sends these packets the same way is
 	// still to be checked per packet.
@@ -431,10 +377,8 @@ func (s *Server) buildRegistry() error {
 
 // broadcast sends a packet to every player online.
 func (s *Server) broadcast(pk packet.Packet) {
-	for _, p := range s.global.online() {
-		if p.conn.WritePacket(pk) == nil {
-			_ = p.conn.Flush()
-		}
+	if host := s.players.Load(); host != nil {
+		host.Broadcast(pk)
 	}
 }
 
@@ -442,8 +386,16 @@ func (s *Server) broadcast(pk packet.Packet) {
 // types (frozen), and the creative inventory and recipes (changeable).
 func (s *Server) Registry() *registry.Registry { return s.reg }
 
+// Players returns the players online. Empty until Run started.
+func (s *Server) Players() []*player.Player {
+	if host := s.players.Load(); host != nil {
+		return host.Online()
+	}
+	return nil
+}
+
 // PlayerCount returns how many players are online.
-func (s *Server) PlayerCount() int { return len(s.global.online()) }
+func (s *Server) PlayerCount() int { return len(s.Players()) }
 
 func (s *Server) updateStatus() {
 	st := network.Status{
@@ -464,9 +416,4 @@ func port(addr string) uint16 {
 		return 19132
 	}
 	return n
-}
-
-// isClosed reports whether err only says a connection closed.
-func isClosed(err error) bool {
-	return errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
 }

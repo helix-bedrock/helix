@@ -1,4 +1,4 @@
-package helix
+package player
 
 import (
 	"github.com/helix-bedrock/protocol"
@@ -58,7 +58,7 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 	for _, req := range pk.Requests {
 		resp.Responses = append(resp.Responses, p.stackRequest(req))
 	}
-	_ = p.conn.WritePacket(resp)
+	p.send(resp)
 	p.flush()
 }
 
@@ -364,7 +364,7 @@ func (p *Player) craftCreative(a *protocol.CraftCreativeStackRequestAction) (uin
 func (p *Player) creative() bool {
 	mode := p.gameMode
 	if mode == GameModeDefault {
-		mode = p.s.level.gameMode
+		mode = p.s.level.GameMode
 	}
 	return mode == GameModeCreative
 }

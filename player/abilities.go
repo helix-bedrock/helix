@@ -1,4 +1,4 @@
-package helix
+package player
 
 import (
 	"github.com/helix-bedrock/protocol"

@@ -1,4 +1,4 @@
-package helix
+package player
 
 import (
 	"math"
@@ -35,6 +35,11 @@ type breakState struct {
 	pos      cube.Pos
 	face     int32
 	progress float32
+	// broken counts the blocks the player broke, so a tick can tell
+	// whether the BreakTick hook broke one.
+	broken uint64
+	// hitWait counts the ticks until the next hit sound.
+	hitWait int
 }
 
 // BlockBreakEvent fires before a player's block break happens. Cancel
@@ -214,11 +219,13 @@ func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) {
 		p.stopBreak()
 		return
 	}
-	p.brk = breakState{active: true, pos: pos, face: face}
+	p.brk.active, p.brk.pos, p.brk.face, p.brk.progress = true, pos, face, 0
 }
 
 // stopBreak clears the breaking.
-func (p *Player) stopBreak() { p.brk = breakState{} }
+func (p *Player) stopBreak() {
+	p.brk.active, p.brk.pos, p.brk.face, p.brk.progress = false, cube.Pos{}, 0, 0
+}
 
 // serverBreakTick is BDS's server tick of block breaking, once per
 // PlayerAuthInput: out of reach stops it, else the BreakTick hook runs.
@@ -231,9 +238,9 @@ func (p *Player) serverBreakTick() bool {
 		p.stopBreak()
 		return false
 	}
-	before := p.brokeCount
+	before := p.brk.broken
 	p.s.game.sys.BreakTick(p)
-	return p.brokeCount != before
+	return p.brk.broken != before
 }
 
 // vanillaBreakTick is BDS's GameMode continue: progress grows by the rate
@@ -284,7 +291,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		return false
 	}
 	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
-	p.brokeCount++
+	p.brk.broken++
 	return true
 }
 
@@ -294,14 +301,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 func (p *Player) resendAround(r *world.Region, pos cube.Pos, face int32) {
 	side := pos.Side(cube.Face(face))
 	for _, at := range [...]cube.Pos{pos, pos.Side(cube.FaceUp), side, side.Side(cube.FaceUp)} {
-		b, ok := r.Block(at, 0)
-		if !ok {
-			continue
-		}
-		_ = p.conn.WritePacket(&packet.UpdateBlock{
-			Position:          protocol.BlockPos{int32(at[0]), int32(at[1]), int32(at[2])}, //nolint:gosec // block coordinates fit int32
-			NewBlockRuntimeID: p.s.reg.Blocks.Hash(b), Flags: world.UpdateBlockFlags,
-		})
+		p.sendBlock(r, at)
 	}
 	p.flush()
 }
@@ -311,11 +311,11 @@ func (p *Player) resendAround(r *world.Region, pos cube.Pos, face int32) {
 // plays it itself (BDS's predictive synchronised sound). The wait carries
 // over from block to block, as BDS's timer does.
 func (p *Player) hitSound(r *world.Region) {
-	if p.hitWait > 0 {
-		p.hitWait--
+	if p.brk.hitWait > 0 {
+		p.brk.hitWait--
 		return
 	}
-	p.hitWait = hitSoundTicks - 1
+	p.brk.hitWait = hitSoundTicks - 1
 	b, ok := r.Block(p.brk.pos, 0)
 	if !ok {
 		return

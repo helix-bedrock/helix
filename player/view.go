@@ -1,9 +1,64 @@
-package helix
+package player
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 )
+
+// listEntry is the player's PlayerList entry.
+func (p *Player) listEntry() protocol.PlayerListEntry {
+	return protocol.PlayerListEntry{
+		ActionType: protocol.PlayerListActionAdd, UUID: p.uuid, EntityUniqueID: p.uniqueID, Username: p.name, XUID: p.xuid,
+		PlayFabID: p.conn.Client().PlayFabID, BuildPlatform: int32(p.conn.Client().DeviceOS), Skin: p.skin,
+	}
+}
+
+// spawnPackets show the player to another player: AddPlayer, built on the
+// player's region tick. The data is a first pass, not yet checked against
+// BDS's synched actor data.
+func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
+	pos, rot := e.Position(), e.Rotation()
+	meta := protocol.EntityMetadata{
+		protocol.EntityDataKeyFlags: int64(1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagBreathing |
+			1<<protocol.EntityDataFlagHasCollision | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName),
+		protocol.EntityDataKeyName:   p.name,
+		protocol.EntityDataKeyWidth:  float32(0.6),
+		protocol.EntityDataKeyHeight: float32(1.8),
+		protocol.EntityDataKeyScale:  float32(1),
+	}
+	return []packet.Packet{&packet.AddPlayer{
+		UUID: p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
+		Position: pos.Sub(mgl32.Vec3{0, eyeHeight, 0}), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		GameType: p.gameMode, EntityMetadata: meta,
+		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().network(p.s.reg),
+		DeviceID: string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
+	}}
+}
+
+// broadcast sends packets to every other player online, from the global
+// owner so the caller never waits on the network. Runs: anywhere.
+func (p *Player) broadcast(pks ...packet.Packet) {
+	g := p.s.global
+	g.run(func() {
+		for _, o := range g.order {
+			if o != p {
+				o.sendNow(pks...)
+			}
+		}
+	})
+}
+
+// movePacket moves the player for the players who see it: MovePlayer, as
+// BDS sends another player's movement.
+func (p *Player) movePacket(e *world.Entity) packet.Packet {
+	rot := e.Rotation()
+	return &packet.MovePlayer{
+		EntityRuntimeID: p.runtimeID, Position: e.Position(), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		Mode: packet.MoveModeNormal, OnGround: e.OnGround(), Tick: e.Tick(),
+	}
+}
 
 // playerWidth is the player's hitbox width in BDS 1.26.60's synched data.
 const playerWidth = 0.6

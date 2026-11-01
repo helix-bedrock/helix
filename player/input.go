@@ -1,11 +1,9 @@
-package helix
+package player
 
 import (
 	"sync"
 
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -107,40 +105,4 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 func applyMovement(p *Player, m world.Movement) {
 	p.entity.Apply(m)
 	p.moveZones(m.Pos)
-}
-
-// moveZones moves the player's zones when it entered another chunk, and
-// tells the client where chunks are published. Runs: anywhere.
-func (p *Player) moveZones(pos mgl32.Vec3) {
-	p.zoneMu.Lock()
-	defer p.zoneMu.Unlock()
-	p.pos = pos
-	cp := world.ChunkPos(floorInt(pos[0]), floorInt(pos[2]))
-	if p.radius <= 0 || (cp == p.centre && p.published) {
-		return
-	}
-	p.centre, p.published = cp, true
-	_ = p.conn.WritePacket(&packet.NetworkChunkPublisherUpdate{
-		Position: protocol.BlockPos{floorInt(pos[0]), floorInt(pos[1]), floorInt(pos[2])}, Radius: uint32(p.radius) * 16, //nolint:gosec // radius is positive
-	})
-	p.viewer.Move(cp, p.radius)
-	p.flush()
-}
-
-// setRadius sets the player's view radius, from RequestChunkRadius, and
-// publishes chunks around where it is. Network goroutine.
-func (p *Player) setRadius(radius int32) {
-	p.zoneMu.Lock()
-	p.radius, p.published = radius, false
-	pos := p.pos
-	p.zoneMu.Unlock()
-	p.moveZones(pos)
-}
-
-func floorInt(f float32) int32 {
-	i := int32(f)
-	if f < float32(i) {
-		i--
-	}
-	return i
 }

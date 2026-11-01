@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -41,11 +42,20 @@ func (c *Conn) WritePacket(pk packet.Packet) error { return c.c.WritePacket(pk) 
 func (c *Conn) Flush() error { return c.c.Flush() }
 
 // Disconnect sends the player a disconnect reason and message, and closes
-// the connection.
-func (c *Conn) Disconnect(reason int32, message string) {
-	_ = c.c.WritePacket(&packet.Disconnect{Reason: reason, Message: message})
-	_ = c.c.Flush()
-	_ = c.c.Close()
+// the connection. The connection is closed even if sending failed; the
+// error says what failed.
+func (c *Conn) Disconnect(reason int32, message string) error {
+	err := c.c.WritePacket(&packet.Disconnect{Reason: reason, Message: message})
+	if err == nil {
+		err = c.c.Flush()
+	}
+	if cerr := c.c.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return fmt.Errorf("network: disconnect: %w", err)
+	}
+	return nil
 }
 
 // Close closes the connection.
