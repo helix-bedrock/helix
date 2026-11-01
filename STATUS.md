@@ -59,8 +59,9 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
 - **Block behaviour:** blocks tick, but no vanilla block has tick behaviour yet. Blocks are
   placed in their item's state: facing, halves and other placement rules are not done, nor is
   clicking blocks that open or toggle (chests, doors, levers).
-- **Movement:** the client's position is taken as it is. BDS's server-side movement checks and
-  corrections are not researched yet; other containers (chests and the like) do not open.
+- **Movement:** the client's position is taken as it is. BDS's server-side simulation and
+  corrections will come with the optional anti-cheat module. Other containers (chests and the
+  like) do not open.
 - **Breaking leftovers:** no drops (no item entities yet), no hunger cost, and only the placing
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
