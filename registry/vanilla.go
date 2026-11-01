@@ -175,6 +175,10 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
+	coll, err := data.CollisionData()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
 	definitions := make(map[string]map[string]any, len(defs))
 	for _, d := range defs {
 		definitions[d.Name] = d.Properties
@@ -221,6 +225,11 @@ func vanillaBlocks(s *Setup) error {
 			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i),
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 		}})
+		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
+		if err != nil {
+			return err
+		}
+		t.States[i].Properties.Collision, t.States[i].Properties.CollisionComputed = boxes, computed
 	}
 	return flush()
 }
@@ -250,6 +259,49 @@ func sameStates(st map[string]any, def map[string]any) bool {
 				return false
 			}
 		default:
+			return false
+		}
+	}
+	return true
+}
+
+// collisionOf returns a state's collision boxes from helix-data's
+// bds/collision.json, and whether BDS computes them in code instead.
+func collisionOf(c *data.Collision, name string, props map[string]any) ([]Box, bool, error) {
+	if _, ok := c.Computed[name]; ok {
+		return nil, true, nil
+	}
+	b, ok := c.Blocks[name]
+	if !ok {
+		return nil, false, fmt.Errorf("registry: vanilla: %s has no collision", name)
+	}
+	src := b.Boxes
+	if len(b.States) > 0 {
+		src = nil
+		for _, s := range b.States {
+			if sameValues(s.Properties, props) {
+				src = s.Boxes
+				break
+			}
+		}
+		if src == nil {
+			return nil, false, fmt.Errorf("registry: vanilla: %s: no collision for state %v", name, props)
+		}
+	}
+	boxes := make([]Box, len(src))
+	for i, bx := range src {
+		boxes[i] = Box(bx)
+	}
+	return boxes, false, nil
+}
+
+// sameValues compares state values written with different integer types.
+func sameValues(a, b map[string]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if fmt.Sprint(v) != fmt.Sprint(b[k]) {
 			return false
 		}
 	}

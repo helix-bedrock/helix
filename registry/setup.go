@@ -44,7 +44,18 @@ type Properties struct {
 	Friction float32
 	// DestroyTime is the state's hardness; -1 means unbreakable.
 	DestroyTime float32
+	// Collision is the state's collision boxes inside its block, as BDS
+	// stores them; none means nothing collides with it. Shared between
+	// states: never change the slice, replace it.
+	Collision []Box
+	// CollisionComputed is set when BDS computes the state's shape in code
+	// (stairs, fences, slabs...); Collision is then empty and the block's
+	// collision rule gives the shape.
+	CollisionComputed bool
 }
+
+// Box is a collision box inside a block: min x, y, z, then max x, y, z.
+type Box [6]float32
 
 // BlockState is one state of a block type.
 type BlockState struct {

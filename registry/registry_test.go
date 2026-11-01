@@ -274,3 +274,23 @@ func TestBlockDefinitions(t *testing.T) {
 		}
 	}
 }
+
+// TestCollision checks that states get BDS's collision data.
+func TestCollision(t *testing.T) {
+	r, err := vanilla(t).Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := r.Blocks
+	stone, _ := b.Block("minecraft:stone")
+	stairs, _ := b.Block("minecraft:oak_stairs")
+	if p := b.Properties(stone); len(p.Collision) != 1 || p.Collision[0] != (Box{0, 0, 0, 1, 1, 1}) || p.CollisionComputed {
+		t.Fatalf("stone: %+v", p)
+	}
+	if p := b.Properties(b.Air()); len(p.Collision) != 0 {
+		t.Fatalf("air collides: %+v", p)
+	}
+	if !b.Properties(stairs).CollisionComputed {
+		t.Fatal("stairs not marked computed")
+	}
+}
