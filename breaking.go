@@ -150,6 +150,9 @@ func crackData(rate float32) int32 {
 // handleBlockActions runs PlayerAuthInput's block actions in BDS 1.26.60's
 // order (server-authoritative breaking), before movement.
 func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
+	if p.entity == nil {
+		return
+	}
 	r := p.entity.Region()
 	if r == nil {
 		return
