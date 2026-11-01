@@ -24,6 +24,7 @@ type handlerState struct {
 	frozen   bool
 	packets  map[uint32]handlerEntry
 	movement movementEntry
+	game     *gameState
 }
 
 // PacketHandler handles a packet from a player on the player's region
@@ -44,7 +45,7 @@ type movementEntry struct {
 }
 
 func newSetup(reg *registry.Setup, log *slog.Logger) *Setup {
-	return &Setup{Setup: reg, owner: "minecraft", h: &handlerState{log: log, packets: map[uint32]handlerEntry{}}}
+	return &Setup{Setup: reg, owner: "minecraft", h: &handlerState{log: log, packets: map[uint32]handlerEntry{}, game: newGameState()}}
 }
 
 // As returns the same Setup acting for owner, a plugin's name in the log.

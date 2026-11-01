@@ -70,13 +70,24 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleMobEquipment); err != nil {
 		return err
 	}
+	if err := Handle(s, handleInventoryTransaction); err != nil {
+		return err
+	}
+	if err := vanillaGameplay(s); err != nil {
+		return err
+	}
 	return s.Movement(applyMovement)
 }
 
 // handlePlayerAuthInput is vanilla's PlayerAuthInput handler: it takes the
-// packet apart and hands each part to its system. So far only movement;
-// block actions and item use come with block breaking and inventory.
+// packet apart and hands each part to its system: block actions first,
+// before movement, as BDS does, then movement.
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
+	if actions, ok := pk.BlockActions.Value(); ok {
+		p.handleBlockActions(actions)
+	} else {
+		p.handleBlockActions(nil)
+	}
 	p.s.handlers.movement(p, world.Movement{
 		Pos: pk.Position, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
 		OnGround: pk.InputData.Load(packet.InputFlagVerticalCollision), Tick: pk.Tick,

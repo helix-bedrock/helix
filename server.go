@@ -152,6 +152,7 @@ type Server struct {
 	overworld   *world.Dimension
 
 	handlers   handlers
+	game       *gameplay
 	global     *global
 	runtimeIDs atomic.Uint64
 	// stackIDs numbers item stacks for the network, as BDS does with one
@@ -413,7 +414,11 @@ func (s *Server) buildRegistry() error {
 	if err != nil {
 		return err
 	}
-	s.reg, s.handlers = r, setup.freeze()
+	g, err := setup.freezeGameplay()
+	if err != nil {
+		return err
+	}
+	s.reg, s.game, s.handlers = r, g, setup.freeze()
 	// Changes to the creative inventory or recipes reach players already
 	// online at once. Whether BDS re-sends these packets the same way is
 	// still to be checked per packet.

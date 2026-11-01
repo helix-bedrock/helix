@@ -78,6 +78,9 @@ type Region struct {
 	lcg   uint32
 	due   []scheduledTick
 	ticks uint64
+	// chunkPackets are the packets for the players who have a chunk, block
+	// changes among them, sent at the end of the tick.
+	chunkPackets []chunkPacket
 }
 
 // RegionInfo describes a region, as of the end of its last tick.
@@ -126,6 +129,7 @@ func (r *Region) SetBlock(pos cube.Pos, layer uint8, block uint32) bool {
 		return false
 	}
 	c.col.Chunk.SetBlock(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer, block) //nolint:gosec // masked and range-checked
+	r.updateBlock(pos, layer, block)
 	c.dirty, c.net = true, nil
 	c.version++
 	r.d.cache.drop(c.pos)
@@ -159,6 +163,7 @@ func (r *Region) tick() {
 	r.tickEntities()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
 	r.tickBlocks()
+	r.sendChunkPackets()
 	r.updateVisibility()
 	r.sendMovement()
 	for _, v := range r.viewers {

@@ -68,6 +68,7 @@ func (d *Dimension) AddViewer(send func(pk packet.Packet), flush func()) *Viewer
 	r := d.newRegion(time.Now())
 	r.viewers = append(r.viewers, v)
 	v.region = r
+	d.viewers[v] = struct{}{}
 	d.schedule(r)
 	return v
 }
@@ -127,6 +128,9 @@ func (r *Region) updateViewer(v *Viewer) bool {
 		}
 		clear(v.held)
 		clear(v.waiting)
+		r.d.mu.Lock()
+		delete(r.d.viewers, v)
+		r.d.mu.Unlock()
 		return false
 	}
 	if !placed {

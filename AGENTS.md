@@ -121,7 +121,28 @@ sibling library folders, so unreleased library changes are used.
   nothing on a copy. The client's view of its items is never read back.
   Armour and offhand take the items BDS allows (registry `Wearable`,
   `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
-  Drops and crafting are refused until built. No block changes yet.
+  Drops and crafting are refused until built.
+  `breaking.go`, `placing.go`, `mining.go`, `gameplay.go`, `event.go`:
+  block breaking and placing as BDS 1.26.60 does them (research notes are
+  private). PlayerAuthInput's block actions run before movement, in BDS's
+  order (server-authoritative breaking: crack LevelEvents, reach 6.7 / 12
+  to the block corner, progress per input tick, break at 0.99999, the
+  resend of four blocks after a refused prediction). Every step is a hook
+  in `Setup.Systems()` (BreakStart, BreakTime, ToolSpeed, BreakTick,
+  BreakFinish, PlaceState, PlaceCheck, Place) to replace or wrap. The
+  break speed is assembled from parts that can each be changed:
+  the tool rule (helix-data's mining table), each enchantment's
+  `ToolSpeed` (Efficiency) and `Underwater` (Aqua Affinity), each
+  effect's `BreakSpeed` and `BreakRate` (Haste, Conduit Power, Mining
+  Fatigue, applied twice as BDS does), and the player's `SetBreakSpeed`
+  and `SetReachScale`. Enchantments and effects are registered entries
+  (`RegisterEnchantment`, `RegisterEffect`). Per-block behaviour is set
+  with `SetBlockBehaviour` (optional interfaces: `PlacementStater`,
+  `Replaceable`). Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
+  on the minimal event core (named priorities, registration order, no
+  allocation without listeners, panics recovered per plugin). Block
+  changes, and any packet given to `Region.Broadcast`, reach every
+  player whose client has the chunk, in other regions too.
 - `cmd/helix`: the server program.
 
 ## Design

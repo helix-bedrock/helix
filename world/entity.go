@@ -120,6 +120,14 @@ func (e *Entity) Position() mgl32.Vec3 { return e.pos }
 // Rotation returns the entity's rotation. Runs: owner.
 func (e *Entity) Rotation() Rotation { return e.rot }
 
+// Region returns the region the entity belongs to. Runs: owner (the
+// entity's region tick, where it cannot change).
+func (e *Entity) Region() *Region {
+	e.d.mu.Lock()
+	defer e.d.mu.Unlock()
+	return e.region
+}
+
 // OnGround reports whether the entity stands on the ground. Runs: owner.
 func (e *Entity) OnGround() bool { return e.onGround }
 

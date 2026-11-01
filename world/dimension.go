@@ -120,6 +120,9 @@ type Dimension struct {
 	parked    []*Region
 	nextID    uint64
 	viewerSeq uint64
+	// viewers are every player's zones in the dimension, so a block change
+	// reaches the players in other regions who were sent its chunk.
+	viewers   map[*Viewer]struct{}
 	ticketSeq uint64
 	ticking   int
 	closing   bool
@@ -185,6 +188,7 @@ func New(conf Config) (*Dimension, error) {
 		conf: conf, log: conf.Log.With("dimension", conf.Dim.String()), r: r, pool: newPool(conf.Workers),
 		cache: newNetCache(conf.CacheBytes), sched: conf.Scheduler,
 		sections: map[sectionPos]*Region{}, pending: map[mcdb.ChunkPos]bool{}, waiters: map[mcdb.ChunkPos][]*Viewer{},
+		viewers: map[*Viewer]struct{}{},
 	}
 	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
 		return nil, err

@@ -59,6 +59,14 @@ type Player struct {
 	attributes Attributes
 	inventory  Inventory
 	requests   requestState
+	// brk is the block being broken; brokeCount counts blocks broken.
+	brk        breakState
+	brokeCount uint64
+	effects    []ActiveEffect
+	// breakSpeed multiplies the player's break speed; reachScale its
+	// reach. Both 1 by default.
+	breakSpeed float32
+	reachScale float32
 }
 
 // Name returns the player's display name. Runs: anywhere.
@@ -93,6 +101,7 @@ func (s *Server) newPlayer(c *network.Conn, id uuid.UUID) (*Player, error) {
 		s: s, conn: c, uuid: id, name: ident.DisplayName, xuid: ident.XUID, skin: skin,
 		ids: playerIDs(ident.Identity, c.Client().SelfSignedID, ident.XUID), runtimeID: s.runtimeIDs.Add(1),
 		gameMode: s.level.gameMode, abilities: DefaultAbilities(), attributes: DefaultAttributes(),
+		breakSpeed: 1, reachScale: 1,
 	}
 	p.uniqueID = int64(p.runtimeID) //nolint:gosec // runtime IDs are small
 	return p, nil

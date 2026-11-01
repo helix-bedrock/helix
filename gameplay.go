@@ -1,0 +1,191 @@
+package helix
+
+import (
+	"maps"
+
+	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/world/cube"
+)
+
+// Systems are the steps of a player's block breaking and placing. Each
+// starts as vanilla's (BDS 1.26.60) and may be replaced in Setup, or
+// wrapped by keeping the old value and calling it:
+//
+//	sys := s.Systems()
+//	next := sys.BreakTime
+//	sys.BreakTime = func(b *helix.BreakInfo) float32 { return next(b) * 2 }
+//
+// They run on the player's region tick.
+type Systems struct {
+	// Breaking.
+	BreakStart  BreakStartFunc
+	BreakTime   BreakTimeFunc
+	ToolSpeed   ToolSpeedFunc
+	BreakTick   BreakTickFunc
+	BreakFinish BreakFinishFunc
+	// Placing.
+	PlaceState PlaceStateFunc
+	PlaceCheck PlaceCheckFunc
+	Place      PlaceFunc
+}
+
+// BlockBehaviour is what a block type does. Every method is optional: a
+// behaviour implements the interfaces below it needs, and vanilla's
+// default applies to the rest.
+type BlockBehaviour any
+
+// PlacementStater picks the state a block is placed in (BDS's
+// getPlacementBlock): facing, half, axis and so on.
+type PlacementStater interface {
+	PlacementState(pl *Placement) (uint32, bool)
+}
+
+// Replaceable reports whether a block is replaced by a block placed on it,
+// such as air (BDS's canBeBuiltOver).
+type Replaceable interface {
+	Replaceable(block uint32) bool
+}
+
+// gameplay is the frozen gameplay setup.
+type gameplay struct {
+	sys      Systems
+	enchants map[int16]*Enchantment
+	effects  map[int32]*Effect
+	blocks   map[string]BlockBehaviour
+	mining   *mining
+	breakEv  listeners[BlockBreakEvent]
+	placeEv  listeners[BlockPlaceEvent]
+}
+
+// gameState is the gameplay part of the Setup while it is open.
+type gameState struct {
+	sys      Systems
+	enchants map[int16]*Enchantment
+	effects  map[int32]*Effect
+	blocks   map[string]BlockBehaviour
+	breakEv  listeners[BlockBreakEvent]
+	placeEv  listeners[BlockPlaceEvent]
+	// out is the gameplay freeze fills; vanilla's steps read its tables,
+	// so they can be wrapped before the freeze.
+	out *gameplay
+}
+
+func newGameState() *gameState {
+	return &gameState{enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, out: &gameplay{}}
+}
+
+// Systems returns the breaking and placing steps to replace or wrap. Not
+// usable after the Setup froze.
+func (s *Setup) Systems() *Systems {
+	if s.h.frozen {
+		return &Systems{}
+	}
+	return &s.h.game.sys
+}
+
+// RegisterEnchantment adds an enchantment or replaces the one with its ID.
+func (s *Setup) RegisterEnchantment(e Enchantment) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	if old, ok := s.h.game.enchants[e.ID]; ok {
+		s.h.log.Info("enchantment replaced", "name", e.Name, "was", old.Name, "by", s.owner)
+	}
+	s.h.game.enchants[e.ID] = &e
+	return nil
+}
+
+// Enchantment returns the registered enchantment with id, to change its
+// fields in place.
+func (s *Setup) Enchantment(id int16) (*Enchantment, bool) {
+	e, ok := s.h.game.enchants[id]
+	return e, ok && !s.h.frozen
+}
+
+// RegisterEffect adds an effect or replaces the one with its ID.
+func (s *Setup) RegisterEffect(e Effect) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	if old, ok := s.h.game.effects[e.ID]; ok {
+		s.h.log.Info("effect replaced", "name", e.Name, "was", old.Name, "by", s.owner)
+	}
+	s.h.game.effects[e.ID] = &e
+	return nil
+}
+
+// Effect returns the registered effect with id, to change its fields in
+// place.
+func (s *Setup) Effect(id int32) (*Effect, bool) {
+	e, ok := s.h.game.effects[id]
+	return e, ok && !s.h.frozen
+}
+
+// SetBlockBehaviour sets what the block type name does, replacing its
+// behaviour.
+func (s *Setup) SetBlockBehaviour(name string, b BlockBehaviour) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.blocks[name] = b
+	return nil
+}
+
+// OnBlockBreak listens to players breaking blocks.
+func OnBlockBreak(s *Setup, fn func(e *BlockBreakEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.breakEv.add(s.owner, p, fn)
+	return nil
+}
+
+// OnBlockPlace listens to players placing blocks.
+func OnBlockPlace(s *Setup, fn func(e *BlockPlaceEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.placeEv.add(s.owner, p, fn)
+	return nil
+}
+
+// vanillaGameplay registers BDS's enchantments, effects and steps.
+func vanillaGameplay(s *Setup) error {
+	for _, e := range vanillaEnchantments() {
+		if err := s.RegisterEnchantment(e); err != nil {
+			return err
+		}
+	}
+	for _, e := range vanillaEffects() {
+		if err := s.RegisterEffect(e); err != nil {
+			return err
+		}
+	}
+	sys, g := s.Systems(), s.h.game.out
+	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
+	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }
+	sys.BreakTime = g.vanillaBreakTime
+	sys.BreakTick = vanillaBreakTick
+	sys.BreakFinish = vanillaBreakFinish
+	sys.PlaceState = vanillaPlaceState
+	sys.PlaceCheck = vanillaPlaceCheck
+	sys.Place = vanillaPlace
+	return nil
+}
+
+// freezeGameplay ends the gameplay part of the Setup.
+func (s *Setup) freezeGameplay() (*gameplay, error) {
+	m, err := loadMining()
+	if err != nil {
+		return nil, err
+	}
+	gs := s.h.game
+	g := gs.out
+	*g = gameplay{
+		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
+		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
+	}
+	g.breakEv.freeze()
+	g.placeEv.freeze()
+	return g, nil
+}
