@@ -55,7 +55,11 @@ type Player struct {
 	saved map[string]any
 
 	// Owned by the player's region once it joined.
-	gameMode   int32
+	gameMode int32
+	// windowID is BDS's per-player window ID counter; windowOpen says
+	// whether a container window is open. Owned by the region.
+	windowID   byte
+	windowOpen bool
 	abilities  Abilities
 	attributes Attributes
 	inventory  Inventory
@@ -324,6 +328,12 @@ func (p *Player) play() {
 		_ = c.WritePacket(pk)
 	}
 	_ = c.WritePacket(s.reg.Crafting.Packet())
+	// BDS sends the player its own synched data on its first tick, then
+	// the next tick the breathing flag once it finds air.
+	_ = c.WritePacket(&packet.SetActorData{EntityRuntimeID: p.runtimeID, EntityMetadata: p.ownMetadata()})
+	_ = c.WritePacket(&packet.SetActorData{EntityRuntimeID: p.runtimeID, EntityMetadata: protocol.EntityMetadata{
+		protocol.EntityDataKeyFlags: int64(ownFlags | 1<<protocol.EntityDataFlagBreathing),
+	}})
 	if c.Flush() != nil {
 		return
 	}

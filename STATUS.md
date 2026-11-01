@@ -46,6 +46,11 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
   (Unbreaking included) and break when worn out; effects run out.
   Every step, every enchantment and effect, and the player's own break speed and reach can be
   changed by plugins; `OnBlockBreak` and `OnBlockPlace` events can cancel or change them.
+- **Player physics data and the inventory window (not yet tested in game):** the player gets its
+  own synched actor data on joining, entry for entry as BDS 1.26.60 sends it (gravity and
+  collision flags, the 0.6 by 1.8 box, air supply), so the client's own physics run; before
+  this the player floated. Opening the inventory (Interact) and closing a container answer as
+  BDS does.
 
 ## What is left
 
@@ -54,6 +59,8 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
 - **Block behaviour:** blocks tick, but no vanilla block has tick behaviour yet. Blocks are
   placed in their item's state: facing, halves and other placement rules are not done, nor is
   clicking blocks that open or toggle (chests, doors, levers).
+- **Movement:** the client's position is taken as it is. BDS's server-side movement checks and
+  corrections are not researched yet; other containers (chests and the like) do not open.
 - **Breaking leftovers:** no drops (no item entities yet), no hunger cost, and only the placing
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's

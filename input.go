@@ -74,6 +74,12 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleInventoryTransaction); err != nil {
 		return err
 	}
+	if err := Handle(s, handleInteract); err != nil {
+		return err
+	}
+	if err := Handle(s, handleContainerClose); err != nil {
+		return err
+	}
 	if err := vanillaGameplay(s); err != nil {
 		return err
 	}

@@ -148,7 +148,12 @@ sibling library folders, so unreleased library changes are used.
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every
   player whose client has the chunk, in other regions too.
-- `cmd/helix`: the server program.
+  `metadata.go`: the synched actor data BDS sends a joining player about
+  itself (gravity, collision, hitbox), which the client's physics run on.
+  `container.go`: opening the inventory (Interact) and ContainerClose as
+  BDS answers them, with BDS's window ID counter.
+- `cmd/helix`: the server program. `-testcmds` adds a stand-in /gamemode
+  for in-game testing until commands are designed.
 
 ## Design
 
