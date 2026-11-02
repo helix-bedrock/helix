@@ -7,13 +7,14 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync/atomic"
 
 	"github.com/helix-bedrock/helix"
 )
 
 func main() {
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
-	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and show a countdown over dropped items, for in-game testing")
+	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
 	flag.Parse()
 	level := slog.LevelInfo
 	if *debug {
@@ -25,14 +26,16 @@ func main() {
 
 	conf := helix.DefaultConfig()
 	conf.Log = log
+	var testServer atomic.Pointer[helix.Server]
 	if *testcmds {
-		conf.Setup = testCommands
+		conf.Setup = testCommands(&testServer)
 	}
 	srv, err := helix.New(conf)
 	if err != nil {
 		log.Error("cannot start", "err", err)
 		return
 	}
+	testServer.Store(srv)
 	if err := srv.Run(ctx); err != nil {
 		log.Error("server stopped", "err", err)
 	}

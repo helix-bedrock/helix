@@ -218,8 +218,9 @@ sibling library folders, so unreleased library changes are used.
   player whose client has the chunk, in other regions too.
 - `cmd/helix`: the server program. `-testcmds` adds a stand-in /gamemode
   (and /gm), listed to the client with an AvailableCommands packet on its
-  first input, for in-game testing until commands are designed, and a countdown
-  name tag over dropped items through an item view.
+  first input, for in-game testing until commands are designed, a countdown
+  name tag over dropped items through an item view, and /itemtest to try the
+  item API (private drops, lifetimes per player's drops and server-wide).
 
 ## Design
 
