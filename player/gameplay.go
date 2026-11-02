@@ -46,13 +46,7 @@ type Systems struct {
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
-	// ItemTag gives items a name tag, updated once a second. Nil, vanilla's,
-	// shows none. It is sent to clients only, never saved.
-	ItemTag ItemTagFunc
 }
-
-// ItemTagFunc returns the text of an item's name tag.
-type ItemTagFunc func(i *ItemActor) string
 
 // MoveFlagsFunc sets the player's movement states (sneaking, sprinting...)
 // from its PlayerAuthInput input flags.
@@ -110,6 +104,9 @@ type gameplay struct {
 	placement map[string]data.Placement
 	breakEv   listeners[BlockBreakEvent]
 	placeEv   listeners[BlockPlaceEvent]
+	// itemDropEv and itemLoadEv are the item events.
+	itemDropEv listeners[ItemDropEvent]
+	itemLoadEv listeners[ItemLoadEvent]
 }
 
 // gameState is the gameplay part of the Setup while it is open.
@@ -120,6 +117,9 @@ type gameState struct {
 	blocks   map[string]BlockBehaviour
 	breakEv  listeners[BlockBreakEvent]
 	placeEv  listeners[BlockPlaceEvent]
+	// itemDropEv and itemLoadEv are the item events.
+	itemDropEv listeners[ItemDropEvent]
+	itemLoadEv listeners[ItemLoadEvent]
 	// out is the gameplay freeze fills; vanilla's steps read its tables,
 	// so they can be wrapped before the freeze.
 	out *gameplay
@@ -204,6 +204,24 @@ func OnBlockPlace(s *Setup, fn func(e *BlockPlaceEvent), p Priority) error {
 	return nil
 }
 
+// OnItemDrop listens to players' items entering the world.
+func OnItemDrop(s *Setup, fn func(e *ItemDropEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.itemDropEv.add(s.owner, p, fn)
+	return nil
+}
+
+// OnItemLoad listens to saved items coming back with their chunks.
+func OnItemLoad(s *Setup, fn func(e *ItemLoadEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.itemLoadEv.add(s.owner, p, fn)
+	return nil
+}
+
 // vanillaGameplay registers BDS's enchantments, effects and steps.
 func vanillaGameplay(s *Setup) error {
 	for _, e := range vanillaEnchantments() {
@@ -265,12 +283,14 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
-		placement: placement,
+		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv,
 	}
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
 	}
 	g.breakEv.freeze()
 	g.placeEv.freeze()
+	g.itemDropEv.freeze()
+	g.itemLoadEv.freeze()
 	return g, nil
 }

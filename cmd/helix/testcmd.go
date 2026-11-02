@@ -51,11 +51,18 @@ func testCommandList() *packet.AvailableCommands {
 // ticksPerSecond is the server's tick rate.
 const ticksPerSecond = 20
 
-// itemTimerTag shows how long an item has left, as minutes and seconds, for
-// checking its lifetime in game. Only with -testcmds.
-func itemTimerTag(i *player.ItemActor) string {
-	left := i.TicksLeft() / ticksPerSecond
-	return fmt.Sprintf("%d:%02d", left/60, left%60)
+// showItemTimer shows how long an item has left, as minutes and seconds, for
+// checking its lifetime in game. Only with -testcmds. Items with a view never
+// merge, so stacks do not join while it is on.
+func showItemTimer(i *player.ItemActor) {
+	i.SetView(func(_ *player.Player, v *player.ItemView) {
+		if i.TicksLeft() == player.ItemLifetimeForever {
+			v.Name = "never"
+			return
+		}
+		left := i.TicksLeft() / ticksPerSecond
+		v.Name = fmt.Sprintf("%d:%02d", left/60, left%60)
+	})
 }
 
 // testCommands is a stand-in until commands are designed: /gamemode for
@@ -64,7 +71,12 @@ func itemTimerTag(i *player.ItemActor) string {
 // with its first input.
 func testCommands(s *helix.Setup) error {
 	setup := s.As("testcmds").Player
-	setup.Systems().ItemTag = itemTimerTag
+	if err := player.OnItemDrop(setup, func(e *player.ItemDropEvent) { showItemTimer(e.Item) }, player.Normal); err != nil {
+		return err
+	}
+	if err := player.OnItemLoad(setup, func(e *player.ItemLoadEvent) { showItemTimer(e.Item) }, player.Normal); err != nil {
+		return err
+	}
 	list := testCommandList()
 	var sent sync.Map // *player.Player -> struct{}, so a rejoin gets it again
 	if err := player.WrapHandle(setup, func(p *player.Player, pk *packet.PlayerAuthInput, next player.PacketHandler[*packet.PlayerAuthInput]) {

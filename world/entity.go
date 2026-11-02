@@ -99,6 +99,66 @@ type EntityConfig struct {
 	// nothing. Nil means the entity is not saved. It runs on its region's
 	// tick, and the result must not be changed afterwards.
 	Save func(e *Entity) (chunk.Entity, bool)
+	// VisibleTo decides which players see the entity; nil is everyone in
+	// range. It runs each tick for each player in range, so a rule that
+	// changes its answer takes effect by itself: a player who may not see the
+	// entity is sent nothing about it, and one who loses sight of it is told
+	// it is gone. Change it with [Entity.SetVisibleTo].
+	VisibleTo func(player *Entity) bool
+	// SpawnFor replaces Spawn with packets built for one player, not shared.
+	// Change it with [Entity.SetSpawnFor].
+	SpawnFor func(player *Entity) []packet.Packet
+}
+
+// SetVisibleTo changes the entity's VisibleTo. Runs: owner.
+func (e *Entity) SetVisibleTo(fn func(player *Entity) bool) { e.conf.VisibleTo = fn }
+
+// SetSpawnFor changes the entity's SpawnFor. Runs: owner.
+func (e *Entity) SetSpawnFor(fn func(player *Entity) []packet.Packet) { e.conf.SpawnFor = fn }
+
+// Send sends pk to the players who see the entity, and no one else. Runs:
+// owner.
+func (e *Entity) Send(pk packet.Packet) {
+	e.EachSeer(func(p *Entity) { p.conf.Viewer.sendEntity(pk) })
+}
+
+// SendTo sends pk to one player, given as its entity. Runs: owner of that
+// entity.
+func (e *Entity) SendTo(pk packet.Packet) {
+	if e.conf.Viewer != nil {
+		e.conf.Viewer.sendEntity(pk)
+	}
+}
+
+// EachSeer runs fn for each player who sees the entity. Regions keep further
+// apart than a player sees, so all of them are in its region. Runs: owner.
+func (e *Entity) EachSeer(fn func(player *Entity)) {
+	r := e.region
+	if r == nil {
+		return
+	}
+	for _, p := range r.entities {
+		if _, ok := p.known[e]; ok {
+			fn(p)
+		}
+	}
+}
+
+// Respawn shows the entity again to the players who see it, for a change only
+// a spawn carries. Runs: owner.
+func (e *Entity) Respawn() {
+	r := e.region
+	if r == nil {
+		return
+	}
+	e.spawn = nil
+	gone := &packet.RemoveActor{EntityUniqueID: e.conf.UniqueID}
+	e.EachSeer(func(p *Entity) {
+		p.conf.Viewer.sendEntity(gone)
+		for _, pk := range r.spawnPacketsFor(e, p) {
+			p.conf.Viewer.sendEntity(pk)
+		}
+	})
 }
 
 // EntityLoader takes a saved entity of the chunk at pos that just loaded into
@@ -432,7 +492,7 @@ func (r *Region) updateVisibility() {
 					continue
 				}
 				for _, o := range r.byChunk[mcdb.ChunkPos{p.chunk[0] + dx, p.chunk[1] + dz}] {
-					if o == p {
+					if o == p || o.conf.VisibleTo != nil && !o.conf.VisibleTo(p) {
 						continue
 					}
 					if k, ok := p.known[o]; ok {
@@ -441,7 +501,7 @@ func (r *Region) updateVisibility() {
 						continue
 					}
 					p.known[o] = known{id: o.conf.UniqueID, seen: true}
-					for _, pk := range r.spawnPackets(o) {
+					for _, pk := range r.spawnPacketsFor(o, p) {
 						p.conf.Viewer.sendEntity(pk)
 					}
 				}
@@ -457,6 +517,15 @@ func (r *Region) updateVisibility() {
 			p.known[o] = k
 		}
 	}
+}
+
+// spawnPacketsFor returns the packets that show o to the player p: its own if
+// it has SpawnFor, else the ones shared by every player.
+func (r *Region) spawnPacketsFor(o, p *Entity) []packet.Packet {
+	if o.conf.SpawnFor != nil {
+		return o.conf.SpawnFor(p)
+	}
+	return r.spawnPackets(o)
 }
 
 // spawnPackets returns o's spawn packets, built once per tick.

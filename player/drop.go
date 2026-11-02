@@ -53,12 +53,23 @@ func vanillaDropItem(p *Player, s ItemStack, randomly bool) bool {
 	if r == nil {
 		return false
 	}
+	pos, rot := p.entity.Position(), p.entity.Rotation()
+	pos[1] -= dropHeightBelowEyes
+	i := p.s.newItem(s, p.dropVelocity(rot, randomly), dropPickupDelay, dropThrowTime)
+	if g := p.s.game; g.itemDropEv.Has() {
+		e := ItemDropEvent{Player: p, Item: i}
+		g.itemDropEv.fire(p.s.log, &e)
+		if e.Cancelled() {
+			return false
+		}
+		if i.stack.Empty() {
+			return true
+		}
+	}
 	r.Broadcast(p.blockPos(), &packet.Animate{
 		ActionType: packet.AnimateActionSwingArm, EntityRuntimeID: p.runtimeID, SwingSource: packet.AnimateSwingSourceDropItem,
 	}, p.viewer)
-	pos, rot := p.entity.Position(), p.entity.Rotation()
-	pos[1] -= dropHeightBelowEyes
-	p.s.spawnItem(r.Dimension(), s, pos, p.dropVelocity(rot, randomly), rot, dropPickupDelay, dropThrowTime)
+	i.addTo(r.Dimension(), pos, rot)
 	return true
 }
 
@@ -235,7 +246,7 @@ func (p *Player) tickPickup() {
 	for i, e := range p.touching {
 		p.touching[i] = nil
 		it, ok := e.Owner().(*ItemActor)
-		if !ok || it.taken || it.pickupDelay != 0 || it.throwTime != 0 {
+		if !ok || it.taken || it.pickupDelay != 0 || it.throwTime != 0 || !it.CanSee(p) {
 			continue
 		}
 		ip := e.Position()
@@ -271,11 +282,11 @@ func vanillaPickUp(p *Player, i *ItemActor) {
 			return
 		}
 		i.stack.Count = rest.Count
-		i.sendStackSize(r)
+		i.sendStackSize()
 		return
 	}
 	i.taken = true
-	r.Broadcast(floorPos(i.entity.Position()), &packet.TakeItemActor{ItemEntityRuntimeID: i.entity.RuntimeID(), TakerEntityRuntimeID: p.runtimeID}, nil)
+	i.entity.Send(&packet.TakeItemActor{ItemEntityRuntimeID: i.entity.RuntimeID(), TakerEntityRuntimeID: p.runtimeID})
 	i.entity.Remove()
 }
 

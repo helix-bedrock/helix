@@ -105,8 +105,10 @@ func (p *Player) dropSlots(slots []ItemStack, vanishingOnly bool) {
 			}
 			continue
 		}
-		slots[i] = ItemStack{}
-		p.s.game.sys.DropItem(p, s, true)
+		// A drop that was refused stays in its slot, so no item is lost.
+		if p.s.game.sys.DropItem(p, s, true) {
+			slots[i] = ItemStack{}
+		}
 	}
 }
 

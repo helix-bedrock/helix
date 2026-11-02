@@ -36,7 +36,9 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Item drops and pick-up (not yet tested in game):** Q and dropping from the inventory screen
   throw items as BDS does. Items fall, float in water and lava, drift with the current, slow down on the block under them,
   join nearby stacks, vanish after 6000 ticks, and go to the offhand and inventory in BDS's order
-  when touched, leaving what does not fit. Other players see the held item change.
+  when touched, leaving what does not fit. Other players see the held item change. Plugins can decide
+  who sees an item (others are sent nothing about it and cannot pick it up), show each player its own
+  name or item, change the real stack, and set when it vanishes, per item or for the whole server.
 - **Registry:** built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with their
   network hashes and BDS's runtime numbers (light, flammability, explosion resistance, friction,
   destroy time, and BDS's collision boxes for every state: data for the 888 blocks whose shape is

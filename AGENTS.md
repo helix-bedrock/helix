@@ -159,7 +159,14 @@ sibling library folders, so unreleased library changes are used.
   systems), saved with their chunk in BDS's format. World gained
   `EntityConfig.Owner`, `Region.AppendEntitiesIn`, and for saving `EntityConfig.Save`
   and `Dimension.SetEntityLoader` (saved entities nothing takes, such as mobs, stay
-  in the chunk's data untouched).
+  in the chunk's data untouched). `itemview.go`: the plugin API on an item:
+  `SetVisibility` (per player; refused players get no packets and cannot pick it
+  up), `SetView` (per player name and shown item, server unchanged), `SetStack`
+  (the real item), `SetLifetime` and the server-wide `Host.SetItemLifetime`,
+  events `OnItemDrop`, `OnItemLoad`. Rules are not saved and
+  items with one never merge. Packets about an entity go through `Entity.Send`,
+  which reaches only those who see it, never `Region.Broadcast`; the world's
+  `EntityConfig.VisibleTo` and `SpawnFor` work for any entity.
   Armour and offhand take the items BDS allows (registry `Wearable`,
   `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
   Crafting is refused until built.
@@ -212,7 +219,7 @@ sibling library folders, so unreleased library changes are used.
 - `cmd/helix`: the server program. `-testcmds` adds a stand-in /gamemode
   (and /gm), listed to the client with an AvailableCommands packet on its
   first input, for in-game testing until commands are designed, and a countdown
-  name tag over dropped items through the `ItemTag` system.
+  name tag over dropped items through an item view.
 
 ## Design
 

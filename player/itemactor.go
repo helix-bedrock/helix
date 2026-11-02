@@ -43,8 +43,8 @@ const (
 
 	// itemFlags are an item's actor flags.
 	itemFlags = 1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagHasCollision
-	// itemTagInterval is how often, in ticks, an item's name tag is updated.
-	itemTagInterval = 20
+	// itemViewInterval is how often, in ticks, an item's name tag is updated.
+	itemViewInterval = 20
 
 	// itemIdentifier is what an item is saved as; itemHealth is the health
 	// BDS gives a new one.
@@ -75,7 +75,15 @@ type ItemActor struct {
 	// saved keeps what BDS saved for the item that Helix does not use (its
 	// health, owner and the actor fields), written back as it was.
 	saved map[string]any
+	// rule and view are a plugin's: who sees the item and what they are shown.
+	rule func(p *Player) bool
+	view func(p *Player, v *ItemView)
+	// lifetime is the age this item vanishes at; 0 is the server's.
+	lifetime int32
 }
+
+// ItemLifetimeForever is a lifetime that never ends.
+const ItemLifetimeForever int32 = -1
 
 // Stack returns the item's stack.
 func (i *ItemActor) Stack() ItemStack { return i.stack }
@@ -85,12 +93,22 @@ func (i *ItemActor) Entity() *world.Entity { return i.entity }
 
 // spawnItem adds an item to the dimension.
 func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec3, rot world.Rotation, pickupDelay, throwTime int32) *ItemActor {
+	i := s.newItem(stack, vel, pickupDelay, throwTime)
+	i.addTo(d, pos, rot)
+	return i
+}
+
+// newItem builds an item that is not in the world yet.
+func (s *Host) newItem(stack ItemStack, vel mgl32.Vec3, pickupDelay, throwTime int32) *ItemActor {
 	// A stack in the world has no slot, so no network ID the client names.
 	stack.netID = 0
-	i := &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime}
+	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime}
+}
+
+// addTo puts the item in the dimension.
+func (i *ItemActor) addTo(d *world.Dimension, pos mgl32.Vec3, rot world.Rotation) {
 	// Random, since items saved by an earlier run keep their IDs.
-	i.entity = d.AddEntity(i.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, rot)) //nolint:gosec // an entity ID, not a secret
-	return i
+	i.entity = d.AddEntity(i.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), i.s.runtimeIDs.Add(1), pos, rot)) //nolint:gosec // an entity ID, not a secret
 }
 
 // config is the item's entity.
@@ -98,6 +116,7 @@ func (i *ItemActor) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: i, Spawn: i.spawnPackets, Move: i.movePacket, Input: i.tick, Save: i.saveEntity,
+		VisibleTo: i.visibleFunc(), SpawnFor: i.spawnForFunc(),
 	}
 }
 
@@ -121,7 +140,7 @@ func (i *ItemActor) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	data["Motion"] = []float32{i.vel[0], i.vel[1], i.vel[2]}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data["OnGround"] = onGround
-	data["Age"] = int16(i.age) //nolint:gosec // never past the lifetime
+	data["Age"] = int16(min(i.age, math.MaxInt16)) //nolint:gosec // clamped: a plugin's lifetime can outlast the saved field
 	data["Item"] = i.stack.nbt(0, false)
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
@@ -155,56 +174,50 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	onGround, _ := saved.Data["OnGround"].(uint8)
 	i.onGround = onGround != 0
 	i.entity = r.AddLoadedEntity(at, i.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
+	if s.game != nil && s.game.itemLoadEv.Has() {
+		s.game.itemLoadEv.fire(s.log, &ItemLoadEvent{Item: i})
+	}
 	return true
 }
 
 // spawnPackets show the item to a player. The data is a first pass, not yet
 // checked against what BDS sends.
 func (i *ItemActor) spawnPackets(e *world.Entity) []packet.Packet {
-	meta := protocol.EntityMetadata{
-		protocol.EntityDataKeyFlags:  int64(itemFlags),
-		protocol.EntityDataKeyWidth:  float32(2 * itemHalfSize),
-		protocol.EntityDataKeyHeight: float32(2 * itemHalfSize),
-		protocol.EntityDataKeyScale:  float32(1),
-	}
-	if fn := i.tagFunc(); fn != nil {
-		maps.Copy(meta, tagMetadata(fn(i)))
-	}
-	return []packet.Packet{&packet.AddItemActor{
-		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Item: i.stack.network(i.s.reg),
-		Position: e.Position(), Velocity: i.vel, EntityMetadata: meta,
-	}}
-}
-
-// tagFunc returns the ItemTag system, nil when items have no tag.
-func (i *ItemActor) tagFunc() ItemTagFunc {
-	if i.s.game == nil {
-		return nil
-	}
-	return i.s.game.sys.ItemTag
-}
-
-// sendTag updates the item's name tag once a second, when it has one.
-func (i *ItemActor) sendTag(r *world.Region, e *world.Entity) {
-	fn := i.tagFunc()
-	if fn == nil || i.age%itemTagInterval != 0 {
-		return
-	}
-	r.Broadcast(floorPos(e.Position()), &packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: tagMetadata(fn(i))}, nil)
-}
-
-// tagMetadata shows text as an always visible name tag.
-func tagMetadata(text string) protocol.EntityMetadata {
-	return protocol.EntityMetadata{
-		protocol.EntityDataKeyFlags:             int64(itemFlags | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName),
-		protocol.EntityDataKeyName:              text,
-		protocol.EntityDataKeyAlwaysShowNameTag: uint8(1),
-	}
+	return []packet.Packet{i.addPacket(e, ItemView{Stack: i.stack})}
 }
 
 // TicksLeft returns how many ticks of being loaded the item has before it
-// vanishes. Runs: owner of its entity.
-func (i *ItemActor) TicksLeft() int32 { return itemLifetime - i.age }
+// vanishes, or ItemLifetimeForever if it never does. Runs: owner of its entity.
+func (i *ItemActor) TicksLeft() int32 {
+	lifetime := i.lifetimeTicks()
+	if lifetime == ItemLifetimeForever {
+		return ItemLifetimeForever
+	}
+	return max(lifetime-i.age, 0)
+}
+
+// SetLifetime sets how many ticks old this item vanishes at, whatever the
+// server's lifetime is; ItemLifetimeForever keeps it until it is picked up, and
+// 0 goes back to the server's. An item already that old vanishes on its next
+// tick. Like visibility rules it is not saved: set it again in [ItemLoadEvent].
+// Runs: owner of the item's entity, or in an [ItemDropEvent].
+func (i *ItemActor) SetLifetime(ticks int32) { i.lifetime = ticks }
+
+// lifetimeTicks is the age this item vanishes at: its own, else the server's.
+func (i *ItemActor) lifetimeTicks() int32 {
+	if i.lifetime != 0 {
+		return i.lifetime
+	}
+	if v := i.s.itemLifetime.Load(); v != 0 {
+		return v
+	}
+	return itemLifetime
+}
+
+// SetItemLifetime changes how many ticks old items vanish at, for every item
+// without its own lifetime, also those already in the world. Vanilla's is
+// 6000; ItemLifetimeForever keeps them. Runs: anywhere.
+func (s *Host) SetItemLifetime(ticks int32) { s.itemLifetime.Store(ticks) }
 
 // movePacket moves the item for the players who see it.
 func (i *ItemActor) movePacket(e *world.Entity) packet.Packet {
@@ -245,9 +258,9 @@ func (i *ItemActor) tick(e *world.Entity) {
 		}
 		i.moveAndDrag(r, e)
 	}
-	i.sendTag(r, e)
+	i.sendViews(e)
 	i.age++
-	if i.age >= itemLifetime {
+	if lifetime := i.lifetimeTicks(); lifetime != ItemLifetimeForever && i.age >= lifetime {
 		i.taken = true
 		e.Remove()
 	}
@@ -299,7 +312,7 @@ func (i *ItemActor) mergeNearby(r *world.Region, pos mgl32.Vec3) {
 		if p := o.Position(); boxesApart(pos, p, 2*itemHalfSize+itemMergeReach) {
 			continue
 		}
-		if i.merge(r, other) && i.taken {
+		if i.merge(other) && i.taken {
 			return
 		}
 	}
@@ -317,9 +330,10 @@ func boxesApart(a, b mgl32.Vec3, d float32) bool {
 }
 
 // merge joins two items as BDS does: the larger stack stays, the other on a
-// tie, if the stacks match and fit one slot.
-func (i *ItemActor) merge(r *world.Region, o *ItemActor) bool {
-	if i.pickupDelay == itemNeverPickedUp || o.pickupDelay == itemNeverPickedUp || !o.stack.stacksWith(i.stack) {
+// tie, if the stacks match and fit one slot. Items a plugin set apart never
+// merge, so a private item does not join a public one.
+func (i *ItemActor) merge(o *ItemActor) bool {
+	if i.custom() || o.custom() || i.pickupDelay == itemNeverPickedUp || o.pickupDelay == itemNeverPickedUp || !o.stack.stacksWith(i.stack) {
 		return false
 	}
 	keep, gone := o, i
@@ -334,15 +348,8 @@ func (i *ItemActor) merge(r *world.Region, o *ItemActor) bool {
 	keep.age = min(keep.age, gone.age)
 	gone.taken = true
 	gone.entity.Remove()
-	keep.sendStackSize(r)
+	keep.sendStackSize()
 	return true
-}
-
-// sendStackSize tells the players near the item its new count.
-func (i *ItemActor) sendStackSize(r *world.Region) {
-	r.Broadcast(floorPos(i.entity.Position()), &packet.ActorEvent{
-		EntityRuntimeID: i.entity.RuntimeID(), EventType: packet.ActorEventUpdateStackSize, EventData: int32(i.stack.Count),
-	}, nil)
 }
 
 // moveAndDrag moves the item by its velocity through the blocks' collision

@@ -67,7 +67,9 @@ type Host struct {
 	// for the network, as BDS does with one counter for the whole server.
 	runtimeIDs atomic.Uint64
 	stackIDs   atomic.Int32
-	wg         sync.WaitGroup
+	// itemLifetime is the live age items vanish at; 0 is vanilla's.
+	itemLifetime atomic.Int32
+	wg           sync.WaitGroup
 }
 
 // NewHost freezes setup and returns the Host that runs players with it.

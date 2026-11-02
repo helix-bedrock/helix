@@ -149,7 +149,7 @@ func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) (leave func())
 	}
 	removed := make(chan last, 1)
 	p.entity = s.overworld.AddEntity(world.EntityConfig{
-		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: spawn, Rot: rot, Viewer: p.viewer,
+		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: spawn, Rot: rot, Viewer: p.viewer, Owner: p,
 		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,
 		Removed: func(e *world.Entity) { removed <- last{e.Position(), e.Rotation()} },
 	})
