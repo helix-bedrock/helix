@@ -104,6 +104,12 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Movement:** the client's position is taken as it is. BDS's server-side simulation and
   corrections will come with the optional anti-cheat module. Other containers (chests and the
   like) do not open.
+- **Block use (first pass, not yet tested in game):** clicking a block follows BDS's order: the
+  `OnBlockUse` event, the block's use, then the held item, and a held click stays with whichever the
+  first click did. Doors, trapdoors, fence gates, levers and buttons work (new `blockuse` package).
+  Doors place both halves with BDS's hinge rule and fall apart without their other half or support.
+  Buttons pop out after 20 or 30 ticks. No redstone output yet. Other blocks with a use (chests,
+  furnaces, beds...) do not react yet, so a block in hand is placed against them.
 - **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
   1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
   inventory are thrown at random (items kept on death stay), others see the death, the death screen

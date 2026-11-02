@@ -31,6 +31,8 @@ type Systems struct {
 	PlaceState PlaceStateFunc
 	PlaceCheck PlaceCheckFunc
 	Place      PlaceFunc
+	// UseBlock is a click on a block, before the held item is used.
+	UseBlock UseBlockFunc
 	// Movement state, after the movement handler.
 	MoveFlags  MoveFlagsFunc
 	Jump       JumpFunc
@@ -107,6 +109,7 @@ type gameplay struct {
 	placement map[string]data.Placement
 	breakEv   listeners[BlockBreakEvent]
 	placeEv   listeners[BlockPlaceEvent]
+	useEv     listeners[BlockUseEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -120,6 +123,7 @@ type gameState struct {
 	blocks   map[string]BlockBehaviour
 	breakEv  listeners[BlockBreakEvent]
 	placeEv  listeners[BlockPlaceEvent]
+	useEv    listeners[BlockUseEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -207,6 +211,15 @@ func OnBlockPlace(s *Setup, fn func(e *BlockPlaceEvent), p Priority) error {
 	return nil
 }
 
+// OnBlockUse listens to players clicking blocks.
+func OnBlockUse(s *Setup, fn func(e *BlockUseEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.useEv.add(s.owner, p, fn)
+	return nil
+}
+
 // OnItemDrop listens to players' items entering the world.
 func OnItemDrop(s *Setup, fn func(e *ItemDropEvent), p Priority) error {
 	if s.h.frozen {
@@ -247,6 +260,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.PlaceState = vanillaPlaceState
 	sys.PlaceCheck = vanillaPlaceCheck
 	sys.Place = vanillaPlace
+	sys.UseBlock = vanillaUseBlock
 	sys.DropItem = vanillaDropItem
 	sys.PickUp = vanillaPickUp
 	sys.ItemLifetime = itemLifetime
@@ -287,13 +301,14 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
-		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv,
+		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 	}
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
 	}
 	g.breakEv.freeze()
 	g.placeEv.freeze()
+	g.useEv.freeze()
 	g.itemDropEv.freeze()
 	g.itemLoadEv.freeze()
 	return g, nil

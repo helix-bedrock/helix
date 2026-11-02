@@ -71,6 +71,8 @@ type Player struct {
 	window     windowState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
+	// lastUse is what the first click of the held button did, a use constant.
+	lastUse int
 	// touching is the pick-up scan's buffer; shownHeld and shownSlot are what
 	// other players were last told it holds.
 	touching  []*world.Entity

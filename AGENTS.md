@@ -221,6 +221,8 @@ sibling library folders, so unreleased library changes are used.
   first input, for in-game testing until commands are designed, a countdown
   name tag over dropped items through an item view, and /itemtest to try the
   item API (private drops, lifetimes per player's drops and server-wide).
+- `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
+  with its `Ticker` for buttons popping out and doors breaking.
 
 ## Design
 

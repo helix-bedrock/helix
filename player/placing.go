@@ -2,6 +2,8 @@ package player
 
 import (
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/blockuse"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -47,8 +49,7 @@ type PlaceCheckFunc func(pl *Placement) bool
 type PlaceFunc func(pl *Placement) bool
 
 // handleInventoryTransaction handles the legacy drop and item use on a
-// block. Of item use only placing is built: clicking air, using items on
-// entities and interacting with blocks come later.
+// block. Clicking air and using items on entities come later.
 func handleInventoryTransaction(p *Player, pk *packet.InventoryTransaction) {
 	if _, normal := pk.TransactionData.(*protocol.NormalTransactionData); normal {
 		p.handleNormalTransaction(pk.Actions)
@@ -63,22 +64,66 @@ func handleInventoryTransaction(p *Player, pk *packet.InventoryTransaction) {
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 		return
 	}
-	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition) {
+	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, d.TriggerType != protocol.TriggerTypeSimulationTick) {
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 	}
 }
 
-// useItemOn is BDS's GameMode useItemOn for a block item: the target, the
-// check, the state, then the placing. False if nothing was placed.
-func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3) bool {
+// useItemOn is BDS's GameMode useItemOn: the event, the clicked block's use,
+// then the held item. first is false for the repeats sent while the button is
+// held, which stay with whichever of the two the first click did, so a held
+// click does not flap a door. False if nothing happened.
+func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first bool) bool {
 	if face < int32(cube.FaceDown) || face > int32(cube.FaceEast) {
 		return false
 	}
 	r := p.entity.Region()
-	held := p.inventory.Held()
-	if r == nil || held.Empty() {
+	if r == nil {
 		return false
 	}
+	if first {
+		p.lastUse = useNothing
+	}
+	target, ok := r.Block(clicked, 0)
+	if !ok || !p.inReach(clicked) {
+		return false
+	}
+	g, held := p.s.game, p.inventory.Held()
+	if g.useEv.Has() {
+		e := BlockUseEvent{Player: p, Pos: clicked, Block: target}
+		g.useEv.fire(p.s.log, &e)
+		if e.Cancelled() {
+			return false
+		}
+	}
+	// A player sneaking with something in hand uses the item, not the block.
+	if (held.Empty() || !p.Moving(MoveSneaking)) && p.lastUse != useItem {
+		u := &BlockUse{Player: p, Pos: clicked, Block: target, Face: face, ClickPos: click, Item: held}
+		if g.sys.UseBlock(u) {
+			if p.lastUse == useNothing {
+				p.lastUse = useBlock
+			}
+			return true
+		}
+	}
+	if p.lastUse == useBlock {
+		return true
+	}
+	if held.Empty() {
+		return false
+	}
+	if !p.useHeldOn(r, clicked, face, click, held) {
+		return false
+	}
+	if p.lastUse == useNothing {
+		p.lastUse = useItem
+	}
+	return true
+}
+
+// useHeldOn is the held item's part of useItemOn, for a block item: the target,
+// the check, the state, then the placing. False if nothing was placed.
+func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
 	if _, ok := bucketLiquids[held.Name]; ok {
 		return p.pourBucket(clicked, face, held)
 	}
@@ -141,6 +186,12 @@ func vanillaPlaceCheck(pl *Placement) bool {
 	if !ok || !p.s.game.replaceable(p, b, pl.Block) {
 		return false
 	}
+	blocks := p.s.reg.Blocks
+	if blockuse.IsDoor(blocks, pl.Block) && !blockuse.DoorFits(blocks, r, pl.Pos, func(above uint32) bool {
+		return p.s.game.replaceable(p, above, pl.Block)
+	}) {
+		return false
+	}
 	return !p.inside(pl.Pos)
 }
 
@@ -181,10 +232,17 @@ func vanillaPlace(pl *Placement) bool {
 		}
 		pl.Block = e.Block
 	}
-	if !r.SetBlock(pl.Pos, 0, pl.Block) {
-		return false
+	blocks := p.s.reg.Blocks
+	if blockuse.IsDoor(blocks, pl.Block) {
+		if !blockuse.PlaceDoor(blocks, r, pl.Pos, pl.Block) {
+			return false
+		}
+	} else {
+		if !r.SetBlock(pl.Pos, 0, pl.Block) {
+			return false
+		}
+		r.UpdateNeighbours(pl.Pos)
 	}
-	r.UpdateNeighbours(pl.Pos)
 	r.Broadcast(pl.Pos, &packet.LevelSoundEvent{
 		SoundType: packet.SoundEventPlace, Position: blockVec(pl.Pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}),
 		ExtraData: int32(p.s.reg.Blocks.Hash(pl.Block)), //nolint:gosec // hashes are sent as int32
