@@ -62,6 +62,9 @@ type Properties struct {
 	SolidMaterial bool
 	// LiquidReaction is what a liquid flowing into the block does.
 	LiquidReaction LiquidReaction
+	// LavaBlocking is set when the block stops lava flowing into it. Lava
+	// asks this instead of LiquidReaction.
+	LavaBlocking bool
 	// CanContainLiquid is set when the block can hold a liquid in its
 	// second layer (waterlogged).
 	CanContainLiquid bool

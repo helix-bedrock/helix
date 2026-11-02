@@ -163,7 +163,7 @@ func (l *Liquids) flow(r *world.Region, pos cube.Pos, k Kind, depth, drop int) {
 	if below[1] >= r.Dimension().Range()[0] {
 		if _, ok := r.Block(below, 0); ok {
 			bm := l.material(l.liquidAt(r, below))
-			if bm != registry.MaterialLava && bm != l.liq[k].material && !l.blocking(r, below) {
+			if bm != registry.MaterialLava && bm != l.liq[k].material && !l.blocking(r, below, pos) {
 				if k == Lava {
 					b0, _ := r.Block(below, 0)
 					if bm == registry.MaterialWater || l.material(b0) == registry.MaterialBubbleColumn {
@@ -178,12 +178,12 @@ func (l *Liquids) flow(r *world.Region, pos cube.Pos, k Kind, depth, drop int) {
 				if d < falling {
 					d += falling
 				}
-				l.spreadTo(r, below, k, d)
+				l.spreadTo(r, below, pos, k, d)
 				return
 			}
 		}
 	}
-	if depth < 0 || depth != 0 && !l.blocking(r, below) {
+	if depth < 0 || depth != 0 && !l.blocking(r, below, pos) {
 		return
 	}
 	var costs [4]int
@@ -191,10 +191,10 @@ func (l *Liquids) flow(r *world.Region, pos cube.Pos, k Kind, depth, drop int) {
 		costs[i] = noCost
 		d := horizontal(i)
 		n := pos.Add(d)
-		if l.blocking(r, n) || l.source(r, n, k) {
+		if l.blocking(r, n, pos) || l.source(r, n, k) {
 			continue
 		}
-		if !l.blocking(r, n.Add(cube.Pos{0, -1, 0})) {
+		if !l.blocking(r, n.Add(cube.Pos{0, -1, 0}), pos) {
 			costs[i] = 0
 			continue
 		}
@@ -215,7 +215,7 @@ func (l *Liquids) flow(r *world.Region, pos cube.Pos, k Kind, depth, drop int) {
 	for i, c := range costs {
 		if c == least {
 			d := horizontal(i)
-			l.spreadTo(r, pos.Add(d), k, next)
+			l.spreadTo(r, pos.Add(d), pos, k, next)
 		}
 	}
 }
@@ -240,10 +240,10 @@ func (l *Liquids) slope(r *world.Region, pos cube.Pos, k Kind, dist, from int) i
 		}
 		d := horizontal(i)
 		n := pos.Add(d)
-		if l.blocking(r, n) || l.source(r, n, k) {
+		if l.blocking(r, n, pos) || l.source(r, n, k) {
 			continue
 		}
-		if !l.blocking(r, n.Add(cube.Pos{0, -1, 0})) {
+		if !l.blocking(r, n.Add(cube.Pos{0, -1, 0}), pos) {
 			return dist
 		}
 		if dist < reach {
@@ -253,16 +253,20 @@ func (l *Liquids) slope(r *world.Region, pos cube.Pos, k Kind, dist, from int) i
 	return best
 }
 
-// blocking is BDS's isWaterBlocking for a liquid moving into pos: true
-// when the block there stops liquids. Lava there never does. Blocks whose
-// own shape decides it (stairs, slabs) are not ported and let liquid out
-// on every side.
-func (l *Liquids) blocking(r *world.Region, pos cube.Pos) bool {
-	if l.material(l.liquidAt(r, pos)) == registry.MaterialLava {
-		return false
-	}
+// blocking is BDS's isWaterBlocking for a liquid moving into pos from the
+// block at from: true when the block at pos stops it. If lava is at from,
+// the block's own lava rule decides, whatever liquid is moving; else its
+// liquid reaction. Blocks whose own shape decides it (stairs, slabs) are not
+// ported and let liquid out on every side.
+func (l *Liquids) blocking(r *world.Region, pos, from cube.Pos) bool {
 	b, ok := r.Block(pos, 0)
-	return !ok || l.blocks.Properties(b).LiquidReaction == registry.LiquidBlocking
+	if !ok {
+		return true
+	}
+	if l.material(l.liquidAt(r, from)) == registry.MaterialLava {
+		return l.blocks.Properties(b).LavaBlocking
+	}
+	return l.blocks.Properties(b).LiquidReaction == registry.LiquidBlocking
 }
 
 // spreadTo is BDS's trySpreadTo: liquid k of depth flows into pos unless
@@ -270,7 +274,7 @@ func (l *Liquids) blocking(r *world.Region, pos cube.Pos) bool {
 // block it flows into fizz; other liquids replace the block or, if it
 // takes liquid in its second layer, go there. The liquid is ticked again
 // after its delay.
-func (l *Liquids) spreadTo(r *world.Region, pos cube.Pos, k Kind, depth int) {
+func (l *Liquids) spreadTo(r *world.Region, pos, from cube.Pos, k Kind, depth int) {
 	if pos[1] < r.Dimension().Range()[0] {
 		return
 	}
@@ -278,7 +282,7 @@ func (l *Liquids) spreadTo(r *world.Region, pos cube.Pos, k Kind, depth int) {
 		return
 	}
 	m := l.material(l.liquidAt(r, pos))
-	if m == registry.MaterialLava || m == l.liq[k].material || l.blocking(r, pos) {
+	if m == registry.MaterialLava || m == l.liq[k].material || l.blocking(r, pos, from) {
 		return
 	}
 	layer := uint8(0)

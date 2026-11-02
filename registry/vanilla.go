@@ -241,7 +241,7 @@ func vanillaBlocks(s *Setup) error {
 			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i),
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 			Climbable: climbable[st.Name], Material: materials[st.Name],
-			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name],
+			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
 		if err != nil {
@@ -333,6 +333,7 @@ func sameValues(a, b map[string]any) bool {
 type liquidFacts struct {
 	reaction       map[string]LiquidReaction
 	contain, solid map[string]bool
+	lavaBlocking   map[string]bool
 }
 
 // vanillaLiquids reads the liquid facts of every block.
@@ -341,7 +342,7 @@ func vanillaLiquids() (liquidFacts, error) {
 	if err != nil {
 		return liquidFacts{}, fmt.Errorf("registry: vanilla: %w", err)
 	}
-	f := liquidFacts{reaction: map[string]LiquidReaction{}, contain: map[string]bool{}, solid: map[string]bool{}}
+	f := liquidFacts{reaction: map[string]LiquidReaction{}, contain: map[string]bool{}, solid: map[string]bool{}, lavaBlocking: map[string]bool{}}
 	for name, blocks := range d.Reaction {
 		r, ok := liquidReaction(name)
 		if !ok {
@@ -356,6 +357,9 @@ func vanillaLiquids() (liquidFacts, error) {
 	}
 	for _, b := range d.Solid {
 		f.solid[b] = true
+	}
+	for _, b := range d.LavaBlocking {
+		f.lavaBlocking[b] = true
 	}
 	return f, nil
 }
