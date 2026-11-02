@@ -159,7 +159,7 @@ sibling library folders, so unreleased library changes are used.
   systems). World gained `EntityConfig.Owner`, `Region.AppendEntitiesIn`.
   Armour and offhand take the items BDS allows (registry `Wearable`,
   `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
-  Drops and crafting are refused until built.
+  Crafting is refused until built.
   `breaking.go`, `placing.go`, `mining.go`, `gameplay.go`, `event.go`:
   block breaking and placing as BDS 1.26.60 does them (research notes are
   private). PlayerAuthInput's block actions run before movement, in BDS's
