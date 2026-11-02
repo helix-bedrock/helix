@@ -66,6 +66,8 @@ type Host struct {
 	global   *global
 	// connections works out the arms of fences and the like as they are placed.
 	connections *connect.Table
+	// chests holds which blocks are chests and what lets them open.
+	chests *chestTable
 	// runtimeIDs numbers players' entities; stackIDs numbers item stacks
 	// for the network, as BDS does with one counter for the whole server.
 	runtimeIDs atomic.Uint64
@@ -86,13 +88,18 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: connections: %w", err)
 	}
+	chests, err := newChestTable(conf.Registry.Blocks)
+	if err != nil {
+		return nil, fmt.Errorf("player: chests: %w", err)
+	}
 	h := &Host{
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections,
+		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, chests: chests,
 	}
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	conf.Overworld.SetEntityLoader(h.loadEntity)
+	conf.Overworld.SetBlockEntities(chestEntities{s: h})
 	return h, nil
 }
 

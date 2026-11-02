@@ -1,0 +1,259 @@
+package world
+
+import (
+	"maps"
+	"slices"
+
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/chunk"
+	"github.com/helix-bedrock/world/cube"
+)
+
+// BlockEntity is what a block keeps beyond its state, such as a chest's items
+// (BDS's block actor). It lives with its chunk, so only the region owning that
+// chunk may touch it.
+type BlockEntity interface {
+	// SaveData returns the compound BDS saves for it. The result goes to a
+	// save worker, so it must not change afterwards.
+	SaveData(pos cube.Pos) map[string]any
+	// NetworkData returns the compound the client gets. The same rule applies.
+	NetworkData(pos cube.Pos) map[string]any
+}
+
+// BlockEntityTicker is a block entity that ticks with its chunk.
+type BlockEntityTicker interface {
+	TickBlockEntity(r *Region, pos cube.Pos)
+}
+
+// BlockEntityPlacer is a block entity told when the block making it was set.
+type BlockEntityPlacer interface {
+	BlockEntityPlaced(r *Region, pos cube.Pos)
+}
+
+// BlockEntityRemover is a block entity told when its block was replaced by a
+// block of another type. It is already out of the chunk.
+type BlockEntityRemover interface {
+	BlockEntityRemoved(r *Region, pos cube.Pos)
+}
+
+// BlockEntities makes block entities: the engine's list of those it runs.
+type BlockEntities interface {
+	// Load returns the live form of a saved block entity. False keeps it saved
+	// as it is, as for those the engine does not run yet.
+	Load(pos cube.Pos, saved map[string]any) (BlockEntity, bool)
+	// New returns the block entity block makes, or nil. It is asked whenever a
+	// block changes type, so it must be cheap.
+	New(block uint32) BlockEntity
+}
+
+// SetBlockEntities sets who makes block entities. Set it before any player
+// joins: chunks loaded earlier keep theirs saved. Runs: anywhere.
+func (d *Dimension) SetBlockEntities(b BlockEntities) { d.blockEntities.Store(&b) }
+
+// networkHidden are the saved fields the client never needs.
+var networkHidden = [...]string{"Items", "Findable", "LootTable", "LootTableSeed"}
+
+// savedNetworkData is the client's view of a saved compound.
+func savedNetworkData(saved map[string]any) map[string]any {
+	out := maps.Clone(saved)
+	for _, k := range networkHidden {
+		delete(out, k)
+	}
+	return out
+}
+
+// savedBlockEntity is a block entity the engine does not run yet: its data is
+// kept as it was loaded, so the world loses nothing.
+type savedBlockEntity struct {
+	data map[string]any
+}
+
+// SaveData returns the data as it was loaded.
+func (s savedBlockEntity) SaveData(cube.Pos) map[string]any { return s.data }
+
+// NetworkData returns the data without what the client never needs.
+func (s savedBlockEntity) NetworkData(cube.Pos) map[string]any { return savedNetworkData(s.data) }
+
+// loadBlockEntities turns the saved block entities of a chunk that just loaded
+// into live ones.
+func (r *Region) loadBlockEntities(c *Chunk) {
+	saved := c.col.BlockEntities
+	c.col.BlockEntities = nil
+	if len(saved) == 0 {
+		return
+	}
+	var maker BlockEntities
+	if m := r.d.blockEntities.Load(); m != nil {
+		maker = *m
+	}
+	for _, s := range saved {
+		var be BlockEntity = savedBlockEntity{data: s.Data}
+		if maker != nil {
+			if live, ok := maker.Load(s.Pos, s.Data); ok {
+				be = live
+			}
+		}
+		c.addBlockEntity(s.Pos, be)
+	}
+}
+
+// addBlockEntity puts be in the chunk in place of any other at pos.
+func (c *Chunk) addBlockEntity(pos cube.Pos, be BlockEntity) {
+	c.removeBlockEntity(pos)
+	if c.blockEntities == nil {
+		c.blockEntities = make(map[cube.Pos]BlockEntity)
+	}
+	c.blockEntities[pos] = be
+	if _, ok := be.(BlockEntityTicker); ok {
+		c.tickingEntities = append(c.tickingEntities, pos)
+	}
+}
+
+// removeBlockEntity takes the block entity at pos out of the chunk.
+func (c *Chunk) removeBlockEntity(pos cube.Pos) (BlockEntity, bool) {
+	be, ok := c.blockEntities[pos]
+	if !ok {
+		return nil, false
+	}
+	delete(c.blockEntities, pos)
+	if i := slices.Index(c.tickingEntities, pos); i >= 0 {
+		c.tickingEntities = slices.Delete(c.tickingEntities, i, i+1)
+	}
+	return be, true
+}
+
+// blockTypeChanged runs after the block at pos on layer 0 changed from old to
+// block: a new type drops the block entity of the old one and makes its own.
+func (r *Region) blockTypeChanged(c *Chunk, pos cube.Pos, old, block uint32) {
+	blocks := r.d.conf.Blocks
+	if blocks.Name(old) == blocks.Name(block) {
+		return
+	}
+	if be, ok := c.removeBlockEntity(pos); ok {
+		c.netChanged()
+		if rem, ok := be.(BlockEntityRemover); ok {
+			rem.BlockEntityRemoved(r, pos)
+		}
+	}
+	m := r.d.blockEntities.Load()
+	if m == nil {
+		return
+	}
+	if be := (*m).New(block); be != nil {
+		c.addBlockEntity(pos, be)
+		c.dirty = true
+		c.netChanged()
+		if pl, ok := be.(BlockEntityPlacer); ok {
+			pl.BlockEntityPlaced(r, pos)
+		}
+	}
+}
+
+// netChanged drops the chunk's network form.
+func (c *Chunk) netChanged() {
+	c.net = nil
+	c.version++
+}
+
+// BlockEntity returns the block entity at pos, and false if there is none or
+// its chunk is not loaded in this region. Runs: owner.
+func (r *Region) BlockEntity(pos cube.Pos) (BlockEntity, bool) {
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return nil, false
+	}
+	be, ok := c.blockEntities[pos]
+	return be, ok
+}
+
+// SetBlockEntity puts be at pos in place of any other, telling neither. False if
+// the chunk is not loaded in this region. Runs: owner.
+func (r *Region) SetBlockEntity(pos cube.Pos, be BlockEntity) bool {
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return false
+	}
+	c.addBlockEntity(pos, be)
+	c.dirty = true
+	c.netChanged()
+	r.d.cache.drop(c.pos)
+	return true
+}
+
+// SaveBlockEntity marks a block entity changed in a way only the save sees, such
+// as a chest's items. Runs: owner.
+func (r *Region) SaveBlockEntity(pos cube.Pos) {
+	if c, ok := r.chunkAt(pos); ok {
+		c.dirty = true
+	}
+}
+
+// SendBlockEntity marks a block entity changed in a way the client sees and sends
+// it to every player whose client has the chunk (BDS's BlockActorData). Runs: owner.
+func (r *Region) SendBlockEntity(pos cube.Pos) {
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return
+	}
+	be, ok := c.blockEntities[pos]
+	if !ok {
+		return
+	}
+	c.dirty = true
+	c.netChanged()
+	r.d.cache.drop(c.pos)
+	r.Broadcast(pos, &packet.BlockActorData{
+		Position: protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
+		NBTData:  be.NetworkData(pos),
+	}, nil)
+}
+
+// tickBlockEntities ticks the chunk's block entities, in the order they came. A
+// tick may remove some.
+func (r *Region) tickBlockEntities(c *Chunk) {
+	for i := 0; i < len(c.tickingEntities); i++ {
+		pos := c.tickingEntities[i]
+		if t, ok := c.blockEntities[pos].(BlockEntityTicker); ok {
+			t.TickBlockEntity(r, pos)
+		}
+	}
+}
+
+// savedBlockEntities returns the chunk's block entities as the store wants them.
+func (c *Chunk) savedBlockEntities() []chunk.BlockEntity {
+	if len(c.blockEntities) == 0 {
+		return nil
+	}
+	out := make([]chunk.BlockEntity, 0, len(c.blockEntities))
+	for pos, be := range c.blockEntities {
+		out = append(out, chunk.BlockEntity{Pos: pos, Data: be.SaveData(pos)})
+	}
+	return sortedBlockEntities(out)
+}
+
+// networkBlockEntities returns what the client gets of the chunk's block entities.
+func (c *Chunk) networkBlockEntities() []chunk.BlockEntity {
+	if len(c.blockEntities) == 0 {
+		return nil
+	}
+	out := make([]chunk.BlockEntity, 0, len(c.blockEntities))
+	for pos, be := range c.blockEntities {
+		out = append(out, chunk.BlockEntity{Pos: pos, Data: be.NetworkData(pos)})
+	}
+	return sortedBlockEntities(out)
+}
+
+// sortedBlockEntities puts them in a fixed order, so one chunk always saves and
+// encodes to the same bytes.
+func sortedBlockEntities(l []chunk.BlockEntity) []chunk.BlockEntity {
+	slices.SortFunc(l, func(a, b chunk.BlockEntity) int {
+		for i := range a.Pos {
+			if d := a.Pos[i] - b.Pos[i]; d != 0 {
+				return d
+			}
+		}
+		return 0
+	})
+	return l
+}

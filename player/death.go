@@ -42,6 +42,7 @@ func (p *Player) dead() bool { return p.Health() <= 0 }
 // the death event, the death info and the death message follow, and the
 // respawn sequence starts. Experience is not dropped yet.
 func vanillaDie(p *Player, cause DamageCause) {
+	p.leaveChest(p.entity.Region(), true)
 	if !p.s.level.KeepInventory {
 		p.dropAllOnDeath()
 	}

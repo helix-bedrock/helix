@@ -295,6 +295,7 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 	r.randomTicks(c, speed)
 	r.runQueue(c, &c.ticks, now)
 	r.runQueue(c, &c.randomTicks, c.randomTicks.clock+int64(speed))
+	r.tickBlockEntities(c)
 }
 
 // randomTicks gives random blocks of c a random tick: speed times 2.5 per

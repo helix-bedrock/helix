@@ -224,6 +224,11 @@ sibling library folders, so unreleased library changes are used.
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.
 - `connect`: the arms of fences, panes and bars, kept in their block states since 1.26, from helix-data's rules.
+- Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
+  `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`; `Dimension.SetBlockEntities` names who
+  makes them; those it does not take stay saved as they were). `player/chest.go` is the only one run so far:
+  BDS 1.26.60's pairing, lid and window, with `Inventory.open` as a stack request's copy of the open
+  chest (container `ContainerLevelEntity`).
 
 ## Design
 

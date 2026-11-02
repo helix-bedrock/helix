@@ -14,6 +14,7 @@ const (
 	containerOffhand       = protocol.ContainerOffhand
 	containerCursor        = protocol.ContainerCursor
 	containerCreatedOutput = protocol.ContainerCreatedOutput
+	containerLevelEntity   = protocol.ContainerLevelEntity
 )
 
 // Item locks, as BDS keeps them in an item's "minecraft:item_lock" tag.
@@ -48,6 +49,8 @@ type requestState struct {
 	// drops are what the running request dropped, spawned only if all of it
 	// passes.
 	drops []pendingDrop
+	// chest is the running request's copy of the open chest's items.
+	chest []ItemStack
 }
 
 // pendingDrop is an item a request took out to drop.
@@ -75,6 +78,7 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackResponse {
 	st := &p.requests
 	st.work = p.inventory
+	st.work.open = p.loadChestWork()
 	st.drops = st.drops[:0]
 	var touched []slotRef
 	for _, a := range req.Actions {
@@ -87,6 +91,7 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	// The created output only holds an item for the request that made it.
 	st.work.ui[createdOutputSlot] = ItemStack{}
 	p.inventory = st.work
+	p.commitChestWork()
 	p.spawnDrops()
 	p.sendEquipment()
 
@@ -210,6 +215,11 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.ui[createdOutputSlot]
+	case containerLevelEntity:
+		if int(slot) >= len(inv.open) {
+			return r, false
+		}
+		r.stack = &inv.open[slot]
 	default:
 		return r, false
 	}

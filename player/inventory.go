@@ -30,6 +30,9 @@ type Inventory struct {
 	ui      [uiSize]ItemStack
 	// held is the selected hotbar slot.
 	held uint8
+	// open is what a request works on of the chest the player has open, nil with
+	// none. The chest holds the real items.
+	open []ItemStack
 }
 
 // Held returns the item in the selected hotbar slot.

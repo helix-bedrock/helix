@@ -59,6 +59,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if b, ok := p.s.game.blocks[blocks.Name(u.Block)].(Usable); ok {
 		return b.Use(u)
 	}
+	if p.s.chests.kind[u.Block] != chestNone {
+		return p.useChest(r, u)
+	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)
 	}

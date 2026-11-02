@@ -2,6 +2,7 @@ package world
 
 import (
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/mcdb"
@@ -31,12 +32,11 @@ type netSub struct {
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, entities []chunk.BlockEntity) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
-	// Biomes, then no border blocks. Block entities are sent with block
-	// behaviour, which knows what the client may see of them.
+	// Biomes, then no border blocks. Block entities go with their sub chunk.
 	payload := append(chunk.EncodeBiomes(c, chunk.NetworkHashEncoding), 0)
 	// BDS sends no sub chunks in the packet (count 0) and tells the
 	// client how many to request, from the bottom, as the limit.
@@ -51,6 +51,15 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk) *NetC
 	for i := range subs {
 		s := &nc.subs[i]
 		s.payload = chunk.EncodeSubChunk(c, chunk.NetworkHashEncoding, i)
+		for _, be := range entities {
+			if int(c.SubY(int16(i))) != be.Pos[1]&^15 { //nolint:gosec // few sections
+				continue
+			}
+			// A compound that cannot be encoded is left out; the block still shows.
+			if data, err := nbt.MarshalEncoding(be.Data, nbt.NetworkLittleEndian); err == nil {
+				s.payload = append(s.payload, data...)
+			}
+		}
 		nc.size += len(s.payload)
 		s.hmType, s.hm = subHeightMap(heights, int(c.SubY(int16(i)))) //nolint:gosec // few sections
 	}

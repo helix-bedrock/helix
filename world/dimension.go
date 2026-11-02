@@ -138,6 +138,8 @@ type Dimension struct {
 	randomTickSpeed atomic.Int32
 	// entityLoader turns saved entities into live ones.
 	entityLoader atomic.Pointer[EntityLoader]
+	// blockEntities makes block entities.
+	blockEntities atomic.Pointer[BlockEntities]
 
 	closeOnce sync.Once
 	closeErr  error
@@ -164,6 +166,10 @@ type Chunk struct {
 	// savedLive means the store holds live entities for this chunk, so it
 	// must be saved when it unloads even if none are left in it.
 	savedLive bool
+	// blockEntities are the chunk's block entities, tickingEntities the
+	// positions of those that tick, in the order they came.
+	blockEntities   map[cube.Pos]BlockEntity
+	tickingEntities []cube.Pos
 	// tickedAt is the world tick the chunk last ticked in.
 	tickedAt int64
 }
@@ -379,7 +385,11 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	} else {
 		col.Chunk.ReplaceBiomes(d.resolveBiome)
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk)
+	entities := make([]chunk.BlockEntity, 0, len(col.BlockEntities))
+	for _, be := range col.BlockEntities {
+		entities = append(entities, chunk.BlockEntity{Pos: be.Pos, Data: savedNetworkData(be.Data)})
+	}
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
 	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard) })
 }

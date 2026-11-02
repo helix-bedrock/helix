@@ -103,16 +103,25 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   done. Buckets do not pick liquids up.
 - **Movement:** the client's position is taken as it is. BDS's server-side simulation and
   corrections will come with the optional anti-cheat module. Other containers (chests and the
-  like) do not open.
+  like, other than chests) do not open.
 - **Block use (first pass, not yet tested in game):** clicking a block follows BDS's order: the
   `OnBlockUse` event, the block's use, then the held item, and a held click stays with whichever the
   first click did. Doors, trapdoors, fence gates, levers and buttons work (new `blockuse` package).
   Doors place both halves with BDS's hinge rule and fall apart without their other half or support.
-  Buttons pop out after 20 or 30 ticks. No redstone output yet. Other blocks with a use (chests,
-  furnaces, beds...) do not react yet, so a block in hand is placed against them.
+  Buttons pop out after 20 or 30 ticks. No redstone output yet. Other blocks with a use (furnaces,
+  beds...) do not react yet, so a block in hand is placed against them.
 - **Fences, panes and bars (not yet tested in game):** since 1.26 their arms are in the block's own
   state, so the server works them out on placing and when a neighbour changes (new `connect` package,
   from BDS's per-state rules in helix-data's `bds/connections.json`). Walls are not done yet.
+- **Block entities and chests (first pass, not yet tested in game):** block entities now live with
+  their chunk while it is loaded (`world.BlockEntity`): made when their block is set, removed when it
+  changes type, ticked, saved in BDS's format and sent to clients in the chunk and when they change.
+  Ones the engine does not run yet keep their saved data untouched. Chests, trapped chests and copper
+  chests follow BDS 1.26.60: they pair with the chest beside them facing the same way, open unless the
+  block above stops the lid (BDS's list, then collision boxes), share one window between everyone
+  using them, move items with BDS's checks, re-pair after a load, and throw their items when broken.
+  Not done yet: chests dropping themselves (block drops), loot tables, cats on chests, redstone from
+  trapped chests, ender chests, barrels, and an API for plugins to read and change chest contents.
 - **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
   1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
   inventory are thrown at random (items kept on death stay), others see the death, the death screen

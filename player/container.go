@@ -2,6 +2,7 @@ package player
 
 import (
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/cube"
 )
 
 // Container window rules from BDS 1.26.60.
@@ -20,6 +21,17 @@ const (
 type windowState struct {
 	id   byte
 	open bool
+	// chest means the open window is the chest at chestPos.
+	chest    bool
+	chestPos cube.Pos
+}
+
+// nextID moves to the next window ID.
+func (w *windowState) nextID() {
+	w.id++
+	if w.id >= maxWindowID {
+		w.id = 1
+	}
 }
 
 // handleInteract is vanilla's Interact handler. Only opening the inventory
@@ -41,10 +53,7 @@ func handleInteract(p *Player, pk *packet.Interact) {
 // window ID, the position floored, no entity.
 func (p *Player) openInventory() {
 	w := &p.window
-	w.id++
-	if w.id >= maxWindowID {
-		w.id = 1
-	}
+	w.nextID()
 	w.open = true
 	p.send(&packet.ContainerOpen{
 		WindowID: w.id, ContainerType: containerTypeInventory,
@@ -57,6 +66,9 @@ func (p *Player) openInventory() {
 // whatever is open, whatever window the client names, and answers with
 // its own window ID and no type.
 func handleContainerClose(p *Player, _ *packet.ContainerClose) {
+	if p.entity != nil {
+		p.leaveChest(p.entity.Region(), false)
+	}
 	p.window.open = false
 	p.send(&packet.ContainerClose{WindowID: p.window.id, ContainerType: containerTypeNone})
 	p.flush()

@@ -143,6 +143,9 @@ func (r *Region) SetBlock(pos cube.Pos, layer uint8, block uint32) bool {
 	}
 	old, _ := r.Block(pos, layer)
 	r.set(c, pos, layer, block)
+	if layer == 0 && old != block {
+		r.blockTypeChanged(c, pos, old, block)
+	}
 	if t := r.d.conf.Ticker; t != nil && old != block {
 		t.Placed(r, pos, block, layer)
 	}
@@ -330,6 +333,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	col.ScheduledBlocks, col.RandomTicks = nil, nil
 	r.chunks[pos] = c
 	c.savedLive = r.loadEntities(c)
+	r.loadBlockEntities(c)
 	if fns, ok := r.awaiting[pos]; ok {
 		delete(r.awaiting, pos)
 		for _, fn := range fns {
@@ -386,9 +390,9 @@ func (r *Region) netChunk(pos mcdb.ChunkPos) *NetChunk {
 func (r *Region) encode(c *Chunk) {
 	c.encoding = true
 	d, pos := r.d, c.pos
-	snap, version := c.col.Chunk.Snapshot(), c.version
+	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
 	d.pool.do(pos, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap)
+		nc := encodeNetChunk(pos, d.conf.Dim, snap, entities)
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
 		}
@@ -429,6 +433,7 @@ func (r *Region) save(c *Chunk, ticks bool) {
 	d, pos, snap := r.d, c.pos, *c.col
 	snap.Chunk = c.col.Chunk.Snapshot()
 	snap.Entities, c.savedLive = r.entitiesToSave(c)
+	snap.BlockEntities = c.savedBlockEntities()
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	d.pool.do(pos, func() {
