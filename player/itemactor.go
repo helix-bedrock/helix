@@ -1,14 +1,18 @@
 package player
 
 import (
+	"maps"
 	"math"
+	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // An item actor's numbers, from BDS 1.26.60.
@@ -37,6 +41,11 @@ const (
 	itemBuoyancyAdd    = 0.0005
 	itemBuoyancyRate   = 0.01
 
+	// itemIdentifier is what an item is saved as; itemHealth is the health
+	// BDS gives a new one.
+	itemIdentifier = "minecraft:item"
+	itemHealth     = 5
+
 	// itemUniqueIDBase keeps items' unique IDs apart from players', which
 	// come from saved data or small runtime IDs.
 	itemUniqueIDBase = int64(1) << 48
@@ -48,8 +57,8 @@ const (
 // taken from a slot the server checked and is never replaced by anything a
 // client sends. Runs: owner of its entity.
 //
-// First pass from BDS 1.26.60: items are not saved with their chunk, do not
-// burn in lava or fire, and are not pushed out of a block placed on them.
+// First pass from BDS 1.26.60: items do not burn in lava or fire and are not
+// pushed out of a block placed on them.
 type ItemActor struct {
 	s      *Host
 	entity *world.Entity
@@ -58,6 +67,9 @@ type ItemActor struct {
 
 	age, pickupDelay, throwTime int32
 	onGround, taken             bool
+	// saved keeps what BDS saved for the item that Helix does not use (its
+	// health, owner and the actor fields), written back as it was.
+	saved map[string]any
 }
 
 // Stack returns the item's stack.
@@ -71,12 +83,74 @@ func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec
 	// A stack in the world has no slot, so no network ID the client names.
 	stack.netID = 0
 	i := &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime}
-	id := s.runtimeIDs.Add(1)
-	i.entity = d.AddEntity(world.EntityConfig{
-		UniqueID: itemUniqueIDBase + int64(id), RuntimeID: id, Pos: pos, Rot: rot, //nolint:gosec // runtime IDs are small
-		Owner: i, Spawn: i.spawnPackets, Move: i.movePacket, Input: i.tick,
-	})
+	// Random, since items saved by an earlier run keep their IDs.
+	i.entity = d.AddEntity(i.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, rot)) //nolint:gosec // an entity ID, not a secret
 	return i
+}
+
+// config is the item's entity.
+func (i *ItemActor) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+	return world.EntityConfig{
+		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
+		Owner: i, Spawn: i.spawnPackets, Move: i.movePacket, Input: i.tick, Save: i.saveEntity,
+	}
+}
+
+// saveEntity is the item as BDS saves it: the actor's fields, then Health, Age
+// and the Item. The pick-up delays are not saved, so they end on a reload.
+func (i *ItemActor) saveEntity(e *world.Entity) (chunk.Entity, bool) {
+	if i.taken || i.stack.Empty() {
+		return chunk.Entity{}, false
+	}
+	data := maps.Clone(i.saved)
+	if data == nil {
+		data = map[string]any{"Health": int16(itemHealth)}
+	}
+	pos, rot := e.Position(), e.Rotation()
+	var onGround uint8
+	if i.onGround {
+		onGround = 1
+	}
+	data["identifier"] = itemIdentifier
+	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Motion"] = []float32{i.vel[0], i.vel[1], i.vel[2]}
+	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
+	data["OnGround"] = onGround
+	data["Age"] = int16(i.age) //nolint:gosec // never past the lifetime
+	data["Item"] = i.stack.nbt(0, false)
+	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
+}
+
+// loadEntity is the world's EntityLoader: it brings back items, as BDS loads
+// their Age and Item, with no pick-up delays. Anything else stays saved until
+// the engine runs it.
+func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bool {
+	if id, _ := saved.Data["identifier"].(string); id != itemIdentifier {
+		return false
+	}
+	item, ok := saved.Data["Item"].(map[string]any)
+	pos, okPos := floats(saved.Data["Pos"])
+	if !ok || !okPos || len(pos) != 3 {
+		return false
+	}
+	stack := itemFromNBT(item)
+	if stack.Empty() {
+		return false
+	}
+	i := &ItemActor{s: s, stack: stack, saved: saved.Data}
+	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
+		i.vel = mgl32.Vec3{v[0], v[1], v[2]}
+	}
+	var rot world.Rotation
+	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
+		rot = world.Rotation{Yaw: v[0], Pitch: v[1], HeadYaw: v[0]}
+	}
+	age, _ := saved.Data["Age"].(int16)
+	i.age = int32(age)
+	onGround, _ := saved.Data["OnGround"].(uint8)
+	i.onGround = onGround != 0
+	i.entity = r.AddLoadedEntity(at, i.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
+	return true
 }
 
 // spawnPackets show the item to a player. The data is a first pass, not yet

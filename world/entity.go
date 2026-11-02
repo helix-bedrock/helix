@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -94,6 +95,78 @@ type EntityConfig struct {
 	// as if removed, and is added again with AddEntity when wanted. Nil
 	// drops it.
 	Unloaded func(e *Entity)
+	// Save returns what the entity is saved as with its chunk; false saves
+	// nothing. Nil means the entity is not saved. It runs on its region's
+	// tick, and the result must not be changed afterwards.
+	Save func(e *Entity) (chunk.Entity, bool)
+}
+
+// EntityLoader takes a saved entity of the chunk at pos that just loaded into
+// r, normally with [Region.AddLoadedEntity]. False leaves it saved in the chunk
+// as it is, as for entity types the engine does not run yet.
+type EntityLoader func(r *Region, pos mcdb.ChunkPos, saved chunk.Entity) bool
+
+// SetEntityLoader sets who turns saved entities into live ones. Set it before
+// any player joins: chunks loaded earlier keep their entities saved. Runs:
+// anywhere.
+func (d *Dimension) SetEntityLoader(fn EntityLoader) { d.entityLoader.Store(&fn) }
+
+// AddLoadedEntity adds an entity from the saved data of the chunk at pos,
+// which it stays in whatever its position says, until it moves. Runs: only in
+// an EntityLoader.
+func (r *Region) AddLoadedEntity(pos mcdb.ChunkPos, conf EntityConfig) *Entity {
+	e := &Entity{d: r.d, conf: conf, pos: conf.Pos, rot: conf.Rot, chunk: pos}
+	r.addEntity(e)
+	return e
+}
+
+// loadEntities offers the saved entities of a chunk that just loaded to the
+// EntityLoader and leaves those it did not take. It reports whether it took
+// any.
+func (r *Region) loadEntities(c *Chunk) bool {
+	load := r.d.entityLoader.Load()
+	if load == nil {
+		return false
+	}
+	took := false
+	kept := c.col.Entities[:0]
+	for _, saved := range c.col.Entities {
+		if (*load)(r, c.pos, saved) {
+			took = true
+			continue
+		}
+		kept = append(kept, saved)
+	}
+	c.col.Entities = kept
+	return took
+}
+
+// holdsSaved reports whether a live entity in the chunk at pos is saved with
+// it.
+func (r *Region) holdsSaved(pos mcdb.ChunkPos) bool {
+	for _, e := range r.byChunk[pos] {
+		if e.conf.Save != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// entitiesToSave returns the chunk's saved entities the engine does not run
+// plus the live ones, and whether there were any live ones.
+func (r *Region) entitiesToSave(c *Chunk) ([]chunk.Entity, bool) {
+	all := slices.Clip(c.col.Entities)
+	live := false
+	for _, e := range r.byChunk[c.pos] {
+		if e.conf.Save == nil {
+			continue
+		}
+		if saved, ok := e.conf.Save(e); ok {
+			all = append(all, saved)
+			live = true
+		}
+	}
+	return all, live
 }
 
 // AddEntity adds an entity, in its viewer's region for a player, else in

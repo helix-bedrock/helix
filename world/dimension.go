@@ -136,6 +136,8 @@ type Dimension struct {
 	entityView atomic.Int32
 	// randomTickSpeed is the live RandomTickSpeed.
 	randomTickSpeed atomic.Int32
+	// entityLoader turns saved entities into live ones.
+	entityLoader atomic.Pointer[EntityLoader]
 
 	closeOnce sync.Once
 	closeErr  error
@@ -159,6 +161,9 @@ type Chunk struct {
 	// save or when it unloads.
 	ticks, randomTicks tickQueue
 	ticksDirty         bool
+	// savedLive means the store holds live entities for this chunk, so it
+	// must be saved when it unloads even if none are left in it.
+	savedLive bool
 	// tickedAt is the world tick the chunk last ticked in.
 	tickedAt int64
 }

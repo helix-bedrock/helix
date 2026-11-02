@@ -156,7 +156,10 @@ sibling library folders, so unreleased library changes are used.
   than BDS: client items are compared, never kept (lead's decision, core
   architecture, not anti-cheat). `Give`, pick-up and held item updates.
   `itemactor.go`: item entities with BDS 1.26.60's tick (`DropItem`, `PickUp`
-  systems). World gained `EntityConfig.Owner`, `Region.AppendEntitiesIn`.
+  systems), saved with their chunk in BDS's format. World gained
+  `EntityConfig.Owner`, `Region.AppendEntitiesIn`, and for saving `EntityConfig.Save`
+  and `Dimension.SetEntityLoader` (saved entities nothing takes, such as mobs, stay
+  in the chunk's data untouched).
   Armour and offhand take the items BDS allows (registry `Wearable`,
   `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
   Crafting is refused until built.

@@ -117,8 +117,9 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
   own snow layer rule, are not done.
-- **Crafting** is not done yet. **Item entities** are a first pass: they are not saved with their
-  chunk, do not burn in lava or fire, are not pushed out of a block placed on them, and their
+- **Crafting** is not done yet. **Item entities** are a first pass: they are saved with their chunk
+  (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
+  infinite world's ungenerated ones), do not burn in lava or fire, are not pushed out of a block placed on them, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
 - **Everything else** (mobs, combat, redstone, commands, UI) comes after core player gameplay.
   [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which

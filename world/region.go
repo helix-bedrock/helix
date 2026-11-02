@@ -281,8 +281,8 @@ func (r *Region) release(pos mcdb.ChunkPos) {
 	}
 	delete(r.holds, pos)
 	if c, ok := r.chunks[pos]; ok {
-		r.unloadChunkEntities(pos)
 		r.save(c, true)
+		r.unloadChunkEntities(pos)
 		delete(r.chunks, pos)
 	}
 	s := r.d.sectionOf(pos)
@@ -329,6 +329,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)
 	col.ScheduledBlocks, col.RandomTicks = nil, nil
 	r.chunks[pos] = c
+	c.savedLive = r.loadEntities(c)
 	if fns, ok := r.awaiting[pos]; ok {
 		delete(r.awaiting, pos)
 		for _, fn := range fns {
@@ -418,15 +419,16 @@ func (r *Region) saveChanged(ticks bool) {
 }
 
 // save saves c if its blocks changed, or with ticks set, if its tick queues
-// changed: they are saved with the blocks but do not make a save of their
-// own every tick.
+// changed or it has or had live entities: they are saved with the blocks but
+// do not make a save of their own every tick.
 func (r *Region) save(c *Chunk, ticks bool) {
-	if !c.dirty && (!ticks || !c.ticksDirty) || c.discard {
+	if c.discard || !c.dirty && (!ticks || !c.ticksDirty && !c.savedLive && !r.holdsSaved(c.pos)) {
 		return
 	}
 	c.dirty, c.ticksDirty = false, false
 	d, pos, snap := r.d, c.pos, *c.col
 	snap.Chunk = c.col.Chunk.Snapshot()
+	snap.Entities, c.savedLive = r.entitiesToSave(c)
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	d.pool.do(pos, func() {
