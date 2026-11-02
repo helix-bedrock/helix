@@ -18,6 +18,30 @@ func TestBlockDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.drops = table
+	setup, err := NewSetup(s.log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.game, err = setup.freezeGameplay(); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		block, item string
+		want        bool
+	}{
+		{"minecraft:dirt", "", true},
+		{"minecraft:stone", "", false},
+		{"minecraft:stone", "minecraft:wooden_pickaxe", true},
+		{"minecraft:diamond_ore", "minecraft:wooden_pickaxe", false},
+	} {
+		b := BreakInfo{Player: p, Name: c.block}
+		if c.item != "" {
+			b.Item = ItemStack{Name: c.item, Count: 1}
+		}
+		if got := s.game.harvests(&b); got != c.want {
+			t.Errorf("%s with %q harvests = %v", c.block, c.item, got)
+		}
+	}
 	stone, _ := s.reg.Blocks.Block("minecraft:stone")
 	items := vanillaDrops(s, stone, &loot.Context{})
 	if len(items) != 1 || items[0].Name != "minecraft:cobblestone" || items[0].Count != 1 || items[0].Block == nil {

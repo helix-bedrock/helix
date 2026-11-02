@@ -371,7 +371,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		p.hurtHeld(g.sys.Wear(&b))
 		// BDS reads the item after wearing it: a tool that just broke no
 		// longer harvests, and its Fortune and Silk Touch are gone.
-		if worn, ok := p.breakInfo(r, pos); ok && worn.Harvest {
+		if worn, ok := p.breakInfo(r, pos); ok && g.harvests(&worn) {
 			drops = g.sys.Drops(p.s, b.Block, p.breakContext(r, pos))
 		}
 	}

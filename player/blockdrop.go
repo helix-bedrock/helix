@@ -24,6 +24,13 @@ const (
 	dropUp        = 0.2
 )
 
+// harvests reports whether the item in b is the right tool, or none is needed. Only
+// the tool speed hook works this out, so it runs here.
+func (g *gameplay) harvests(b *BreakInfo) bool {
+	g.sys.ToolSpeed(b)
+	return b.Harvest
+}
+
 // DropsFunc returns the items a block drops, given what broke it. Replace it in
 // Systems to change drops. Runs: on the region tick.
 type DropsFunc func(s *Host, block uint32, c *loot.Context) []ItemStack
