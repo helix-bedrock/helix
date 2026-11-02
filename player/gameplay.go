@@ -123,6 +123,7 @@ type gameplay struct {
 	chestPairEv  listeners[ChestPairEvent]
 	chestSpillEv listeners[ChestSpillEvent]
 	dropsEv      listeners[BlockDropsEvent]
+	xpEv         listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
 }
@@ -146,6 +147,7 @@ type gameState struct {
 	chestPairEv  listeners[ChestPairEvent]
 	chestSpillEv listeners[ChestSpillEvent]
 	dropsEv      listeners[BlockDropsEvent]
+	xpEv         listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
 	// out is the gameplay freeze fills; vanilla's steps read its tables,
@@ -325,7 +327,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv,
-		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, dropRules: maps.Clone(gs.dropRules),
+		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 	}
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
@@ -341,5 +343,6 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.chestPairEv.freeze()
 	g.chestSpillEv.freeze()
 	g.dropsEv.freeze()
+	g.xpEv.freeze()
 	return g, nil
 }

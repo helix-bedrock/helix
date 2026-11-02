@@ -8,6 +8,7 @@ import (
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // ChestOpenEvent is a player opening a chest or ender chest, before the window
@@ -66,6 +67,31 @@ type ChestItemEvent struct {
 	Old, New ItemStack
 	// Cursor is what the player's cursor will hold after the request.
 	Cursor ItemStack
+	// InventorySlots are the player's inventory slots the request changes: where a
+	// shift-click puts what it takes. Read and change them with InventoryItem and
+	// SetInventoryItem.
+	InventorySlots []int
+}
+
+// InventoryItem returns what a slot of the player's inventory will hold after the
+// request.
+func (e *ChestItemEvent) InventoryItem(slot int) ItemStack {
+	if slot < 0 || slot >= inventorySize {
+		return ItemStack{}
+	}
+	return e.Player.requests.work.main[slot]
+}
+
+// SetInventoryItem changes what a slot of the player's inventory will hold after the
+// request. It is taken as it is, with no checks. False if there is no such slot.
+func (e *ChestItemEvent) SetInventoryItem(slot int, s ItemStack) bool {
+	if slot < 0 || slot >= inventorySize {
+		return false
+	}
+	st := &e.Player.requests
+	st.work.main[slot] = e.Player.s.freshStack(s)
+	st.refresh = true
+	return true
 }
 
 // ChestPairEvent is a placed chest about to pair with the one beside it. Cancel it to
@@ -144,6 +170,17 @@ func sameStack(a, b ItemStack) bool {
 // ChestAt returns the chest or ender chest at pos, nil if none is there. Runs: owner
 // of the chunk.
 func (s *Host) ChestAt(r *world.Region, pos cube.Pos) *Chest { return s.chestAt(r, pos) }
+
+// WithChest runs fn on the owner of the chest at pos in the dimension, loading its
+// chunk; c is nil if no chest is there. Runs: anywhere.
+func (s *Host) WithChest(d *world.Dimension, pos cube.Pos, fn func(r *world.Region, c *Chest)) {
+	d.RunAt(mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)}, func(r *world.Region) { //nolint:gosec // chunk coordinates fit int32
+		fn(r, s.chestAt(r, pos))
+	})
+}
+
+// Overworld returns the overworld.
+func (s *Host) Overworld() *world.Dimension { return s.overworld }
 
 // Pos returns where the chest is.
 func (c *Chest) Pos() cube.Pos { return c.pos }
@@ -306,8 +343,8 @@ func (c *Chest) Name() string {
 	return name
 }
 
-// SetName sets the custom name of the whole chest, shown on its window the next time
-// it opens; empty removes it.
+// SetName sets the custom name of the whole chest; empty removes it. Anyone with it
+// open has the window opened again, because a client reads the name only on opening.
 func (c *Chest) SetName(r *world.Region, name string) {
 	lead, follower := c.halves(r)
 	for _, half := range [...]*Chest{lead, follower} {
@@ -322,9 +359,23 @@ func (c *Chest) SetName(r *world.Region, name string) {
 		} else {
 			half.saved["CustomName"] = name
 		}
-		half.changed = true
+		half.changed = false
+		r.SendBlockEntity(half.pos)
 		r.SaveBlockEntity(half.pos)
 	}
+	for _, v := range lead.viewers {
+		if v.entity != nil && v.entity.Region() == r {
+			v.reopenChest(r, c)
+		}
+	}
+}
+
+// reopenChest shows the window again, the player staying among the chest's viewers
+// so the lid stays up and no close event fires.
+func (p *Player) reopenChest(r *world.Region, c *Chest) {
+	p.sendNow(&packet.ContainerClose{WindowID: p.window.id, ContainerType: containerTypeNone, ServerSide: true})
+	p.window.open = false
+	p.openChest(r, c, p.window.chestPos)
 }
 
 // PairWith pairs this chest with other as its lead, closing their windows. BDS's rule
@@ -434,6 +485,12 @@ func (p *Player) fireChestItems() bool {
 	if c == nil {
 		return true
 	}
+	var changed []int
+	for i := range st.work.main {
+		if s, o := &st.work.main[i], &p.inventory.main[i]; s.netID != o.netID || s.Count != o.Count {
+			changed = append(changed, i)
+		}
+	}
 	for i := range work {
 		var old ItemStack
 		if c.ender {
@@ -446,7 +503,7 @@ func (p *Player) fireChestItems() bool {
 		}
 		e := ChestItemEvent{
 			Player: p, Region: r, Chest: c, Slot: i, Change: chestChange(old, work[i]),
-			Old: old, New: work[i], Cursor: st.work.ui[cursorSlot],
+			Old: old, New: work[i], Cursor: st.work.ui[cursorSlot], InventorySlots: changed,
 		}
 		g.chestItemEv.fire(p.s.log, &e)
 		if e.Cancelled() {

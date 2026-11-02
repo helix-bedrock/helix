@@ -667,7 +667,7 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 	}
 	lead, _ := c.halves(r)
 	w.nextID()
-	w.open, w.chest, w.chestPos = true, true, pos
+	w.open, w.chest, w.chestPos, w.chestDim = true, true, pos, r.Dimension()
 	p.send(&packet.ContainerOpen{
 		WindowID: w.id, ContainerType: byte(protocol.ContainerTypeContainer),
 		ContainerPosition:       protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
@@ -709,7 +709,11 @@ func (p *Player) leaveChest(r *world.Region, serverSide bool) {
 			return
 		}
 	}
-	p.s.overworld.RunAt(mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)}, func(o *world.Region) { //nolint:gosec // chunk coordinates fit int32
+	dim := p.window.chestDim
+	if dim == nil {
+		return
+	}
+	dim.RunAt(mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)}, func(o *world.Region) { //nolint:gosec // chunk coordinates fit int32
 		if c := p.s.chestAt(o, pos); c != nil {
 			lead, _ := c.halves(o)
 			lead.removeViewer(o, p)

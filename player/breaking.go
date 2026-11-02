@@ -378,7 +378,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		becomes, wear = e.Becomes, e.Wear
 	}
 	p.hurtHeld(wear)
-	drops := p.blockDrops(r, pos, b.Block)
+	drops, xp := p.blockDrops(r, pos, b.Block)
 	if !r.SetBlock(pos, 0, becomes) {
 		return false
 	}
@@ -386,6 +386,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	g.sys.Exhaust(p, g.sys.Exhaustion.Mine)
 	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
 	p.s.throwDrops(r, drops)
+	p.s.SpawnExperience(r, blockVec(pos), xp)
 	p.brk.broken++
 	return true
 }

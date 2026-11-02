@@ -73,6 +73,11 @@ func TestChestAPI(t *testing.T) {
 			}
 			if rewrite {
 				e.New.Name = "minecraft:stick"
+				for _, slot := range e.InventorySlots {
+					s := e.InventoryItem(slot)
+					s.Name = "minecraft:apple"
+					e.SetInventoryItem(slot, s)
+				}
 			}
 		}, Normal)
 		_ = OnChestOpen(s, func(e *ChestOpenEvent) {
@@ -128,6 +133,11 @@ func TestChestAPI(t *testing.T) {
 		if resp := take(); resp.Status != protocol.ItemStackResponseStatusOK || c.Item(r, 1).Name != "minecraft:stick" || !p.requests.refresh {
 			t.Errorf("rewritten take: status %d, chest %+v", resp.Status, c.Item(r, 1))
 		}
+		moved := &protocol.TakeStackRequestAction{}
+		moved.Count, moved.Source, moved.Destination = 1, slotInfo(containerLevelEntity, 1, c.Item(r, 1).netID), slotInfo(containerCombined, 1, 0)
+		if resp := p.stackRequest(protocol.ItemStackRequest{RequestID: 2, Actions: []protocol.StackRequestAction{moved}}); resp.Status != protocol.ItemStackResponseStatusOK || p.inventory.main[1].Name != "minecraft:apple" {
+			t.Errorf("shift-click: status %d, slot %+v", resp.Status, p.inventory.main[1])
+		}
 		p.leaveChest(r, false)
 		if closed != 1 || len(c.Viewers(r)) != 0 {
 			t.Errorf("close events %d, viewers %d", closed, len(c.Viewers(r)))
@@ -152,6 +162,7 @@ func TestBlockDropsEvent(t *testing.T) {
 			harvest = e.Harvest
 			if e.Player.s.reg.Blocks.Name(e.Block) == "minecraft:glass" {
 				e.Drops = append(e.Drops, NewBlockDrop(e.Pos, ItemStack{Name: "minecraft:diamond", Count: 3}))
+				e.XP = 11
 			}
 		}, Normal)
 	})
@@ -175,6 +186,9 @@ func TestBlockDropsEvent(t *testing.T) {
 	count := func(r *world.Region) map[string]int {
 		got := map[string]int{}
 		for _, e := range r.AppendEntitiesIn(nil, 0, 0, 15, 15) {
+			if o, ok := e.Owner().(*XPOrb); ok {
+				got["xp"] += int(o.value)
+			}
 			if it, ok := e.Owner().(*ItemActor); ok {
 				got[it.stack.Name] += int(it.stack.Count)
 				it.taken = true
@@ -200,7 +214,26 @@ func TestBlockDropsEvent(t *testing.T) {
 	})
 	var got map[string]int
 	runIn(t, d, func(r *world.Region) { got = count(r) })
-	if got["minecraft:dirt"] != 1 || got["minecraft:cobblestone"] != 0 || got["minecraft:diamond"] != 3 {
+	if got["minecraft:dirt"] != 1 || got["minecraft:cobblestone"] != 0 || got["minecraft:diamond"] != 3 || got["xp"] != 11 {
 		t.Errorf("in the world: %v", got)
+	}
+}
+
+// TestExperience checks BDS's orb sizes and level sums.
+func TestExperience(t *testing.T) {
+	for amount, want := range map[int32]int32{1: 1, 2: 1, 3: 3, 6: 3, 7: 7, 16: 7, 17: 17, 2476: 1237, 2477: 2477} {
+		if got := xpOrbSize(amount); got != want {
+			t.Errorf("orb of %d = %d, want %d", amount, got, want)
+		}
+	}
+	for level, want := range map[int32]int32{0: 7, 14: 35, 15: 37, 29: 107, 30: 112} {
+		if got := xpForLevel(level); got != want {
+			t.Errorf("level %d costs %d, want %d", level, got, want)
+		}
+	}
+	var reached []int32
+	level, progress := gainExperience(0, 0, 16, func(l int32) { reached = append(reached, l) })
+	if level != 2 || progress > 1e-3 || len(reached) != 2 {
+		t.Errorf("16 from nothing: level %d progress %v reached %v", level, progress, reached)
 	}
 }

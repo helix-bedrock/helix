@@ -35,6 +35,10 @@ func testCommandList() *packet.AvailableCommands {
 	for i := range idx {
 		idx[i] = uint32(i)
 	}
+	chestIdx := make([]uint32, len(chestTestActions))
+	for i := range chestIdx {
+		chestIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + i)
+	}
 	itemIdx := make([]uint32, len(itemTestActions))
 	for i := range itemIdx {
 		itemIdx[i] = uint32(len(testModeNames) + i)
@@ -58,10 +62,19 @@ func testCommandList() *packet.AvailableCommands {
 		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
 		Overloads: []protocol.CommandOverload{itemOverload},
 	}
+	chest := protocol.Command{
+		Name: chestTestCommand, Description: "Tests the chest API: refuse, rewrite, name, off.",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 2},
+		}}},
+	}
 	return &packet.AvailableCommands{
-		EnumValues: slices.Concat(testModeNames, itemTestActions),
-		Enums:      []protocol.CommandEnum{{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}},
-		Commands:   []protocol.Command{cmd("gamemode"), cmd("gm"), item},
+		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions),
+		Enums: []protocol.CommandEnum{
+			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
+		},
+		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest},
 	}
 }
 
@@ -85,6 +98,42 @@ func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestD
 		left := i.TicksLeft() / ticksPerSecond
 		v.Name = fmt.Sprintf("%d:%02d %s", left/60, left%60, p.Name())
 	})
+}
+
+// chestTestCommand is the command that tries the chest API.
+const chestTestCommand = "chesttest"
+
+// chestTestActions are what chestTestCommand takes: refuse every move in a chest,
+// rewrite turns what lands in the chest into sticks and what is taken into apples,
+// name renames the chest in the player's window.
+var chestTestActions = []string{"refuse", "rewrite", "name", "off"}
+
+// The chest test modes.
+const (
+	chestTestOff int32 = iota
+	chestTestRefuse
+	chestTestRewrite
+)
+
+// chestTest runs the chest test's item rule.
+func chestTest(mode int32, e *player.ChestItemEvent) {
+	switch mode {
+	case chestTestRefuse:
+		e.Cancel()
+	case chestTestRewrite:
+		if !e.New.Empty() {
+			e.New.Name, e.New.Block = "minecraft:stick", nil
+		}
+		if !e.Cursor.Empty() {
+			e.Cursor.Name, e.Cursor.Block = "minecraft:apple", nil
+		}
+		for _, slot := range e.InventorySlots {
+			if s := e.InventoryItem(slot); !s.Empty() {
+				s.Name, s.Block = "minecraft:apple", nil
+				e.SetInventoryItem(slot, s)
+			}
+		}
+	}
 }
 
 // itemTestCommand is the command that tries the item API.
@@ -200,8 +249,33 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	}); err != nil {
 		return err
 	}
+	var chestMode atomic.Int32
+	if err := player.OnChestItem(setup, func(e *player.ChestItemEvent) { chestTest(chestMode.Load(), e) }, player.Normal); err != nil {
+		return err
+	}
+	var chestNames atomic.Int32
+	if err := player.OnChestOpen(setup, func(e *player.ChestOpenEvent) {
+		if chestNames.Swap(0) != 0 {
+			e.Chest.SetName(e.Region, "Renamed by /chesttest")
+		}
+	}, player.Normal); err != nil {
+		return err
+	}
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) == 2 && args[0] == chestTestCommand {
+			switch args[1] {
+			case "refuse":
+				chestMode.Store(chestTestRefuse)
+			case "rewrite":
+				chestMode.Store(chestTestRewrite)
+			case "name":
+				chestNames.Store(1)
+			default:
+				chestMode.Store(chestTestOff)
+			}
+			return
+		}
 		if len(args) > 0 && args[0] == itemTestCommand {
 			// A failed write means the connection is closing, as above.
 			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: itemTest(p, settings(p), srv, args[1:])})

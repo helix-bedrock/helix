@@ -50,8 +50,9 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Plugins:** can add, replace and delete any registry entry in `Config.Setup`. World packets go
   through a handler table plugins can replace or wrap, per packet or per system (movement so far),
   on the player's region tick. Chests and ender chests have events before anything happens (open,
-  close, each slot a player changes, pairing, spilling) and methods to read and change their items,
-  name and pair (`Host.ChestAt`, `Chest`, `Player.EnderItem`). Block breaks say what is left behind and
+  close, each slot a player changes with the inventory slots it changes, pairing, spilling) and methods
+  to read and change their items, name and pair (`Host.ChestAt`, `Host.WithChest`, `Chest`, `Player.EnderItem`).
+  Experience has `OnExperience`, `Player.AddExperience`, `SetLevel` and `Host.SpawnExperience`. Block breaks say what is left behind and
   how much the tool wears, and `OnBlockDrops` and `Setup.SetBlockDrops` decide what comes out, where
   and how fast (not yet tested in game).
 
@@ -146,7 +147,8 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Block drops (first pass, not yet tested in game):** survival players breaking a block with the
   right tool get BDS 1.26.60's drops for all 1,480 blocks (new `loot` package, from helix-data's
   `bds/block_drops.json` and its block loot tables). Plugins can change all of it (see Plugins above).
-  Not done yet: experience orbs, items built from a block entity (the plain item drops), chests filling
+  Blocks give BDS's experience orbs, which follow the nearest player and raise its level (Mending, how
+  far they spread at first and what BDS sends about them are not compared yet). Not done yet: items built from a block entity (the plain item drops), chests filling
   from `LootTable`, enchantment loot functions, drops from anything but a player breaking the block. The
   speed items leave a broken block at was not read from BDS.
 - **Crafting** is not done yet. **Item entities** are a first pass: they are saved with their chunk

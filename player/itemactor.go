@@ -149,7 +149,11 @@ func (i *ItemActor) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 // their Age and Item, with no pick-up delays. Anything else stays saved until
 // the engine runs it.
 func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bool {
-	if id, _ := saved.Data["identifier"].(string); id != itemIdentifier {
+	id, _ := saved.Data["identifier"].(string)
+	if id == xpOrbIdentifier {
+		return s.loadOrb(r, at, saved)
+	}
+	if id != itemIdentifier {
 		return false
 	}
 	item, ok := saved.Data["Item"].(map[string]any)

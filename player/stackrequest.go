@@ -95,6 +95,7 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 		}
 		touched = append(touched, refs...)
 	}
+	// Listeners work on the copy, so refusing here changes nothing.
 	if !p.fireChestItems() {
 		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
 	}

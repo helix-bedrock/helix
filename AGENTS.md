@@ -233,6 +233,8 @@ sibling library folders, so unreleased library changes are used.
   request, changes make the player get its items resent), `OnChestPair`, `OnChestSpill`, and methods on `Chest`
   and `Player`, which fire no events. `player/blockdrop.go`: what a player's break drops (`Systems.Drops`, from
   the `loot` package, BDS's rule per block), `OnBlockDrops`, `Setup.SetBlockDrops`.
+  `player/xporb.go`: experience orbs (`XPOrb`, BDS's sizes, merging, pull and touch; saved with the chunk) and
+  levels (`AddExperience`, `OnExperience`). `-testcmds` adds /chesttest to try the chest events in game.
 
 ## Design
 

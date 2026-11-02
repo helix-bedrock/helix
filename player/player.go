@@ -81,7 +81,9 @@ type Player struct {
 	// breakSpeed multiplies the player's break speed; reachScale its
 	// reach. Both 1 by default.
 	breakSpeed float32
-	reachScale float32
+	// lastLevelSound is the tick of the last level sound.
+	lastLevelSound int64
+	reachScale     float32
 	// rng is the player's random source (item wear).
 	rng *rand.Rand
 }
@@ -109,6 +111,9 @@ func (s *Host) newPlayer(c *network.Conn, id uuid.UUID) (*Player, error) {
 
 // Name returns the player's display name. Runs: anywhere.
 func (p *Player) Name() string { return p.name }
+
+// Host returns the Host the player is on.
+func (p *Player) Host() *Host { return p.s }
 
 // UUID returns the player's identity UUID. Runs: anywhere.
 func (p *Player) UUID() uuid.UUID { return p.uuid }

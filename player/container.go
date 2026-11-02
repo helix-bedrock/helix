@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -24,6 +25,8 @@ type windowState struct {
 	// chest means the open window is the chest at chestPos.
 	chest    bool
 	chestPos cube.Pos
+	// chestDim is the dimension of that chest.
+	chestDim *world.Dimension
 }
 
 // nextID moves to the next window ID.

@@ -390,6 +390,9 @@ func (s *Server) broadcast(pk packet.Packet) {
 // types (frozen), and the creative inventory and recipes (changeable).
 func (s *Server) Registry() *registry.Registry { return s.reg }
 
+// Host returns what runs the players, nil until Run started.
+func (s *Server) Host() *player.Host { return s.players.Load() }
+
 // Players returns the players online. Empty until Run started.
 func (s *Server) Players() []*player.Player {
 	if host := s.players.Load(); host != nil {

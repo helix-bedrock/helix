@@ -69,7 +69,7 @@ type BlockDropsEvent struct {
 	// tool or none needed.
 	Harvest bool
 	Drops   []BlockDrop
-	// XP is the experience the block gives. It is only reported: no orbs exist yet.
+	// XP is the experience the block gives, as orbs from the block's corner.
 	XP int32
 }
 
@@ -99,7 +99,7 @@ type DropsFunc func(s *Host, block uint32, c *loot.Context) ([]ItemStack, int32)
 // blockDrops is what a player's break of the block at pos throws out: the Drops
 // system if vanilla's rule lets it drop, then the event. BDS reads the item after
 // wearing it, so a tool that just broke no longer harvests.
-func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) []BlockDrop {
+func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) ([]BlockDrop, int32) {
 	g := p.s.game
 	var drops []BlockDrop
 	var xp int32
@@ -119,11 +119,11 @@ func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) []Block
 		e := BlockDropsEvent{Player: p, Region: r, Pos: pos, Block: block, Item: p.inventory.Held(), Harvest: harvest, Drops: drops, XP: xp}
 		g.dropsEv.fire(p.s.log, &e)
 		if e.Cancelled() {
-			return nil
+			return nil, 0
 		}
-		return e.Drops
+		return e.Drops, e.XP
 	}
-	return drops
+	return drops, xp
 }
 
 // vanillaDrops is BDS's getResourceDrops, through its drop rule.
