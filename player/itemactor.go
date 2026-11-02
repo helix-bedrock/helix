@@ -118,6 +118,7 @@ func (i *ItemActor) tick(e *world.Entity) {
 	if i.throwTime > 0 {
 		i.throwTime--
 	}
+	i.applyFlow(r, e.Position())
 	gravity, inWater := i.liquidForces(r, e.Position())
 	if i.age > 0 && i.age%itemMergeInterval == 0 {
 		i.mergeNearby(r, e.Position())

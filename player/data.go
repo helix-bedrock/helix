@@ -23,6 +23,12 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 	}
 	p.abilities.load(data)
 	p.attributes.load(data)
+	// Death and respawn are not built, so a player who fell to 0 health was
+	// saved that way and could never pick up an item again. Helix's stopgap,
+	// not from BDS: come back with full health.
+	if p.Health() <= 0 {
+		p.attributes.set(attrHealth, playerAttributes[attrHealth].def)
+	}
 	p.inventory.load(data, func() int32 { return p.s.stackIDs.Add(1) })
 	if id, isInt := data["UniqueID"].(int64); isInt {
 		p.uniqueID = id
