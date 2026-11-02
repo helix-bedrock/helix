@@ -65,7 +65,7 @@ What works today and what is left is in [STATUS.md](STATUS.md).
 | Registry (blocks, items, biomes, entities, creative items, recipes) | ✅ done |
 | Chunk loading, sending and saving, tickets | ✅ done |
 | Regions (parallel ticking, merge and split) | ✅ done |
-| Block ticks (random and scheduled) | 🟡 ticks run; no vanilla block behaviour yet |
+| Block ticks (random and scheduled) | 🟡 ticks run; water and lava flow, other blocks have no behaviour yet |
 | Players (spawn, movement, seeing each other, abilities, attributes) | 🟡 in progress |
 | Inventory | 🟡 changes checked as BDS does; dropping and crafting not done |
 | Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | ⬜ not hooked up |

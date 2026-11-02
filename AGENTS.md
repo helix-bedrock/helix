@@ -40,7 +40,8 @@ sibling library folders, so unreleased library changes are used.
   `CollisionComputed` marks the states that need the world, a block
   entity or the colliding entity: doors (`Door`), shulker boxes,
   scaffolding, powder snow, end gateways, piston parts), BDS's climbable flag
-  and material per block, and `chunk.BlockRegistry`
+  and material per block, its liquid facts (reaction, can contain liquid,
+  solid material; helix-data's `bds/liquids.json`), and `chunk.BlockRegistry`
   for the world library. Items: BDS's network IDs, versions and
   components, stack sizes and tags, and the ItemRegistry packet built once.
   Biomes: BDS's numeric IDs, climate and tags, `Resolve` for deleted or
@@ -50,6 +51,11 @@ sibling library folders, so unreleased library changes are used.
   online players. Unchanged, every packet is BDS's own; once a plugin
   changes biomes or entity types they are rebuilt (tests check the rebuild
   of vanilla is byte for byte BDS's). `Vanilla` loads helix-data.
+- `liquid`: water and lava as BDS 1.26.60 (`Liquids`, the default
+  `Config.BlockTicker`): the tick (depth from the neighbours, infinite
+  water, falling, spreading along the shortest way down), lava solidifying,
+  and the old `flowing_*` names turning into water and lava. Not ported:
+  lava fire, drops of blocks liquids replace, stair and slab shape rules.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.
@@ -79,8 +85,14 @@ sibling library folders, so unreleased library changes are used.
   queues (pending ticks and the random ticking queue, up to 100 each, in
   time then priority order, waiting while chunks within 8 blocks are not
   loaded, run only if the block type is still there). Blocks get their
-  behaviour through `Config.Ticker` (`BlockTicker`); `Region.ScheduleTick`
-  adds ticks. The queues are saved with the chunk; the world tick clock
+  behaviour through `Config.Ticker` (`BlockTicker`): ticks, `Placed`
+  (BDS's onPlace, from `Region.SetBlock` when the state changes) and
+  `NeighbourChanged` (from `Region.UpdateNeighbours`, BDS's order -x +x
+  +z -z +y -y, layer 0 then the second layer). Gameplay that changes a
+  block calls `SetBlock` then `UpdateNeighbours`, as BDS's update flag.
+  `SetBlock` of air on layer 0 moves a block's second layer (water in a
+  waterlogged block) down, as BDS's chunk does. `Region.ScheduleTick`
+  adds ticks; `Region.Local` keeps a system's per-region working state. The queues are saved with the chunk; the world tick clock
   lives on the `Scheduler` and in level.dat's currentTick. Tickets
   (`ticket.go`, RFC 0003): `Dimension.KeepLoaded(area, ticking)` holds
   every chunk of an `Area` (`Chunks`, `Box`, `Radius`) as a simulation

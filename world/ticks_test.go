@@ -42,6 +42,10 @@ func (tt *testTicker) QueuedTick(_ *Region, pos cube.Pos, _ uint32) {
 	tt.mu.Unlock()
 }
 
+func (*testTicker) Placed(*Region, cube.Pos, uint32, uint8) {}
+
+func (*testTicker) NeighbourChanged(*Region, cube.Pos, cube.Pos, uint32, uint8) {}
+
 func (tt *testTicker) queuedTicks() []cube.Pos {
 	tt.mu.Lock()
 	defer tt.mu.Unlock()

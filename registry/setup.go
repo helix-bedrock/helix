@@ -58,10 +58,52 @@ type Properties struct {
 	Climbable bool
 	// Material is BDS's MaterialType of the block (0 air, 5 water, 6 lava).
 	Material uint8
+	// SolidMaterial is set when the block's material is solid.
+	SolidMaterial bool
+	// LiquidReaction is what a liquid flowing into the block does.
+	LiquidReaction LiquidReaction
+	// CanContainLiquid is set when the block can hold a liquid in its
+	// second layer (waterlogged).
+	CanContainLiquid bool
 }
 
-// MaterialWater is the Material of water.
-const MaterialWater = 5
+// The Materials liquids look at.
+const (
+	MaterialWater        = 5
+	MaterialLava         = 6
+	MaterialBubbleColumn = 18
+)
+
+// LiquidReaction is what a liquid flowing into a block does, as BDS names
+// them in on_liquid_touches.
+type LiquidReaction uint8
+
+// The liquid reactions, in BDS's order.
+const (
+	// LiquidBroken: the liquid replaces the block.
+	LiquidBroken LiquidReaction = iota
+	// LiquidPopped: the liquid replaces the block, which drops.
+	LiquidPopped
+	// LiquidBlocking: the liquid cannot flow into the block.
+	LiquidBlocking
+	// LiquidNoReaction: the liquid goes in the block's second layer.
+	LiquidNoReaction
+)
+
+// liquidReaction is the reaction helix-data names name.
+func liquidReaction(name string) (LiquidReaction, bool) {
+	switch name {
+	case "broken":
+		return LiquidBroken, true
+	case "popped":
+		return LiquidPopped, true
+	case "blocking":
+		return LiquidBlocking, true
+	case "no_reaction":
+		return LiquidNoReaction, true
+	}
+	return 0, false
+}
 
 // Box is a collision box inside a block: min x, y, z, then max x, y, z.
 type Box [6]float32

@@ -41,6 +41,10 @@ type Config struct {
 	// Generator makes the overworld's chunks the world has not saved. Nil
 	// means the generator level.dat names.
 	Generator world.Generator
+	// BlockTicker gives blocks their ticks and their reactions to changes
+	// beside them. Nil means vanilla's, which so far is water and lava
+	// (package liquid).
+	BlockTicker world.BlockTicker
 	// ViewDistance is the largest view radius in chunks a player gets,
 	// BDS's view-distance.
 	ViewDistance int32

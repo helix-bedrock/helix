@@ -25,6 +25,12 @@ type BlockTicker interface {
 	// QueuedTick runs a tick scheduled with ScheduleTick or
 	// ScheduleRandomTick, for block at pos.
 	QueuedTick(r *Region, pos cube.Pos, block uint32)
+	// Placed runs when SetBlock put block at pos on layer in place of
+	// another state, as BDS's onPlace.
+	Placed(r *Region, pos cube.Pos, block uint32, layer uint8)
+	// NeighbourChanged runs for block at pos on layer when UpdateNeighbours
+	// is called for its neighbour from, as BDS's neighborChanged.
+	NeighbourChanged(r *Region, pos, from cube.Pos, block uint32, layer uint8)
 }
 
 const (
@@ -159,6 +165,24 @@ func (r *Region) ScheduleRandomTick(pos cube.Pos, block uint32, delay, priority 
 func (r *Region) HasScheduledTick(pos cube.Pos, block uint32) bool {
 	c, ok := r.chunkAt(pos)
 	return ok && (c.ticks.has(r, pos, block) || c.randomTicks.has(r, pos, block))
+}
+
+// ScheduledTickAt reports whether a tick for block's type is waiting at pos
+// on the ticking queue, due in exactly delay ticks. Runs: owner.
+func (r *Region) ScheduledTickAt(pos cube.Pos, block uint32, delay int32) bool {
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return false
+	}
+	q := &c.ticks
+	typ, _ := r.d.conf.Blocks.Type(block)
+	for i := range q.ticks {
+		t := &q.ticks[i]
+		if tt, _ := r.d.conf.Blocks.Type(t.block); t.pos == pos && tt == typ && t.time == q.clock+int64(delay) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Region) schedule(pos cube.Pos, block uint32, delay, priority int32, random bool) bool {

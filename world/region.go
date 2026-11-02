@@ -81,6 +81,8 @@ type Region struct {
 	// chunkPackets are the packets for the players who have a chunk, block
 	// changes among them, sent at the end of the tick.
 	chunkPackets []chunkPacket
+	// locals is the working state systems keep on the region (Local).
+	locals map[any]any
 }
 
 // RegionInfo describes a region, as of the end of its last tick.
@@ -120,7 +122,11 @@ func (r *Region) Block(pos cube.Pos, layer uint8) (uint32, bool) {
 	return c.col.Chunk.Block(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer), true //nolint:gosec // masked and range-checked
 }
 
-// SetBlock sets the block at pos on layer. It returns false, changing
+// SetBlock sets the block at pos on layer, as BDS's chunk does: setting
+// air on layer 0 over a block holding something in its second layer (water
+// in a waterlogged block) moves that down to layer 0 instead. When the
+// state changes, the Ticker's Placed runs for the new block. Neighbours
+// are not told; call UpdateNeighbours for that. It returns false, changing
 // nothing, if the chunk is not loaded in this region or the call is made
 // outside the region's tick. Runs: owner.
 func (r *Region) SetBlock(pos cube.Pos, layer uint8, block uint32) bool {
@@ -128,12 +134,65 @@ func (r *Region) SetBlock(pos cube.Pos, layer uint8, block uint32) bool {
 	if !ok {
 		return false
 	}
+	air := r.d.conf.Blocks.Air()
+	if layer == 0 && block == air {
+		if extra, _ := r.Block(pos, 1); extra != air {
+			r.set(c, pos, 1, air)
+			block = extra
+		}
+	}
+	old, _ := r.Block(pos, layer)
+	r.set(c, pos, layer, block)
+	if t := r.d.conf.Ticker; t != nil && old != block {
+		t.Placed(r, pos, block, layer)
+	}
+	return true
+}
+
+// set changes the block at pos on layer and queues its update.
+func (r *Region) set(c *Chunk, pos cube.Pos, layer uint8, block uint32) {
 	c.col.Chunk.SetBlock(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer, block) //nolint:gosec // masked and range-checked
 	r.updateBlock(pos, layer, block)
 	c.dirty, c.net = true, nil
 	c.version++
 	r.d.cache.drop(c.pos)
-	return true
+}
+
+// UpdateNeighbours tells the six neighbours of pos that it changed, as
+// BDS's updateNeighborsAt: for each, in BDS's order, the Ticker's
+// NeighbourChanged runs for its block on layer 0, then for the one in its
+// second layer, skipping air. Neighbours outside the region are skipped.
+// Runs: owner.
+func (r *Region) UpdateNeighbours(pos cube.Pos) {
+	t := r.d.conf.Ticker
+	if t == nil {
+		return
+	}
+	air := r.d.conf.Blocks.Air()
+	for _, d := range [6]cube.Pos{{-1, 0, 0}, {1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}} {
+		n := pos.Add(d)
+		for layer := range uint8(2) {
+			if b, ok := r.Block(n, layer); ok && b != air {
+				t.NeighbourChanged(r, n, pos, b, layer)
+			}
+		}
+	}
+}
+
+// Local returns the value systems keep on the region under key, made with
+// newFn the first time. It is for working state of a system that runs on
+// region ticks, which run one at a time per region; it is not saved, and
+// regions that merge or split start with none. Runs: owner.
+func (r *Region) Local(key any, newFn func() any) any {
+	if v, ok := r.locals[key]; ok {
+		return v
+	}
+	if r.locals == nil {
+		r.locals = map[any]any{}
+	}
+	v := newFn()
+	r.locals[key] = v
+	return v
 }
 
 func (r *Region) chunkAt(pos cube.Pos) (*Chunk, bool) {

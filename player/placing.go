@@ -175,6 +175,7 @@ func vanillaPlace(pl *Placement) bool {
 	if !r.SetBlock(pl.Pos, 0, pl.Block) {
 		return false
 	}
+	r.UpdateNeighbours(pl.Pos)
 	r.Broadcast(pl.Pos, &packet.LevelSoundEvent{
 		SoundType: packet.SoundEventPlace, Position: blockVec(pl.Pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}),
 		ExtraData: int32(p.s.reg.Blocks.Hash(pl.Block)), //nolint:gosec // hashes are sent as int32

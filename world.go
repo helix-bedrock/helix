@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/mcdb"
@@ -82,6 +83,10 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
 	conf.EntityViewRadius2 = s.conf.EntityViewRadius2
 	conf.Scheduler, conf.RandomTickSpeed = s.ticker, randomTickSpeed
+	conf.Ticker = s.conf.BlockTicker
+	if conf.Ticker == nil {
+		conf.Ticker = liquid.New(s.reg.Blocks)
+	}
 	r, _ := mcdb.Overworld.Range()
 	switch {
 	case s.conf.Generator != nil:

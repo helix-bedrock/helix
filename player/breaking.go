@@ -302,6 +302,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	if !r.SetBlock(pos, 0, p.s.reg.Blocks.Air()) {
 		return false
 	}
+	r.UpdateNeighbours(pos)
 	g.sys.Exhaust(p, g.sys.Exhaustion.Mine)
 	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
 	p.brk.broken++

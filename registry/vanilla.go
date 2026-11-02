@@ -191,6 +191,10 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
+	liq, err := vanillaLiquids()
+	if err != nil {
+		return err
+	}
 	definitions := make(map[string]map[string]any, len(defs))
 	for _, d := range defs {
 		definitions[d.Name] = d.Properties
@@ -237,6 +241,7 @@ func vanillaBlocks(s *Setup) error {
 			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i),
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 			Climbable: climbable[st.Name], Material: materials[st.Name],
+			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name],
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
 		if err != nil {
@@ -322,4 +327,35 @@ func sameValues(a, b map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// liquidFacts are helix-data's liquid facts by block name.
+type liquidFacts struct {
+	reaction       map[string]LiquidReaction
+	contain, solid map[string]bool
+}
+
+// vanillaLiquids reads the liquid facts of every block.
+func vanillaLiquids() (liquidFacts, error) {
+	d, err := data.Liquids()
+	if err != nil {
+		return liquidFacts{}, fmt.Errorf("registry: vanilla: %w", err)
+	}
+	f := liquidFacts{reaction: map[string]LiquidReaction{}, contain: map[string]bool{}, solid: map[string]bool{}}
+	for name, blocks := range d.Reaction {
+		r, ok := liquidReaction(name)
+		if !ok {
+			return f, fmt.Errorf("registry: vanilla: unknown liquid reaction %q", name)
+		}
+		for _, b := range blocks {
+			f.reaction[b] = r
+		}
+	}
+	for _, b := range d.CanContain {
+		f.contain[b] = true
+	}
+	for _, b := range d.Solid {
+		f.solid[b] = true
+	}
+	return f, nil
 }

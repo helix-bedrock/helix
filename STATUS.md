@@ -70,8 +70,13 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   terracotta, skulls, buttons, levers, torches, ladders, lanterns, bells, grindstones, hoppers, end
   rods, cocoa, tripwire hooks, vines and leaves. Whether a wall holds a torch, ladder or lantern is
   judged from collision boxes (BDS asks each block).
-- **Buckets (first pass):** water and lava buckets pour a source block and become empty buckets
-  outside creative. The liquid does not flow yet.
+- **Water and lava (not yet tested in game):** liquids flow as BDS 1.26.60's: they spread one
+  depth per block (lava two, every 30 ticks; water every 5) towards the nearest way down, fall,
+  dry up when their source goes, make infinite water between two sources, and lava turns to
+  obsidian, cobblestone, stone or basalt where it meets water or blue ice, with the fizz sound.
+  Liquids flow into waterloggable blocks' second layer and replace plants, torches and the like
+  (no drops yet). Breaking or placing a block wakes the liquids beside it. Buckets pour water
+  and lava (water into waterloggable blocks) and become empty buckets outside creative.
 - **Creative inventory:** items can be taken from the creative menu (the client's results
   message after a creative take is accepted).
 
@@ -79,11 +84,13 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 
 - **Vanilla terrain generation** is not hooked up yet, so an infinite world shows only what it has
   saved.
-- **Block behaviour:** blocks tick, but no vanilla block has tick behaviour yet: water and lava
-  do not flow. Walls, fences, panes, redstone wire, snow layers, scaffolding, petals, glow lichen
+- **Block behaviour:** water and lava are the only blocks with behaviour so far. Lava does not set
+  fire, blocks liquids replace drop nothing, stairs and slabs let water out on every side (BDS
+  decides by their shape), and placing a waterloggable block into water does not keep the water.
+  Walls, fences, panes, redstone wire, snow layers, scaffolding, petals, glow lichen
   and dripstone are placed in their item's state (their state needs the neighbours), the second
   door half is not placed, and clicking blocks that open or toggle (chests, doors, levers) is not
-  done. Buckets do not pick liquids up or waterlog blocks.
+  done. Buckets do not pick liquids up.
 - **Movement:** the client's position is taken as it is. BDS's server-side simulation and
   corrections will come with the optional anti-cheat module. Other containers (chests and the
   like) do not open.
