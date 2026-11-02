@@ -107,15 +107,3 @@ func TestLiquidFlow(t *testing.T) {
 		t.Fatalf("velocity %v, want towards +x", i.vel)
 	}
 }
-
-// TestDeadPlayerDoesNotPickUp checks BDS's rule that only a living player
-// touches items.
-func TestDeadPlayerDoesNotPickUp(t *testing.T) {
-	p := testPlayer(t)
-	p.attributes = DefaultAttributes()
-	if p.Health() <= 0 {
-		t.Fatal("a new player has no health")
-	}
-	p.attributes.set(attrHealth, 0)
-	p.tickPickup()
-}

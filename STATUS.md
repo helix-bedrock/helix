@@ -34,7 +34,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   holds is refused (BDS clamps it), and a legacy transaction must be exactly one inventory slot
   plus one world drop.
 - **Item drops and pick-up (not yet tested in game):** Q and dropping from the inventory screen
-  throw items as BDS does. Items fall, float in water and lava, slow down on the block under them,
+  throw items as BDS does. Items fall, float in water and lava, drift with the current, slow down on the block under them,
   join nearby stacks, vanish after 6000 ticks, and go to the offhand and inventory in BDS's order
   when touched, leaving what does not fit. Other players see the held item change.
 - **Registry:** built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with their
@@ -111,6 +111,8 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
   own snow layer rule, are not done.
+- **Death and respawn** are not built: a player at 0 health stays there and cannot pick up items
+  until it rejoins, when it comes back with full health (a stopgap, not from BDS).
 - **Crafting** is not done yet. **Item entities** are a first pass: they are not saved with their
   chunk, do not burn in lava or fire, are not pushed out of a block placed on them, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
