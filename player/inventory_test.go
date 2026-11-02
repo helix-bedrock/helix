@@ -99,6 +99,7 @@ func TestStackRequests(t *testing.T) {
 	// A creative item into the hotbar through the created output.
 	r = p.stackRequest(protocol.ItemStackRequest{RequestID: -15, Actions: []protocol.StackRequestAction{
 		&protocol.CraftCreativeStackRequestAction{CreativeItemNetworkID: p.s.reg.Creative.Packet().Items[0].CreativeItemNetworkID, NumberOfCrafts: 1},
+		&protocol.CraftResultsDeprecatedStackRequestAction{TimesCrafted: 1},
 		take(1, slotInfo(containerCreatedOutput, createdOutputSlot, -15), slotInfo(containerHotbar, 0, 0)),
 	}})
 	if r.Status != protocol.ItemStackResponseStatusOK || p.inventory.main[0].Count != 1 || !p.inventory.ui[createdOutputSlot].Empty() {

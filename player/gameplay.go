@@ -5,10 +5,12 @@ import (
 
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Systems are the steps of a player's block breaking and placing. Each
+// Systems are the steps of a player's block breaking and placing, its
+// movement state, health and food. Each
 // starts as vanilla's (BDS 1.26.60) and may be replaced in Setup, or
 // wrapped by keeping the old value and calling it:
 //
@@ -29,7 +31,40 @@ type Systems struct {
 	PlaceState PlaceStateFunc
 	PlaceCheck PlaceCheckFunc
 	Place      PlaceFunc
+	// Movement state, after the movement handler.
+	MoveFlags  MoveFlagsFunc
+	Jump       JumpFunc
+	Fall       FallFunc
+	FallDamage FallDamageFunc
+	MoveCost   MoveCostFunc
+	// Health and food.
+	Hurt       HurtFunc
+	Exhaust    ExhaustFunc
+	Exhaustion ExhaustionValues
 }
+
+// MoveFlagsFunc sets the player's movement states (sneaking, sprinting...)
+// from its PlayerAuthInput input flags.
+type MoveFlagsFunc func(p *Player, in protocol.InputFlags)
+
+// JumpFunc runs when the player starts a jump.
+type JumpFunc func(p *Player)
+
+// FallFunc updates the player's fall distance after a movement and lands
+// it.
+type FallFunc func(p *Player, m *MoveInfo)
+
+// FallDamageFunc lands the player after falling distance blocks.
+type FallDamageFunc func(p *Player, distance float32)
+
+// MoveCostFunc returns the exhaustion a movement costs.
+type MoveCostFunc func(p *Player, m *MoveInfo) float32
+
+// HurtFunc deals damage to the player; false if it was not hurt.
+type HurtFunc func(p *Player, damage float32, cause DamageCause) bool
+
+// ExhaustFunc adds exhaustion to the player and burns its food.
+type ExhaustFunc func(p *Player, amount float32)
 
 // BlockBehaviour is what a block type does. Every method is optional: a
 // behaviour implements the interfaces below it needs, and vanilla's
@@ -178,6 +213,18 @@ func vanillaGameplay(s *Setup) error {
 	sys.PlaceState = vanillaPlaceState
 	sys.PlaceCheck = vanillaPlaceCheck
 	sys.Place = vanillaPlace
+	sys.MoveFlags = vanillaMoveFlags
+	sys.Jump = vanillaJump
+	sys.Fall = vanillaFall
+	sys.FallDamage = vanillaFallDamage
+	sys.MoveCost = vanillaMoveCost
+	sys.Hurt = vanillaHurt
+	sys.Exhaust = vanillaExhaust
+	ex, err := vanillaExhaustionValues()
+	if err != nil {
+		return err
+	}
+	sys.Exhaustion = ex
 	return nil
 }
 

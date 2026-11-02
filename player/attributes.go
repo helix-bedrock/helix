@@ -35,6 +35,14 @@ var playerAttributes = [...]attributeDef{
 	{"minecraft:player.experience", 0, 1, 0, true},
 }
 
+// Indexes into playerAttributes of the attributes gameplay changes.
+const (
+	attrHealth     = 0
+	attrHunger     = 12
+	attrSaturation = 13
+	attrExhaustion = 14
+)
+
 // attributeValue is an attribute's base and current value.
 type attributeValue struct {
 	base, current float32
@@ -83,11 +91,27 @@ func (a *Attributes) load(data map[string]any) {
 	}
 }
 
+// get returns attribute i's current value.
+func (a *Attributes) get(i int) float32 { return a[i].current }
+
+// set sets attribute i's current value, clamped to its range as BDS clamps
+// it; false if that changed nothing.
+func (a *Attributes) set(i int, v float32) bool {
+	d := playerAttributes[i]
+	v = min(max(v, d.min), d.max)
+	if a[i].current == v {
+		return false
+	}
+	a[i].current = v
+	return true
+}
+
 // save writes the attributes BDS saves, as it writes them, into the
-// player's data. A saved list is kept as it is (with any modifiers) while
-// Helix changes no attribute.
+// player's data. In a saved list only the current values are updated, so
+// the modifiers and fields Helix does not use yet are kept.
 func (a *Attributes) save(data map[string]any) {
-	if _, ok := data["Attributes"]; ok {
+	if list, ok := data["Attributes"].([]any); ok {
+		a.update(list)
 		return
 	}
 	list := make([]any, 0, len(playerAttributes))
@@ -104,14 +128,42 @@ func (a *Attributes) save(data map[string]any) {
 	data["Attributes"] = list
 }
 
+// update writes the current values into a saved list: "Current" when it
+// differs from the base, as a new list is written.
+func (a *Attributes) update(list []any) {
+	for _, e := range list {
+		m, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := m["Name"].(string)
+		for i, d := range playerAttributes {
+			if d.name != name || !d.saved {
+				continue
+			}
+			if a[i].current != a[i].base {
+				m["Current"] = a[i].current
+			} else {
+				delete(m, "Current")
+			}
+		}
+	}
+}
+
 // list returns the attributes as UpdateAttributes carries them.
 func (a *Attributes) list() []protocol.Attribute {
 	out := make([]protocol.Attribute, len(playerAttributes))
-	for i, d := range playerAttributes {
-		out[i] = protocol.Attribute{
-			AttributeValue: protocol.AttributeValue{Name: d.name, Value: a[i].current, Min: d.min, Max: d.max},
-			DefaultMin:     d.min, DefaultMax: d.max, Default: d.def,
-		}
+	for i := range playerAttributes {
+		out[i] = a.entry(i)
 	}
 	return out
+}
+
+// entry returns attribute i as UpdateAttributes carries it.
+func (a *Attributes) entry(i int) protocol.Attribute {
+	d := playerAttributes[i]
+	return protocol.Attribute{
+		AttributeValue: protocol.AttributeValue{Name: d.name, Value: a[i].current, Min: d.min, Max: d.max},
+		DefaultMin:     d.min, DefaultMax: d.max, Default: d.def,
+	}
 }

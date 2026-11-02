@@ -53,7 +53,15 @@ type Properties struct {
 	// not ported yet; Collision is then empty. Shapes BDS computes from
 	// the state alone (stairs, slabs, fences, walls...) are in Collision.
 	CollisionComputed bool
+	// Climbable is BDS's climbable flag: a mob or player in the block can
+	// climb, and its fall distance is cleared (ladders, vines).
+	Climbable bool
+	// Material is BDS's MaterialType of the block (0 air, 5 water, 6 lava).
+	Material uint8
 }
+
+// MaterialWater is the Material of water.
+const MaterialWater = 5
 
 // Box is a collision box inside a block: min x, y, z, then max x, y, z.
 type Box [6]float32

@@ -146,6 +146,12 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 		return protocol.ItemStackResponseStatusCannotDropItem, nil
 	case *protocol.CraftCreativeStackRequestAction:
 		return p.craftCreative(a)
+	case *protocol.CraftResultsDeprecatedStackRequestAction:
+		// The client follows every craft (creative ones too) with the
+		// items it expects; the server made the result itself, so the
+		// list changes nothing. Without accepting it no creative item
+		// could be taken.
+		return protocol.ItemStackResponseStatusOK, nil
 	}
 	// Crafting and the other screens come later.
 	return protocol.ItemStackResponseStatusError, nil

@@ -21,8 +21,7 @@ func (p *Player) listEntry() protocol.PlayerListEntry {
 func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 	pos, rot := e.Position(), e.Rotation()
 	meta := protocol.EntityMetadata{
-		protocol.EntityDataKeyFlags: int64(1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagBreathing |
-			1<<protocol.EntityDataFlagHasCollision | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName),
+		protocol.EntityDataKeyFlags:  p.actorFlags(),
 		protocol.EntityDataKeyName:   p.name,
 		protocol.EntityDataKeyWidth:  float32(0.6),
 		protocol.EntityDataKeyHeight: float32(1.8),

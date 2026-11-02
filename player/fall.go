@@ -1,0 +1,92 @@
+package player
+
+import (
+	"math"
+
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/cube"
+)
+
+// Vanilla effect IDs the fall reads (BDS 1.26.60).
+const (
+	EffectJumpBoost   int32 = 8
+	EffectSlowFalling int32 = 27
+)
+
+// DamageCause is why a player is hurt, as BDS's ActorDamageCause numbers
+// it.
+type DamageCause int32
+
+// The damage causes Helix deals so far.
+const (
+	DamageFall DamageCause = 5
+)
+
+// fallBigDamage is the damage from which BDS plays the big fall sound.
+const fallBigDamage = 5
+
+// vanillaFall is BDS's fall distance (Actor::checkFallDamage, with the
+// resets of climbing, gliding and slow falling that BDS's movement does
+// before it): in water it is cleared; on landing the FallDamage system
+// runs with the distance fallen, then it is cleared; it grows while the
+// player moves down and is cleared when it does not.
+func vanillaFall(p *Player, m *MoveInfo) {
+	dy := m.To[1] - m.From[1]
+	_, slow := p.Effect(EffectSlowFalling)
+	if m.Climbing || p.Moving(MoveGliding) || slow && dy < 0 {
+		p.move.fall = 0
+	}
+	switch {
+	case m.InWater:
+		p.move.fall = 0
+	case m.OnGround:
+		if p.move.fall > 0 {
+			p.s.game.sys.FallDamage(p, p.move.fall)
+		}
+		p.move.fall = 0
+	case dy < 0:
+		p.move.fall -= dy
+	default:
+		p.move.fall = 0
+	}
+}
+
+// vanillaFallDamage is BDS's landing (the block's fall-on, then the
+// player's causeFallDamage): damage ceil(distance - 3 - jump boost level),
+// a big or small fall sound when it hurts, then the fall or land sound of
+// the block below. Blocks that change the fall (slime, hay, beds) are not
+// ported yet.
+func vanillaFallDamage(p *Player, distance float32) {
+	r := p.entity.Region()
+	if r == nil {
+		return
+	}
+	var boost float32
+	if amp, ok := p.Effect(EffectJumpBoost); ok {
+		boost = float32(amp + 1)
+	}
+	damage := float32(math.Ceil(float64(distance - 3 - boost)))
+	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
+	pos := vecPos(feet)
+	if damage > 0 && !p.invulnerable() {
+		sound := packet.SoundEventFallSmall
+		if damage >= fallBigDamage {
+			sound = packet.SoundEventFallBig
+		}
+		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: sound, Position: feet, ExtraData: -1, EntityType: "minecraft:player"}, p.viewer)
+		p.s.game.sys.Hurt(p, damage, DamageFall)
+	}
+	sound := packet.SoundEventLand
+	if damage > 0 {
+		sound = packet.SoundEventFall
+	}
+	below, ok := r.Block(pos.Side(cube.FaceDown), 0)
+	if !ok {
+		return
+	}
+	r.Broadcast(pos, &packet.LevelSoundEvent{
+		SoundType: sound, Position: feet, EntityType: "minecraft:player",
+		ExtraData: int32(p.s.reg.Blocks.Hash(below)), //nolint:gosec // hashes are sent as int32
+	}, p.viewer)
+}

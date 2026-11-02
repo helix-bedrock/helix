@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/go-gl/mathgl/mgl32"
 	"sync"
 
 	"github.com/helix-bedrock/helix/world"
@@ -86,17 +87,29 @@ func vanillaHandlers(s *Setup) error {
 
 // handlePlayerAuthInput is vanilla's PlayerAuthInput handler: it takes the
 // packet apart and hands each part to its system: block actions first,
-// before movement, as BDS does, then movement.
+// before movement, as BDS does, then the movement states and jump, the
+// movement, and the fall and exhaustion that follow it.
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	if actions, ok := pk.BlockActions.Value(); ok {
 		p.handleBlockActions(actions)
 	} else {
 		p.handleBlockActions(nil)
 	}
+	sys := p.s.game.sys
+	sys.MoveFlags(p, pk.InputData)
+	if pk.InputData.Load(packet.InputFlagStartJumping) {
+		sys.Jump(p)
+	}
+	collided := pk.InputData.Load(packet.InputFlagVerticalCollision)
+	var from mgl32.Vec3
+	if p.entity != nil {
+		from = p.entity.Position()
+	}
 	p.s.handlers.movement(p, world.Movement{
 		Pos: pk.Position, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
-		OnGround: pk.InputData.Load(packet.InputFlagVerticalCollision), Tick: pk.Tick,
+		OnGround: collided, Tick: pk.Tick,
 	})
+	p.afterMove(from, collided)
 }
 
 // applyMovement is vanilla's movement: the client's position is taken as

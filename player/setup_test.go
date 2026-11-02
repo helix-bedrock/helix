@@ -34,6 +34,7 @@ func TestHandlers(t *testing.T) {
 	if err := plugin.WrapMovement(func(p *Player, m world.Movement, _ MovementHandler) { moved = true }); err != nil {
 		t.Fatal(err)
 	}
+	sys := s.h.game.sys
 	h := s.freeze()
 	if !errors.Is(Handle(s, func(*Player, *packet.Animate) {}), registry.ErrFrozen) {
 		t.Fatal("handler added after freeze")
@@ -47,7 +48,7 @@ func TestHandlers(t *testing.T) {
 	}
 	// The wrap does not call vanilla's movement, so the player needs no
 	// entity.
-	p := &Player{s: &Host{handlers: h}}
+	p := &Player{s: &Host{handlers: h, game: &gameplay{sys: sys}}}
 	h.handler(packet.IDPlayerAuthInput)(p, &packet.PlayerAuthInput{})
 	if !moved {
 		t.Fatal("movement wrap not called by vanilla's PlayerAuthInput handler")

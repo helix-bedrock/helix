@@ -67,6 +67,7 @@ type Player struct {
 	requests   requestState
 	effects    []ActiveEffect
 	brk        breakState
+	move       moveState
 	window     windowState
 	// breakSpeed multiplies the player's break speed; reachScale its
 	// reach. Both 1 by default.

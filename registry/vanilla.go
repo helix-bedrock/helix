@@ -179,6 +179,18 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
+	climb, err := data.Climbable()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	climbable := make(map[string]bool, len(climb))
+	for _, n := range climb {
+		climbable[n] = true
+	}
+	materials, err := data.BlockMaterials()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
 	definitions := make(map[string]map[string]any, len(defs))
 	for _, d := range defs {
 		definitions[d.Name] = d.Properties
@@ -224,6 +236,7 @@ func vanillaBlocks(s *Setup) error {
 			LightEmission: p.LightEmission.At(i), LightDampening: p.LightDampening.At(i),
 			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i),
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
+			Climbable: climbable[st.Name], Material: materials[st.Name],
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
 		if err != nil {

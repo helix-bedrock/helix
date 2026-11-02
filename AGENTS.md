@@ -39,7 +39,8 @@ sibling library folders, so unreleased library changes are used.
   that read only the state, in `collision.go` and `collision_more.go`;
   `CollisionComputed` marks the states that need the world, a block
   entity or the colliding entity: doors (`Door`), shulker boxes,
-  scaffolding, powder snow, end gateways, piston parts), and `chunk.BlockRegistry`
+  scaffolding, powder snow, end gateways, piston parts), BDS's climbable flag
+  and material per block, and `chunk.BlockRegistry`
   for the world library. Items: BDS's network IDs, versions and
   components, stack sizes and tags, and the ItemRegistry packet built once.
   Biomes: BDS's numeric IDs, climate and tags, `Resolve` for deleted or
@@ -164,7 +165,17 @@ sibling library folders, so unreleased library changes are used.
   tools wear by BDS's rule per item from the same table (the `Wear`
   hook; Unbreaking is the enchantment's `DamageChance`), and break with
   the break sound. Effects count down each tick and are removed when
-  they run out. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
+  they run out. `movestate.go`, `fall.go`, `hunger.go`, `health.go`:
+  the movement states (sneak, sprint, swim, glide, crawl) from the
+  client's start and stop input flags (BDS decides them in its own
+  simulation, which belongs to the anti-cheat module), shown to others
+  as actor flags; after each movement BDS's fall distance (cleared in
+  water, on climbable blocks, gliding, slow falling) and fall damage, and
+  BDS's exhaustion for moving, jumping, mining and damage (values from
+  the player definition), burning saturation then hunger. `Hurt` is a
+  first pass (health and the hurt event only). All are `Systems` hooks
+  (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, Exhaust,
+  Exhaustion). Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
   on the minimal event core (named priorities, registration order, no
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every

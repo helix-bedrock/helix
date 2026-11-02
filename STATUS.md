@@ -1,7 +1,8 @@
 # What Helix does
 
 Status as of 2026-11-01. Helix was **restarted from scratch with its own architecture.** Players can
-join, spawn in a BDS world, see each other, use their inventory, and break and place blocks. Everything follows BDS 1.26.60.
+join, spawn in a BDS world, see each other, use their inventory, break and place blocks, and
+sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 
 ## What works
 
@@ -55,6 +56,17 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
   this the player floated. Opening the inventory (Interact) and closing a container answer as
   BDS does.
 
+- **Movement state, falling and hunger (first pass, not yet tested in game):** sneaking,
+  sprinting, swimming, gliding and crawling are taken from the client's start and stop input and
+  shown to other players. Fall distance follows BDS (cleared in water, on ladders and vines, while
+  gliding or slow falling, and when not moving down), and landing deals BDS's fall damage
+  (distance minus 3, minus the Jump Boost level) with the fall sounds. Sprinting, swimming, jumps,
+  sprint jumps, breaking blocks and taking damage cost BDS's exhaustion from the player
+  definition, which burns saturation and then hunger (not on peaceful, not in creative). Health
+  goes down and the player is shown hurt. Each step is a system plugins can replace.
+- **Creative inventory:** items can be taken from the creative menu (the client's results
+  message after a creative take is accepted).
+
 ## What is left
 
 - **Vanilla terrain generation** is not hooked up yet, so an infinite world shows only what it has
@@ -65,7 +77,12 @@ join, spawn in a BDS world, see each other, use their inventory, and break and p
 - **Movement:** the client's position is taken as it is. BDS's server-side simulation and
   corrections will come with the optional anti-cheat module. Other containers (chests and the
   like) do not open.
-- **Breaking leftovers:** no drops (no item entities yet), no hunger cost, and only the placing
+- **Health:** death and respawn are not built: at 0 health the client shows the death screen
+  and cannot respawn. Armour, Feather Falling, Protection, Resistance, absorption, the
+  invulnerability ticks after a hit, natural regeneration and starving are not done. Blocks
+  that change a fall (slime, hay, beds) are not ported; "in water" is the feet or eye block
+  holding water, not BDS's exact liquid-height check. Elytra durability is not done.
+- **Breaking leftovers:** no drops (no item entities yet), and only the placing
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
   own snow layer rule, are not done.
