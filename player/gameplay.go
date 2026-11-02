@@ -4,6 +4,7 @@ import (
 	"maps"
 
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
@@ -115,6 +116,15 @@ type gameplay struct {
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
+	// The chest events, and the event about what a broken block drops.
+	chestOpenEv  listeners[ChestOpenEvent]
+	chestCloseEv listeners[ChestCloseEvent]
+	chestItemEv  listeners[ChestItemEvent]
+	chestPairEv  listeners[ChestPairEvent]
+	chestSpillEv listeners[ChestSpillEvent]
+	dropsEv      listeners[BlockDropsEvent]
+	// dropRules replace blocks' drop rules; a nil rule drops nothing.
+	dropRules map[string]loot.Rule
 }
 
 // gameState is the gameplay part of the Setup while it is open.
@@ -129,13 +139,22 @@ type gameState struct {
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
+	// The chest events, and the event about what a broken block drops.
+	chestOpenEv  listeners[ChestOpenEvent]
+	chestCloseEv listeners[ChestCloseEvent]
+	chestItemEv  listeners[ChestItemEvent]
+	chestPairEv  listeners[ChestPairEvent]
+	chestSpillEv listeners[ChestSpillEvent]
+	dropsEv      listeners[BlockDropsEvent]
+	// dropRules replace blocks' drop rules; a nil rule drops nothing.
+	dropRules map[string]loot.Rule
 	// out is the gameplay freeze fills; vanilla's steps read its tables,
 	// so they can be wrapped before the freeze.
 	out *gameplay
 }
 
 func newGameState() *gameState {
-	return &gameState{enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, out: &gameplay{}}
+	return &gameState{enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, dropRules: map[string]loot.Rule{}, out: &gameplay{}}
 }
 
 // Systems returns the breaking and placing steps to replace or wrap. Not
@@ -305,6 +324,8 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
+		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv,
+		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, dropRules: maps.Clone(gs.dropRules),
 	}
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
@@ -314,5 +335,11 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.useEv.freeze()
 	g.itemDropEv.freeze()
 	g.itemLoadEv.freeze()
+	g.chestOpenEv.freeze()
+	g.chestCloseEv.freeze()
+	g.chestItemEv.freeze()
+	g.chestPairEv.freeze()
+	g.chestSpillEv.freeze()
+	g.dropsEv.freeze()
 	return g, nil
 }

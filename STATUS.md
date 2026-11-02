@@ -49,7 +49,11 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   players get the registry packets; untouched, each is byte for byte BDS's.
 - **Plugins:** can add, replace and delete any registry entry in `Config.Setup`. World packets go
   through a handler table plugins can replace or wrap, per packet or per system (movement so far),
-  on the player's region tick.
+  on the player's region tick. Chests and ender chests have events before anything happens (open,
+  close, each slot a player changes, pairing, spilling) and methods to read and change their items,
+  name and pair (`Host.ChestAt`, `Chest`, `Player.EnderItem`). Block breaks say what is left behind and
+  how much the tool wears, and `OnBlockDrops` and `Setup.SetBlockDrops` decide what comes out, where
+  and how fast (not yet tested in game).
 
 - **Breaking and placing (first pass, not yet tested in game):** block breaking the way BDS
   1.26.60 does it with server-authoritative breaking: cracks and BDS's hit, break and place sounds for everyone near, the reach,
@@ -123,7 +127,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   Ender chests open the same way but never pair, and show each player their own items, which are saved
   on the player in BDS's `EnderChestInventory` and stay through death.
   Not done yet: loot tables, cats on chests, redstone from
-  trapped chests, barrels, and an API for plugins to read and change chest contents.
+  trapped chests, barrels.
 - **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
   1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
   inventory are thrown at random (items kept on death stay), others see the death, the death screen
@@ -141,7 +145,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   own snow layer rule, are not done.
 - **Block drops (first pass, not yet tested in game):** survival players breaking a block with the
   right tool get BDS 1.26.60's drops for all 1,480 blocks (new `loot` package, from helix-data's
-  `bds/block_drops.json` and its block loot tables). Plugins replace `Systems.Drops` or a block's rule.
+  `bds/block_drops.json` and its block loot tables). Plugins can change all of it (see Plugins above).
   Not done yet: experience orbs, items built from a block entity (the plain item drops), chests filling
   from `LootTable`, enchantment loot functions, drops from anything but a player breaking the block. The
   speed items leave a broken block at was not read from BDS.

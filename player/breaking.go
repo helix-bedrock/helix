@@ -69,6 +69,11 @@ type BlockBreakEvent struct {
 	Pos    cube.Pos
 	// Block is the state being broken.
 	Block uint32
+	// Becomes is what is left in its place: air unless changed.
+	Becomes uint32
+	// Wear is the damage the held item takes; change it to wear the tool more,
+	// less or not at all.
+	Wear int32
 }
 
 // BreakStartFunc decides whether a player may start breaking the block at
@@ -359,29 +364,28 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		return false
 	}
 	g := p.s.game
+	var wear int32
+	if !p.creative() {
+		wear = g.sys.Wear(&b)
+	}
+	becomes := p.s.reg.Blocks.Air()
 	if g.breakEv.Has() {
-		e := BlockBreakEvent{Player: p, Pos: pos, Block: b.Block}
+		e := BlockBreakEvent{Player: p, Pos: pos, Block: b.Block, Becomes: becomes, Wear: wear}
 		g.breakEv.fire(p.s.log, &e)
 		if e.Cancelled() {
 			return false
 		}
+		becomes, wear = e.Becomes, e.Wear
 	}
-	var drops []ItemStack
-	if !p.creative() {
-		p.hurtHeld(g.sys.Wear(&b))
-		// BDS reads the item after wearing it: a tool that just broke no
-		// longer harvests, and its Fortune and Silk Touch are gone.
-		if worn, ok := p.breakInfo(r, pos); ok && g.harvests(&worn) {
-			drops = g.sys.Drops(p.s, b.Block, p.breakContext(r, pos))
-		}
-	}
-	if !r.SetBlock(pos, 0, p.s.reg.Blocks.Air()) {
+	p.hurtHeld(wear)
+	drops := p.blockDrops(r, pos, b.Block)
+	if !r.SetBlock(pos, 0, becomes) {
 		return false
 	}
 	r.UpdateNeighbours(pos)
 	g.sys.Exhaust(p, g.sys.Exhaustion.Mine)
 	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
-	p.s.throwDrops(r, pos, drops)
+	p.s.throwDrops(r, drops)
 	p.brk.broken++
 	return true
 }

@@ -325,6 +325,13 @@ func (c *Chest) tryPair(r *world.Region, pos cube.Pos) {
 	if o == nil || !c.canPair(r, o) {
 		return
 	}
+	if g := c.s.game; g.chestPairEv.Has() {
+		e := ChestPairEvent{Region: r, Chest: c, Other: o}
+		g.chestPairEv.fire(c.s.log, &e)
+		if e.Cancelled() {
+			return
+		}
+	}
 	o.closeViewers(r)
 	c.link(o.pos, false)
 	o.link(c.pos, true)
@@ -410,15 +417,23 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	c.pos = pos
 	c.unpair(r)
 	c.closeViewers(r)
-	for i := range c.items {
-		c.throwSlot(r, i)
+	items := c.items[:]
+	if g := c.s.game; !c.ender && g.chestSpillEv.Has() {
+		e := ChestSpillEvent{Region: r, Chest: c, Pos: pos, Items: slices.Clone(items)}
+		g.chestSpillEv.fire(c.s.log, &e)
+		items = e.Items
+		if e.Cancelled() {
+			items = nil
+		}
 	}
+	for _, s := range items {
+		c.throwStack(r, s)
+	}
+	c.items = [chestSize]ItemStack{}
 }
 
-// throwSlot throws a slot's items out in piles, as BDS's container drop does.
-func (c *Chest) throwSlot(r *world.Region, slot int) {
-	s := c.items[slot]
-	c.items[slot] = ItemStack{}
+// throwStack throws a slot's items out in piles, as BDS's container drop does.
+func (c *Chest) throwStack(r *world.Region, s ItemStack) {
 	for !s.Empty() {
 		pile := s
 		pile.Count = min(uint8(rand.IntN(chestPileExtra))+chestPileMin, s.Count) //nolint:gosec // an item's scatter, not a secret
@@ -569,6 +584,10 @@ func (c *Chest) removeViewer(r *world.Region, p *Player) {
 		c.open = false
 		c.blockEvent(r)
 	}
+	if g := c.s.game; g.chestCloseEv.Has() {
+		e := ChestCloseEvent{Player: p, Region: r, Chest: c}
+		g.chestCloseEv.fire(c.s.log, &e)
+	}
 }
 
 // closeViewers closes the window of everyone with the chest open. BDS only clears
@@ -601,13 +620,18 @@ func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	if !p.abilities.Flag(AbilityOpenContainers) {
 		return true
 	}
-	if !c.canOpen(r, u.Pos) {
-		return true
-	}
+	blocked := !c.canOpen(r, u.Pos)
 	if o := c.mate(r); o != nil && !o.canOpen(r, o.pos) {
-		return true
+		blocked = true
 	}
-	p.openChest(r, c, u.Pos)
+	if g := p.s.game; g.chestOpenEv.Has() {
+		e := ChestOpenEvent{Player: p, Region: r, Chest: c, Pos: u.Pos, Blocked: blocked}
+		g.chestOpenEv.fire(p.s.log, &e)
+		blocked = e.Blocked || e.Cancelled()
+	}
+	if !blocked {
+		p.openChest(r, c, u.Pos)
+	}
 	return true
 }
 
@@ -641,7 +665,7 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 	if w.open {
 		return
 	}
-	lead, follower := c.halves(r)
+	lead, _ := c.halves(r)
 	w.nextID()
 	w.open, w.chest, w.chestPos = true, true, pos
 	p.send(&packet.ContainerOpen{
@@ -649,20 +673,7 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 		ContainerPosition:       protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
 		ContainerEntityUniqueID: -1,
 	})
-	content := make([]protocol.ItemInstance, 0, 2*chestSize)
-	shown := lead.items[:]
-	if c.ender {
-		shown = p.inventory.ender[:]
-	}
-	for _, s := range shown {
-		content = append(content, s.network(p.s.reg))
-	}
-	if follower != nil {
-		for _, s := range follower.items {
-			content = append(content, s.network(p.s.reg))
-		}
-	}
-	p.send(&packet.InventoryContent{WindowID: uint32(w.id), Content: content})
+	p.send(&packet.InventoryContent{WindowID: uint32(w.id), Content: p.chestContent(r, c)})
 	p.flush()
 	lead.addViewer(r, p)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/loot"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -31,13 +32,102 @@ func (g *gameplay) harvests(b *BreakInfo) bool {
 	return b.Harvest
 }
 
-// DropsFunc returns the items a block drops, given what broke it. Replace it in
-// Systems to change drops. Runs: on the region tick.
-type DropsFunc func(s *Host, block uint32, c *loot.Context) []ItemStack
+// BlockDrop is one item a broken block is about to throw out, and how.
+type BlockDrop struct {
+	Stack ItemStack
+	// Pos is where it appears, Velocity how it moves.
+	Pos, Velocity mgl32.Vec3
+	// PickupDelay is how many ticks pass before it can be picked up.
+	PickupDelay int32
+}
 
-// vanillaDrops is BDS's getResourceDrops, through its drop rule. Experience is
-// worked out but no orbs exist yet.
-func vanillaDrops(s *Host, block uint32, c *loot.Context) []ItemStack {
+// NewBlockDrop returns a drop thrown from the block at pos as BDS throws them: a
+// random spot inside the block, with its usual delay.
+func NewBlockDrop(pos cube.Pos, s ItemStack) BlockDrop {
+	return BlockDrop{
+		Stack: s, Pos: blockVec(pos).Add(mgl32.Vec3{dropOffset(), dropOffset(), dropOffset()}),
+		Velocity: mgl32.Vec3{dropDrift(), dropUp, dropDrift()}, PickupDelay: blockDropDelay,
+	}
+}
+
+// BlockDropsEvent is a block a player is breaking, with what it is about to drop. The
+// block is still there, with its block entity. It fires for every break, so listeners
+// can make a block drop where it would not: the wrong tool or creative give an empty
+// Drops. Change, add or remove drops as you like; to add one, use NewBlockDrop.
+// Cancelling drops nothing, and a stack given to the player with Give need only be
+// removed from Drops.
+type BlockDropsEvent struct {
+	Cancellable
+	Player *Player
+	Region *world.Region
+	Pos    cube.Pos
+	// Block is the state being broken.
+	Block uint32
+	// Item is the held item after this break wore it, empty if that broke it.
+	Item ItemStack
+	// Harvest says vanilla's rule let the block drop: not creative, and the right
+	// tool or none needed.
+	Harvest bool
+	Drops   []BlockDrop
+	// XP is the experience the block gives. It is only reported: no orbs exist yet.
+	XP int32
+}
+
+// OnBlockDrops listens to what blocks broken by players are about to drop.
+func OnBlockDrops(s *Setup, fn func(e *BlockDropsEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.dropsEv.add(s.owner, p, fn)
+	return nil
+}
+
+// SetBlockDrops replaces what a block drops, by its name; a nil rule drops nothing.
+func (s *Setup) SetBlockDrops(block string, rule loot.Rule) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.dropRules[block] = rule
+	return nil
+}
+
+// DropsFunc returns the items a block drops and the experience it gives, given what
+// broke it. Replace it in Systems to change every block's drops. Runs: on the region
+// tick.
+type DropsFunc func(s *Host, block uint32, c *loot.Context) ([]ItemStack, int32)
+
+// blockDrops is what a player's break of the block at pos throws out: the Drops
+// system if vanilla's rule lets it drop, then the event. BDS reads the item after
+// wearing it, so a tool that just broke no longer harvests.
+func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) []BlockDrop {
+	g := p.s.game
+	var drops []BlockDrop
+	var xp int32
+	harvest := false
+	if !p.creative() {
+		if worn, ok := p.breakInfo(r, pos); ok && g.harvests(&worn) {
+			harvest = true
+			var items []ItemStack
+			items, xp = g.sys.Drops(p.s, block, p.breakContext(r, pos))
+			drops = make([]BlockDrop, 0, len(items))
+			for _, it := range items {
+				drops = append(drops, NewBlockDrop(pos, it))
+			}
+		}
+	}
+	if g.dropsEv.Has() {
+		e := BlockDropsEvent{Player: p, Region: r, Pos: pos, Block: block, Item: p.inventory.Held(), Harvest: harvest, Drops: drops, XP: xp}
+		g.dropsEv.fire(p.s.log, &e)
+		if e.Cancelled() {
+			return nil
+		}
+		return e.Drops
+	}
+	return drops
+}
+
+// vanillaDrops is BDS's getResourceDrops, through its drop rule.
+func vanillaDrops(s *Host, block uint32, c *loot.Context) ([]ItemStack, int32) {
 	c.State = func(name string) (int32, bool) { return blockStateNumber(s.reg.Blocks.States(block), name) }
 	res := s.drops.Roll(s.reg.Blocks.Name(block), c)
 	items := make([]ItemStack, 0, len(res.Stacks))
@@ -46,7 +136,7 @@ func vanillaDrops(s *Host, block uint32, c *loot.Context) []ItemStack {
 			items = append(items, it)
 		}
 	}
-	return items
+	return items, res.XP
 }
 
 // blockStateNumber reads a state value as a number, as BDS stores all of them.
@@ -129,12 +219,12 @@ func customNameAt(r *world.Region, pos cube.Pos) string {
 	return name
 }
 
-// throwDrops is BDS's spawnResources: each item at a random spot in the block.
-func (s *Host) throwDrops(r *world.Region, pos cube.Pos, items []ItemStack) {
-	for _, it := range items {
-		at := blockVec(pos).Add(mgl32.Vec3{dropOffset(), dropOffset(), dropOffset()})
-		vel := mgl32.Vec3{dropDrift(), dropUp, dropDrift()}
-		s.spawnItem(r.Dimension(), it, at, vel, world.Rotation{}, blockDropDelay, 0)
+// throwDrops puts the drops in the world.
+func (s *Host) throwDrops(r *world.Region, drops []BlockDrop) {
+	for _, d := range drops {
+		if !d.Stack.Empty() {
+			s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+		}
 	}
 }
 

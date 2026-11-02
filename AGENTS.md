@@ -228,7 +228,11 @@ sibling library folders, so unreleased library changes are used.
   `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`; `Dimension.SetBlockEntities` names who
   makes them; those it does not take stay saved as they were). `player/chest.go` is the only one run so far:
   chests and ender chests (items in `Inventory.ender`), BDS 1.26.60's pairing, lid and window, with `Inventory.open` as a stack request's copy of the open
-  chest (container `ContainerLevelEntity`).
+  chest (container `ContainerLevelEntity`). `player/chestapi.go` is their plugin API: events `OnChestOpen`,
+  `OnChestClose`, `OnChestItem` (per slot a request changes, after BDS's checks; cancelling refuses the whole
+  request, changes make the player get its items resent), `OnChestPair`, `OnChestSpill`, and methods on `Chest`
+  and `Player`, which fire no events. `player/blockdrop.go`: what a player's break drops (`Systems.Drops`, from
+  the `loot` package, BDS's rule per block), `OnBlockDrops`, `Setup.SetBlockDrops`.
 
 ## Design
 

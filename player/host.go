@@ -99,6 +99,9 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: drops: %w", err)
 	}
+	for name, rule := range g.dropRules {
+		drops.Set(name, rule)
+	}
 	h := &Host{
 		drops: drops,
 		log:   conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,

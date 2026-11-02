@@ -51,6 +51,9 @@ type requestState struct {
 	drops []pendingDrop
 	// chest is the running request's copy of the open chest's items.
 	chest []ItemStack
+	// refresh means a listener changed what a request did, so the player must be
+	// sent its items after the response.
+	refresh bool
 }
 
 // pendingDrop is an item a request took out to drop.
@@ -71,6 +74,10 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 		resp.Responses = append(resp.Responses, p.stackRequest(req))
 	}
 	p.send(resp)
+	if p.requests.refresh {
+		p.requests.refresh = false
+		p.refreshItems()
+	}
 	p.flush()
 }
 
@@ -87,6 +94,9 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 			return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
 		}
 		touched = append(touched, refs...)
+	}
+	if !p.fireChestItems() {
+		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
 	}
 	// The created output only holds an item for the request that made it.
 	st.work.ui[createdOutputSlot] = ItemStack{}

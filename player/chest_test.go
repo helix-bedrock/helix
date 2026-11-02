@@ -35,6 +35,13 @@ func TestChest(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.s.chests = table
+	setup, err := NewSetup(p.s.log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.s.game, err = setup.freezeGameplay(); err != nil {
+		t.Fatal(err)
+	}
 	db, err := mcdb.Config{Blocks: reg.Blocks}.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

@@ -43,7 +43,7 @@ func TestBlockDrops(t *testing.T) {
 		}
 	}
 	stone, _ := s.reg.Blocks.Block("minecraft:stone")
-	items := vanillaDrops(s, stone, &loot.Context{})
+	items, _ := vanillaDrops(s, stone, &loot.Context{})
 	if len(items) != 1 || items[0].Name != "minecraft:cobblestone" || items[0].Count != 1 || items[0].Block == nil {
 		t.Fatalf("stone dropped %+v", items)
 	}
@@ -51,7 +51,7 @@ func TestBlockDrops(t *testing.T) {
 	if !ok {
 		t.Fatal("no snow layer state")
 	}
-	if items := vanillaDrops(s, snow, &loot.Context{}); len(items) != 2 || items[0].Name != "minecraft:snowball" {
+	if items, _ := vanillaDrops(s, snow, &loot.Context{}); len(items) != 2 || items[0].Name != "minecraft:snowball" {
 		t.Fatalf("snow of height 3 dropped %+v", items)
 	}
 
