@@ -160,8 +160,10 @@ sibling library folders, so unreleased library changes are used.
   private). PlayerAuthInput's block actions run before movement, in BDS's
   order (server-authoritative breaking: crack LevelEvents, reach 6.7 / 12
   to the block corner, progress per input tick, break at 0.99999, the
-  resend of four blocks after a refused prediction; in creative the block
-  breaks as soon as breaking starts, as BDS's GameMode start does). Every step is a hook
+  resend of four blocks after a refused prediction; in creative and for
+  blocks with no break time the block breaks as soon as breaking starts, as
+  BDS's GameMode start does; after a block breaks, breaking stays on at that
+  position, with a 250 ms cooldown before the next block makes progress). Every step is a hook
   in `Setup.Systems()` (BreakStart, BreakTime, ToolSpeed, BreakTick,
   BreakFinish, PlaceState, PlaceCheck, Place) to replace or wrap. The
   break speed is assembled from parts that can each be changed:

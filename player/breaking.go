@@ -24,22 +24,38 @@ const (
 	levelEventDestroyParticles = 2001
 )
 
-// hitSoundTicks is how often the hit sound plays while breaking: BDS's
-// GameMode waits 200 ms between them.
-const hitSoundTicks = 4
+const (
+	// hitSoundTicks is BDS's GameMode 200 ms between hit sounds. The next
+	// one plays once the clock has passed the wait, so every fifth tick.
+	hitSoundTicks = 4
+	// breakCooldownTicks is BDS's GameMode 250 ms after a block that did
+	// not break at once, in which the next block makes no progress.
+	breakCooldownTicks = 5
+)
 
 // breakState is a player's block breaking, BDS's "destroying" flag and the
-// GameMode's position, face and progress. Owned by the player's region.
+// GameMode's position, face, progress and clock. As in BDS with
+// server-authoritative breaking, pos stays after breaking stops and after a
+// block breaks: it is where the next crack is stopped. Owned by the player's
+// region.
 type breakState struct {
 	active   bool
 	pos      cube.Pos
 	face     int32
 	progress float32
+	// target and targetFace are the block this tick's breaking aims at;
+	// breaking moves there if it is not pos.
+	target     cube.Pos
+	targetFace int32
+	// clock counts the ticks of breaking, BDS's GameMode clock.
+	clock uint64
+	// cooldown is the clock when progress may go on after a block broke.
+	cooldown uint64
+	// nextHit is the clock the hit sound must pass to play again.
+	nextHit uint64
 	// broken counts the blocks the player broke, so a tick can tell
 	// whether the BreakTick hook broke one.
 	broken uint64
-	// hitWait counts the ticks until the next hit sound.
-	hitWait int
 }
 
 // BlockBreakEvent fires before a player's block break happens. Cancel
@@ -191,16 +207,13 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 				levelEvent(r, p.brk.pos, blockVec(p.brk.pos), levelEventStopCracking, 0)
 				levelEvent(r, pos, blockVec(pos), levelEventStartCracking, crackData(p.breakRate(r, pos)))
 			}
-			if !p.brk.active || p.brk.pos != pos || p.brk.face != a.Face {
-				p.startBreak(r, pos, a.Face)
-			}
 			hadContinue = true
-			if p.serverBreakTick() {
+			if p.serverBreakTick(pos, a.Face) {
 				destroyed = true
 			}
 		}
 	}
-	if !hadContinue && p.serverBreakTick() {
+	if !hadContinue && p.serverBreakTick(p.brk.pos, p.brk.face) {
 		destroyed = true
 	}
 	if predicted && !destroyed {
@@ -210,7 +223,9 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 
 // startBreak is BDS's StartDestroyBlock: the crack starts for everyone
 // near, and in reach the breaking starts if the BreakStart hook allows.
-// True if the block broke at once (creative).
+// Progress is left as it is: only stopping or moving to another block resets
+// it. True if the block broke at once (creative, or a block with no break
+// time).
 func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
 	if !p.creative() {
 		levelEvent(r, pos, blockVec(pos), levelEventStartCracking, crackData(p.breakRate(r, pos)))
@@ -222,52 +237,82 @@ func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
 		p.stopBreak()
 		return false
 	}
-	p.brk.active, p.brk.pos, p.brk.face, p.brk.progress = true, pos, face, 0
-	// In creative BDS destroys the block as soon as breaking starts (its
-	// GameMode start; a player-input check for touch controls that skips
-	// this is not ported, nor putting out fire on the clicked face).
-	if p.creative() {
-		if b, ok := r.Block(pos, 0); ok && b != p.s.reg.Blocks.Air() {
-			return p.s.game.sys.BreakFinish(p, pos)
-		}
+	p.brk.active, p.brk.pos, p.brk.face = true, pos, face
+	// BDS's GameMode start destroys the block now in creative and when it
+	// has no break time (a player-input check for touch controls that skips
+	// this is not ported, nor putting out fire on the clicked face). The
+	// next block waits the cooldown.
+	b, ok := p.breakInfo(r, pos)
+	if !ok || b.Block == p.s.reg.Blocks.Air() {
+		return false
 	}
-	return false
+	if !p.creative() && (b.DestroyTime > 0 || p.s.game.sys.BreakTime(&b) < breakEnd) {
+		return false
+	}
+	if !p.s.game.sys.BreakFinish(p, pos) {
+		return false
+	}
+	p.brk.cooldown = p.brk.clock + breakCooldownTicks
+	return true
 }
 
-// stopBreak clears the breaking.
+// stopBreak stops the breaking: BDS's "destroying" flag and GameMode stop.
+// The position stays.
 func (p *Player) stopBreak() {
-	p.brk.active, p.brk.pos, p.brk.face, p.brk.progress = false, cube.Pos{}, 0, 0
+	p.brk.active, p.brk.progress, p.brk.cooldown = false, 0, 0
 }
 
 // serverBreakTick is BDS's server tick of block breaking, once per
-// PlayerAuthInput: out of reach stops it, else the BreakTick hook runs.
+// PlayerAuthInput, aimed at pos: only a player who started breaking goes on,
+// out of reach stops it, else the clock moves and the BreakTick hook runs.
 // True if a block broke.
-func (p *Player) serverBreakTick() bool {
+func (p *Player) serverBreakTick(pos cube.Pos, face int32) bool {
 	if !p.brk.active || p.creative() {
 		return false
 	}
-	if !p.inReach(p.brk.pos) {
+	if !p.inReach(pos) {
 		p.stopBreak()
 		return false
 	}
+	p.brk.target, p.brk.targetFace = pos, face
+	p.brk.clock++
 	before := p.brk.broken
 	p.s.game.sys.BreakTick(p)
 	return p.brk.broken != before
 }
 
-// vanillaBreakTick is BDS's GameMode continue: progress grows by the rate
-// each tick and the block breaks at 0.99999.
+// vanillaBreakTick is BDS's GameMode continue. Another block starts over
+// from 0, and adds no progress this tick. On the same block progress grows by
+// the rate each tick, unless the cooldown of the last block is still running,
+// and the block breaks at 0.99999. Whether or not it really broke, progress
+// starts over and the cooldown starts, unless the block took a single tick.
 func vanillaBreakTick(p *Player) {
 	r := p.entity.Region()
 	if r == nil {
 		return
 	}
-	p.brk.progress += p.breakRate(r, p.brk.pos)
-	p.hitSound(r)
-	if p.brk.progress >= breakEnd {
-		if p.s.game.sys.BreakFinish(p, p.brk.pos) {
+	brk := &p.brk
+	if brk.target != brk.pos {
+		if !p.s.game.sys.BreakStart(p, brk.target, brk.targetFace) {
 			p.stopBreak()
+			return
 		}
+		brk.pos, brk.progress = brk.target, 0
+		return
+	}
+	if b, ok := r.Block(brk.pos, 0); !ok || b == p.s.reg.Blocks.Air() || brk.clock < brk.cooldown {
+		return
+	}
+	rate := p.breakRate(r, brk.pos)
+	brk.progress += rate
+	p.hitSound(r)
+	if brk.progress < breakEnd {
+		return
+	}
+	p.s.game.sys.BreakFinish(p, brk.pos)
+	brk.progress, brk.cooldown = 0, brk.clock
+	if rate < breakEnd {
+		brk.cooldown += breakCooldownTicks
 	}
 }
 
@@ -320,16 +365,15 @@ func (p *Player) resendAround(r *world.Region, pos cube.Pos, face int32) {
 	p.flush()
 }
 
-// hitSound plays BDS's hit sound of the block being broken, at most every
-// hitSoundTicks, to everyone near but the breaking player, whose client
-// plays it itself (BDS's predictive synchronised sound). The wait carries
-// over from block to block, as BDS's timer does.
+// hitSound plays BDS's hit sound of the block being broken, once the wait of
+// hitSoundTicks has passed, to everyone near but the breaking player, whose
+// client plays it itself (BDS's predictive synchronised sound). The wait
+// carries over from block to block, as BDS's timer does.
 func (p *Player) hitSound(r *world.Region) {
-	if p.brk.hitWait > 0 {
-		p.brk.hitWait--
+	if p.brk.clock <= p.brk.nextHit {
 		return
 	}
-	p.brk.hitWait = hitSoundTicks - 1
+	p.brk.nextHit = p.brk.clock + hitSoundTicks
 	b, ok := r.Block(p.brk.pos, 0)
 	if !ok {
 		return

@@ -1,6 +1,6 @@
 # What Helix does
 
-Status as of 2026-11-01. Helix was **restarted from scratch with its own architecture.** Players can
+Status as of 2026-11-02. Helix was **restarted from scratch with its own architecture.** Players can
 join, spawn in a BDS world, see each other, use their inventory, break and place blocks, and
 sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 
@@ -44,7 +44,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Breaking and placing (first pass, not yet tested in game):** block breaking the way BDS
   1.26.60 does it with server-authoritative breaking: cracks and BDS's hit, break and place sounds for everyone near, the reach,
   the break speed from the tool, Efficiency, Aqua Affinity, Haste, Conduit Power, Mining Fatigue,
-  being in the air or under water, and BDS's resend when the client got it wrong. Placing puts the
+  being in the air or under water, BDS's short pause after each broken block, and BDS's resend when the client got it wrong. Placing puts the
   held block item's block where the player clicked (replacing grass, water and the other blocks BDS
   lets you build over), with the place sound, and uses up one item. Tools wear as in BDS
   (Unbreaking included) and break when worn out; effects run out.
