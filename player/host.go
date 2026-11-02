@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/connect"
+	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -68,6 +69,8 @@ type Host struct {
 	connections *connect.Table
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
+	// drops holds what each block drops.
+	drops *loot.Table
 	// runtimeIDs numbers players' entities; stackIDs numbers item stacks
 	// for the network, as BDS does with one counter for the whole server.
 	runtimeIDs atomic.Uint64
@@ -92,8 +95,13 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: chests: %w", err)
 	}
+	drops, err := loot.New()
+	if err != nil {
+		return nil, fmt.Errorf("player: drops: %w", err)
+	}
 	h := &Host{
-		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
+		drops: drops,
+		log:   conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, chests: chests,
 	}

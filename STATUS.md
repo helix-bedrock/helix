@@ -122,7 +122,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   using them, move items with BDS's checks, re-pair after a load, and throw their items when broken.
   Ender chests open the same way but never pair, and show each player their own items, which are saved
   on the player in BDS's `EnderChestInventory` and stay through death.
-  Not done yet: chests dropping themselves (block drops), loot tables, cats on chests, redstone from
+  Not done yet: loot tables, cats on chests, redstone from
   trapped chests, barrels, and an API for plugins to read and change chest contents.
 - **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
   1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
@@ -135,10 +135,16 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   invulnerability ticks after a hit, natural regeneration and starving are not done. Blocks
   that change a fall (slime, hay, beds) are not ported; "in water" is the feet or eye block
   holding water, not BDS's exact liquid-height check. Elytra durability is not done.
-- **Breaking leftovers:** broken blocks drop nothing yet (needs loot tables), and only the placing
+- **Breaking leftovers:** only the placing
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
   own snow layer rule, are not done.
+- **Block drops (first pass, not yet tested in game):** survival players breaking a block with the
+  right tool get BDS 1.26.60's drops for all 1,480 blocks (new `loot` package, from helix-data's
+  `bds/block_drops.json` and its block loot tables). Plugins replace `Systems.Drops` or a block's rule.
+  Not done yet: experience orbs, items built from a block entity (the plain item drops), chests filling
+  from `LootTable`, enchantment loot functions, drops from anything but a player breaking the block. The
+  speed items leave a broken block at was not read from BDS.
 - **Crafting** is not done yet. **Item entities** are a first pass: they are saved with their chunk
   (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
   infinite world's ungenerated ones), do not burn in lava or fire, are not pushed out of a block placed on them, and their

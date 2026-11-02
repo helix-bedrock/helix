@@ -366,8 +366,14 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 			return false
 		}
 	}
+	var drops []ItemStack
 	if !p.creative() {
 		p.hurtHeld(g.sys.Wear(&b))
+		// BDS reads the item after wearing it: a tool that just broke no
+		// longer harvests, and its Fortune and Silk Touch are gone.
+		if worn, ok := p.breakInfo(r, pos); ok && worn.Harvest {
+			drops = g.sys.Drops(p.s, b.Block, p.breakContext(r, pos))
+		}
 	}
 	if !r.SetBlock(pos, 0, p.s.reg.Blocks.Air()) {
 		return false
@@ -375,6 +381,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	r.UpdateNeighbours(pos)
 	g.sys.Exhaust(p, g.sys.Exhaustion.Mine)
 	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
+	p.s.throwDrops(r, pos, drops)
 	p.brk.broken++
 	return true
 }

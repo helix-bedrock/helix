@@ -27,6 +27,8 @@ type Systems struct {
 	BreakTick   BreakTickFunc
 	BreakFinish BreakFinishFunc
 	Wear        WearFunc
+	// Drops is what a broken block drops.
+	Drops DropsFunc
 	// Placing.
 	PlaceState PlaceStateFunc
 	PlaceCheck PlaceCheckFunc
@@ -257,6 +259,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.Wear = func(b *BreakInfo) int32 { return g.wear(b) }
 	sys.BreakTick = vanillaBreakTick
 	sys.BreakFinish = vanillaBreakFinish
+	sys.Drops = vanillaDrops
 	sys.PlaceState = vanillaPlaceState
 	sys.PlaceCheck = vanillaPlaceCheck
 	sys.Place = vanillaPlace
