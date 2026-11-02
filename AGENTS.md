@@ -199,7 +199,9 @@ sibling library folders, so unreleased library changes are used.
   the player definition), burning saturation then hunger. `Hurt` is a
   first pass (health and the hurt event only). All are `Systems` hooks
   (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, Exhaust,
-  Exhaustion). Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
+  Exhaustion). `death.go`: BDS's death (`Die`: items thrown unless
+  `keepinventory`, death event and message) and its Respawn packet sequence
+  (`Respawn`), a first pass without the spawn search. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
   on the minimal event core (named priorities, registration order, no
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every

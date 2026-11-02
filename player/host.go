@@ -30,6 +30,9 @@ type Level struct {
 	// Surface is the Y a player stands on in a flat world, used while the
 	// spawn has no height yet; 0 when unknown.
 	Surface int32
+	// KeepInventory and ShowDeathMessages are level.dat's game rules.
+	KeepInventory     bool
+	ShowDeathMessages bool
 }
 
 // HostConfig is what the server gives the players.

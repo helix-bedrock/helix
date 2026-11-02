@@ -26,9 +26,10 @@ func (p *Player) invulnerable() bool {
 // player's health, the player and those who see it get the hurt event,
 // and the damage costs the damage exhaustion. Armour, enchantments,
 // resistance, absorption, the invulnerability ticks after a hit, knockback
-// and death are not built yet. Returns whether the player was hurt.
-func vanillaHurt(p *Player, damage float32, _ DamageCause) bool {
-	if damage <= 0 || p.invulnerable() {
+// are not built yet. At no health left the Die system runs. Returns whether
+// the player was hurt.
+func vanillaHurt(p *Player, damage float32, cause DamageCause) bool {
+	if damage <= 0 || p.invulnerable() || p.dead() {
 		return false
 	}
 	p.SetHealth(p.Health() - damage)
@@ -36,6 +37,9 @@ func vanillaHurt(p *Player, damage float32, _ DamageCause) bool {
 		r.Broadcast(p.blockPos(), &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventHurt}, nil)
 	}
 	p.s.game.sys.Exhaust(p, p.s.game.sys.Exhaustion.Damage)
+	if p.dead() {
+		p.s.game.sys.Die(p, cause)
+	}
 	return true
 }
 

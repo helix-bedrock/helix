@@ -41,6 +41,8 @@ type Systems struct {
 	Hurt       HurtFunc
 	Exhaust    ExhaustFunc
 	Exhaustion ExhaustionValues
+	Die        DieFunc
+	Respawn    RespawnFunc
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
@@ -227,6 +229,8 @@ func vanillaGameplay(s *Setup) error {
 	sys.MoveCost = vanillaMoveCost
 	sys.Hurt = vanillaHurt
 	sys.Exhaust = vanillaExhaust
+	sys.Die = vanillaDie
+	sys.Respawn = vanillaRespawn
 	ex, err := vanillaExhaustionValues()
 	if err != nil {
 		return err

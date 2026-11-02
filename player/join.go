@@ -34,23 +34,28 @@ func (p *Player) play() {
 // spawnPoint is where the player appears: where it was saved, else the
 // world spawn.
 func (p *Player) spawnPoint() (spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) {
-	lv := p.s.level
-	worldSpawn = protocol.BlockPos{lv.Spawn[0], lv.Spawn[1], lv.Spawn[2]}
-	if r := p.s.overworld.Range(); int(worldSpawn[1]) < r[0] || int(worldSpawn[1]) > r[1] {
-		// BDS stores a height out of range ("find the surface") until it
-		// has placed the spawn. Flat worlds know their surface; anywhere
-		// else the player starts high up until spawning is built.
-		worldSpawn[1] = 100
-		if lv.Surface != 0 {
-			worldSpawn[1] = lv.Surface
-		}
-	}
-	spawn = mgl32.Vec3{float32(worldSpawn[0]) + 0.5, float32(worldSpawn[1]) + eyeHeight, float32(worldSpawn[2]) + 0.5}
+	spawn, worldSpawn = p.worldSpawn()
 	if pos, r, ok := p.load(); ok {
 		spawn, rot = pos, r
 	}
-	p.abilities.SetGameMode(p.gameMode, lv.GameMode)
+	p.abilities.SetGameMode(p.gameMode, p.s.level.GameMode)
 	return spawn, worldSpawn, rot
+}
+
+// worldSpawn is the world's spawn: the eye position there and its block.
+func (p *Player) worldSpawn() (mgl32.Vec3, protocol.BlockPos) {
+	lv := p.s.level
+	at := protocol.BlockPos{lv.Spawn[0], lv.Spawn[1], lv.Spawn[2]}
+	if r := p.s.overworld.Range(); int(at[1]) < r[0] || int(at[1]) > r[1] {
+		// BDS stores a height out of range ("find the surface") until it
+		// has placed the spawn. Flat worlds know their surface; anywhere
+		// else the player starts high up until spawning is built.
+		at[1] = 100
+		if lv.Surface != 0 {
+			at[1] = lv.Surface
+		}
+	}
+	return mgl32.Vec3{float32(at[0]) + 0.5, float32(at[1]) + eyeHeight, float32(at[2]) + 0.5}, at
 }
 
 // announce tells everyone else of the player before it gets StartGame,

@@ -57,6 +57,7 @@ func (p *Player) handleInput(*world.Entity) {
 		}
 		run[i] = nil
 	}
+	p.tickRespawn()
 	p.tickPickup()
 }
 
@@ -81,6 +82,12 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleContainerClose); err != nil {
 		return err
 	}
+	if err := Handle(s, handleRespawn); err != nil {
+		return err
+	}
+	if err := Handle(s, handlePlayerAction); err != nil {
+		return err
+	}
 	if err := vanillaGameplay(s); err != nil {
 		return err
 	}
@@ -92,15 +99,17 @@ func vanillaHandlers(s *Setup) error {
 // before movement, as BDS does, then the movement states and jump, the
 // movement, and the fall and exhaustion that follow it.
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
-	if actions, ok := pk.BlockActions.Value(); ok {
-		p.handleBlockActions(actions)
-	} else {
-		p.handleBlockActions(nil)
-	}
 	sys := p.s.game.sys
-	sys.MoveFlags(p, pk.InputData)
-	if pk.InputData.Load(packet.InputFlagStartJumping) {
-		sys.Jump(p)
+	if !p.dead() {
+		if actions, ok := pk.BlockActions.Value(); ok {
+			p.handleBlockActions(actions)
+		} else {
+			p.handleBlockActions(nil)
+		}
+		sys.MoveFlags(p, pk.InputData)
+		if pk.InputData.Load(packet.InputFlagStartJumping) {
+			sys.Jump(p)
+		}
 	}
 	collided := pk.InputData.Load(packet.InputFlagVerticalCollision)
 	var from mgl32.Vec3
@@ -111,7 +120,14 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		Pos: pk.Position, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
 		OnGround: collided, Tick: pk.Tick,
 	})
-	p.afterMove(from, collided)
+	if !p.dead() {
+		p.afterMove(from, collided)
+	}
+}
+
+// moveTo is a movement the server decides.
+func moveTo(pos mgl32.Vec3, rot world.Rotation, tick uint64) world.Movement {
+	return world.Movement{Pos: pos, Rot: rot, Tick: tick}
 }
 
 // applyMovement is vanilla's movement: the client's position is taken as

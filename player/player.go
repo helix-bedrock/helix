@@ -69,6 +69,8 @@ type Player struct {
 	brk        breakState
 	move       moveState
 	window     windowState
+	// respawn is how far the respawn sequence got (respawnNone when alive).
+	respawn int
 	// touching is the pick-up scan's buffer; shownHeld and shownSlot are what
 	// other players were last told it holds.
 	touching  []*world.Entity

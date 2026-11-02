@@ -55,7 +55,7 @@ func handleInventoryTransaction(p *Player, pk *packet.InventoryTransaction) {
 		return
 	}
 	d, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
-	if !ok || d.ActionType != protocol.UseItemActionClickBlock {
+	if !ok || d.ActionType != protocol.UseItemActionClickBlock || p.dead() {
 		return
 	}
 	if !p.selectUsed(d) {

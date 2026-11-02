@@ -102,8 +102,14 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Movement:** the client's position is taken as it is. BDS's server-side simulation and
   corrections will come with the optional anti-cheat module. Other containers (chests and the
   like) do not open.
-- **Health:** death and respawn are not built: at 0 health the client shows the death screen
-  and cannot respawn. Armour, Feather Falling, Protection, Resistance, absorption, the
+- **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
+  1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
+  inventory are thrown at random (items kept on death stay), others see the death, the death screen
+  and the death message show, and the respawn button runs BDS's Respawn packets and brings the player
+  back with full health and hunger. Not done yet: experience drops, beds and respawn anchors, BDS's
+  search for a safe spot within `spawnradius` (Helix uses the world spawn itself) and waiting for the
+  chunks there. Which attributes reset is a first reading.
+- **Health:** Armour, Feather Falling, Protection, Resistance, absorption, the
   invulnerability ticks after a hit, natural regeneration and starving are not done. Blocks
   that change a fall (slime, hay, beds) are not ported; "in water" is the feet or eye block
   holding water, not BDS's exact liquid-height check. Elytra durability is not done.
@@ -111,8 +117,6 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
   own snow layer rule, are not done.
-- **Death and respawn** are not built: a player at 0 health stays there and cannot pick up items
-  until it rejoins, when it comes back with full health (a stopgap, not from BDS).
 - **Crafting** is not done yet. **Item entities** are a first pass: they are not saved with their
   chunk, do not burn in lava or fire, are not pushed out of a block placed on them, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
