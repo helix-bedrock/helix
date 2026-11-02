@@ -163,7 +163,9 @@ sibling library folders, so unreleased library changes are used.
   resend of four blocks after a refused prediction; in creative and for
   blocks with no break time the block breaks as soon as breaking starts, as
   BDS's GameMode start does; after a block breaks, breaking stays on at that
-  position, with a 250 ms cooldown before the next block makes progress). Every step is a hook
+  position, with a 250 ms cooldown before the next block makes progress; one
+  extra beyond BDS as read so far: LevelEvent 3602 when the break rate changes,
+  so the crack keeps up after landing). Every step is a hook
   in `Setup.Systems()` (BreakStart, BreakTime, ToolSpeed, BreakTick,
   BreakFinish, PlaceState, PlaceCheck, Place) to replace or wrap. The
   break speed is assembled from parts that can each be changed:

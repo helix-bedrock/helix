@@ -21,6 +21,7 @@ const (
 const (
 	levelEventStartCracking    = 3600
 	levelEventStopCracking     = 3601
+	levelEventUpdateCracking   = 3602
 	levelEventDestroyParticles = 2001
 )
 
@@ -53,6 +54,8 @@ type breakState struct {
 	cooldown uint64
 	// nextHit is the clock the hit sound must pass to play again.
 	nextHit uint64
+	// crack is the speed the crack animation was last sent, as LevelEvent data.
+	crack int32
 	// broken counts the blocks the player broke, so a tick can tell
 	// whether the BreakTick hook broke one.
 	broken uint64
@@ -205,7 +208,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 		case protocol.PlayerActionContinueDestroyBlock:
 			if !creative {
 				levelEvent(r, p.brk.pos, blockVec(p.brk.pos), levelEventStopCracking, 0)
-				levelEvent(r, pos, blockVec(pos), levelEventStartCracking, crackData(p.breakRate(r, pos)))
+				p.startCrack(r, pos)
 			}
 			hadContinue = true
 			if p.serverBreakTick(pos, a.Face) {
@@ -228,7 +231,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 // time).
 func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
 	if !p.creative() {
-		levelEvent(r, pos, blockVec(pos), levelEventStartCracking, crackData(p.breakRate(r, pos)))
+		p.startCrack(r, pos)
 	}
 	if !p.inReach(pos) {
 		return false
@@ -254,6 +257,24 @@ func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
 	}
 	p.brk.cooldown = p.brk.clock + breakCooldownTicks
 	return true
+}
+
+// startCrack starts the crack animation at pos, at the speed of the rate now.
+func (p *Player) startCrack(r *world.Region, pos cube.Pos) {
+	p.brk.crack = crackData(p.breakRate(r, pos))
+	levelEvent(r, pos, blockVec(pos), levelEventStartCracking, p.brk.crack)
+}
+
+// updateCrack tells clients the crack's new speed when the rate has changed.
+// Clients run the animation themselves from the speed they were sent, so
+// landing after starting a block in the air would leave it far behind the
+// real progress. This event is an extra: from the code read so far, BDS sends
+// it only without server-authoritative breaking.
+func (p *Player) updateCrack(r *world.Region, rate float32) {
+	if data := crackData(rate); data != p.brk.crack {
+		p.brk.crack = data
+		levelEvent(r, p.brk.pos, blockVec(p.brk.pos), levelEventUpdateCracking, data)
+	}
 }
 
 // stopBreak stops the breaking: BDS's "destroying" flag and GameMode stop.
@@ -300,10 +321,14 @@ func vanillaBreakTick(p *Player) {
 		brk.pos, brk.progress = brk.target, 0
 		return
 	}
-	if b, ok := r.Block(brk.pos, 0); !ok || b == p.s.reg.Blocks.Air() || brk.clock < brk.cooldown {
+	if b, ok := r.Block(brk.pos, 0); !ok || b == p.s.reg.Blocks.Air() {
 		return
 	}
 	rate := p.breakRate(r, brk.pos)
+	p.updateCrack(r, rate)
+	if brk.clock < brk.cooldown {
+		return
+	}
 	brk.progress += rate
 	p.hitSound(r)
 	if brk.progress < breakEnd {
