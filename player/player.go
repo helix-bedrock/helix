@@ -69,6 +69,11 @@ type Player struct {
 	brk        breakState
 	move       moveState
 	window     windowState
+	// touching is the pick-up scan's buffer; shownHeld and shownSlot are what
+	// other players were last told it holds.
+	touching  []*world.Entity
+	shownHeld ItemStack
+	shownSlot uint8
 	// breakSpeed multiplies the player's break speed; reachScale its
 	// reach. Both 1 by default.
 	breakSpeed float32

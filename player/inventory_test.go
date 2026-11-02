@@ -144,3 +144,110 @@ func TestInventorySave(t *testing.T) {
 		t.Fatalf("armour %v", l)
 	}
 }
+
+// TestDropRequest checks a drop takes only what the server holds, and only
+// once the whole request passed.
+func TestDropRequest(t *testing.T) {
+	p := testPlayer(t)
+	p.abilities = DefaultAbilities()
+	var dropped []ItemStack
+	p.s.game = &gameplay{}
+	p.s.game.sys.DropItem = func(_ *Player, s ItemStack, _ bool) bool {
+		dropped = append(dropped, s)
+		return true
+	}
+	emeralds := p.inventory.main[2].netID
+	drop := func(count byte, id int32) *protocol.DropStackRequestAction {
+		return &protocol.DropStackRequestAction{Count: count, Source: slotInfo(containerHotbar, 2, id)}
+	}
+	cases := []struct {
+		name   string
+		action protocol.StackRequestAction
+		status uint8
+	}{
+		{"more than held", drop(65, emeralds), protocol.ItemStackResponseStatusInvalidRemovedAmount},
+		{"none", drop(0, emeralds), protocol.ItemStackResponseStatusInvalidRemovedAmount},
+		{"forged stack", drop(1, emeralds+999), protocol.ItemStackResponseStatusFailedToValidateSrcSlot},
+		{"empty slot", &protocol.DropStackRequestAction{Count: 1, Source: slotInfo(containerHotbar, 7, 0)}, protocol.ItemStackResponseStatusFailedToValidateSrcSlot},
+	}
+	for _, c := range cases {
+		r := p.stackRequest(protocol.ItemStackRequest{RequestID: -1, Actions: []protocol.StackRequestAction{c.action}})
+		if r.Status != c.status || p.inventory.main[2].Count != 64 || len(dropped) != 0 {
+			t.Fatalf("%s: status %d, count %d, dropped %d", c.name, r.Status, p.inventory.main[2].Count, len(dropped))
+		}
+	}
+	// A drop followed by a refused action drops nothing.
+	r := p.stackRequest(protocol.ItemStackRequest{RequestID: -3, Actions: []protocol.StackRequestAction{drop(4, emeralds), drop(1, emeralds+999)}})
+	if r.Status == protocol.ItemStackResponseStatusOK || p.inventory.main[2].Count != 64 || len(dropped) != 0 {
+		t.Fatalf("refused request: status %d, count %d, dropped %d", r.Status, p.inventory.main[2].Count, len(dropped))
+	}
+	r = p.stackRequest(protocol.ItemStackRequest{RequestID: -5, Actions: []protocol.StackRequestAction{drop(4, emeralds)}})
+	if r.Status != protocol.ItemStackResponseStatusOK || p.inventory.main[2].Count != 60 || len(dropped) != 1 || dropped[0].Count != 4 || dropped[0].Name != "minecraft:emerald" {
+		t.Fatalf("drop: status %d, count %d, dropped %v", r.Status, p.inventory.main[2].Count, dropped)
+	}
+}
+
+// TestLegacyDrop checks the client's old items must match the server's and
+// only one slot and a world drop are accepted.
+func TestLegacyDrop(t *testing.T) {
+	p := testPlayer(t)
+	it, ok := p.s.reg.Items.ByName("minecraft:emerald")
+	if !ok {
+		t.Fatal("no emerald")
+	}
+	stack := func(id int32, count uint16) protocol.ItemInstance {
+		return protocol.ItemInstance{Stack: protocol.ItemStack{ItemType: protocol.ItemType{NetworkID: id}, Count: count}}
+	}
+	id := int32(it.ID)
+	from := func(slot uint32, old, left uint16) protocol.InventoryAction {
+		return protocol.InventoryAction{SourceType: protocol.InventoryActionSourceContainer, WindowID: protocol.Option(int8(protocol.WindowIDInventory)), InventorySlot: slot, OldItem: stack(id, old), NewItem: stack(id, left)}
+	}
+	out := func(itemID int32, n uint16) protocol.InventoryAction {
+		return protocol.InventoryAction{SourceType: protocol.InventoryActionSourceWorld, NewItem: stack(itemID, n)}
+	}
+	diamond, _ := p.s.reg.Items.ByName("minecraft:diamond")
+	bad := map[string][]protocol.InventoryAction{
+		"item not held":  {from(7, 1, 0), out(id, 1)},
+		"count not held": {from(2, 65, 0), out(id, 65)},
+		"makes items":    {from(2, 64, 63), out(id, 64)},
+		"other item out": {from(2, 64, 63), out(int32(diamond.ID), 1)},
+		"no slot":        {out(id, 1)},
+		"three actions":  {from(2, 64, 63), out(id, 1), out(id, 1)},
+	}
+	for name, a := range bad {
+		if _, _, ok := p.legacyDrop(a); ok {
+			t.Fatalf("%s: accepted", name)
+		}
+	}
+	slot, count, ok := p.legacyDrop([]protocol.InventoryAction{from(2, 64, 63), out(id, 1)})
+	if !ok || slot != 2 || count != 1 {
+		t.Fatalf("honest drop: slot %d, count %d, ok %v", slot, count, ok)
+	}
+}
+
+// TestInventoryAdd checks BDS's order: stacks with room, then free slots; the
+// rest comes back.
+func TestInventoryAdd(t *testing.T) {
+	p := testPlayer(t)
+	ids := func() int32 { return p.s.stackIDs.Add(1) }
+	var filled []int
+	changed := func(i int) { filled = append(filled, i) }
+	inv := &p.inventory
+	inv.main[2].Count = 60
+	rest := inv.add(p.s.reg, ItemStack{Name: "minecraft:emerald", Count: 10}, ids, changed)
+	if !rest.Empty() || inv.main[2].Count != 64 || inv.main[1].Count != 6 || inv.main[1].netID == 0 || len(filled) != 2 {
+		t.Fatalf("rest %v, slot 2 %d, slot 1 %d, filled %v", rest, inv.main[2].Count, inv.main[1].Count, filled)
+	}
+	for i := range inv.main {
+		if inv.main[i].Empty() {
+			inv.main[i] = ItemStack{Name: "minecraft:diamond", Count: 64}
+		}
+	}
+	if inv.canAdd(p.s.reg, ItemStack{Name: "minecraft:stick", Count: 1}) {
+		t.Fatal("full inventory takes a new item")
+	}
+	rest = inv.add(p.s.reg, ItemStack{Name: "minecraft:emerald", Count: 60}, ids, changed)
+	if rest.Count != 2 || inv.main[1].Count != 64 {
+		t.Fatalf("rest %d, slot 1 %d", rest.Count, inv.main[1].Count)
+	}
+}

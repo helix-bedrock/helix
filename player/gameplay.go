@@ -41,6 +41,9 @@ type Systems struct {
 	Hurt       HurtFunc
 	Exhaust    ExhaustFunc
 	Exhaustion ExhaustionValues
+	// Items in the world.
+	DropItem DropItemFunc
+	PickUp   PickUpFunc
 }
 
 // MoveFlagsFunc sets the player's movement states (sneaking, sprinting...)
@@ -215,6 +218,8 @@ func vanillaGameplay(s *Setup) error {
 	sys.PlaceState = vanillaPlaceState
 	sys.PlaceCheck = vanillaPlaceCheck
 	sys.Place = vanillaPlace
+	sys.DropItem = vanillaDropItem
+	sys.PickUp = vanillaPickUp
 	sys.MoveFlags = vanillaMoveFlags
 	sys.Jump = vanillaJump
 	sys.Fall = vanillaFall

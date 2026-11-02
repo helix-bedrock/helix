@@ -137,5 +137,74 @@ func (inv *Inventory) contentPackets(reg *registry.Registry) []packet.Packet {
 func handleMobEquipment(p *Player, pk *packet.MobEquipment) {
 	if pk.WindowID == protocol.WindowIDInventory && pk.HotBarSlot < hotbarSize {
 		p.inventory.held = pk.HotBarSlot
+		p.sendEquipment()
 	}
+}
+
+// freeSlot returns the first empty inventory slot, -1 if none.
+func (inv *Inventory) freeSlot() int {
+	for i := range inv.main {
+		if inv.main[i].Empty() {
+			return i
+		}
+	}
+	return -1
+}
+
+// slotWithRoom returns the first slot holding s's item with room for more, -1
+// if none.
+func (inv *Inventory) slotWithRoom(reg *registry.Registry, s ItemStack) int {
+	max := s.maxStack(reg)
+	for i := range inv.main {
+		if o := &inv.main[i]; !o.Empty() && o.stacksWith(s) && o.Count < max {
+			return i
+		}
+	}
+	return -1
+}
+
+// canAdd reports whether any of s fits, as BDS's inventory canAdd.
+func (inv *Inventory) canAdd(reg *registry.Registry, s ItemStack) bool {
+	return inv.freeSlot() >= 0 || inv.slotWithRoom(reg, s) >= 0
+}
+
+// add puts s in the inventory as BDS's add: a damaged or unstackable item in
+// the first free slot; others on the first stack with room, then the first
+// free slot, until none is left. It returns what did not fit; changed is told
+// each slot it filled, ids numbers new stacks.
+func (inv *Inventory) add(reg *registry.Registry, s ItemStack, ids func() int32, changed func(int)) ItemStack {
+	maxStack := s.maxStack(reg)
+	if maxStack == 0 {
+		return s
+	}
+	if maxStack == 1 || itemDamage(s) > 0 {
+		i := inv.freeSlot()
+		if i < 0 {
+			return s
+		}
+		s.netID = ids()
+		inv.main[i] = s
+		changed(i)
+		return ItemStack{}
+	}
+	for s.Count > 0 {
+		i := inv.slotWithRoom(reg, s)
+		if i >= 0 {
+			moved := min(maxStack-inv.main[i].Count, s.Count)
+			inv.main[i].Count += moved
+			s.Count -= moved
+			changed(i)
+			continue
+		}
+		if i = inv.freeSlot(); i < 0 {
+			return s
+		}
+		moved := min(maxStack, s.Count)
+		placed := s
+		placed.Count, placed.netID = moved, ids()
+		inv.main[i] = placed
+		s.Count -= moved
+		changed(i)
+	}
+	return ItemStack{}
 }

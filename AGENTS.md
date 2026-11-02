@@ -152,6 +152,11 @@ sibling library folders, so unreleased library changes are used.
   (BDS's saved format and join packets) and BDS's checks on stack
   requests (take, place, swap, destroy, creative items), applied all or
   nothing on a copy. The client's view of its items is never read back.
+  `drop.go`: drops from stack requests and the legacy transaction, stricter
+  than BDS: client items are compared, never kept (lead's decision, core
+  architecture, not anti-cheat). `Give`, pick-up and held item updates.
+  `itemactor.go`: item entities with BDS 1.26.60's tick (`DropItem`, `PickUp`
+  systems). World gained `EntityConfig.Owner`, `Region.AppendEntitiesIn`.
   Armour and offhand take the items BDS allows (registry `Wearable`,
   `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
   Drops and crafting are refused until built.

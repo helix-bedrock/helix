@@ -46,12 +46,21 @@ type PlaceCheckFunc func(pl *Placement) bool
 // item used up. False if nothing was placed.
 type PlaceFunc func(pl *Placement) bool
 
-// handleInventoryTransaction handles item use on a block. Only placing is
-// built: clicking air, using items on entities and interacting with
-// blocks come later.
+// handleInventoryTransaction handles the legacy drop and item use on a
+// block. Of item use only placing is built: clicking air, using items on
+// entities and interacting with blocks come later.
 func handleInventoryTransaction(p *Player, pk *packet.InventoryTransaction) {
+	if _, normal := pk.TransactionData.(*protocol.NormalTransactionData); normal {
+		p.handleNormalTransaction(pk.Actions)
+		return
+	}
 	d, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
 	if !ok || d.ActionType != protocol.UseItemActionClickBlock {
+		return
+	}
+	if !p.selectUsed(d) {
+		p.sendHeld()
+		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 		return
 	}
 	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition) {
@@ -197,6 +206,7 @@ func (p *Player) useHeld() {
 		*s = ItemStack{}
 	}
 	p.sendHeld()
+	p.sendEquipment()
 	p.flush()
 }
 
@@ -212,4 +222,22 @@ func (p *Player) resendPlace(clicked cube.Pos, face int32) {
 		p.sendBlock(r, at)
 	}
 	p.flush()
+}
+
+// selectUsed applies item use's slot, as BDS selects the slot the client
+// names, and checks the client thinks it holds the item the server has there.
+// What is used is the server's stack either way; a client that names another
+// item gets its slot back.
+func (p *Player) selectUsed(d *protocol.UseItemTransactionData) bool {
+	if d.HotBarSlot < 0 || d.HotBarSlot >= hotbarSize {
+		return false
+	}
+	p.inventory.held = uint8(d.HotBarSlot) //nolint:gosec // checked above
+	p.sendEquipment()
+	held := p.inventory.Held()
+	if held.Empty() {
+		return d.HeldItem.Stack.NetworkID == 0
+	}
+	t, ok := p.s.reg.Items.ByName(held.Name)
+	return ok && int32(t.ID) == d.HeldItem.Stack.NetworkID
 }

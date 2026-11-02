@@ -29,6 +29,14 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Inventory:** items are loaded from and saved in BDS's format. Every inventory change the client
   asks for is checked as BDS checks it (stack network IDs, counts, stack sizes, armour slots and
   offhand items as BDS lists them, creative-only destroy and creative items) before it happens.
+  Stricter than BDS on purpose: what a client says it holds is only compared, never kept, so a
+  dropped item is always cut from the server's own stack. A drop asking for more than the stack
+  holds is refused (BDS clamps it), and a legacy transaction must be exactly one inventory slot
+  plus one world drop.
+- **Item drops and pick-up (not yet tested in game):** Q and dropping from the inventory screen
+  throw items as BDS does. Items fall, float in water and lava, slow down on the block under them,
+  join nearby stacks, vanish after 6000 ticks, and go to the offhand and inventory in BDS's order
+  when touched, leaving what does not fit. Other players see the held item change.
 - **Registry:** built at boot from BDS 1.26.60's data: 23,960 states of 1,480 blocks with their
   network hashes and BDS's runtime numbers (light, flammability, explosion resistance, friction,
   destroy time, and BDS's collision boxes for every state: data for the 888 blocks whose shape is
@@ -99,11 +107,13 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   invulnerability ticks after a hit, natural regeneration and starving are not done. Blocks
   that change a fall (slime, hay, beds) are not ported; "in water" is the feet or eye block
   holding water, not BDS's exact liquid-height check. Elytra durability is not done.
-- **Breaking leftovers:** no drops (no item entities yet), and only the placing
+- **Breaking leftovers:** broken blocks drop nothing yet (needs loot tables), and only the placing
   player blocks a placement (BDS checks every entity against the placed block's collision boxes).
   Spears and other data-driven items do not wear yet. Stacking petals and leaf litter, and BDS's
   own snow layer rule, are not done.
-- **Dropping and crafting** items are not done yet.
+- **Crafting** is not done yet. **Item entities** are a first pass: they are not saved with their
+  chunk, do not burn in lava or fire, are not pushed out of a block placed on them, and their
+  spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
 - **Everything else** (mobs, combat, redstone, commands, UI) comes after core player gameplay.
   [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which
   topics are designed.

@@ -57,6 +57,7 @@ func (p *Player) handleInput(*world.Entity) {
 		}
 		run[i] = nil
 	}
+	p.tickPickup()
 }
 
 // vanillaHandlers registers vanilla's packet handlers and systems. They go

@@ -75,6 +75,9 @@ type EntityConfig struct {
 	// Viewer makes the entity a player's: it moves with the viewer between
 	// regions and is shown every entity within BDS's 57-chunk disc.
 	Viewer *Viewer
+	// Owner is what the entity belongs to, for whoever finds it with
+	// [Region.AppendEntitiesIn].
+	Owner any
 	// Spawn returns the packets that show the entity to a player seeing it
 	// for the first time. Built once per tick and shared by every player.
 	Spawn func(e *Entity) []packet.Packet
@@ -113,6 +116,9 @@ func (e *Entity) UniqueID() int64 { return e.conf.UniqueID }
 
 // RuntimeID returns the entity's runtime ID. Runs: anywhere.
 func (e *Entity) RuntimeID() uint64 { return e.conf.RuntimeID }
+
+// Owner returns the EntityConfig's Owner. Runs: anywhere.
+func (e *Entity) Owner() any { return e.conf.Owner }
 
 // Position returns where the entity is. Runs: owner.
 func (e *Entity) Position() mgl32.Vec3 { return e.pos }
@@ -412,4 +418,17 @@ func (r *Region) sendMovement() {
 			}
 		}
 	}
+}
+
+// AppendEntitiesIn appends the entities in this region standing in the chunks
+// the area touches to dst, so a caller reusing dst allocates nothing. The
+// caller checks positions. Runs: owner.
+func (r *Region) AppendEntitiesIn(dst []*Entity, minX, minZ, maxX, maxZ float32) []*Entity {
+	lo, hi := chunkOf(mgl32.Vec3{minX, 0, minZ}), chunkOf(mgl32.Vec3{maxX, 0, maxZ})
+	for x := lo[0]; x <= hi[0]; x++ {
+		for z := lo[1]; z <= hi[1]; z++ {
+			dst = append(dst, r.byChunk[mcdb.ChunkPos{x, z}]...)
+		}
+	}
+	return dst
 }

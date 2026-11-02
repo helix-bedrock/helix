@@ -45,6 +45,15 @@ type requestState struct {
 		slots map[[2]byte]int32
 	}
 	next int
+	// drops are what the running request dropped, spawned only if all of it
+	// passes.
+	drops []pendingDrop
+}
+
+// pendingDrop is an item a request took out to drop.
+type pendingDrop struct {
+	stack    ItemStack
+	randomly bool
 }
 
 // handleItemStackRequest answers the client's inventory requests as BDS's
@@ -66,6 +75,7 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackResponse {
 	st := &p.requests
 	st.work = p.inventory
+	st.drops = st.drops[:0]
 	var touched []slotRef
 	for _, a := range req.Actions {
 		status, refs := p.stackAction(a)
@@ -77,6 +87,8 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	// The created output only holds an item for the request that made it.
 	st.work.ui[createdOutputSlot] = ItemStack{}
 	p.inventory = st.work
+	p.spawnDrops()
+	p.sendEquipment()
 
 	resp := protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusOK, RequestID: req.RequestID}
 	slots := map[[2]byte]int32{}
@@ -142,8 +154,7 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 	case *protocol.DestroyStackRequestAction:
 		return p.destroy(a.Count, a.Source)
 	case *protocol.DropStackRequestAction:
-		// Dropped items become item entities, which are not built yet.
-		return protocol.ItemStackResponseStatusCannotDropItem, nil
+		return p.dropAction(a)
 	case *protocol.CraftCreativeStackRequestAction:
 		return p.craftCreative(a)
 	case *protocol.CraftResultsDeprecatedStackRequestAction:
