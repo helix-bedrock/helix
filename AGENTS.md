@@ -223,6 +223,7 @@ sibling library folders, so unreleased library changes are used.
   item API (private drops, lifetimes per player's drops and server-wide).
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.
+- `connect`: the arms of fences, panes and bars, kept in their block states since 1.26, from helix-data's rules.
 
 ## Design
 

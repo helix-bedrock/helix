@@ -110,6 +110,9 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   Doors place both halves with BDS's hinge rule and fall apart without their other half or support.
   Buttons pop out after 20 or 30 ticks. No redstone output yet. Other blocks with a use (chests,
   furnaces, beds...) do not react yet, so a block in hand is placed against them.
+- **Fences, panes and bars (not yet tested in game):** since 1.26 their arms are in the block's own
+  state, so the server works them out on placing and when a neighbour changes (new `connect` package,
+  from BDS's per-state rules in helix-data's `bds/connections.json`). Walls are not done yet.
 - **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
   1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
   inventory are thrown at random (items kept on death stay), others see the death, the death screen

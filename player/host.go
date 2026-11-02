@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -63,6 +64,8 @@ type Host struct {
 	handlers handlers
 	game     *gameplay
 	global   *global
+	// connections works out the arms of fences and the like as they are placed.
+	connections *connect.Table
 	// runtimeIDs numbers players' entities; stackIDs numbers item stacks
 	// for the network, as BDS does with one counter for the whole server.
 	runtimeIDs atomic.Uint64
@@ -79,10 +82,14 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: gameplay: %w", err)
 	}
+	connections, err := connect.New(conf.Registry.Blocks)
+	if err != nil {
+		return nil, fmt.Errorf("player: connections: %w", err)
+	}
 	h := &Host{
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(),
+		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections,
 	}
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	conf.Overworld.SetEntityLoader(h.loadEntity)

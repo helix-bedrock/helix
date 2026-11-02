@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/helix-bedrock/helix/blockuse"
+	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
@@ -87,7 +88,11 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 	conf.Scheduler, conf.RandomTickSpeed = s.ticker, randomTickSpeed
 	conf.Ticker = s.conf.BlockTicker
 	if conf.Ticker == nil {
-		conf.Ticker = blockuse.NewTicker(s.reg.Blocks, liquid.New(s.reg.Blocks))
+		table, err := connect.New(s.reg.Blocks)
+		if err != nil {
+			return err
+		}
+		conf.Ticker = blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks)))
 	}
 	r, _ := mcdb.Overworld.Range()
 	switch {

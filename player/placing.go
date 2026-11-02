@@ -223,6 +223,7 @@ func vanillaPlace(pl *Placement) bool {
 	if r == nil {
 		return false
 	}
+	pl.Block = p.s.connections.Connected(r, pl.Pos, pl.Block)
 	g := p.s.game
 	if g.placeEv.Has() {
 		e := BlockPlaceEvent{Player: p, Pos: pl.Pos, Block: pl.Block}
