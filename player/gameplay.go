@@ -95,8 +95,10 @@ type gameplay struct {
 	durability    map[string]data.Durability
 	replaceables  map[string]bool
 	notReplacedBy map[string]map[string]bool
-	breakEv       listeners[BlockBreakEvent]
-	placeEv       listeners[BlockPlaceEvent]
+	// placement is helix-data's bds/placement.json.
+	placement map[string]data.Placement
+	breakEv   listeners[BlockBreakEvent]
+	placeEv   listeners[BlockPlaceEvent]
 }
 
 // gameState is the gameplay part of the Setup while it is open.
@@ -238,12 +240,17 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	if err != nil {
 		return nil, err
 	}
+	placement, err := data.PlacementData()
+	if err != nil {
+		return nil, err
+	}
 	gs := s.h.game
 	g := gs.out
 	*g = gameplay{
 		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
+		placement: placement,
 	}
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)

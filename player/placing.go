@@ -150,16 +150,6 @@ func (p *Player) inside(pos cube.Pos) bool {
 	return maxX > bx && minX < bx+1 && maxY > by && minY < by+1 && maxZ > bz && minZ < bz+1
 }
 
-// vanillaPlaceState is BDS's getPlacementBlock: the block's own rule, else
-// the item's block as it is.
-func vanillaPlaceState(pl *Placement) (uint32, bool) {
-	p := pl.Player
-	if s, ok := p.s.game.blocks[p.s.reg.Blocks.Name(pl.Block)].(PlacementStater); ok {
-		return s.PlacementState(pl)
-	}
-	return pl.Block, true
-}
-
 // vanillaPlace is BDS's BlockItem placing after the checks: the BlockPlace
 // event, the block set, the place sound (LevelSoundEvent "place" with the
 // block, at its centre, to everyone near, the placer too), and one item used
