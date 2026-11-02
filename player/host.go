@@ -84,6 +84,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(),
 	}
+	h.itemLifetime.Store(g.sys.ItemLifetime)
 	conf.Overworld.SetEntityLoader(h.loadEntity)
 	return h, nil
 }

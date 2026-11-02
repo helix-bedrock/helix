@@ -46,6 +46,9 @@ type Systems struct {
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
+	// ItemLifetime is how many ticks old items vanish at, from the start. It
+	// can change while running with Host.SetItemLifetime.
+	ItemLifetime int32
 }
 
 // MoveFlagsFunc sets the player's movement states (sneaking, sprinting...)
@@ -246,6 +249,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.Place = vanillaPlace
 	sys.DropItem = vanillaDropItem
 	sys.PickUp = vanillaPickUp
+	sys.ItemLifetime = itemLifetime
 	sys.MoveFlags = vanillaMoveFlags
 	sys.Jump = vanillaJump
 	sys.Fall = vanillaFall

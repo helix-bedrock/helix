@@ -398,6 +398,16 @@ func (s *Server) Players() []*player.Player {
 	return nil
 }
 
+// SetItemLifetime changes how many ticks old items vanish at, for every item
+// without its own lifetime, also those already in the world. Vanilla's is 6000;
+// player.ItemLifetimeForever keeps them. Does nothing until Run started: to set
+// it from the start, use player.Systems' ItemLifetime in Config.Setup.
+func (s *Server) SetItemLifetime(ticks int32) {
+	if host := s.players.Load(); host != nil {
+		host.SetItemLifetime(ticks)
+	}
+}
+
 // PlayerCount returns how many players are online.
 func (s *Server) PlayerCount() int { return len(s.Players()) }
 
