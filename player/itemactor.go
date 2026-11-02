@@ -41,6 +41,11 @@ const (
 	itemBuoyancyAdd    = 0.0005
 	itemBuoyancyRate   = 0.01
 
+	// itemFlags are an item's actor flags.
+	itemFlags = 1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagHasCollision
+	// itemTagInterval is how often, in ticks, an item's name tag is updated.
+	itemTagInterval = 20
+
 	// itemIdentifier is what an item is saved as; itemHealth is the health
 	// BDS gives a new one.
 	itemIdentifier = "minecraft:item"
@@ -156,17 +161,50 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 // spawnPackets show the item to a player. The data is a first pass, not yet
 // checked against what BDS sends.
 func (i *ItemActor) spawnPackets(e *world.Entity) []packet.Packet {
+	meta := protocol.EntityMetadata{
+		protocol.EntityDataKeyFlags:  int64(itemFlags),
+		protocol.EntityDataKeyWidth:  float32(2 * itemHalfSize),
+		protocol.EntityDataKeyHeight: float32(2 * itemHalfSize),
+		protocol.EntityDataKeyScale:  float32(1),
+	}
+	if fn := i.tagFunc(); fn != nil {
+		maps.Copy(meta, tagMetadata(fn(i)))
+	}
 	return []packet.Packet{&packet.AddItemActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Item: i.stack.network(i.s.reg),
-		Position: e.Position(), Velocity: i.vel,
-		EntityMetadata: protocol.EntityMetadata{
-			protocol.EntityDataKeyFlags:  int64(1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagHasCollision),
-			protocol.EntityDataKeyWidth:  float32(2 * itemHalfSize),
-			protocol.EntityDataKeyHeight: float32(2 * itemHalfSize),
-			protocol.EntityDataKeyScale:  float32(1),
-		},
+		Position: e.Position(), Velocity: i.vel, EntityMetadata: meta,
 	}}
 }
+
+// tagFunc returns the ItemTag system, nil when items have no tag.
+func (i *ItemActor) tagFunc() ItemTagFunc {
+	if i.s.game == nil {
+		return nil
+	}
+	return i.s.game.sys.ItemTag
+}
+
+// sendTag updates the item's name tag once a second, when it has one.
+func (i *ItemActor) sendTag(r *world.Region, e *world.Entity) {
+	fn := i.tagFunc()
+	if fn == nil || i.age%itemTagInterval != 0 {
+		return
+	}
+	r.Broadcast(floorPos(e.Position()), &packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: tagMetadata(fn(i))}, nil)
+}
+
+// tagMetadata shows text as an always visible name tag.
+func tagMetadata(text string) protocol.EntityMetadata {
+	return protocol.EntityMetadata{
+		protocol.EntityDataKeyFlags:             int64(itemFlags | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName),
+		protocol.EntityDataKeyName:              text,
+		protocol.EntityDataKeyAlwaysShowNameTag: uint8(1),
+	}
+}
+
+// TicksLeft returns how many ticks of being loaded the item has before it
+// vanishes. Runs: owner of its entity.
+func (i *ItemActor) TicksLeft() int32 { return itemLifetime - i.age }
 
 // movePacket moves the item for the players who see it.
 func (i *ItemActor) movePacket(e *world.Entity) packet.Packet {
@@ -207,6 +245,7 @@ func (i *ItemActor) tick(e *world.Entity) {
 		}
 		i.moveAndDrag(r, e)
 	}
+	i.sendTag(r, e)
 	i.age++
 	if i.age >= itemLifetime {
 		i.taken = true

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -47,11 +48,23 @@ func testCommandList() *packet.AvailableCommands {
 	}
 }
 
+// ticksPerSecond is the server's tick rate.
+const ticksPerSecond = 20
+
+// itemTimerTag shows how long an item has left, as minutes and seconds, for
+// checking its lifetime in game. Only with -testcmds.
+func itemTimerTag(i *player.ItemActor) string {
+	left := i.TicksLeft() / ticksPerSecond
+	return fmt.Sprintf("%d:%02d", left/60, left%60)
+}
+
 // testCommands is a stand-in until commands are designed: /gamemode for
-// anyone, so break and place can be tested in game. Only with -testcmds.
-// The command list goes to each player with its first input.
+// anyone, so break and place can be tested in game, and a countdown over
+// dropped items. Only with -testcmds. The command list goes to each player
+// with its first input.
 func testCommands(s *helix.Setup) error {
 	setup := s.As("testcmds").Player
+	setup.Systems().ItemTag = itemTimerTag
 	list := testCommandList()
 	var sent sync.Map // *player.Player -> struct{}, so a rejoin gets it again
 	if err := player.WrapHandle(setup, func(p *player.Player, pk *packet.PlayerAuthInput, next player.PacketHandler[*packet.PlayerAuthInput]) {

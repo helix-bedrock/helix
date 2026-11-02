@@ -46,7 +46,13 @@ type Systems struct {
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
+	// ItemTag gives items a name tag, updated once a second. Nil, vanilla's,
+	// shows none. It is sent to clients only, never saved.
+	ItemTag ItemTagFunc
 }
+
+// ItemTagFunc returns the text of an item's name tag.
+type ItemTagFunc func(i *ItemActor) string
 
 // MoveFlagsFunc sets the player's movement states (sneaking, sprinting...)
 // from its PlayerAuthInput input flags.

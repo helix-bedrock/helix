@@ -13,7 +13,7 @@ import (
 
 func main() {
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
-	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode, for in-game testing")
+	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and show a countdown over dropped items, for in-game testing")
 	flag.Parse()
 	level := slog.LevelInfo
 	if *debug {
