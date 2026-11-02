@@ -51,6 +51,8 @@ type requestState struct {
 	drops []pendingDrop
 	// chest is the running request's copy of the open chest's items.
 	chest []ItemStack
+	// craft is what the running request's craft still has to do.
+	craft craftState
 	// refresh means a listener changed what a request did, so the player must be
 	// sent its items after the response.
 	refresh bool
@@ -87,13 +89,20 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	st.work = p.inventory
 	st.work.open = p.loadChestWork()
 	st.drops = st.drops[:0]
+	st.craft = craftState{}
 	var touched []slotRef
 	for _, a := range req.Actions {
+		if status := p.preCraftAction(a); status != protocol.ItemStackResponseStatusOK {
+			return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
+		}
 		status, refs := p.stackAction(a)
 		if status != protocol.ItemStackResponseStatusOK {
 			return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
 		}
 		touched = append(touched, refs...)
+	}
+	if status := p.finishCraft(); status != protocol.ItemStackResponseStatusOK {
+		return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
 	}
 	// Listeners work on the copy, so refusing here changes nothing.
 	if !p.fireChestItems() {
@@ -171,6 +180,14 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 		return p.destroy(a.Count, a.Source)
 	case *protocol.DropStackRequestAction:
 		return p.dropAction(a)
+	case *protocol.CraftRecipeStackRequestAction:
+		return p.craftRecipe(a)
+	case *protocol.AutoCraftRecipeStackRequestAction:
+		return p.craftAuto(a)
+	case *protocol.ConsumeStackRequestAction:
+		return p.consumeAction(a)
+	case *protocol.CreateStackRequestAction:
+		return p.createAction(a)
 	case *protocol.CraftCreativeStackRequestAction:
 		return p.craftCreative(a)
 	case *protocol.CraftResultsDeprecatedStackRequestAction:
@@ -180,7 +197,7 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 		// could be taken.
 		return protocol.ItemStackResponseStatusOK, nil
 	}
-	// Crafting and the other screens come later.
+	// The other screens come later.
 	return protocol.ItemStackResponseStatusError, nil
 }
 
@@ -226,6 +243,12 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.ui[createdOutputSlot]
+	case protocol.ContainerCraftingInput:
+		start, size, _, ok := p.craftGrid()
+		if !ok || int(slot) < start || int(slot) >= start+size {
+			return r, false
+		}
+		r.stack = &inv.ui[slot]
 	case containerLevelEntity:
 		if int(slot) >= len(inv.open) {
 			return r, false

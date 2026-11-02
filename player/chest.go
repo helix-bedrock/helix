@@ -682,7 +682,7 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 // which otherwise closed it itself.
 func (p *Player) closeWindow(serverSide bool) {
 	w := &p.window
-	w.open, w.chest = false, false
+	w.open, w.chest, w.workbench = false, false, false
 	p.inventory.open = nil
 	if serverSide {
 		p.sendNow(&packet.ContainerClose{WindowID: w.id, ContainerType: containerTypeNone, ServerSide: true})

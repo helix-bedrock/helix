@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/connect"
+	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/registry"
@@ -56,6 +57,7 @@ type HostConfig struct {
 type Host struct {
 	log          *slog.Logger
 	reg          *registry.Registry
+	recipes      crafting.Book
 	overworld    *world.Dimension
 	playerStore  mcdb.PlayerStore
 	level        Level

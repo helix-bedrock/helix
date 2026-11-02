@@ -151,7 +151,13 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   far they spread at first and what BDS sends about them are not compared yet). Not done yet: items built from a block entity (the plain item drops), chests filling
   from `LootTable`, enchantment loot functions, drops from anything but a player breaking the block. The
   speed items leave a broken block at was not read from BDS.
-- **Crafting** is not done yet. **Item entities** are a first pass: they are saved with their chunk
+- **Crafting** is a first pass from BDS 1.26.60: the inventory's small grid and the crafting table's large
+  one, by hand and from the recipe book, with `OnCraft` to change the results or refuse. Recipes come from the
+  `CraftingData` packet, so plugins change them through `Registry.Crafting`. Not done yet: which recipes a player
+  has unlocked (the recipe book may show few or none), `doLimitedCrafting`, BDS's 14 special recipes (fireworks,
+  map copies, banners, repairs...), the 1,456 recipes that keep an item's data (dyeing bundles and such), and the
+  other screens (furnace, anvil, smithing, stonecutter...). Items left in a grid stay there when the window closes:
+  no return was found in BDS, so the client is taken to move them, which is not confirmed. **Item entities** are a first pass: they are saved with their chunk
   (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
   infinite world's ungenerated ones), do not burn in lava or fire, are not pushed out of a block placed on them, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
