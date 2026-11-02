@@ -1,8 +1,9 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
 	"sync"
+
+	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
