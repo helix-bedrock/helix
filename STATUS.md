@@ -64,6 +64,14 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   sprint jumps, breaking blocks and taking damage cost BDS's exhaustion from the player
   definition, which burns saturation and then hunger (not on peaceful, not in creative). Health
   goes down and the player is shown hurt. Each step is a system plugins can replace.
+- **Placement states (not yet tested in game):** placed blocks face, turn and split into halves
+  as BDS 1.26.60 places them: its placement traits (furnaces, chests, doors, observers, slabs,
+  amethyst...) and its own rules for stairs, logs, trapdoors, pistons, dispensers, barrels, glazed
+  terracotta, skulls, buttons, levers, torches, ladders, lanterns, bells, grindstones, hoppers, end
+  rods, cocoa, tripwire hooks, vines and leaves. Whether a wall holds a torch, ladder or lantern is
+  judged from collision boxes (BDS asks each block).
+- **Buckets (first pass):** water and lava buckets pour a source block and become empty buckets
+  outside creative. The liquid does not flow yet.
 - **Creative inventory:** items can be taken from the creative menu (the client's results
   message after a creative take is accepted).
 
@@ -71,9 +79,11 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 
 - **Vanilla terrain generation** is not hooked up yet, so an infinite world shows only what it has
   saved.
-- **Block behaviour:** blocks tick, but no vanilla block has tick behaviour yet. Blocks are
-  placed in their item's state: facing, halves and other placement rules are not done, nor is
-  clicking blocks that open or toggle (chests, doors, levers).
+- **Block behaviour:** blocks tick, but no vanilla block has tick behaviour yet: water and lava
+  do not flow. Walls, fences, panes, redstone wire, snow layers, scaffolding, petals, glow lichen
+  and dripstone are placed in their item's state (their state needs the neighbours), the second
+  door half is not placed, and clicking blocks that open or toggle (chests, doors, levers) is not
+  done. Buckets do not pick liquids up or waterlog blocks.
 - **Movement:** the client's position is taken as it is. BDS's server-side simulation and
   corrections will come with the optional anti-cheat module. Other containers (chests and the
   like) do not open.

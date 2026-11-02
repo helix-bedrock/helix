@@ -70,6 +70,9 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3) bool 
 	if r == nil || held.Empty() {
 		return false
 	}
+	if _, ok := bucketLiquids[held.Name]; ok {
+		return p.pourBucket(clicked, face, held)
+	}
 	block, ok := p.itemBlock(held)
 	if !ok {
 		return false

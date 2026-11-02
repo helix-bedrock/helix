@@ -160,6 +160,9 @@ sibling library folders, so unreleased library changes are used.
   and `SetReachScale`. Enchantments and effects are registered entries
   (`RegisterEnchantment`, `RegisterEffect`). Per-block behaviour is set
   with `SetBlockBehaviour` (optional interfaces: `PlacementStater`,
+  which wins over vanilla's placement; vanilla's is `placestate.go`:
+  BDS's placement traits and getPlacementBlock rules per block from
+  helix-data's `bds/placement.json`; `bucket.go` pours water and lava,
   `Replaceable`; without one, a block is built over if it carries BDS's
   replaceable component, from helix-data's `bds/break_place.json`). Held
   tools wear by BDS's rule per item from the same table (the `Wear`
