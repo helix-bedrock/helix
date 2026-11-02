@@ -227,7 +227,7 @@ sibling library folders, so unreleased library changes are used.
 - Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
   `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`; `Dimension.SetBlockEntities` names who
   makes them; those it does not take stay saved as they were). `player/chest.go` is the only one run so far:
-  BDS 1.26.60's pairing, lid and window, with `Inventory.open` as a stack request's copy of the open
+  chests and ender chests (items in `Inventory.ender`), BDS 1.26.60's pairing, lid and window, with `Inventory.open` as a stack request's copy of the open
   chest (container `ContainerLevelEntity`).
 
 ## Design

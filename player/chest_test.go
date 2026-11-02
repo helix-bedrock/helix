@@ -147,6 +147,35 @@ func TestChest(t *testing.T) {
 	})
 }
 
+// TestEnderChest checks that ender chests are known, come back from a save as ender
+// chests, and that their items are the player's, through a save and a load.
+func TestEnderChest(t *testing.T) {
+	p := testPlayer(t)
+	table, err := newChestTable(p.s.reg.Blocks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ender, _ := p.s.reg.Blocks.Block("minecraft:ender_chest"); table.kind[ender] != chestEnder {
+		t.Fatal("ender chest not known")
+	}
+	saved := (&Chest{ender: true, lead: true}).SaveData(cube.Pos{1, 2, 3})
+	if saved["id"] != enderChestEntityID {
+		t.Fatalf("saved %+v", saved)
+	}
+	be, ok := chestEntities{s: p.s}.Load(cube.Pos{1, 2, 3}, saved)
+	if c, isChest := be.(*Chest); !ok || !isChest || !c.ender {
+		t.Fatalf("loaded %+v", be)
+	}
+	var inv, back Inventory
+	inv.ender[5] = ItemStack{Name: "minecraft:emerald", Count: 7}
+	data := map[string]any{}
+	inv.save(data)
+	back.load(data, func() int32 { return 1 })
+	if s := back.ender[5]; s.Name != "minecraft:emerald" || s.Count != 7 {
+		t.Fatalf("loaded %+v", s)
+	}
+}
+
 // TestChestObstruction checks BDS's list: glass never stops the lid, stone does
 // through its box.
 func TestChestObstruction(t *testing.T) {

@@ -30,6 +30,9 @@ type Inventory struct {
 	ui      [uiSize]ItemStack
 	// held is the selected hotbar slot.
 	held uint8
+	// ender is the player's ender chest. BDS keeps it on the player, whichever
+	// ender chest opens it, and a death does not throw it.
+	ender [chestSize]ItemStack
 	// open is what a request works on of the chest the player has open, nil with
 	// none. The chest holds the real items.
 	open []ItemStack
@@ -65,6 +68,11 @@ func (inv *Inventory) load(data map[string]any, ids func() int32) {
 	for _, m := range compounds(data["PlayerUIItems"]) {
 		if slot, ok := m["Slot"].(uint8); ok && int(slot) < uiSize {
 			inv.ui[slot] = withID(itemFromNBT(m), ids)
+		}
+	}
+	for _, m := range compounds(data["EnderChestInventory"]) {
+		if slot, ok := m["Slot"].(uint8); ok && int(slot) < chestSize {
+			inv.ender[slot] = withID(itemFromNBT(m), ids)
 		}
 	}
 	if held, ok := data["SelectedInventorySlot"].(int32); ok && held >= 0 && held < hotbarSize {
@@ -110,6 +118,13 @@ func (inv *Inventory) save(data map[string]any) {
 	if ui == nil {
 		ui = []any{}
 	}
+	ender := []any{}
+	for i, s := range inv.ender {
+		if !s.Empty() {
+			ender = append(ender, s.nbt(i, true))
+		}
+	}
+	data["EnderChestInventory"] = ender
 	data["Inventory"], data["Armor"], data["PlayerUIItems"] = main, armor, ui
 	data["Offhand"] = []any{inv.offhand.nbt(0, false)}
 	data["Mainhand"] = []any{inv.Held().nbt(0, false)}

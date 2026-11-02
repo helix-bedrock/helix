@@ -43,8 +43,10 @@ const (
 	chestPileMin     = 10
 	chestPileExtra   = 21
 	chestPickupDelay = 10
-	// chestEntityID is the saved ID of a chest's block entity.
-	chestEntityID = "Chest"
+	// chestEntityID and enderChestEntityID are the saved IDs of their block
+	// entities.
+	chestEntityID      = "Chest"
+	enderChestEntityID = "EnderChest"
 )
 
 // Kinds of chest. Only chests of one kind pair.
@@ -53,6 +55,7 @@ const (
 	chestPlain
 	chestTrapped
 	chestCopper
+	chestEnder
 )
 
 // Cardinal directions in a chest's state, numbered as BDS numbers them.
@@ -120,6 +123,8 @@ func chestKindOf(name string) int8 {
 		return chestTrapped
 	case strings.HasSuffix(name, "copper_chest"):
 		return chestCopper
+	case name == "minecraft:ender_chest":
+		return chestEnder
 	}
 	return chestNone
 }
@@ -169,10 +174,13 @@ func sameStates(listed, states map[string]any) bool {
 
 // Chest is a chest's block entity: its items, who has it open and which chest it
 // is paired with. A double chest is two of these, the lead holding the first half.
-// Runs: owner of its chunk.
+// An ender chest is one too, with the same lid and rules, but it never pairs and its
+// viewers each see their own items, which are kept on the player. Runs: owner of its
+// chunk.
 type Chest struct {
 	s     *Host
 	pos   cube.Pos
+	ender bool
 	items [chestSize]ItemStack
 	// saved keeps the other fields of the saved chest (CustomName, LootTable...),
 	// written back as they were.
@@ -206,16 +214,17 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if int(block) >= len(t.kind) || t.kind[block] == chestNone {
 		return nil
 	}
-	return &Chest{s: e.s, lead: true}
+	return &Chest{s: e.s, lead: true, ender: t.kind[block] == chestEnder}
 }
 
 // Load brings back a chest as BDS loads one. A follower waits for its lead's tick
 // to link them; only the lead reads the partner's position.
 func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEntity, bool) {
-	if id, _ := saved["id"].(string); id != chestEntityID {
+	id, _ := saved["id"].(string)
+	if id != chestEntityID && id != enderChestEntityID {
 		return nil, false
 	}
-	c := &Chest{s: e.s, pos: pos, lead: true, saved: maps.Clone(saved)}
+	c := &Chest{s: e.s, pos: pos, lead: true, ender: id == enderChestEntityID, saved: maps.Clone(saved)}
 	for _, item := range compounds(saved["Items"]) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < chestSize {
@@ -253,6 +262,9 @@ func (c *Chest) NetworkData(pos cube.Pos) map[string]any {
 		}
 	}
 	m["id"] = chestEntityID
+	if c.ender {
+		m["id"] = enderChestEntityID
+	}
 	m["x"], m["y"], m["z"] = int32(pos[0]), int32(pos[1]), int32(pos[2]) //nolint:gosec // block coordinates fit int32
 	switch {
 	case c.paired || c.pending:
@@ -291,6 +303,9 @@ func boolByte(b bool) uint8 {
 // BlockEntityPlaced tries the two neighbours a chest facing this way can pair with.
 func (c *Chest) BlockEntityPlaced(r *world.Region, pos cube.Pos) {
 	c.pos = pos
+	if c.ender {
+		return
+	}
 	block, ok := r.Block(pos, 0)
 	if !ok {
 		return
@@ -328,7 +343,7 @@ func (c *Chest) canPair(r *world.Region, o *Chest) bool {
 		return false
 	}
 	t := c.s.chests
-	if t.kind[a] == chestNone || t.kind[a] != t.kind[b] || t.dir[a] != t.dir[b] {
+	if t.kind[a] == chestNone || t.kind[a] == chestEnder || t.kind[a] != t.kind[b] || t.dir[a] != t.dir[b] {
 		return false
 	}
 	alongX := t.dir[a]&^2 == 0
@@ -438,7 +453,7 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 			c.blockEvent(r)
 		}
 		if c.lid == 0 {
-			c.lidSound(r, packet.SoundEventChestOpen)
+			c.lidSound(r, c.openSound())
 		}
 	}
 	was := c.lid
@@ -448,7 +463,7 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	case !c.open && was > 0:
 		c.lid = was - chestLidSpeed
 		if was >= chestLidCloseSound && c.lid < chestLidCloseSound {
-			c.lidSound(r, packet.SoundEventChestClosed)
+			c.lidSound(r, c.closeSound())
 		}
 		if c.lid < 0 {
 			c.lid = 0
@@ -488,6 +503,22 @@ func (c *Chest) tickPair(r *world.Region) {
 	default:
 		c.lead = true
 	}
+}
+
+// openSound is the sound of the lid starting to open.
+func (c *Chest) openSound() string {
+	if c.ender {
+		return packet.SoundEventEnderChestOpen
+	}
+	return packet.SoundEventChestOpen
+}
+
+// closeSound is the sound of the lid closing.
+func (c *Chest) closeSound() string {
+	if c.ender {
+		return packet.SoundEventEnderChestClosed
+	}
+	return packet.SoundEventChestClosed
 }
 
 // lidSound plays a lid's sound at the middle of the whole chest.
@@ -562,7 +593,7 @@ func (c *Chest) closeViewers(r *world.Region) {
 func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	c := p.s.chestAt(r, u.Pos)
 	if c == nil {
-		c = &Chest{s: p.s, pos: u.Pos, lead: true}
+		c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder}
 		if !r.SetBlockEntity(u.Pos, c) {
 			return false
 		}
@@ -619,7 +650,11 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 		ContainerEntityUniqueID: -1,
 	})
 	content := make([]protocol.ItemInstance, 0, 2*chestSize)
-	for _, s := range lead.items {
+	shown := lead.items[:]
+	if c.ender {
+		shown = p.inventory.ender[:]
+	}
+	for _, s := range shown {
 		content = append(content, s.network(p.s.reg))
 	}
 	if follower != nil {
@@ -706,6 +741,10 @@ func (p *Player) loadChestWork() []ItemStack {
 	if c == nil {
 		return nil
 	}
+	if c.ender {
+		st.chest = append(st.chest, p.inventory.ender[:]...)
+		return st.chest
+	}
 	lead, follower := c.halves(r)
 	st.chest = append(st.chest, lead.items[:]...)
 	if follower != nil {
@@ -727,6 +766,11 @@ func (p *Player) commitChestWork() {
 	}
 	c := p.s.chestAt(r, p.window.chestPos)
 	if c == nil {
+		return
+	}
+	// An ender chest's items are this player's alone, saved with the player.
+	if c.ender {
+		copy(p.inventory.ender[:], work)
 		return
 	}
 	lead, follower := c.halves(r)

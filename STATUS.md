@@ -120,8 +120,10 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   chests follow BDS 1.26.60: they pair with the chest beside them facing the same way, open unless the
   block above stops the lid (BDS's list, then collision boxes), share one window between everyone
   using them, move items with BDS's checks, re-pair after a load, and throw their items when broken.
+  Ender chests open the same way but never pair, and show each player their own items, which are saved
+  on the player in BDS's `EnderChestInventory` and stay through death.
   Not done yet: chests dropping themselves (block drops), loot tables, cats on chests, redstone from
-  trapped chests, ender chests, barrels, and an API for plugins to read and change chest contents.
+  trapped chests, barrels, and an API for plugins to read and change chest contents.
 - **Death and respawn (first pass, not yet tested in game):** at 0 health the player dies as BDS
   1.26.60's order has it: without `keepinventory`, vanishing items go and armour, offhand, cursor and
   inventory are thrown at random (items kept on death stay), others see the death, the death screen
