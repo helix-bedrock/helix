@@ -54,7 +54,7 @@ func testCommandList() *packet.AvailableCommands {
 		}
 	}
 	item := protocol.Command{
-		Name: itemTestCommand, Description: "Tests the item API: private, life, server, off.",
+		Name: itemTestCommand, Description: "Tests the item API: private, life, server, timer, off.",
 		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
 		Overloads: []protocol.CommandOverload{itemOverload},
 	}
@@ -70,10 +70,14 @@ const ticksPerSecond = 20
 
 // showItemTimer shows how long an item has left, as minutes and seconds, then
 // the name of the player looking, so the tag proves each player gets their own.
+// A player who turned the timer off gets no tag, on every item, within a second.
 // Only with -testcmds. Items with a view never merge, so stacks do not join
-// while it is on.
-func showItemTimer(i *player.ItemActor) {
+// even for a player with the timer off.
+func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestDrops) {
 	i.SetView(func(p *player.Player, v *player.ItemView) {
+		if settings(p).timerOff.Load() {
+			return
+		}
 		if i.TicksLeft() == player.ItemLifetimeForever {
 			v.Name = "never " + p.Name()
 			return
@@ -87,28 +91,37 @@ func showItemTimer(i *player.ItemActor) {
 const itemTestCommand = "itemtest"
 
 // itemTestActions are what itemTestCommand takes.
-var itemTestActions = []string{"private", "life", "server", "off"}
+var itemTestActions = []string{"private", "life", "server", "timer", "off"}
 
-// itemTestDrops is how a player's drops are set up. Owned by its region.
+// itemTestDrops is how a player's drops are set up, and whether it sees the
+// timer. private and lifetime are owned by the player's region; timerOff is read
+// by the regions of the items the player sees.
 type itemTestDrops struct {
 	private  bool
 	lifetime int32
+	timerOff atomic.Bool
 }
 
 // itemTest runs /itemtest: private toggles the player's drops being seen only
-// by it, life sets their lifetime, server sets every item's, off undoes the
-// player's own settings. Rules last until the item's chunk reloads.
+// by it, life sets their lifetime, server sets every item's, timer toggles the
+// player seeing the timer, off undoes the player's own settings and hides the
+// timer. Rules last until the item's chunk reloads.
 func itemTest(p *player.Player, drops *itemTestDrops, srv *atomic.Pointer[helix.Server], args []string) string {
 	if len(args) == 0 {
-		return "/itemtest private | life <seconds|forever|default> | server <seconds|forever|default> | off"
+		return "/itemtest private | life <seconds|forever|default> | server <seconds|forever|default> | timer | off"
 	}
 	switch args[0] {
 	case "private":
 		drops.private = !drops.private
 		return fmt.Sprintf("Your new drops are private: %v", drops.private)
+	case "timer":
+		shown := drops.timerOff.Load()
+		drops.timerOff.Store(!shown)
+		return fmt.Sprintf("You see item timers: %v", shown)
 	case "off":
-		*drops = itemTestDrops{}
-		return "Your new drops are normal again"
+		drops.private, drops.lifetime = false, 0
+		drops.timerOff.Store(true)
+		return "Your new drops are normal again and you see no item timers"
 	case "life", "server":
 		if len(args) != 2 {
 			return "Give seconds, forever or default"
@@ -162,7 +175,7 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 		return drops
 	}
 	if err := player.OnItemDrop(setup, func(e *player.ItemDropEvent) {
-		showItemTimer(e.Item)
+		showItemTimer(e.Item, settings)
 		drops := settings(e.Player)
 		if drops.private {
 			owner := e.Player
@@ -172,7 +185,7 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	}, player.Normal); err != nil {
 		return err
 	}
-	if err := player.OnItemLoad(setup, func(e *player.ItemLoadEvent) { showItemTimer(e.Item) }, player.Normal); err != nil {
+	if err := player.OnItemLoad(setup, func(e *player.ItemLoadEvent) { showItemTimer(e.Item, settings) }, player.Normal); err != nil {
 		return err
 	}
 	list := testCommandList()
