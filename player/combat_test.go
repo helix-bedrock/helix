@@ -73,6 +73,31 @@ func TestKnockbackStep(t *testing.T) {
 	}
 }
 
+// TestArmorShown notices a change of what is worn, and puts each piece in its place.
+func TestArmorShown(t *testing.T) {
+	p := testPlayer(t)
+	if p.armorChanged() {
+		t.Fatal("nothing worn, yet changed")
+	}
+	p.inventory.armor[0] = ItemStack{Name: "minecraft:diamond_helmet", Count: 1, netID: 7}
+	p.inventory.armor[3] = ItemStack{Name: "minecraft:diamond_boots", Count: 1, netID: 8}
+	if !p.armorChanged() {
+		t.Fatal("armour put on, not noticed")
+	}
+	pk := p.armorEquipment()
+	if pk.Helmet.Stack.Count != 1 || pk.Boots.Stack.Count != 1 || pk.Chestplate.Stack.Count != 0 || pk.Leggings.Stack.Count != 0 {
+		t.Errorf("packet = %+v", pk)
+	}
+	p.showArmor()
+	if p.armorChanged() {
+		t.Error("shown, still changed")
+	}
+	p.inventory.armor[0] = ItemStack{}
+	if !p.armorChanged() {
+		t.Error("armour taken off, not noticed")
+	}
+}
+
 // TestDamageCauses pins the sets BDS tests causes against.
 func TestDamageCauses(t *testing.T) {
 	if armorBypassed(DamageEntityAttack) || !armorBypassed(DamageFall) || !armorBypassed(DamageStarve) || !armorBypassed(DamageVoid) {

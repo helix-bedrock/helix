@@ -318,6 +318,9 @@ func (p *Player) sendSlot(i int) {
 // sendEquipment shows the players who see this one what it holds, if that
 // changed.
 func (p *Player) sendEquipment() {
+	if p.armorChanged() {
+		p.showArmor()
+	}
 	inv := &p.inventory
 	held := inv.Held()
 	if p.entity == nil || (held.netID == p.shownHeld.netID && held.Count == p.shownHeld.Count && inv.held == p.shownSlot) {
@@ -331,4 +334,36 @@ func (p *Player) sendEquipment() {
 	r.Broadcast(p.blockPos(), &packet.MobEquipment{
 		EntityRuntimeID: p.runtimeID, NewItem: held.network(p.s.reg), InventorySlot: inv.held, HotBarSlot: inv.held, WindowID: protocol.WindowIDInventory,
 	}, p.viewer)
+}
+
+// armorChanged reports whether what the player wears differs from what those who see
+// it were last shown.
+func (p *Player) armorChanged() bool {
+	for i := range p.inventory.armor {
+		if p.inventory.armor[i].netID != p.shownArmor[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// armorEquipment is what the player wears as those who see it get it, as BDS's mob
+// sends its armour: every piece in one packet.
+func (p *Player) armorEquipment() *packet.MobArmourEquipment {
+	a, reg := &p.inventory.armor, p.s.reg
+	return &packet.MobArmourEquipment{
+		EntityRuntimeID: p.runtimeID, Helmet: a[0].network(reg), Chestplate: a[1].network(reg),
+		Leggings: a[2].network(reg), Boots: a[3].network(reg), Body: a[4].network(reg),
+	}
+}
+
+// showArmor shows those who see the player what it wears. Its own client has it from
+// its inventory.
+func (p *Player) showArmor() {
+	for i := range p.inventory.armor {
+		p.shownArmor[i] = p.inventory.armor[i].netID
+	}
+	if p.entity != nil {
+		p.entity.Send(p.armorEquipment())
+	}
 }

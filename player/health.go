@@ -315,6 +315,7 @@ func (p *Player) wearArmor(damage float32, cause DamageCause) {
 	}
 	if changed {
 		p.send(p.inventory.armorPacket(p.s.reg))
+		p.showArmor()
 	}
 }
 
