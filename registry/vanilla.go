@@ -107,7 +107,11 @@ func vanillaLive(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
-	s.s.creative, s.s.crafting = creative, crafting
+	trims, err := data.TrimData()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	s.s.creative, s.s.crafting, s.s.trims = creative, crafting, trims
 	if s.s.voxelShapes, err = data.VoxelShapes(); err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}

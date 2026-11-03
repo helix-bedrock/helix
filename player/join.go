@@ -100,7 +100,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 	p.send(adventure, abilities, list, abilities,
 		s.reg.Biomes.DefinitionPacket(), s.reg.EntityTypes.IdentifiersPacket(),
 		&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()},
-		s.reg.Creative.Packet())
+		s.reg.Creative.Packet(), s.reg.Trims.Packet())
 	p.send(p.inventory.contentPackets(s.reg)...)
 	p.send(s.reg.Crafting.Packet())
 

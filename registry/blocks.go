@@ -59,6 +59,8 @@ type Registry struct {
 	Creative *Live[packet.CreativeContent]
 	// Crafting is the recipes; they may change while running.
 	Crafting *Live[packet.CraftingData]
+	// Trims is the armour trim patterns and materials; they may change while running.
+	Trims *Live[packet.TrimData]
 	// VoxelShapes and JigsawStructures are sent right before StartGame, as
 	// BDS sends them: the client needs both to join. Vanilla's are BDS's
 	// own; shared, do not change them.
@@ -115,8 +117,13 @@ func (s *Setup) Freeze() (*Registry, error) {
 			}
 		}
 	}
+	trims := s.s.trims
+	if trims == nil {
+		trims = &packet.TrimData{}
+	}
 	s.s.frozen = true
 	return &Registry{
+		Trims:  newLive(trims, cloneTrims),
 		Blocks: b, Items: it, Biomes: bs, EntityTypes: et,
 		Creative: newLive(creative, cloneCreative), Crafting: newLive(crafting, cloneCrafting),
 		VoxelShapes: s.s.voxelShapes, JigsawStructures: s.s.jigsaw,

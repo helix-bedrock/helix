@@ -156,10 +156,10 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   `CraftingData` packet, so plugins change them through `Registry.Crafting`. Not done yet: which recipes a player
   has unlocked (the recipe book may show few or none), `doLimitedCrafting`, BDS's 14 special recipes (fireworks,
   map copies, banners, repairs...), the 1,456 recipes that keep an item's data (dyeing bundles and such), and the
-  other screens (furnace, anvil, stonecutter...). **Smithing tables** work for BDS's upgrades (netherite), with a
+  other screens (furnace, anvil, stonecutter...). **Smithing tables** work for every BDS recipe, upgrades and armour trims, with a
   plugin API: `Registry.EditSmithing` and `Setup.EditSmithing` clear, remove or change recipes (`Clear`, `Remove`,
-  `RemoveFor`, `Set`), and `OnSmith` changes or refuses one use. Armour trims are not done: they are listed and
-  can be removed, but using one is refused. **All recipes** have the same API: `Registry.EditRecipes` and
+  `RemoveFor`, `Set`), and `OnSmith` changes or refuses one use; `Setup.EditTrims` and `Registry.Trims` change the
+  trim patterns and materials. **All recipes** have the same API: `Registry.EditRecipes` and
   `Setup.EditRecipes` list, clear (`Clear`, `ClearBlock`, `ClearSpecial`, `ClearBrewing`), remove (`Remove`,
   `RemoveFor`) or change and add (`Set`) shaped and shapeless recipes of any block, at boot or while running. Screens
   not built yet list their recipes but cannot use them. Items left in a grid stay there when the window closes:

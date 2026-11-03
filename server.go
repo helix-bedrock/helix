@@ -374,6 +374,7 @@ func (s *Server) buildRegistry() error {
 	// still to be checked per packet.
 	r.Creative.OnChange(func(p *packet.CreativeContent) { s.broadcast(p) })
 	r.Crafting.OnChange(func(p *packet.CraftingData) { s.broadcast(p) })
+	r.Trims.OnChange(func(p *packet.TrimData) { s.broadcast(p) })
 	s.log.Info("Registry frozen", "block states", r.Blocks.Count(), "items", r.Items.Count(),
 		"biomes", r.Biomes.Count(), "entity types", r.EntityTypes.Count())
 	return nil

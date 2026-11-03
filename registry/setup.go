@@ -178,6 +178,8 @@ type setupState struct {
 
 	creative *packet.CreativeContent
 	crafting *packet.CraftingData
+	// trims is the armour trim patterns and materials.
+	trims *packet.TrimData
 	// smithingEdits run on the recipes at freeze, once items and blocks are known.
 	smithingEdits []func(*Smithing) error
 	recipeEdits   []func(*Recipes) error

@@ -70,6 +70,25 @@ func cloneCreative(p *packet.CreativeContent) *packet.CreativeContent {
 	return &packet.CreativeContent{Groups: slices.Clone(p.Groups), Items: slices.Clone(p.Items)}
 }
 
+func cloneTrims(p *packet.TrimData) *packet.TrimData {
+	return &packet.TrimData{Patterns: slices.Clone(p.Patterns), Materials: slices.Clone(p.Materials)}
+}
+
+// EditTrims changes the armour trim patterns and materials at boot; Registry.Trims
+// changes them later. Vanilla's are BDS's own.
+func (s *Setup) EditTrims(edit func(p *packet.TrimData)) error {
+	if s.s.frozen {
+		return ErrFrozen
+	}
+	if s.s.trims == nil {
+		s.s.trims = &packet.TrimData{}
+	}
+	p := cloneTrims(s.s.trims)
+	edit(p)
+	s.s.trims = p
+	return nil
+}
+
 func cloneCrafting(p *packet.CraftingData) *packet.CraftingData {
 	return &packet.CraftingData{
 		ShapedRecipes:                slices.Clone(p.ShapedRecipes),

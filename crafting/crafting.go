@@ -197,6 +197,12 @@ func NewTable(pk *packet.CraftingData) *Table {
 			Template: ReadIngredient(r.Template), Base: ReadIngredient(r.Base), Addition: ReadIngredient(r.Addition),
 		}
 	}
+	for _, r := range pk.SmithingTrimRecipes {
+		t.smithing[r.RecipeNetworkID] = &SmithingRecipe{
+			ID: r.RecipeID, NetworkID: r.RecipeNetworkID, Block: r.Block, Trim: true,
+			Template: ReadIngredient(r.Template), Base: ReadIngredient(r.Base), Addition: ReadIngredient(r.Addition),
+		}
+	}
 	for _, r := range pk.ShapedRecipes {
 		t.recipes[r.RecipeNetworkID] = &Recipe{
 			ID: r.RecipeID, NetworkID: r.RecipeNetworkID, Block: r.Block, Shaped: true,

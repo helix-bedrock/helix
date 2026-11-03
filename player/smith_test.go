@@ -202,3 +202,89 @@ func TestSmithingClientCannotLie(t *testing.T) {
 		t.Errorf("no template: status %d", r.Status)
 	}
 }
+
+// TestArmourTrim runs every pattern and material through the trim recipe, keeps the
+// armour's own data, and refuses what BDS refuses.
+func TestArmourTrim(t *testing.T) {
+	p := testPlayer(t)
+	craftGame(t, p, nil)
+	p.window.open, p.window.smithing = true, true
+	trims := p.s.reg.Trims.Packet()
+	if len(trims.Patterns) != 18 || len(trims.Materials) != 11 {
+		t.Fatalf("%d patterns, %d materials", len(trims.Patterns), len(trims.Materials))
+	}
+	pk := p.s.reg.Crafting.Packet()
+	if len(pk.SmithingTrimRecipes) != 1 {
+		t.Fatalf("%d trim recipes", len(pk.SmithingTrimRecipes))
+	}
+	id := pk.SmithingTrimRecipes[0].RecipeNetworkID
+
+	fill := func(template, base, addition string, tag map[string]any) {
+		p.inventory.ui[smithTemplateSlot] = p.s.freshStack(ItemStack{Name: template, Count: 1})
+		p.inventory.ui[smithBaseSlot] = p.s.freshStack(ItemStack{Name: base, Count: 1, Tag: tag})
+		p.inventory.ui[smithAdditionSlot] = p.s.freshStack(ItemStack{Name: addition, Count: 1})
+		p.inventory.main[1] = ItemStack{}
+	}
+	request := func() protocol.ItemStackResponse {
+		return p.stackRequest(protocol.ItemStackRequest{RequestID: 1, Actions: smithActions(p, id)})
+	}
+
+	for _, pattern := range trims.Patterns {
+		for _, material := range trims.Materials {
+			fill(pattern.ItemName, "minecraft:iron_chestplate", material.ItemName, map[string]any{"Damage": int32(9)})
+			if r := request(); r.Status != protocol.ItemStackResponseStatusOK {
+				t.Fatalf("%s + %s refused: %d", pattern.PatternID, material.MaterialID, r.Status)
+			}
+			s := p.inventory.main[1]
+			trim, _ := s.Tag[trimTag].(map[string]any)
+			if s.Name != "minecraft:iron_chestplate" || itemDamage(s) != 9 || trim[trimPattern] != pattern.PatternID || trim[trimMaterial] != material.MaterialID {
+				t.Fatalf("%s + %s made %+v", pattern.PatternID, material.MaterialID, s)
+			}
+		}
+	}
+
+	tag := func(pattern, material string) map[string]any {
+		return map[string]any{trimTag: map[string]any{trimMaterial: material, trimPattern: pattern}}
+	}
+	wild := "minecraft:wild_armor_trim_smithing_template"
+	fill(wild, "minecraft:iron_chestplate", "minecraft:diamond", tag("wild", "diamond"))
+	if r := request(); r.Status != protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems {
+		t.Errorf("the same trim again: status %d", r.Status)
+	}
+	fill(wild, "minecraft:iron_chestplate", "minecraft:gold_ingot", tag("wild", "diamond"))
+	if r := request(); r.Status != protocol.ItemStackResponseStatusOK {
+		t.Errorf("a new material over an old trim: status %d", r.Status)
+	}
+	fill(wild, "minecraft:iron_sword", "minecraft:gold_ingot", nil)
+	if r := request(); r.Status != protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems {
+		t.Errorf("trimming a sword: status %d", r.Status)
+	}
+	fill("minecraft:netherite_upgrade_smithing_template", "minecraft:iron_chestplate", "minecraft:gold_ingot", nil)
+	if r := request(); r.Status != protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems {
+		t.Errorf("a template that is no pattern: status %d", r.Status)
+	}
+}
+
+// TestSmithingEveryUpgrade runs every vanilla upgrade from the server's own items.
+func TestSmithingEveryUpgrade(t *testing.T) {
+	p := testPlayer(t)
+	craftGame(t, p, nil)
+	p.window.open, p.window.smithing = true, true
+	for _, r := range p.s.reg.Crafting.Packet().SmithingTransformRecipes {
+		recipe, ok := p.s.Recipes().Smithing(r.RecipeNetworkID)
+		if !ok {
+			t.Fatalf("%s is not in the table", r.RecipeID)
+		}
+		p.inventory.ui[smithTemplateSlot] = p.s.freshStack(ItemStack{Name: recipe.Template.Name, Count: 1})
+		p.inventory.ui[smithBaseSlot] = p.s.freshStack(ItemStack{Name: recipe.Base.Name, Count: 1})
+		p.inventory.ui[smithAdditionSlot] = p.s.freshStack(ItemStack{Name: recipe.Addition.Name, Count: 1})
+		p.inventory.main[1] = ItemStack{}
+		if resp := p.stackRequest(protocol.ItemStackRequest{RequestID: 1, Actions: smithActions(p, r.RecipeNetworkID)}); resp.Status != protocol.ItemStackResponseStatusOK {
+			t.Errorf("%s (%s, %s, %s) refused: %d", r.RecipeID, recipe.Template.Name, recipe.Base.Name, recipe.Addition.Name, resp.Status)
+			continue
+		}
+		if want := itemFromNetwork(p.s.reg, r.Result); p.inventory.main[1].Name != want.Name {
+			t.Errorf("%s made %s, want %s", r.RecipeID, p.inventory.main[1].Name, want.Name)
+		}
+	}
+}

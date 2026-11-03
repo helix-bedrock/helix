@@ -2,6 +2,7 @@ package player
 
 import (
 	"maps"
+	"slices"
 
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/registry"
@@ -15,6 +16,10 @@ const (
 	smithTemplateSlot = 53
 	// smithingTable is the block that opens the screen.
 	smithingTable = "minecraft:smithing_table"
+	// The tag BDS saves an armour trim in, and its two fields.
+	trimTag      = "Trim"
+	trimMaterial = "Material"
+	trimPattern  = "Pattern"
 )
 
 // SmithEvent fires once a smithing request has passed BDS's checks, before any item
@@ -50,6 +55,29 @@ func smithSlot(container byte) (crafting.SmithingSlot, int) {
 	return crafting.SmithingAddition, smithAdditionSlot
 }
 
+// trimmed is the base with the trim its template and addition make, as BDS's trim
+// recipe: the template must be a known pattern and the addition a known material,
+// and a base that already has that exact trim does not fit.
+func (p *Player) trimmed(template, base, addition ItemStack) (ItemStack, bool) {
+	trims := p.s.reg.Trims.Packet()
+	i := slices.IndexFunc(trims.Patterns, func(t protocol.TrimPattern) bool { return t.ItemName == template.Name })
+	j := slices.IndexFunc(trims.Materials, func(t protocol.TrimMaterial) bool { return t.ItemName == addition.Name })
+	if i < 0 || j < 0 {
+		return ItemStack{}, false
+	}
+	pattern, material := trims.Patterns[i].PatternID, trims.Materials[j].MaterialID
+	if old, ok := base.Tag[trimTag].(map[string]any); ok && old[trimMaterial] == material && old[trimPattern] == pattern {
+		return ItemStack{}, false
+	}
+	result := base
+	result.Tag = maps.Clone(base.Tag)
+	if result.Tag == nil {
+		result.Tag = map[string]any{}
+	}
+	result.Tag[trimTag] = map[string]any{trimMaterial: material, trimPattern: pattern}
+	return result, true
+}
+
 // craftSmithing is BDS's smithing action: base and addition must be there, the slots
 // must fit the recipe, and one of each is consumed by the actions that follow. The
 // result carries the base's data.
@@ -71,12 +99,20 @@ func (p *Player) craftSmithing(a *protocol.CraftRecipeStackRequestAction) (uint8
 	if !r.Fits(p.craftItem(template), p.craftItem(base), p.craftItem(addition)) {
 		return protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems, nil
 	}
-	result := itemFromNetwork(p.s.reg, r.Result)
-	if result.Empty() {
-		return protocol.ItemStackResponseStatusInvalidCraftResultItem, nil
-	}
-	if base.Tag != nil {
-		result.Tag = maps.Clone(base.Tag)
+	var result ItemStack
+	if r.Trim {
+		var ok bool
+		if result, ok = p.trimmed(template, base, addition); !ok {
+			return protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems, nil
+		}
+	} else {
+		result = itemFromNetwork(p.s.reg, r.Result)
+		if result.Empty() {
+			return protocol.ItemStackResponseStatusInvalidCraftResultItem, nil
+		}
+		if base.Tag != nil {
+			result.Tag = maps.Clone(base.Tag)
+		}
 	}
 	if g := p.s.game; g.smithEv.Has() {
 		e := SmithEvent{Player: p, Recipe: r, Template: template, Base: base, Addition: addition, Result: result}

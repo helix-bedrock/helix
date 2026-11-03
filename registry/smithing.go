@@ -29,8 +29,8 @@ type SmithingRecipe struct {
 	ResultMeta int16
 	// ResultCount is how many are made; 0 means one.
 	ResultCount uint8
-	// Trim marks vanilla's armour trim recipe. It has no Result and can only be
-	// listed or removed.
+	// Trim marks vanilla's armour trim recipe. It has no Result, because it writes a
+	// trim on the base, and can only be listed or removed.
 	Trim bool
 }
 
