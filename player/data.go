@@ -28,6 +28,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 		p.respawn = respawnStart
 	}
 	p.inventory.load(data, func() int32 { return p.s.stackIDs.Add(1) })
+	p.uiLeftovers = p.inventory.takeUIItems(p.s.reg, func() int32 { return p.s.stackIDs.Add(1) }, !p.dead())
 	if seed, isInt := data[enchantSeedTag].(int32); isInt {
 		p.enchant.seed, p.enchant.seeded = seed, true
 	}

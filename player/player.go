@@ -103,6 +103,8 @@ type Player struct {
 	reachScale     float32
 	// enchant is the player's enchanting table state.
 	enchant enchantState
+	// uiLeftovers means the UI slots held items at load that did not fit the inventory.
+	uiLeftovers bool
 	// rng is the player's random source (item wear).
 	rng *rand.Rand
 }

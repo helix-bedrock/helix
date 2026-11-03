@@ -67,7 +67,7 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickRespawn()
 	p.tickPickup()
 	p.tickChest()
-	p.tickWorkbench()
+	p.tickUILeftovers()
 }
 
 // vanillaHandlers registers vanilla's packet handlers and systems. They go

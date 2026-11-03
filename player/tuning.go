@@ -133,6 +133,8 @@ const (
 	TuneAnvilRepairableBonus
 	TuneAnvilMaterialShare
 	TuneAnvilMergeCost
+	// TuneAnvilWearChance is the chance a use out of creative wears the anvil a step.
+	TuneAnvilWearChance
 	// TuneGrindstoneBonusShare is the part of durability two merged items get on top (20
 	// is a twentieth), TuneGrindstoneXPScale multiplies the experience given back.
 	TuneGrindstoneBonusShare
@@ -216,6 +218,7 @@ var tuneSpecs = [tuneCount]tuneSpec{
 	TuneAnvilRepairableBonus: {"anvil_repairable_bonus", anvilRepairableBonus},
 	TuneAnvilMaterialShare:   {"anvil_material_share", anvilMaterialShare},
 	TuneAnvilMergeCost:       {"anvil_merge_cost", anvilMergeCost},
+	TuneAnvilWearChance:      {"anvil_wear_chance", anvilWearChance},
 	TuneGrindstoneBonusShare: {"grindstone_bonus_share", grindstoneBonusShare},
 	TuneGrindstoneXPScale:    {"grindstone_xp_scale", 1},
 }

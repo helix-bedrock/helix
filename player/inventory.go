@@ -80,6 +80,42 @@ func (inv *Inventory) load(data map[string]any, ids func() int32) {
 	}
 }
 
+// takeUIItems is what BDS does to the UI slots after loading a player: a live player
+// gets their items in the inventory. It reports whether any are left, to be dropped once
+// the player is in the world.
+func (inv *Inventory) takeUIItems(reg *registry.Registry, ids func() int32, alive bool) bool {
+	left := false
+	for i := range inv.ui {
+		s := inv.ui[i]
+		if s.Empty() {
+			continue
+		}
+		if alive {
+			s = inv.add(reg, s, ids, func(int) {})
+		}
+		inv.ui[i] = s
+		left = left || !s.Empty()
+	}
+	return left
+}
+
+// tickUILeftovers drops what the UI slots still held after loading. A drop that was
+// refused stays in its slot, so no item is lost. Region tick.
+func (p *Player) tickUILeftovers() {
+	if !p.uiLeftovers {
+		return
+	}
+	p.uiLeftovers = false
+	for i := range p.inventory.ui {
+		s := p.inventory.ui[i]
+		if !s.Empty() && p.s.game.sys.DropItem(p, s, true) {
+			p.inventory.ui[i] = ItemStack{}
+		}
+	}
+	p.refreshItems()
+	p.flush()
+}
+
 // compounds reads an NBT list of compounds.
 func compounds(v any) []map[string]any {
 	l, _ := v.([]any)

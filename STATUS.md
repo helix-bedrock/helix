@@ -169,7 +169,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   far they spread at first and what BDS sends about them are not compared yet). Not done yet: items built from a block entity (the plain item drops), chests filling
   from `LootTable`, enchantment loot functions, drops from anything but a player breaking the block. The
   speed items leave a broken block at was not read from BDS.
-- **Enchanting (first pass, not yet tested in game):** all 42 of BDS 1.26.60's enchantments are registered on the same
+- **Enchanting (first pass; the lead reports it working in game, anvil wear and the edge cases not separately confirmed):** all 42 of BDS 1.26.60's enchantments are registered on the same
   `Enchantment` struct plugins use, from helix-data's `bds/enchantments.json`: max level, weight, slots, group, costs,
   compatibility and every hook can be changed or removed in `Setup`, or while running with `Host.EditEnchantment`, `SetEnchantment`
   and `RemoveEnchantment`; a removed one does nothing on items, Silk Touch and curses included. `Systems.EnchantRequire` sets what a table's option
@@ -178,7 +178,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   `OnEnchant`), **anvils** (materials, merging, books, names, the price of earlier work, `OnAnvil`) and **grindstones**
   (curses kept, experience back, `OnGrindstone`) work, each with a `Systems` hook. **Effects built:** Thorns, Breach, Density, Impaling in water and
   Mending, with Sharpness, Efficiency, Unbreaking, Aqua Affinity, Silk Touch, Fortune and the armour kinds from before. Not done yet:
-  anvils wearing out (BDS's chance was not found), anvils on maps, Fire Aspect (needs burning), Impaling in rain, Smite and Bane (no mobs),
+  anvils on maps, Fire Aspect (needs burning), Impaling in rain, Smite and Bane (no mobs),
   bows, crossbows, tridents, fishing, Depth Strider, Respiration, Soul Speed, Swift Sneak, Frost Walker and Fire Protection's burn
   time, and enchant loot functions. Run with `-testcmds`, `/enchanttest` gives levels and changes a maximum.
 - **Crafting** is a first pass from BDS 1.26.60: the inventory's small grid and the crafting table's large

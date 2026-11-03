@@ -7,6 +7,7 @@ import (
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -30,7 +31,9 @@ type Systems struct {
 	EnchantRequire EnchantRequireFunc
 	Bookshelves    BookshelvesFunc
 	Anvil          AnvilFunc
-	Grindstone     GrindstoneFunc
+	// AnvilWear runs after an anvil at pos was used.
+	AnvilWear  func(p *Player, r *world.Region, pos cube.Pos)
+	Grindstone GrindstoneFunc
 	// Breaking.
 	BreakStart  BreakStartFunc
 	BreakTime   BreakTimeFunc
@@ -358,6 +361,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.EnchantRequire = vanillaEnchantRequire
 	sys.Bookshelves = vanillaBookshelves
 	sys.Anvil = vanillaAnvil
+	sys.AnvilWear = vanillaAnvilWear
 	sys.Grindstone = vanillaGrindstone
 	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
 	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }

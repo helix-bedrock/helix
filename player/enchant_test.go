@@ -4,7 +4,9 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/world/cube"
 )
 
 // enchantPlayer is a survival player on a host with vanilla's gameplay set up.
@@ -207,7 +209,7 @@ func TestEnchantAction(t *testing.T) {
 	lapis := p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
 	p.inventory.ui[enchantInputSlot], p.inventory.ui[enchantLapisSlot] = sword, lapis
 	p.enchant.seeded = true
-	p.enchant.options = vanillaEnchantOptions(p, sword, 15)
+	p.enchant.options, p.enchant.input = vanillaEnchantOptions(p, sword, 15), sword.netID
 	if len(p.enchant.options) != enchantOptionCount {
 		t.Fatalf("%d options", len(p.enchant.options))
 	}
@@ -227,6 +229,220 @@ func TestEnchantAction(t *testing.T) {
 	p.attributes.set(attrLevel, 1)
 	if status, _ = p.craftEnchant(&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: p.enchant.options[2].NetworkID, NumberOfCrafts: 1}); status != protocol.ItemStackResponseStatusInsufficientPlayerLevelToEnchant {
 		t.Fatalf("level 1 got status %d", status)
+	}
+}
+
+// TestEnchantSwappedItem checks options work only on the item they were made for: a
+// request that swaps another item in first gets nothing.
+func TestEnchantSwappedItem(t *testing.T) {
+	p, _ := apiWorld(t, func(*Setup) {})
+	p.rng = rand.New(rand.NewPCG(1, 2))
+	p.attributes.set(attrLevel, 30)
+	p.window.enchanting, p.window.open = true, true
+	sword := p.s.freshStack(stack("minecraft:iron_sword", 0))
+	p.inventory.ui[enchantInputSlot] = sword
+	p.inventory.ui[enchantLapisSlot] = p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
+	p.enchant.seeded = true
+	p.enchant.options, p.enchant.input = vanillaEnchantOptions(p, sword, 15), sword.netID
+	p.requests.work = p.inventory
+	p.requests.work.ui[enchantInputSlot] = p.s.freshStack(stack("minecraft:stick", 0))
+	status, _ := p.craftEnchant(&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: p.enchant.options[0].NetworkID, NumberOfCrafts: 1})
+	if status != protocol.ItemStackResponseStatusFailedToEnchant {
+		t.Fatalf("status %d", status)
+	}
+}
+
+// TestAnvilWear walks an anvil down BDS's steps and checks the direction stays, that a
+// damaged one goes without a trace, and that creative and other blocks are left alone.
+func TestAnvilWear(t *testing.T) {
+	p, d := apiWorld(t, func(*Setup) {})
+	p.rng = rand.New(rand.NewPCG(1, 2))
+	blocks := p.s.reg.Blocks
+	facing := map[string]any{"minecraft:cardinal_direction": "east"}
+	at := func(name string) uint32 {
+		t.Helper()
+		b, ok := blocks.StateID(name, facing)
+		if !ok {
+			t.Fatalf("no state of %s", name)
+		}
+		return b
+	}
+	pos := cube.Pos{8, 0, 8}
+	runIn(t, d, func(r *world.Region) {
+		wear := func(from uint32, want uint32) {
+			t.Helper()
+			r.SetBlock(pos, 0, from)
+			vanillaAnvilWear(p, r, pos)
+			if got, _ := r.Block(pos, 0); got != want {
+				t.Errorf("%s became %s, want %s", blocks.Name(from), blocks.Name(got), blocks.Name(want))
+			}
+		}
+		p.SetTuning(TuneAnvilWearChance, 2)
+		wear(at(anvilBlock), at(anvilChipped))
+		wear(at(anvilDeprecated), at(anvilChipped))
+		wear(at(anvilChipped), at(anvilDamaged))
+		wear(at(anvilDamaged), blocks.Air())
+		stone, _ := blocks.Block("minecraft:stone")
+		wear(stone, stone)
+		p.SetTuning(TuneAnvilWearChance, 0)
+		wear(at(anvilBlock), at(anvilBlock))
+		p.SetTuning(TuneAnvilWearChance, 2)
+		p.gameMode = GameModeCreative
+		wear(at(anvilBlock), at(anvilBlock))
+	})
+}
+
+// TestEnchantTableEntity checks a table has BDS's block entity, kept through a load.
+func TestEnchantTableEntity(t *testing.T) {
+	p, _ := apiWorld(t, func(*Setup) {})
+	made := chestEntities{s: p.s}
+	block, ok := p.s.reg.Blocks.StateID(enchantingTable, map[string]any{})
+	if !ok {
+		t.Fatal("no table block")
+	}
+	be := made.New(block)
+	if be == nil {
+		t.Fatal("no block entity")
+	}
+	pos := cube.Pos{1, 2, 3}
+	saved := be.SaveData(pos)
+	if saved["id"] != enchantTableEntityID || saved[enchantTableRotation] != float32(0) || saved["y"] != int32(2) {
+		t.Fatalf("saved %v", saved)
+	}
+	saved["CustomName"] = "Mine"
+	loaded, ok := made.Load(pos, saved)
+	if !ok || loaded.NetworkData(pos)["CustomName"] != "Mine" {
+		t.Fatalf("loaded %v %v", loaded, ok)
+	}
+}
+
+// TestEnchantResultSlot checks the result may go back in the slot the craft emptied,
+// however the client names it, and only in that case.
+func TestEnchantResultSlot(t *testing.T) {
+	p, _ := apiWorld(t, func(*Setup) {})
+	p.window.enchanting, p.window.open = true, true
+	book := p.s.freshStack(ItemStack{Name: itemBook, Count: 1})
+	p.inventory.ui[enchantInputSlot] = book
+	st := &p.requests
+	st.work = p.inventory
+	st.current = -7
+	st.work.ui[enchantInputSlot] = ItemStack{}
+	slot := func(id int32) protocol.StackRequestSlotInfo {
+		return protocol.StackRequestSlotInfo{Container: protocol.FullContainerName{ContainerID: protocol.ContainerEnchantingInput}, Slot: enchantInputSlot, StackNetworkID: id}
+	}
+	if _, ok := p.validate(slot(book.netID), false); ok {
+		t.Fatal("named the old stack with no craft running")
+	}
+	st.craft.active = true
+	for _, id := range []int32{0, book.netID, st.current} {
+		if _, ok := p.validate(slot(id), false); !ok {
+			t.Fatalf("refused %d", id)
+		}
+	}
+	if _, ok := p.validate(slot(book.netID+1000), false); ok {
+		t.Fatal("took a stack that was never there")
+	}
+	if _, ok := p.validate(slot(book.netID), true); ok {
+		t.Fatal("took an item from an empty slot")
+	}
+}
+
+// TestBookshelves pins BDS's count on real blocks, and that no shelves never costs much.
+func TestBookshelves(t *testing.T) {
+	p, d := apiWorld(t, func(*Setup) {})
+	blocks := p.s.reg.Blocks
+	shelf, ok := blocks.StateID("minecraft:bookshelf", map[string]any{})
+	stone, okStone := blocks.StateID("minecraft:obsidian", map[string]any{})
+	if !ok || !okStone {
+		t.Fatal("no shelf or obsidian")
+	}
+	table := cube.Pos{8, 0, 8}
+	set := func(r *world.Region, x, y, z int, b uint32) { r.SetBlock(table.Add(cube.Pos{x, y, z}), 0, b) }
+	runIn(t, d, func(r *world.Region) {
+		for y := range 2 {
+			for z := -2; z <= 2; z++ {
+				for x := -2; x <= 2; x++ {
+					set(r, x, y, z, blocks.Air())
+				}
+			}
+		}
+		want := func(n int32, what string) {
+			if got := p.s.countBookshelves(r, table); got != n {
+				t.Errorf("%s: %d shelves, want %d", what, got, n)
+			}
+		}
+		want(0, "none")
+		set(r, 1, 0, 0, shelf)
+		want(0, "touching the table")
+		set(r, 1, 0, 0, blocks.Air())
+		set(r, 2, 0, 0, shelf)
+		want(1, "one away")
+		set(r, 2, 1, 0, shelf)
+		want(2, "one level up")
+		set(r, 1, 1, 0, stone)
+		want(0, "path blocked on the upper level")
+		set(r, 1, 1, 0, blocks.Air())
+		set(r, 2, 0, 1, shelf)
+		want(3, "beside a corner")
+		set(r, 2, 0, 2, shelf)
+		want(4, "the corner")
+		set(r, 1, 0, 1, stone)
+		want(2, "corner path blocked")
+	})
+	for seed := range uint32(2000) {
+		if c := optionCosts(newMT(seed), 0, enchantMaxShelves); c[2] > 8 || c[0] < 1 {
+			t.Fatalf("seed %d: no shelves cost %v", seed, c)
+		}
+	}
+}
+
+// TestUIItemsAtLoad pins BDS's load: UI items go to a live player's inventory, what does
+// not fit stays to be dropped, and a dead player keeps them all for the drop.
+func TestUIItemsAtLoad(t *testing.T) {
+	p, _ := apiWorld(t, func(*Setup) {})
+	ids := func() int32 { return p.s.stackIDs.Add(1) }
+	var inv Inventory
+	inv.ui[enchantInputSlot] = ItemStack{Name: itemBook, Count: 1}
+	inv.ui[enchantLapisSlot] = ItemStack{Name: itemLapis, Count: 5}
+	if inv.takeUIItems(p.s.reg, ids, true) || !inv.ui[enchantInputSlot].Empty() || !inv.ui[enchantLapisSlot].Empty() {
+		t.Fatalf("items stayed: %+v", inv.ui[enchantInputSlot])
+	}
+	if inv.main[0].Name != itemBook || inv.main[1].Name != itemLapis {
+		t.Fatalf("inventory %+v %+v", inv.main[0], inv.main[1])
+	}
+	var full Inventory
+	for i := range full.main {
+		full.main[i] = ItemStack{Name: "minecraft:iron_sword", Count: 1}
+	}
+	full.ui[enchantInputSlot] = ItemStack{Name: itemBook, Count: 1}
+	if !full.takeUIItems(p.s.reg, ids, true) || full.ui[enchantInputSlot].Empty() {
+		t.Fatal("no room, but nothing left to drop")
+	}
+	var dead Inventory
+	dead.ui[enchantInputSlot] = ItemStack{Name: itemBook, Count: 1}
+	if !dead.takeUIItems(p.s.reg, ids, false) || !dead.main[0].Empty() {
+		t.Fatal("a dead player's item went to the inventory")
+	}
+}
+
+// TestEnchantBook checks a table turns a book into an enchanted book and sends it.
+func TestEnchantBook(t *testing.T) {
+	p, _ := apiWorld(t, func(*Setup) {})
+	p.rng = rand.New(rand.NewPCG(1, 2))
+	p.attributes.set(attrLevel, 30)
+	p.window.enchanting, p.window.open = true, true
+	book := p.s.freshStack(ItemStack{Name: itemBook, Count: 1})
+	p.inventory.ui[enchantInputSlot] = book
+	p.inventory.ui[enchantLapisSlot] = p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
+	p.enchant.seeded = true
+	p.enchant.options, p.enchant.input = vanillaEnchantOptions(p, book, 15), book.netID
+	p.requests.work = p.inventory
+	status, _ := p.craftEnchant(&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: p.enchant.options[2].NetworkID, NumberOfCrafts: 1})
+	if status != protocol.ItemStackResponseStatusOK || !p.requests.refresh {
+		t.Fatalf("status %d refresh %v", status, p.requests.refresh)
+	}
+	if res := p.requests.craft.results[0].stack; res.Name != itemEnchantedBook || res.Tag[enchantTag] == nil {
+		t.Fatalf("result %+v", res)
 	}
 }
 
@@ -292,7 +508,7 @@ func TestRequire(t *testing.T) {
 	sword := p.s.freshStack(stack("minecraft:iron_sword", 0))
 	p.inventory.ui[enchantInputSlot] = sword
 	p.enchant.seeded = true
-	p.enchant.options = vanillaEnchantOptions(p, sword, 15)
+	p.enchant.options, p.enchant.input = vanillaEnchantOptions(p, sword, 15), sword.netID
 	id := p.enchant.options[2].NetworkID
 	action := &protocol.CraftRecipeStackRequestAction{RecipeNetworkID: id, NumberOfCrafts: 1}
 	p.requests.work = p.inventory

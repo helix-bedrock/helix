@@ -34,7 +34,6 @@ type windowState struct {
 	// enchanting, anvil and grindstone mean it is that block's screen at workbenchPos.
 	enchanting, anvil, grindstone bool
 	workbenchPos                  cube.Pos
-	workbenchDim                  *world.Dimension
 }
 
 // clearStations marks no window open.

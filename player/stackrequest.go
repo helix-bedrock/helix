@@ -42,6 +42,8 @@ type requestState struct {
 		slots map[[2]byte]int32
 	}
 	next int
+	// current is the running request's ID.
+	current int32
 	// drops are what the running request dropped, spawned only if all of it
 	// passes.
 	drops []pendingDrop
@@ -86,6 +88,7 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	st := &p.requests
 	st.work = p.inventory
 	st.work.open = p.loadChestWork()
+	st.current = req.RequestID
 	st.drops = st.drops[:0]
 	st.craft = craftState{}
 	st.filter = req.FilterStrings
@@ -294,6 +297,9 @@ func (p *Player) validate(info protocol.StackRequestSlotInfo, needItem bool) (sl
 		return r, true
 	}
 	want := info.StackNetworkID
+	if !needItem && p.emptiedByCraft(r, want) {
+		return r, true
+	}
 	if want < 0 {
 		var found bool
 		want, found = p.requests.assigned(want, info.Container.ContainerID, info.Slot)
@@ -302,6 +308,21 @@ func (p *Player) validate(info protocol.StackRequestSlotInfo, needItem bool) (sl
 		}
 	}
 	return r, r.stack.netID == want
+}
+
+// emptiedByCraft reports whether r is a slot this request's craft emptied, named as the
+// client still sees it: a table's result goes back in the slot the item was consumed
+// from, and the client names that slot by the stack it held or by this request. The slot
+// is empty and the server made what goes in, so the name decides nothing.
+func (p *Player) emptiedByCraft(r slotRef, want int32) bool {
+	if !p.requests.craft.active || !r.stack.Empty() {
+		return false
+	}
+	if want == p.requests.current {
+		return true
+	}
+	before, ok := p.slot(&p.inventory, r.container, r.slot)
+	return ok && !before.stack.Empty() && before.stack.netID == want
 }
 
 // assigned returns the network ID request id left in a slot.

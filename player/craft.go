@@ -3,13 +3,11 @@ package player
 import (
 	"slices"
 
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
-	"github.com/helix-bedrock/world/cube"
 )
 
 // The crafting grids, as slots of the UI container in BDS 1.26.60.
@@ -24,9 +22,6 @@ const (
 	craftingTable = "minecraft:crafting_table"
 	// craftingTableRecipes is the block tag of the recipes the grids make.
 	craftingTableRecipes = "crafting_table"
-	// craftViewRange is how far a player may be from an open crafting table: the
-	// range chests use, as the same check keeps both windows open.
-	craftViewRange = chestViewRange
 )
 
 // craftState is what the running request's craft still has to do. It lasts one
@@ -142,7 +137,7 @@ func (p *Player) openStation(r *world.Region, u *BlockUse, kind byte) bool {
 	}
 	w := &p.window
 	w.nextID()
-	w.open, w.workbenchPos, w.workbenchDim = true, u.Pos, r.Dimension()
+	w.open, w.workbenchPos = true, u.Pos
 	p.send(&packet.ContainerOpen{
 		WindowID: w.id, ContainerType: kind,
 		ContainerPosition:       protocol.BlockPos{int32(u.Pos[0]), int32(u.Pos[1]), int32(u.Pos[2])}, //nolint:gosec // block coordinates fit int32
@@ -150,34 +145,6 @@ func (p *Player) openStation(r *world.Region, u *BlockUse, kind byte) bool {
 	})
 	p.flush()
 	return true
-}
-
-// tickWorkbench closes a crafting or smithing window when its table is gone or too far.
-func (p *Player) tickWorkbench() {
-	if !p.window.station() {
-		return
-	}
-	r := p.entity.Region()
-	if r == nil {
-		return
-	}
-	pos := p.window.workbenchPos
-	if r.Dimension() == p.window.workbenchDim && p.workbenchThere(r, pos) {
-		return
-	}
-	p.closeWindow(true)
-	p.flush()
-}
-
-// workbenchThere reports whether the table still stands within range. An unloaded
-// chunk counts as gone, as for a chest.
-func (p *Player) workbenchThere(r *world.Region, pos cube.Pos) bool {
-	block, ok := r.Block(pos, 0)
-	if !ok || !p.window.standsOn(p.s.reg.Blocks.Name(block)) {
-		return false
-	}
-	d := p.entity.Position().Sub(blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
-	return d.Dot(d) <= craftViewRange*craftViewRange
 }
 
 // recipeFor finds a request's recipe, as BDS's checks start. The client names the

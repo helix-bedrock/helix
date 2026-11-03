@@ -1,6 +1,7 @@
 package player
 
 import (
+	"maps"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -13,12 +14,16 @@ import (
 
 // BDS 1.26.60's enchanting table.
 const (
-	enchantingTable    = "minecraft:enchanting_table"
-	enchantInputSlot   = 14
-	enchantLapisSlot   = 15
-	enchantSeedTag     = "EnchantmentSeed"
-	enchantOptionCount = 3
-	enchantMaxShelves  = 15
+	enchantingTable = "minecraft:enchanting_table"
+	// enchantTableEntityID and enchantTableRotation are the saved block entity's ID and
+	// the field holding the book's turn.
+	enchantTableEntityID = "EnchantTable"
+	enchantTableRotation = "rott"
+	enchantInputSlot     = 14
+	enchantLapisSlot     = 15
+	enchantSeedTag       = "EnchantmentSeed"
+	enchantOptionCount   = 3
+	enchantMaxShelves    = 15
 	// optionWordKinds and optionWordsMin make an option's name 3 or 4 words.
 	optionWordKinds = 2
 	optionWordsMin  = 3
@@ -179,6 +184,8 @@ type craftAfter struct {
 	// what the client used is not the answer.
 	settle       bool
 	materialLeft uint8
+	// anvilWear gives the anvil on show its chance to wear.
+	anvilWear bool
 }
 
 // afterCraft does what the request's craft left to do.
@@ -197,12 +204,39 @@ func (p *Player) afterCraft(a craftAfter) {
 	if a.newSeed {
 		p.enchant.seed, p.enchant.seeded = newMT(rand.Uint32()).positive(), true //nolint:gosec // a table's draw, not a secret
 	}
+	if a.anvilWear && p.entity != nil {
+		if r := p.entity.Region(); r != nil {
+			p.s.game.sys.AnvilWear(p, r, p.window.workbenchPos)
+		}
+	}
 	if a.experience > 0 && p.entity != nil {
 		if r := p.entity.Region(); r != nil {
 			p.s.SpawnExperience(r, p.entity.Position(), a.experience)
 		}
 	}
 }
+
+// enchantTableEntity is an enchanting table's block entity. The client draws the table's
+// shape and book from it, so a table without one looks like a broken block.
+type enchantTableEntity struct {
+	// saved keeps the fields of a loaded table (CustomName, rott...), written back as
+	// they were. BDS's tick only turns the book, so rott stays what it was.
+	saved map[string]any
+}
+
+// SaveData is what BDS saves of a table.
+func (e *enchantTableEntity) SaveData(pos cube.Pos) map[string]any {
+	m := maps.Clone(e.saved)
+	if m == nil {
+		m = map[string]any{"isMovable": uint8(1), enchantTableRotation: float32(0)}
+	}
+	m["id"] = enchantTableEntityID
+	m["x"], m["y"], m["z"] = int32(pos[0]), int32(pos[1]), int32(pos[2]) //nolint:gosec // block coordinates fit int32
+	return m
+}
+
+// NetworkData is the same: BDS sends a table as it saves it.
+func (e *enchantTableEntity) NetworkData(pos cube.Pos) map[string]any { return e.SaveData(pos) }
 
 // useEnchantingTable is what clicking an enchanting table does.
 func (p *Player) useEnchantingTable(r *world.Region, u *BlockUse) bool {
@@ -213,21 +247,6 @@ func (p *Player) useEnchantingTable(r *world.Region, u *BlockUse) bool {
 		p.flush()
 	}
 	return true
-}
-
-// standsOn reports whether a block is the one the window's screen belongs to.
-func (w *windowState) standsOn(block string) bool {
-	switch {
-	case w.smithing:
-		return block == smithingTable
-	case w.enchanting:
-		return block == enchantingTable
-	case w.grindstone:
-		return block == grindstone
-	case w.anvil:
-		return block == anvilBlock || block == anvilChipped || block == anvilDamaged || block == anvilDeprecated
-	}
-	return block == craftingTable
 }
 
 // holds reports whether the open window has a container's slot.
@@ -500,6 +519,12 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	if item.Empty() {
 		return protocol.ItemStackResponseStatusMissingInputItem, nil
 	}
+	// The options are the item's they were made for. A request that first swaps another
+	// item in would put them on that one; a client's own request never does, as it only
+	// sees new options once the server has answered.
+	if item.netID != p.enchant.input {
+		return protocol.ItemStackResponseStatusFailedToEnchant, nil
+	}
 	g := p.s.game
 	place := int32(index) + 1 //nolint:gosec // a short list
 	req := g.sys.EnchantRequire(p, option, place)
@@ -551,6 +576,9 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingMaterial, slot: enchantLapisSlot, item: lapis, left: uint8(taken)}) //nolint:gosec // clamped to the slot
 	}
 	c.results = append(c.results, craftResult{stack: result, left: int32(result.Count)})
+	// The response only carries a count and an ID, so the client is sent the item the
+	// server made rather than left with what it worked out itself.
+	st.refresh = true
 	return protocol.ItemStackResponseStatusOK, nil
 }
 

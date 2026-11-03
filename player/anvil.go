@@ -8,6 +8,8 @@ import (
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/cube"
 )
 
 // BDS 1.26.60's anvil and grindstone.
@@ -32,7 +34,9 @@ const (
 	// anvilTooExpensive is the cost a player out of creative is refused at, and
 	// anvilNameOnly what a rename alone is held to.
 	anvilTooExpensive = 40
-	anvilNameOnly     = 39
+	// anvilWearChance is the chance a use out of creative wears the anvil a step.
+	anvilWearChance = 0.12
+	anvilNameOnly   = 39
 	// anvilStackCost is what merging enchantments onto a stack costs, whatever they are.
 	anvilStackCost = 40
 	// Merging two damaged items: the bonus on a plain merge, on a merge through the
@@ -466,13 +470,49 @@ func (p *Player) craftAnvil(a *protocol.CraftRecipeOptionalStackRequestAction) (
 		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
 	}
 	c.active, c.times = true, 1
-	c.after.levels = out.Cost
+	c.after.levels, c.after.anvilWear = out.Cost, true
 	c.slots = append(c.slots, expectedSlot{container: protocol.ContainerAnvilInput, slot: anvilFirstSlot, item: first, left: first.Count})
 	if out.SecondUsed > 0 && !second.Empty() {
 		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerAnvilMaterial, slot: anvilSecondSlot, item: second, left: out.SecondUsed})
 	}
 	c.results = append(c.results, craftResult{stack: out.Result, left: int32(out.Result.Count)})
+	// As at a table: the client is sent the item the server made.
+	st.refresh = true
 	return protocol.ItemStackResponseStatusOK, nil
+}
+
+// vanillaAnvilWear is BDS's wear after an anvil is used: out of creative, a chance to go a
+// step down (a deprecated anvil counts as a whole one), a damaged one breaking with no
+// drop. Whatever happens, those nearby hear it. A block no longer an anvil does nothing.
+func vanillaAnvilWear(p *Player, r *world.Region, pos cube.Pos) {
+	b, ok := r.Block(pos, 0)
+	if !ok {
+		return
+	}
+	blocks := p.s.reg.Blocks
+	var next string
+	switch blocks.Name(b) {
+	case anvilBlock, anvilDeprecated:
+		next = anvilChipped
+	case anvilChipped:
+		next = anvilDamaged
+	case anvilDamaged:
+	default:
+		return
+	}
+	event := int32(packet.LevelEventSoundAnvilUsed)
+	if !p.creative() && p.rng.Float32() < p.Tuning(TuneAnvilWearChance) {
+		becomes := blocks.Air()
+		if next == "" {
+			event = packet.LevelEventSoundAnvilBroken
+		} else if becomes, ok = blocks.StateID(next, blocks.States(b)); !ok {
+			becomes = b
+		}
+		if becomes != b && r.SetBlock(pos, 0, becomes) {
+			r.UpdateNeighbours(pos)
+		}
+	}
+	levelEvent(r, pos, blockVec(pos), event, 0)
 }
 
 // keepCurses takes every enchantment but the curses off result, keeps the curses of
@@ -619,6 +659,8 @@ func (p *Player) craftGrindstone(a *protocol.CraftGrindstoneRecipeStackRequestAc
 		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerGrindstoneAdditional, slot: grindstoneSecondSlot, item: second, left: second.Count})
 	}
 	c.results = append(c.results, craftResult{stack: out.Result, left: int32(out.Result.Count)})
+	// As at a table: the client is sent the item the server made.
+	st.refresh = true
 	return protocol.ItemStackResponseStatusOK, nil
 }
 
