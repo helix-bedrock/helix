@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/helix-bedrock/helix"
+	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
@@ -43,6 +44,10 @@ func testCommandList() *packet.AvailableCommands {
 	smithIdx := make([]uint32, len(smithTestActions))
 	for i := range smithIdx {
 		smithIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + len(chestTestActions) + i)
+	}
+	recipeIdx := make([]uint32, len(recipeTestActions))
+	for i := range recipeIdx {
+		recipeIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + len(chestTestActions) + len(smithTestActions) + i)
 	}
 	itemIdx := make([]uint32, len(itemTestActions))
 	for i := range itemIdx {
@@ -81,13 +86,20 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 3},
 		}}},
 	}
+	recipe := protocol.Command{
+		Name: recipeTestCommand, Description: "Tests the recipe API: clear, table, remove, change, add, reset.",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 4},
+		}}},
+	}
 	return &packet.AvailableCommands{
-		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions),
+		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions),
 		Enums: []protocol.CommandEnum{
 			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
-			{Type: "SmithTestAction", ValueIndices: smithIdx},
+			{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
 		},
-		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith},
+		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe},
 	}
 }
 
@@ -151,6 +163,58 @@ func smithTest(reg *registry.Registry, start *packet.CraftingData, action string
 			}
 		default:
 			msg = "Use clear, remove, change or reset."
+		}
+		return nil
+	})
+	if err != nil {
+		return err.Error()
+	}
+	return msg
+}
+
+// recipeTestCommand is the command that tries the recipe API.
+const recipeTestCommand = "recipetest"
+
+// recipeTestActions are what recipeTestCommand takes: clear every recipe, table clears
+// the crafting table's, remove the stick's, change the stick to make apples, add a
+// recipe making a diamond from a stick and an apple, reset to what the server started
+// with.
+var recipeTestActions = []string{"clear", "table", "remove", "change", "add", "reset"}
+
+// recipeTest runs the recipe test on the live recipes and says what happened.
+func recipeTest(reg *registry.Registry, start *packet.CraftingData, action string) string {
+	if action == "reset" {
+		reg.Crafting.Update(func(p *packet.CraftingData) { *p = *start })
+		return "Recipes reset."
+	}
+	const stick = "minecraft:stick"
+	var msg string
+	err := reg.EditRecipes(func(s *registry.Recipes) error {
+		switch action {
+		case "clear":
+			s.Clear()
+			msg = "All recipes cleared."
+		case "table":
+			msg = fmt.Sprintf("Removed %d crafting table recipes.", s.ClearBlock("crafting_table"))
+		case "remove":
+			msg = fmt.Sprintf("Removed %d stick recipes.", s.RemoveFor(stick))
+		case "change":
+			r, ok := s.Get(stick)
+			if !ok {
+				msg = "No stick recipe to change."
+				return nil
+			}
+			r.Output = []registry.RecipeItem{{Name: "minecraft:apple", Count: 4}}
+			msg = "Two planks now make 4 apples."
+			return s.Set(r)
+		case "add":
+			msg = "A stick and an apple now make a diamond."
+			return s.Set(registry.Recipe{
+				ID: "test:diamond", Input: []crafting.Ingredient{crafting.AnyVariant(stick), crafting.AnyVariant("minecraft:apple")},
+				Output: []registry.RecipeItem{{Name: "minecraft:diamond"}},
+			})
+		default:
+			msg = "Use clear, table, remove, change, add or reset."
 		}
 		return nil
 	})
@@ -324,6 +388,15 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) == 2 && args[0] == recipeTestCommand {
+			if server := srv.Load(); server != nil {
+				reg := server.Registry()
+				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())
+				// A failed write means the connection is closing, as above.
+				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: recipeTest(reg, smithStart.Load(), args[1])})
+			}
+			return
+		}
 		if len(args) == 2 && args[0] == smithTestCommand {
 			if server := srv.Load(); server != nil {
 				reg := server.Registry()

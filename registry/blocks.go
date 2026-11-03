@@ -102,8 +102,13 @@ func (s *Setup) Freeze() (*Registry, error) {
 	if crafting == nil {
 		crafting = &packet.CraftingData{ClearRecipes: true}
 	}
-	if len(s.s.smithingEdits) != 0 {
+	if len(s.s.smithingEdits)+len(s.s.recipeEdits) != 0 {
 		crafting = cloneCrafting(crafting)
+		for _, edit := range s.s.recipeEdits {
+			if err := applyRecipes(crafting, it, b, edit); err != nil {
+				return nil, err
+			}
+		}
 		for _, edit := range s.s.smithingEdits {
 			if err := applySmithing(crafting, it, b, edit); err != nil {
 				return nil, err

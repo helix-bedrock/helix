@@ -3,6 +3,7 @@ package registry
 import (
 	"bytes"
 	"errors"
+	"github.com/helix-bedrock/helix/crafting"
 	"strings"
 	"testing"
 
@@ -372,5 +373,40 @@ func TestEditSmithingAtBoot(t *testing.T) {
 	}
 	if _, err := bad.Freeze(); err == nil {
 		t.Error("a bad edit did not stop the freeze")
+	}
+}
+
+// TestEditedRecipesEncode checks recipes a plugin wrote go out and come back as a
+// client would read them.
+func TestEditedRecipesEncode(t *testing.T) {
+	setup := NewSetup(nil, "minecraft")
+	if err := Vanilla(setup); err != nil {
+		t.Fatal(err)
+	}
+	r, err := setup.Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.EditRecipes(func(s *Recipes) error {
+		s.Clear()
+		return s.Set(Recipe{
+			ID: "test:shaped", Shaped: true, Width: 2, Height: 1, Mirrored: true,
+			Input:  []crafting.Ingredient{crafting.Tagged("minecraft:planks"), {}},
+			Output: []RecipeItem{{Name: "minecraft:oak_planks", Count: 2}},
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.EditSmithing(func(s *Smithing) error {
+		return s.Set(SmithingRecipe{ID: "test:smith", Base: crafting.AnyVariant("minecraft:stick"), Addition: crafting.AnyVariant("minecraft:apple"), Result: "minecraft:diamond"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	r.Crafting.Packet().Marshal(protocol.NewWriter(&buf, 0))
+	var got packet.CraftingData
+	got.Marshal(protocol.NewReader(bytes.NewReader(buf.Bytes()), 0, false))
+	if len(got.ShapedRecipes) != 1 || got.ShapedRecipes[0].RecipeID != "test:shaped" || len(got.SmithingTransformRecipes) != 1 || got.SmithingTransformRecipes[0].RecipeID != "test:smith" {
+		t.Errorf("read back %d shaped, %d smithing", len(got.ShapedRecipes), len(got.SmithingTransformRecipes))
 	}
 }

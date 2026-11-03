@@ -10,8 +10,11 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// smithingBlock is the block tag of a smithing recipe.
-const smithingBlock = "smithing_table"
+// Block tags of recipes.
+const (
+	smithingBlock         = "smithing_table"
+	deprecatedRecipeBlock = "deprecated"
+)
 
 // SmithingRecipe is a smithing recipe as a plugin reads and writes it.
 type SmithingRecipe struct {
@@ -60,9 +63,7 @@ func (s *Smithing) read(r protocol.SmithingTransformRecipe) SmithingRecipe {
 		Addition: crafting.ReadIngredient(r.Addition), ResultMeta: int16(r.Result.MetadataValue), //nolint:gosec // aux values are int16
 		ResultCount: uint8(min(r.Result.Count, 255)), //nolint:gosec // bounded
 	}
-	if t, ok := s.items.ByID(int16(r.Result.NetworkID)); ok { //nolint:gosec // network IDs are int16
-		out.Result = t.Name
-	}
+	out.Result = itemName(s.items, r.Result)
 	return out
 }
 
@@ -139,28 +140,38 @@ func (s *Smithing) isTrim(id string) bool {
 	return slices.ContainsFunc(s.pk.SmithingTrimRecipes, func(o protocol.SmithingTrimRecipe) bool { return o.RecipeID == id })
 }
 
-// result is the packet's form of a recipe's result. A block item names its block's
-// default state, as BDS's recipes do.
+// result is the packet's form of a recipe's result.
 func (s *Smithing) result(r SmithingRecipe) (protocol.ItemStack, error) {
-	t, ok := s.items.ByName(r.Result)
+	return recipeResult(s.items, s.blocks, r.ID, r.Result, r.ResultMeta, r.ResultCount)
+}
+
+// recipeResult is the packet's form of an item a recipe makes. A block item names its
+// block's default state, as BDS's recipes do.
+func recipeResult(items *Items, blocks *Blocks, id, name string, meta int16, count uint8) (protocol.ItemStack, error) {
+	t, ok := items.ByName(name)
 	if !ok {
-		return protocol.ItemStack{}, fmt.Errorf("registry: smithing: %s: unknown result %q", r.ID, r.Result)
+		return protocol.ItemStack{}, fmt.Errorf("registry: recipe %s: unknown result %q", id, name)
 	}
-	count := r.ResultCount
 	if count == 0 {
 		count = 1
 	}
 	if count > t.MaxStack {
-		return protocol.ItemStack{}, fmt.Errorf("registry: smithing: %s: %d of %s is over a stack", r.ID, count, r.Result)
+		return protocol.ItemStack{}, fmt.Errorf("registry: recipe %s: %d of %s is over a stack", id, count, name)
 	}
 	st := protocol.ItemStack{
-		ItemType: protocol.ItemType{NetworkID: int32(t.ID), MetadataValue: uint32(uint16(r.ResultMeta))},
+		ItemType: protocol.ItemType{NetworkID: int32(t.ID), MetadataValue: uint32(uint16(meta))},
 		Count:    uint16(count),
 	}
-	if id, ok := s.blocks.Block(r.Result); ok {
-		st.BlockRuntimeID = int32(s.blocks.Hash(id)) //nolint:gosec // hashes are sent as int32
+	if b, ok := blocks.Block(name); ok {
+		st.BlockRuntimeID = int32(blocks.Hash(b)) //nolint:gosec // hashes are sent as int32
 	}
 	return st, nil
+}
+
+// itemName is the name of an item in a packet, "" if unknown.
+func itemName(items *Items, st protocol.ItemStack) string {
+	t, _ := items.ByID(int16(st.NetworkID)) //nolint:gosec // network IDs are int16
+	return t.Name
 }
 
 // nextRecipeID is a network ID no recipe of the packet uses.

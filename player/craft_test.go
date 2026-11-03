@@ -3,6 +3,8 @@ package player
 import (
 	"testing"
 
+	"github.com/helix-bedrock/helix/crafting"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 )
 
@@ -317,5 +319,112 @@ func TestCraftClientCannotLie(t *testing.T) {
 	p.window.chest = true
 	if status, _ := p.craftRecipe(craft(1)); status != protocol.ItemStackResponseStatusInvalidCraftRequest {
 		t.Errorf("craft in a chest window: status %d", status)
+	}
+}
+
+// TestRecipeAPI checks a plugin can clear, remove, change and add crafting recipes
+// while running, and that crafting follows.
+func TestRecipeAPI(t *testing.T) {
+	p := craftTestPlayer(t, map[int]string{28: "minecraft:oak_planks", 30: "minecraft:oak_planks"})
+	reg := p.s.reg
+	id := recipeID(t, p, "minecraft:stick")
+	sticks := func() protocol.ItemStackResponse {
+		return p.stackRequest(protocol.ItemStackRequest{RequestID: 1, Actions: []protocol.StackRequestAction{
+			&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: id, NumberOfCrafts: 1},
+			consume(p, 28), consume(p, 30),
+			take(4, slotInfo(containerCreatedOutput, createdOutputSlot, 0), slotInfo(containerCombined, 1, 0)),
+		}})
+	}
+
+	// Change: the same recipe now makes something else, with the same ID.
+	if err := reg.EditRecipes(func(s *registry.Recipes) error {
+		r, ok := s.Get("minecraft:stick")
+		if !ok || r.Block != "crafting_table" || !r.Shaped || r.Input[0].Tag != "minecraft:planks" {
+			t.Errorf("read %+v", r)
+		}
+		r.Output = []registry.RecipeItem{{Name: "minecraft:apple", Count: 4}}
+		return s.Set(r)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := recipeID(t, p, "minecraft:stick"); got != id {
+		t.Errorf("changing a recipe moved its ID from %d to %d", id, got)
+	}
+	if r := sticks(); r.Status != protocol.ItemStackResponseStatusOK || p.inventory.main[1].Name != "minecraft:apple" {
+		t.Fatalf("changed recipe: status %d, item %+v", r.Status, p.inventory.main[1])
+	}
+	p.inventory.main[1] = ItemStack{}
+
+	// Add: a new recipe gets its own ID and can be crafted.
+	var added uint32
+	if err := reg.EditRecipes(func(s *registry.Recipes) error {
+		return s.Set(registry.Recipe{
+			ID: "test:diamond", Input: []crafting.Ingredient{crafting.Tagged("minecraft:planks")},
+			Output: []registry.RecipeItem{{Name: "minecraft:diamond"}},
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	added = recipeID(t, p, "test:diamond")
+	if added == 0 || added == id {
+		t.Errorf("new recipe's ID %d", added)
+	}
+	if r, ok := p.s.Recipes().Recipe(added); !ok || r.Block != "crafting_table" || !r.Fits(crafting.Grid{Width: 2, Items: []crafting.Item{p.craftItem(p.inventory.ui[28])}}) {
+		t.Errorf("new recipe %+v", r)
+	}
+
+	// A failed edit changes nothing, however much it did first.
+	before := len(reg.Crafting.Packet().ShapedRecipes)
+	for name, bad := range map[string]registry.Recipe{
+		"no ID":          {Input: []crafting.Ingredient{crafting.Tagged("x")}, Output: []registry.RecipeItem{{Name: "minecraft:apple"}}},
+		"makes nothing":  {ID: "a", Input: []crafting.Ingredient{crafting.Tagged("x")}},
+		"takes nothing":  {ID: "a", Output: []registry.RecipeItem{{Name: "minecraft:apple"}}},
+		"unknown result": {ID: "a", Input: []crafting.Ingredient{crafting.Tagged("x")}, Output: []registry.RecipeItem{{Name: "minecraft:nothing"}}},
+		"wrong shape":    {ID: "a", Shaped: true, Width: 2, Height: 2, Input: []crafting.Ingredient{crafting.Tagged("x")}, Output: []registry.RecipeItem{{Name: "minecraft:apple"}}},
+		"over a stack":   {ID: "a", Input: []crafting.Ingredient{crafting.Tagged("x")}, Output: []registry.RecipeItem{{Name: "minecraft:netherite_sword", Count: 2}}},
+	} {
+		if err := reg.EditRecipes(func(s *registry.Recipes) error {
+			s.Clear()
+			return s.Set(bad)
+		}); err == nil {
+			t.Errorf("%s was taken", name)
+		}
+		if got := len(reg.Crafting.Packet().ShapedRecipes); got != before {
+			t.Fatalf("%s: a failed edit changed the list", name)
+		}
+	}
+
+	// Remove by ID, by item and by block.
+	if err := reg.EditRecipes(func(s *registry.Recipes) error {
+		if !s.Remove("test:diamond") || s.Remove("test:diamond") {
+			t.Error("Remove by ID")
+		}
+		if s.RemoveFor("minecraft:apple") == 0 {
+			t.Error("RemoveFor")
+		}
+		if s.ClearBlock("stonecutter") == 0 || len(s.ForBlock("stonecutter")) != 0 {
+			t.Error("ClearBlock")
+		}
+		if len(s.ForBlock("furnace")) == 0 {
+			t.Error("clearing one block took another's")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if r := sticks(); r.Status != protocol.ItemStackResponseStatusFailedToFindRecipeByNetId {
+		t.Errorf("removed recipe: status %d", r.Status)
+	}
+
+	// Clear takes everything, smithing and brewing too.
+	if err := reg.EditRecipes(func(s *registry.Recipes) error {
+		s.Clear()
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	k := reg.Crafting.Packet()
+	if n := len(k.ShapedRecipes) + len(k.ShapelessRecipes) + len(k.UserDataShapelessRecipes) + len(k.MultiRecipes) + len(k.SmithingTransformRecipes) + len(k.SmithingTrimRecipes) + len(k.PotionRecipes); n != 0 {
+		t.Errorf("%d recipes left after clear", n)
 	}
 }
