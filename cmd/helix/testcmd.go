@@ -11,6 +11,7 @@ import (
 
 	"github.com/helix-bedrock/helix"
 	"github.com/helix-bedrock/helix/player"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -38,6 +39,10 @@ func testCommandList() *packet.AvailableCommands {
 	chestIdx := make([]uint32, len(chestTestActions))
 	for i := range chestIdx {
 		chestIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + i)
+	}
+	smithIdx := make([]uint32, len(smithTestActions))
+	for i := range smithIdx {
+		smithIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + len(chestTestActions) + i)
 	}
 	itemIdx := make([]uint32, len(itemTestActions))
 	for i := range itemIdx {
@@ -69,12 +74,20 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 2},
 		}}},
 	}
+	smith := protocol.Command{
+		Name: smithTestCommand, Description: "Tests the smithing API: clear, remove, change, reset.",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 3},
+		}}},
+	}
 	return &packet.AvailableCommands{
-		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions),
+		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions),
 		Enums: []protocol.CommandEnum{
 			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
+			{Type: "SmithTestAction", ValueIndices: smithIdx},
 		},
-		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest},
+		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith},
 	}
 }
 
@@ -98,6 +111,53 @@ func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestD
 		left := i.TicksLeft() / ticksPerSecond
 		v.Name = fmt.Sprintf("%d:%02d %s", left/60, left%60, p.Name())
 	})
+}
+
+// smithTestCommand is the command that tries the smithing API.
+const smithTestCommand = "smithtest"
+
+// smithTestSword is the recipe smithTestCommand removes and changes.
+const smithTestSword = "minecraft:netherite_sword"
+
+// smithTestActions are what smithTestCommand takes: clear every recipe, remove the
+// netherite sword's, change it to make a golden sword, reset to what the server
+// started with.
+var smithTestActions = []string{"clear", "remove", "change", "reset"}
+
+// smithTest runs the smithing test on the live recipes and says what happened.
+func smithTest(reg *registry.Registry, start *packet.CraftingData, action string) string {
+	if action == "reset" {
+		reg.Crafting.Update(func(p *packet.CraftingData) {
+			p.SmithingTransformRecipes, p.SmithingTrimRecipes = start.SmithingTransformRecipes, start.SmithingTrimRecipes
+		})
+		return "Smithing recipes reset."
+	}
+	var msg string
+	err := reg.EditSmithing(func(s *registry.Smithing) error {
+		switch action {
+		case "clear":
+			s.Clear()
+			msg = "Smithing recipes cleared."
+		case "remove":
+			msg = fmt.Sprintf("Removed %d recipes for the netherite sword.", s.RemoveFor(smithTestSword))
+		case "change":
+			msg = "No netherite sword recipe to change."
+			for _, r := range s.For(smithTestSword) {
+				r.Result = "minecraft:golden_sword"
+				msg = "The netherite sword recipe now makes a golden sword."
+				if err := s.Set(r); err != nil {
+					return err
+				}
+			}
+		default:
+			msg = "Use clear, remove, change or reset."
+		}
+		return nil
+	})
+	if err != nil {
+		return err.Error()
+	}
+	return msg
 }
 
 // chestTestCommand is the command that tries the chest API.
@@ -261,8 +321,18 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	}, player.Normal); err != nil {
 		return err
 	}
+	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) == 2 && args[0] == smithTestCommand {
+			if server := srv.Load(); server != nil {
+				reg := server.Registry()
+				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())
+				// A failed write means the connection is closing, as above.
+				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: smithTest(reg, smithStart.Load(), args[1])})
+			}
+			return
+		}
 		if len(args) == 2 && args[0] == chestTestCommand {
 			switch args[1] {
 			case "refuse":

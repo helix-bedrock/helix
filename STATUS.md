@@ -156,7 +156,10 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   `CraftingData` packet, so plugins change them through `Registry.Crafting`. Not done yet: which recipes a player
   has unlocked (the recipe book may show few or none), `doLimitedCrafting`, BDS's 14 special recipes (fireworks,
   map copies, banners, repairs...), the 1,456 recipes that keep an item's data (dyeing bundles and such), and the
-  other screens (furnace, anvil, smithing, stonecutter...). Items left in a grid stay there when the window closes:
+  other screens (furnace, anvil, stonecutter...). **Smithing tables** work for BDS's upgrades (netherite), with a
+  plugin API: `Registry.EditSmithing` and `Setup.EditSmithing` clear, remove or change recipes (`Clear`, `Remove`,
+  `RemoveFor`, `Set`), and `OnSmith` changes or refuses one use. Armour trims are not done: they are listed and
+  can be removed, but using one is refused. Items left in a grid stay there when the window closes:
   no return was found in BDS, so the client is taken to move them, which is not confirmed. **Item entities** are a first pass: they are saved with their chunk
   (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
   infinite world's ungenerated ones), do not burn in lava or fire, are not pushed out of a block placed on them, and their

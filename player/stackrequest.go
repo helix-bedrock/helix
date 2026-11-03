@@ -249,6 +249,12 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]
+	case protocol.ContainerSmithingTableTemplate, protocol.ContainerSmithingTableInput, protocol.ContainerSmithingTableMaterial:
+		_, at := smithSlot(container)
+		if !p.window.smithing || int(slot) != at {
+			return r, false
+		}
+		r.stack = &inv.ui[slot]
 	case containerLevelEntity:
 		if int(slot) >= len(inv.open) {
 			return r, false
@@ -456,6 +462,9 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return s.Count == 1 && t.Wearable && t.ArmorSlot == r.slot
 	case containerOffhand:
 		return t.Offhand
+	case protocol.ContainerSmithingTableTemplate, protocol.ContainerSmithingTableInput, protocol.ContainerSmithingTableMaterial:
+		slot, _ := smithSlot(r.kind)
+		return p.s.Recipes().SmithingAllows(slot, p.craftItem(s))
 	}
 	return true
 }

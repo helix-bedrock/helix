@@ -178,6 +178,8 @@ type setupState struct {
 
 	creative *packet.CreativeContent
 	crafting *packet.CraftingData
+	// smithingEdits run on the recipes at freeze, once items and blocks are known.
+	smithingEdits []func(*Smithing) error
 
 	voxelShapes *packet.VoxelShapes
 	jigsaw      *packet.JigsawStructureData

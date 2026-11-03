@@ -47,9 +47,10 @@ type craftState struct {
 
 // expectedSlot is a grid slot and how many of its items must still be consumed.
 type expectedSlot struct {
-	slot byte
-	item ItemStack
-	left uint8
+	container byte
+	slot      byte
+	item      ItemStack
+	left      uint8
 }
 
 // expectedAnywhere is an ingredient and how many items must still be consumed for it.
@@ -103,7 +104,7 @@ func (p *Player) craftGrid() (start, size, width int, ok bool) {
 	switch {
 	case w.workbench:
 		return largeGridStart, largeGridSize, largeGridWidth, true
-	case w.open && !w.chest:
+	case w.open && !w.chest && !w.smithing:
 		return smallGridStart, smallGridSize, smallGridWidth, true
 	}
 	return 0, 0, 0, false
@@ -112,14 +113,31 @@ func (p *Player) craftGrid() (start, size, width int, ok bool) {
 // useCraftingTable is what clicking a crafting table does: it is taken whether or
 // not it opens, as with a chest.
 func (p *Player) useCraftingTable(r *world.Region, u *BlockUse) bool {
+	if p.openStation(r, u, byte(protocol.ContainerTypeWorkbench)) {
+		p.window.workbench = true
+	}
+	return true
+}
+
+// useSmithingTable is the same for a smithing table.
+func (p *Player) useSmithingTable(r *world.Region, u *BlockUse) bool {
+	if p.openStation(r, u, byte(protocol.ContainerTypeSmithingTable)) {
+		p.window.smithing = true
+	}
+	return true
+}
+
+// openStation opens the window of a block with no items of its own, if the player
+// may and none is open.
+func (p *Player) openStation(r *world.Region, u *BlockUse, kind byte) bool {
 	if !p.abilities.Flag(AbilityOpenContainers) || p.window.open {
-		return true
+		return false
 	}
 	w := &p.window
 	w.nextID()
-	w.open, w.workbench, w.workbenchPos, w.workbenchDim = true, true, u.Pos, r.Dimension()
+	w.open, w.workbenchPos, w.workbenchDim = true, u.Pos, r.Dimension()
 	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: byte(protocol.ContainerTypeWorkbench),
+		WindowID: w.id, ContainerType: kind,
 		ContainerPosition:       protocol.BlockPos{int32(u.Pos[0]), int32(u.Pos[1]), int32(u.Pos[2])}, //nolint:gosec // block coordinates fit int32
 		ContainerEntityUniqueID: -1,
 	})
@@ -127,9 +145,9 @@ func (p *Player) useCraftingTable(r *world.Region, u *BlockUse) bool {
 	return true
 }
 
-// tickWorkbench closes the crafting window when the table is gone or too far.
+// tickWorkbench closes a crafting or smithing window when its table is gone or too far.
 func (p *Player) tickWorkbench() {
-	if !p.window.workbench {
+	if !p.window.workbench && !p.window.smithing {
 		return
 	}
 	r := p.entity.Region()
@@ -148,7 +166,11 @@ func (p *Player) tickWorkbench() {
 // chunk counts as gone, as for a chest.
 func (p *Player) workbenchThere(r *world.Region, pos cube.Pos) bool {
 	block, ok := r.Block(pos, 0)
-	if !ok || p.s.reg.Blocks.Name(block) != craftingTable {
+	want := craftingTable
+	if p.window.smithing {
+		want = smithingTable
+	}
+	if !ok || p.s.reg.Blocks.Name(block) != want {
 		return false
 	}
 	d := p.entity.Position().Sub(blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
@@ -170,6 +192,9 @@ func (p *Player) recipeFor(id uint32) (*crafting.Recipe, uint8) {
 // craftRecipe is a craft by hand: the grid must fit the recipe, and each item in it
 // must be consumed once per craft by the actions that follow.
 func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, []slotRef) {
+	if p.window.smithing {
+		return p.craftSmithing(a)
+	}
 	c := &p.requests.craft
 	start, size, width, ok := p.craftGrid()
 	if !ok {
@@ -177,6 +202,9 @@ func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, 
 	}
 	if c.active {
 		return protocol.ItemStackResponseStatusRequestAlreadyInProgress, nil
+	}
+	if a.NumberOfCrafts == 0 {
+		return protocol.ItemStackResponseStatusInvalidNumCrafts, nil
 	}
 	r, status := p.recipeFor(a.RecipeNetworkID)
 	if r == nil {
@@ -193,7 +221,7 @@ func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, 
 	c.active, c.times = true, a.NumberOfCrafts
 	for i := range size {
 		if s := work.ui[start+i]; !s.Empty() {
-			c.slots = append(c.slots, expectedSlot{slot: byte(start + i), item: s, left: a.NumberOfCrafts}) //nolint:gosec // slots are small
+			c.slots = append(c.slots, expectedSlot{container: protocol.ContainerCraftingInput, slot: byte(start + i), item: s, left: a.NumberOfCrafts}) //nolint:gosec // slots are small
 		}
 	}
 	return p.startResults(r, false), nil
@@ -208,6 +236,9 @@ func (p *Player) craftAuto(a *protocol.AutoCraftRecipeStackRequestAction) (uint8
 	}
 	if c.active {
 		return protocol.ItemStackResponseStatusRequestAlreadyInProgress, nil
+	}
+	if a.NumberOfCrafts == 0 {
+		return protocol.ItemStackResponseStatusInvalidNumCrafts, nil
 	}
 	r, status := p.recipeFor(a.RecipeNetworkID)
 	if r == nil {
@@ -355,10 +386,7 @@ func (p *Player) consumed(src slotRef, used ItemStack) uint8 {
 	if c.auto {
 		return p.consumedAnywhere(src, used)
 	}
-	if src.kind != protocol.ContainerCraftingInput {
-		return protocol.ItemStackResponseStatusFailedToMatchExpectedSlotConsumedItem
-	}
-	i := slices.IndexFunc(c.slots, func(e expectedSlot) bool { return e.slot == src.slot })
+	i := slices.IndexFunc(c.slots, func(e expectedSlot) bool { return e.container == src.kind && e.slot == src.slot })
 	if i < 0 {
 		return protocol.ItemStackResponseStatusFailedToMatchExpectedSlotConsumedItem
 	}

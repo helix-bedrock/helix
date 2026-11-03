@@ -102,6 +102,14 @@ func (s *Setup) Freeze() (*Registry, error) {
 	if crafting == nil {
 		crafting = &packet.CraftingData{ClearRecipes: true}
 	}
+	if len(s.s.smithingEdits) != 0 {
+		crafting = cloneCrafting(crafting)
+		for _, edit := range s.s.smithingEdits {
+			if err := applySmithing(crafting, it, b, edit); err != nil {
+				return nil, err
+			}
+		}
+	}
 	s.s.frozen = true
 	return &Registry{
 		Blocks: b, Items: it, Biomes: bs, EntityTypes: et,

@@ -121,6 +121,7 @@ type gameplay struct {
 	chestCloseEv listeners[ChestCloseEvent]
 	chestItemEv  listeners[ChestItemEvent]
 	craftEv      listeners[CraftEvent]
+	smithEv      listeners[SmithEvent]
 	chestPairEv  listeners[ChestPairEvent]
 	chestSpillEv listeners[ChestSpillEvent]
 	dropsEv      listeners[BlockDropsEvent]
@@ -146,6 +147,7 @@ type gameState struct {
 	chestCloseEv listeners[ChestCloseEvent]
 	chestItemEv  listeners[ChestItemEvent]
 	craftEv      listeners[CraftEvent]
+	smithEv      listeners[SmithEvent]
 	chestPairEv  listeners[ChestPairEvent]
 	chestSpillEv listeners[ChestSpillEvent]
 	dropsEv      listeners[BlockDropsEvent]
@@ -328,7 +330,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
-		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv, craftEv: gs.craftEv,
+		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 	}
 	for name, by := range bp.NotReplacedBy {
@@ -343,6 +345,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.chestCloseEv.freeze()
 	g.chestItemEv.freeze()
 	g.craftEv.freeze()
+	g.smithEv.freeze()
 	g.chestPairEv.freeze()
 	g.chestSpillEv.freeze()
 	g.dropsEv.freeze()

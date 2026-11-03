@@ -62,8 +62,11 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if p.s.chests.kind[u.Block] != chestNone {
 		return p.useChest(r, u)
 	}
-	if blocks.Name(u.Block) == craftingTable {
+	switch blocks.Name(u.Block) {
+	case craftingTable:
 		return p.useCraftingTable(r, u)
+	case smithingTable:
+		return p.useSmithingTable(r, u)
 	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)

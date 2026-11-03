@@ -28,7 +28,9 @@ type windowState struct {
 	// chestDim is the dimension of that chest.
 	chestDim *world.Dimension
 	// workbench means the open window is the crafting table at workbenchPos.
-	workbench    bool
+	workbench bool
+	// smithing means it is the smithing table at workbenchPos.
+	smithing     bool
 	workbenchPos cube.Pos
 	workbenchDim *world.Dimension
 }
@@ -76,7 +78,7 @@ func handleContainerClose(p *Player, _ *packet.ContainerClose) {
 	if p.entity != nil {
 		p.leaveChest(p.entity.Region(), false)
 	}
-	p.window.open, p.window.workbench = false, false
+	p.window.open, p.window.workbench, p.window.smithing = false, false, false
 	p.send(&packet.ContainerClose{WindowID: p.window.id, ContainerType: containerTypeNone})
 	p.flush()
 }

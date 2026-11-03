@@ -171,6 +171,8 @@ sibling library folders, so unreleased library changes are used.
   `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
   `crafting` (package): the recipes by network ID from the `CraftingData` packet and BDS's fit rule; knows nothing
   of players. `player/craft.go`: the crafting table's window and the craft actions of a stack request (`OnCraft`).
+  `player/smith.go`: the smithing table's action (`OnSmith`); `registry/smithing.go`: `EditSmithing` and `Smithing`, the
+  plugin API over the recipes (clear, remove, change, for an item), boot or live. `-testcmds` adds /smithtest.
   `breaking.go`, `placing.go`, `mining.go`, `gameplay.go`, `event.go`:
   block breaking and placing as BDS 1.26.60 does them (research notes are
   private). PlayerAuthInput's block actions run before movement, in BDS's

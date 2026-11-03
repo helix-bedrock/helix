@@ -253,3 +253,69 @@ func TestRecipesReadable(t *testing.T) {
 		t.Errorf("unreadable: %s", b)
 	}
 }
+
+// TestCraftClientCannotLie sends what a dishonest client could: nothing it says about
+// its items may change what it gets, and every refused request leaves the items as
+// they were. Only the server's copy of the items counts.
+func TestCraftClientCannotLie(t *testing.T) {
+	p := craftTestPlayer(t, map[int]string{28: "minecraft:oak_planks", 30: "minecraft:oak_planks"})
+	stick := recipeID(t, p, "minecraft:stick")
+	craft := func(times byte) *protocol.CraftRecipeStackRequestAction {
+		return &protocol.CraftRecipeStackRequestAction{RecipeNetworkID: stick, NumberOfCrafts: times}
+	}
+	output := slotInfo(containerCreatedOutput, createdOutputSlot, 0)
+	inv := slotInfo(containerCombined, 1, 0)
+	wrongID := consume(p, 28)
+	wrongID.Source.StackNetworkID++
+	twoFromOne := consume(p, 28)
+	twoFromOne.Count = 2
+	notGrid := &protocol.ConsumeStackRequestAction{}
+	notGrid.Count, notGrid.Source = 1, slotInfo(containerCombined, 2, p.inventory.main[2].netID)
+	anyDiamonds := &protocol.CraftResultsDeprecatedStackRequestAction{TimesCrafted: 1, ResultItems: []protocol.StackRequestItem{{}}}
+	for name, c := range map[string]struct {
+		actions []protocol.StackRequestAction
+		want    uint8
+	}{
+		"takes the result, uses nothing": {[]protocol.StackRequestAction{craft(1), take(4, output, inv)}, protocol.ItemStackResponseStatusExpectedItemSlotNotFullyConsumed},
+		"takes more than was made":       {[]protocol.StackRequestAction{craft(1), consume(p, 28), consume(p, 30), take(5, output, inv)}, protocol.ItemStackResponseStatusError},
+		"asks for two, uses one":         {[]protocol.StackRequestAction{craft(2), consume(p, 28), consume(p, 30), take(8, output, inv)}, protocol.ItemStackResponseStatusExpectedItemSlotNotFullyConsumed},
+		"names a stack it does not have": {[]protocol.StackRequestAction{craft(1), wrongID}, protocol.ItemStackResponseStatusFailedToValidateSrcSlot},
+		"uses more than one craft takes": {[]protocol.StackRequestAction{craft(1), twoFromOne}, protocol.ItemStackResponseStatusConsumedTooMuchFromSlot},
+		"pays with another item":         {[]protocol.StackRequestAction{craft(1), notGrid}, protocol.ItemStackResponseStatusFailedToMatchExpectedSlotConsumedItem},
+		"crafts zero times":              {[]protocol.StackRequestAction{craft(0), take(4, output, inv)}, protocol.ItemStackResponseStatusInvalidNumCrafts},
+		"claims its own results":         {[]protocol.StackRequestAction{anyDiamonds, take(4, output, inv)}, protocol.ItemStackResponseStatusFailedToValidateSrcSlot},
+		"takes with no craft":            {[]protocol.StackRequestAction{take(4, output, inv)}, protocol.ItemStackResponseStatusFailedToValidateSrcSlot},
+	} {
+		if r := p.stackRequest(protocol.ItemStackRequest{RequestID: 2, Actions: c.actions}); r.Status != c.want {
+			t.Errorf("%s: status %d, want %d", name, r.Status, c.want)
+		}
+		if p.inventory.ui[28].Count != 4 || p.inventory.ui[30].Count != 4 || !p.inventory.main[1].Empty() || !p.inventory.ui[createdOutputSlot].Empty() {
+			t.Fatalf("%s changed items", name)
+		}
+	}
+
+	// An item put in the grid after the recipe was checked is not what the recipe took.
+	p.requests.craft = craftState{active: true, slots: []expectedSlot{{container: protocol.ContainerCraftingInput, slot: 28, item: p.inventory.ui[28], left: 1}}}
+	swapped := slotRef{container: protocol.ContainerCraftingInput, slot: 28, kind: protocol.ContainerCraftingInput}
+	if got := p.consumed(swapped, ItemStack{Name: "minecraft:emerald", Count: 1}); got != protocol.ItemStackResponseStatusMismatchSlotExpectedConsumedItem {
+		t.Errorf("swapped grid: status %d", got)
+	}
+	p.requests.craft = craftState{}
+
+	// The large grid and the smithing slots do not exist without their tables,
+	// whatever the client says is open.
+	for name, a := range map[string]*protocol.TakeStackRequestAction{
+		"large grid":    take(1, slotInfo(containerCombined, 2, p.inventory.main[2].netID), slotInfo(protocol.ContainerCraftingInput, largeGridStart, 0)),
+		"smithing slot": take(1, slotInfo(containerCombined, 2, p.inventory.main[2].netID), slotInfo(protocol.ContainerSmithingTableInput, smithBaseSlot, 0)),
+	} {
+		if r := p.stackRequest(protocol.ItemStackRequest{RequestID: 4, Actions: []protocol.StackRequestAction{a}}); r.Status != protocol.ItemStackResponseStatusFailedToValidateDstSlot {
+			t.Errorf("%s with no table: status %d", name, r.Status)
+		}
+	}
+
+	// A chest window has no grid at all.
+	p.window.chest = true
+	if status, _ := p.craftRecipe(craft(1)); status != protocol.ItemStackResponseStatusInvalidCraftRequest {
+		t.Errorf("craft in a chest window: status %d", status)
+	}
+}

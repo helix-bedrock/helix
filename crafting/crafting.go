@@ -179,14 +179,24 @@ func (r *Recipe) fitsShapeless(g Grid) bool {
 // Table is the recipes of one CraftingData packet by network ID. It does not change
 // after it is built.
 type Table struct {
-	source  *packet.CraftingData
-	recipes map[uint32]*Recipe
+	source   *packet.CraftingData
+	recipes  map[uint32]*Recipe
+	smithing map[uint32]*SmithingRecipe
 }
 
 // NewTable reads the shaped and shapeless recipes of a packet. The rest of the packet
 // is what other screens or special rules use, so it is not in the table.
 func NewTable(pk *packet.CraftingData) *Table {
-	t := &Table{source: pk, recipes: make(map[uint32]*Recipe, len(pk.ShapedRecipes)+len(pk.ShapelessRecipes))}
+	t := &Table{
+		source: pk, recipes: make(map[uint32]*Recipe, len(pk.ShapedRecipes)+len(pk.ShapelessRecipes)),
+		smithing: make(map[uint32]*SmithingRecipe, len(pk.SmithingTransformRecipes)),
+	}
+	for _, r := range pk.SmithingTransformRecipes {
+		t.smithing[r.RecipeNetworkID] = &SmithingRecipe{
+			ID: r.RecipeID, NetworkID: r.RecipeNetworkID, Block: r.Block, Result: r.Result,
+			Template: ReadIngredient(r.Template), Base: ReadIngredient(r.Base), Addition: ReadIngredient(r.Addition),
+		}
+	}
 	for _, r := range pk.ShapedRecipes {
 		t.recipes[r.RecipeNetworkID] = &Recipe{
 			ID: r.RecipeID, NetworkID: r.RecipeNetworkID, Block: r.Block, Shaped: true,

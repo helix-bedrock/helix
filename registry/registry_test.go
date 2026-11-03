@@ -338,3 +338,39 @@ func TestCollisionComputed(t *testing.T) {
 		}
 	}
 }
+
+// TestEditSmithingAtBoot checks a boot edit runs on vanilla's recipes, and that a bad
+// one stops the server starting.
+func TestEditSmithingAtBoot(t *testing.T) {
+	setup := NewSetup(nil, "minecraft")
+	if err := Vanilla(setup); err != nil {
+		t.Fatal(err)
+	}
+	if err := setup.EditSmithing(func(s *Smithing) error {
+		if n := len(s.Recipes()); n == 0 {
+			t.Error("vanilla's recipes are not there")
+		}
+		s.Clear()
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := setup.Freeze()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := r.Crafting.Packet(); len(p.SmithingTransformRecipes) != 0 || len(p.SmithingTrimRecipes) != 0 {
+		t.Error("clear at boot left recipes")
+	}
+
+	bad := NewSetup(nil, "minecraft")
+	if err := Vanilla(bad); err != nil {
+		t.Fatal(err)
+	}
+	if err := bad.EditSmithing(func(s *Smithing) error { return s.Set(SmithingRecipe{ID: "x"}) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bad.Freeze(); err == nil {
+		t.Error("a bad edit did not stop the freeze")
+	}
+}
