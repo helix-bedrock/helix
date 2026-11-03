@@ -1,6 +1,7 @@
 package player
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/helix-bedrock/helix/crafting"
@@ -363,6 +364,92 @@ func TestCraftOtherBlocksRecipe(t *testing.T) {
 	}
 	if !seen["furnace"] || !seen["stonecutter"] {
 		t.Fatalf("tried %v", seen)
+	}
+}
+
+// TestPlayerRecipes checks recipes taken from one player are gone from its list and
+// refused when its client asks anyway, while another player keeps them.
+func TestPlayerRecipes(t *testing.T) {
+	p := craftTestPlayer(t, map[int]string{28: "minecraft:oak_planks", 30: "minecraft:oak_planks"})
+	other := &Player{s: p.s}
+	stick := recipeID(t, p, "minecraft:stick")
+	craft := func(pl *Player) uint8 {
+		_, status := pl.recipeFor(stick)
+		return status
+	}
+	listed := func(pl *Player) bool {
+		k := pl.recipesPacket()
+		return slices.ContainsFunc(k.ShapedRecipes, func(r protocol.ShapedRecipe) bool { return r.RecipeNetworkID == stick }) ||
+			slices.ContainsFunc(k.ShapelessRecipes, func(r protocol.ShapelessRecipe) bool { return r.RecipeNetworkID == stick })
+	}
+	check := func(name string, has bool) {
+		t.Helper()
+		want := uint8(protocol.ItemStackResponseStatusFailedToFindRecipeByNetId)
+		if has {
+			want = protocol.ItemStackResponseStatusOK
+		}
+		if got := craft(p); got != want || listed(p) != has {
+			t.Errorf("%s: status %d, listed %v", name, got, listed(p))
+		}
+		if craft(other) != protocol.ItemStackResponseStatusOK || !listed(other) {
+			t.Errorf("%s: the other player lost the recipe", name)
+		}
+		if !p.recipesPacket().ClearRecipes {
+			t.Errorf("%s: the client would keep its old recipes", name)
+		}
+	}
+	check("at the start", true)
+	edits := []struct {
+		name string
+		edit func(r *PlayerRecipes)
+	}{
+		{"by ID", func(r *PlayerRecipes) { r.Remove("minecraft:stick") }},
+		{"by item", func(r *PlayerRecipes) { r.RemoveFor("minecraft:stick") }},
+		{"by block", func(r *PlayerRecipes) { r.ClearBlock(craftingTableRecipes) }},
+		{"all", func(r *PlayerRecipes) { r.Clear() }},
+	}
+	for _, e := range edits {
+		p.applyRecipeEdit(e.edit)
+		check(e.name, false)
+		p.applyRecipeEdit(func(r *PlayerRecipes) { r.Reset() })
+		check("reset after "+e.name, true)
+	}
+	if p.recipesPacket() != p.s.reg.Crafting.Packet() {
+		t.Error("a player with no rules should share the server's packet")
+	}
+
+	// A refused request changes nothing.
+	p.applyRecipeEdit(func(r *PlayerRecipes) { r.RemoveFor("minecraft:stick") })
+	req := protocol.ItemStackRequest{RequestID: 2, Actions: []protocol.StackRequestAction{
+		&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: stick, NumberOfCrafts: 1}, consume(p, 28), consume(p, 30),
+		take(4, slotInfo(containerCreatedOutput, createdOutputSlot, 0), slotInfo(containerCombined, 1, 0)),
+	}}
+	if r := p.stackRequest(req); r.Status != protocol.ItemStackResponseStatusFailedToFindRecipeByNetId || p.inventory.ui[28].Count != 4 {
+		t.Errorf("hidden recipe: status %d, %d planks", r.Status, p.inventory.ui[28].Count)
+	}
+
+	// A rule follows the server's recipes: one added later is hidden as well.
+	if err := p.s.reg.EditRecipes(func(s *registry.Recipes) error {
+		return s.Set(registry.Recipe{
+			ID: "test:stick", Input: []crafting.Ingredient{crafting.AnyVariant("minecraft:apple")},
+			Output: []registry.RecipeItem{{Name: "minecraft:stick"}},
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(p.recipesPacket().ShapelessRecipes, func(r protocol.ShapelessRecipe) bool { return r.RecipeID == "test:stick" }) {
+		t.Error("a recipe added later for a removed item was listed")
+	}
+	if !slices.ContainsFunc(other.recipesPacket().ShapelessRecipes, func(r protocol.ShapelessRecipe) bool { return r.RecipeID == "test:stick" }) {
+		t.Error("the other player should get the new recipe")
+	}
+
+	// Smithing follows the same rules.
+	sword := p.s.reg.Crafting.Packet().SmithingTransformRecipes[0]
+	p.applyRecipeEdit(func(r *PlayerRecipes) { r.Reset(); r.Remove(sword.RecipeID) })
+	p.window.open, p.window.smithing = true, true
+	if status, _ := p.craftSmithing(&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: sword.RecipeNetworkID, NumberOfCrafts: 1}); status != protocol.ItemStackResponseStatusFailedToFindRecipeByNetId {
+		t.Errorf("hidden smithing recipe: status %d", status)
 	}
 }
 

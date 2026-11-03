@@ -15,6 +15,7 @@ package player
 import (
 	"fmt"
 	"math/rand/v2"
+	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -32,6 +33,12 @@ import (
 type Player struct {
 	s    *Host
 	conn *network.Conn
+
+	// recipeMu keeps recipe rule edits and sends in order. recipeRules and
+	// recipeCache are this player's recipes. Runs: anywhere.
+	recipeMu    sync.Mutex
+	recipeRules atomic.Pointer[recipeRules]
+	recipeCache atomic.Pointer[recipeView]
 
 	// Session: fixed once the player joined. Runs: anywhere.
 	uuid      uuid.UUID

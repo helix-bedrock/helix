@@ -87,7 +87,7 @@ func testCommandList() *packet.AvailableCommands {
 		}}},
 	}
 	recipe := protocol.Command{
-		Name: recipeTestCommand, Description: "Tests the recipe API: clear, table, remove [item], change, add, reset.",
+		Name: recipeTestCommand, Description: "Tests the recipe API: clear, table, remove [item], change, add, reset, hide [item], hideall, show.",
 		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
 		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
 			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 4},
@@ -184,7 +184,27 @@ const recipeTestStick = "minecraft:stick"
 // the crafting table's, remove the recipes of an item, change the stick to make apples,
 // add a recipe making a diamond from a stick and an apple, reset to what the server
 // started with.
-var recipeTestActions = []string{"clear", "table", "remove", "change", "add", "reset"}
+//
+// hide, hideall and show act on the player who runs the command only: hide takes away
+// an item's recipes, hideall every recipe, show gives them back.
+var recipeTestActions = []string{"clear", "table", "remove", "change", "add", "reset", "hide", "hideall", "show"}
+
+// recipeTestPlayer runs the actions on the player's own recipes. It reports false for
+// any other action.
+func recipeTestPlayer(p *player.Player, action, item string) (string, bool) {
+	switch action {
+	case "hide":
+		p.EditRecipes(func(r *player.PlayerRecipes) { r.RemoveFor(item) })
+		return "Took " + item + " recipes from you only.", true
+	case "hideall":
+		p.EditRecipes(func(r *player.PlayerRecipes) { r.Clear() })
+		return "Took every recipe from you only.", true
+	case "show":
+		p.EditRecipes(func(r *player.PlayerRecipes) { r.Reset() })
+		return "You have the server's recipes again.", true
+	}
+	return "", false
+}
 
 // recipeTestItem is the item a command names, with or without "minecraft:".
 func recipeTestItem(args []string) string {
@@ -426,6 +446,11 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
 		if (len(args) == 2 || len(args) == 3) && args[0] == recipeTestCommand {
+			if msg, ok := recipeTestPlayer(p, args[1], recipeTestItem(args[2:])); ok {
+				// A failed write means the connection is closing, as above.
+				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: msg})
+				return
+			}
 			if server := srv.Load(); server != nil {
 				reg := server.Registry()
 				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())

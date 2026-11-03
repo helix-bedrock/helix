@@ -90,7 +90,7 @@ func (p *Player) craftSmithing(a *protocol.CraftRecipeStackRequestAction) (uint8
 		return protocol.ItemStackResponseStatusRequestAlreadyInProgress, nil
 	}
 	r, ok := p.s.Recipes().Smithing(a.RecipeNetworkID)
-	if !ok {
+	if !ok || !p.hasRecipe(a.RecipeNetworkID) {
 		return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId, nil
 	}
 	ui := &st.work.ui

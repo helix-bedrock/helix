@@ -184,7 +184,7 @@ func (p *Player) workbenchThere(r *world.Region, pos cube.Pos) bool {
 // read, or a grid would smelt ore and cut stone for anyone who asked.
 func (p *Player) recipeFor(id uint32) (*crafting.Recipe, uint8) {
 	r, ok := p.s.Recipes().Recipe(id)
-	if !ok || r.Block != craftingTableRecipes {
+	if !ok || r.Block != craftingTableRecipes || !p.hasRecipe(id) {
 		return nil, protocol.ItemStackResponseStatusFailedToFindRecipeByNetId
 	}
 	if _, size, _, _ := p.craftGrid(); r.Large() && size != largeGridSize {
