@@ -173,7 +173,7 @@ sibling library folders, so unreleased library changes are used.
   of players. `player/craft.go`: the crafting table's window and the craft actions of a stack request (`OnCraft`).
   `player/smith.go`: the smithing table's action, upgrades and armour trims (`OnSmith`; registry `Trims`, helix-data's `bds/trim.json`); `registry/smithing.go`: `EditSmithing` and `Smithing`, the
   plugin API over the recipes (clear, remove, change, for an item), boot or live; `registry/recipes.go`: `EditRecipes` and
-  `Recipes`, the same for shaped and shapeless recipes of every block. `player/recipes.go`: `Player.EditRecipes`, rules taking recipes from one player, applied to its packet and checked on every craft. `-testcmds` adds /smithtest and /recipetest.
+  `Recipes`, the same for shaped and shapeless recipes of every block. `attach/`: torches, lanterns and ladders: which faces of each block hold things (helix-data `bds/support.json`), where they may go, which way they face, and falling off when the holder goes. `player/recipes.go`: `Player.EditRecipes`, rules taking recipes from one player, applied to its packet and checked on every craft. `-testcmds` adds /smithtest and /recipetest.
   `breaking.go`, `placing.go`, `mining.go`, `gameplay.go`, `event.go`:
   block breaking and placing as BDS 1.26.60 does them (research notes are
   private). PlayerAuthInput's block actions run before movement, in BDS's

@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -92,7 +94,11 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		if err != nil {
 			return err
 		}
-		conf.Ticker = blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks)))
+		attached, err := attach.New(s.reg.Blocks)
+		if err != nil {
+			return err
+		}
+		conf.Ticker = attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks))))
 	}
 	r, _ := mcdb.Overworld.Range()
 	switch {
@@ -159,3 +165,10 @@ func (s *Server) WorldStore() mcdb.WorldStore { return s.worldStore }
 // PlayerStore is the store of the players' saved data. It is set while Run
 // runs.
 func (s *Server) PlayerStore() mcdb.PlayerStore { return s.playerStore }
+
+// fallBlock breaks a block that lost what held it, once players can be served.
+func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {
+	if host := s.players.Load(); host != nil {
+		host.FallBlock(r, pos, block)
+	}
+}

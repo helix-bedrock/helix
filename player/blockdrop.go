@@ -219,6 +219,21 @@ func customNameAt(r *world.Region, pos cube.Pos) string {
 	return name
 }
 
+// FallBlock breaks a block that lost what held it: BDS's destroyBlock with drops,
+// through the Drops system. No player broke it, so no break or drops event fires.
+// Runs: on the region tick.
+func (s *Host) FallBlock(r *world.Region, pos cube.Pos, block uint32) {
+	items, _ := s.game.sys.Drops(s, block, &loot.Context{})
+	if r.SetBlock(pos, 0, s.reg.Blocks.Air()) {
+		r.UpdateNeighbours(pos)
+	}
+	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(s.reg.Blocks.Hash(block))) //nolint:gosec // hashes are sent as int32
+	for _, it := range items {
+		d := NewBlockDrop(pos, it)
+		s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+	}
+}
+
 // throwDrops puts the drops in the world.
 func (s *Host) throwDrops(r *world.Region, drops []BlockDrop) {
 	for _, d := range drops {

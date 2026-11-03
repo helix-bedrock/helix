@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/loot"
@@ -69,6 +70,8 @@ type Host struct {
 	global   *global
 	// connections works out the arms of fences and the like as they are placed.
 	connections *connect.Table
+	// attach is what holds torches, lanterns and ladders.
+	attach *attach.Table
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
 	// drops holds what each block drops.
@@ -93,6 +96,10 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: connections: %w", err)
 	}
+	attached, err := attach.New(conf.Registry.Blocks)
+	if err != nil {
+		return nil, fmt.Errorf("player: attached blocks: %w", err)
+	}
 	chests, err := newChestTable(conf.Registry.Blocks)
 	if err != nil {
 		return nil, fmt.Errorf("player: chests: %w", err)
@@ -108,7 +115,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		drops: drops,
 		log:   conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, chests: chests,
+		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests,
 	}
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	conf.Overworld.SetEntityLoader(h.loadEntity)

@@ -192,7 +192,13 @@ func vanillaPlaceCheck(pl *Placement) bool {
 	}) {
 		return false
 	}
-	return !p.inside(pl.Pos)
+	if !p.s.attach.MayPlace(r, pl.Pos, pl.Block, cube.Face(pl.Face)) {
+		return false
+	}
+	// BDS tests the state it would place, not the item's: only a block with a
+	// collision box can be in the player's way, so a torch goes where it stands.
+	state, ok := p.s.game.sys.PlaceState(pl)
+	return ok && !p.inside(pl.Pos, state)
 }
 
 // Player hitbox, from its eye position: 0.6 wide, 1.8 tall, eyes at 1.62.
@@ -202,15 +208,21 @@ const (
 	playerHeight    = 1.8
 )
 
-// inside reports whether the player's box overlaps the block at pos.
-func (p *Player) inside(pos cube.Pos) bool {
+// inside reports whether the player's box overlaps the collision boxes block
+// would have at pos.
+func (p *Player) inside(pos cube.Pos, block uint32) bool {
 	e := p.entity.Position()
 	minX, maxX := e[0]-playerHalfWidth, e[0]+playerHalfWidth
 	minY := e[1] - playerEyeHeight
 	maxY := minY + playerHeight
 	minZ, maxZ := e[2]-playerHalfWidth, e[2]+playerHalfWidth
 	bx, by, bz := float32(pos[0]), float32(pos[1]), float32(pos[2])
-	return maxX > bx && minX < bx+1 && maxY > by && minY < by+1 && maxZ > bz && minZ < bz+1
+	for _, b := range p.s.reg.Blocks.Properties(block).Collision {
+		if maxX > bx+b[0] && minX < bx+b[3] && maxY > by+b[1] && minY < by+b[4] && maxZ > bz+b[2] && minZ < bz+b[5] {
+			return true
+		}
+	}
+	return false
 }
 
 // vanillaPlace is BDS's BlockItem placing after the checks: the BlockPlace

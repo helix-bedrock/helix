@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -22,7 +23,6 @@ var placeOrders = map[string][]string{
 	"pillar_axis":                  {"y", "x", "z"},
 	"attachment":                   {"standing", "hanging", "side", "multiple"},
 	"lever_direction":              {"down_east_west", "east", "west", "south", "north", "up_north_south", "up_east_west", "down_north_south"},
-	"torch_facing_direction":       {"unknown", "west", "east", "north", "south", "top"},
 }
 
 // Byte tables BDS shifts by eight times a yaw index: the horizontal
@@ -147,40 +147,6 @@ func (s *placeState) top() int {
 	return 0
 }
 
-// supports reports whether the block at pos holds what is placed on its
-// side face: a collision box covering the whole face, or only its centre.
-// BDS asks each block type; this reads the collision boxes.
-func (s *placeState) supports(pos cube.Pos, side int, centre bool) bool {
-	b, ok := s.r.Block(pos, 0)
-	if !ok {
-		return false
-	}
-	for _, box := range s.pl.Player.s.reg.Blocks.Properties(b).Collision {
-		if faceCovered(box, side, centre) {
-			return true
-		}
-	}
-	return false
-}
-
-// faceCovered reports whether box reaches side of its block and covers
-// the face (or its centre).
-func faceCovered(b [6]float32, side int, centre bool) bool {
-	axis := [6]int{1, 1, 2, 2, 0, 0}[side]
-	if side%2 == 0 && b[axis] > 0 || side%2 == 1 && b[axis+3] < 1 {
-		return false
-	}
-	for a := range 3 {
-		if a == axis {
-			continue
-		}
-		if centre && (b[a] > 0.5 || b[a+3] < 0.5) || !centre && (b[a] > 0 || b[a+3] < 1) {
-			return false
-		}
-	}
-	return true
-}
-
 // vanillaPlaceState is BDS's getPlacementBlock: a block behaviour's rule
 // first, else the block's rule and traits from BDS's table.
 func vanillaPlaceState(pl *Placement) (uint32, bool) {
@@ -291,13 +257,13 @@ func (s *placeState) rule(rule string) {
 	case "lever":
 		s.lever(face)
 	case "lantern":
-		pos := s.pl.Pos
-		hang := face == faceDown && s.supports(pos.Side(cube.FaceUp), faceDown, true)
-		s.set("hanging", b2i(hang || !s.supports(pos.Side(cube.FaceDown), faceUp, true)))
+		s.set("hanging", b2i(s.pl.Player.s.attach.LanternHangs(s.r, s.pl.Pos, cube.Face(face))))
 	case "torch":
-		s.torch(face)
+		s.states["torch_facing_direction"] = attach.TorchState(s.pl.Player.s.attach.TorchFace(s.r, s.pl.Pos, cube.Face(face)))
 	case "ladder":
-		s.ladder(face)
+		if f, ok := s.pl.Player.s.attach.LadderFace(s.r, s.pl.Pos, cube.Face(face)); ok {
+			s.set("facing_direction", int(f))
+		}
 	case "end_rod":
 		s.endRod(face)
 	case "bell", "grindstone":
@@ -331,45 +297,6 @@ func (s *placeState) lever(face int) {
 	}
 }
 
-// torchByFace is the torch_facing_direction of a torch on each face.
-var torchByFace = [6]int{0, 5, 3, 4, 1, 2}
-
-// torch is BDS's torch: on the clicked face if the block behind holds it
-// (never under a block), else the first side that holds one (south,
-// east, north, west neighbours), else on the floor.
-func (s *placeState) torch(face int) {
-	pos := s.pl.Pos
-	if face != faceDown && s.supports(pos.Side(cube.Face(oppositeFace[face])), face, face == faceUp) {
-		s.set("torch_facing_direction", torchByFace[face])
-		return
-	}
-	for _, f := range [...]int{faceNorth, faceEast, faceSouth, faceWest} {
-		if s.supports(pos.Side(cube.Face(oppositeFace[f])), f, false) {
-			s.set("torch_facing_direction", torchByFace[f])
-			return
-		}
-	}
-	if s.supports(pos.Side(cube.FaceDown), faceUp, true) {
-		s.set("torch_facing_direction", torchByFace[faceUp])
-	}
-}
-
-// ladder is BDS's ladder: on the clicked side if the block behind holds
-// it, else the first neighbour (south, north, east, west) that does.
-func (s *placeState) ladder(face int) {
-	pos := s.pl.Pos
-	if face >= faceNorth && s.supports(pos.Side(cube.Face(oppositeFace[face])), face, false) {
-		s.set("facing_direction", face)
-		return
-	}
-	for _, f := range [...]int{faceNorth, faceSouth, faceWest, faceEast} {
-		if s.supports(pos.Side(cube.Face(oppositeFace[f])), f, false) {
-			s.set("facing_direction", f)
-			return
-		}
-	}
-}
-
 // endRod is BDS's end rod: facing the clicked face, flipped when it is
 // put on the end of an end rod facing the same way.
 func (s *placeState) endRod(face int) {
@@ -379,6 +306,12 @@ func (s *placeState) endRod(face int) {
 		face = oppositeFace[face]
 	}
 	s.set("facing_direction", face)
+}
+
+// holds reports whether side of the block at pos holds what is attached to it.
+func (s *placeState) holds(pos cube.Pos, side int) bool {
+	b, ok := s.r.Block(pos, 0)
+	return ok && s.pl.Player.s.attach.Supports(b, cube.Face(side))
 }
 
 // attached is BDS's bell and grindstone: standing on a floor, hanging
@@ -394,7 +327,7 @@ func (s *placeState) attached(face int, bell bool) {
 		s.set("direction", directionByYaw[s.yawIndex(0.5)])
 	default:
 		a := attachSide
-		if bell && s.supports(s.pl.Pos.Side(cube.Face(face)), oppositeFace[face], false) {
+		if bell && s.holds(s.pl.Pos.Side(cube.Face(face)), oppositeFace[face]) {
 			a = attachMultiple
 		}
 		s.set("attachment", a)
