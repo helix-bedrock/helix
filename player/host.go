@@ -60,6 +60,8 @@ type HostConfig struct {
 // list (on the global owner) and holds the frozen handlers and gameplay
 // they run on.
 type Host struct {
+	// enchantIDs numbers enchanting tables' options.
+	enchantIDs   atomic.Uint32
 	log          *slog.Logger
 	reg          *registry.Registry
 	recipes      crafting.Book

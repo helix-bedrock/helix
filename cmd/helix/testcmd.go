@@ -103,13 +103,22 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "value", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
 		}}},
 	}
+	enchant := protocol.Command{
+		Name: enchantTestCommand, Description: "Tests enchanting: levels <n>, max <enchantment id> <level>.",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
+			{Name: "value", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
+			{Name: "level", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
+		}}},
+	}
 	return &packet.AvailableCommands{
 		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions),
 		Enums: []protocol.CommandEnum{
 			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
 			{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
 		},
-		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune},
+		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant},
 	}
 }
 
@@ -137,6 +146,35 @@ func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestD
 
 // tuneTestCommand is the command that tries the number API.
 const tuneTestCommand = "tune"
+
+// enchantTestCommand is the command that gives levels and tries changing an
+// enchantment's default while running.
+const enchantTestCommand = "enchanttest"
+
+// enchantTest runs /enchanttest: levels <n> sets the player's level, max <id> <level>
+// changes an enchantment's maximum for the whole server.
+func enchantTest(p *player.Player, args []string) string {
+	if len(args) == 2 && args[0] == "levels" {
+		n, err := strconv.Atoi(args[1])
+		if err != nil {
+			return "Not a number: " + args[1]
+		}
+		p.SetLevel(int32(n), 0) //nolint:gosec // a test command
+		return fmt.Sprintf("Your level is now %d.", p.Level())
+	}
+	if len(args) == 3 && args[0] == "max" {
+		id, errID := strconv.Atoi(args[1])
+		level, errLevel := strconv.Atoi(args[2])
+		if errID != nil || errLevel != nil {
+			return "Use: max <enchantment id> <level>"
+		}
+		if !p.Host().EditEnchantment(int16(id), func(e *player.Enchantment) { e.MaxLevel = int32(level) }) { //nolint:gosec // a test command
+			return "No enchantment " + args[1]
+		}
+		return fmt.Sprintf("Enchantment %d now goes to level %d.", id, level)
+	}
+	return "Use: /enchanttest levels <n>, or max <enchantment id> <level>"
+}
 
 // tuneTest runs /tune on the player who ran it, or on the server, and says what the
 // player now runs on: <name> <value>, clear [name], server <name> <value>, serverclear
@@ -508,6 +546,11 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) > 1 && args[0] == enchantTestCommand {
+			// A failed write means the connection is closing, as above.
+			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: enchantTest(p, args[1:])})
+			return
+		}
 		if len(args) > 1 && args[0] == tuneTestCommand {
 			// A failed write means the connection is closing, as above.
 			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: tuneTest(p, args[1:])})

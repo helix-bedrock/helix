@@ -45,6 +45,8 @@ type craftState struct {
 	consumed bool
 	// results are the items the craft makes.
 	results []craftResult
+	// after is what the craft does once the whole request has passed.
+	after craftAfter
 }
 
 // expectedSlot is a grid slot and how many of its items must still be consumed.
@@ -106,7 +108,7 @@ func (p *Player) craftGrid() (start, size, width int, ok bool) {
 	switch {
 	case w.workbench:
 		return largeGridStart, largeGridSize, largeGridWidth, true
-	case w.open && !w.chest && !w.smithing:
+	case w.open && !w.chest && !w.station():
 		return smallGridStart, smallGridSize, smallGridWidth, true
 	}
 	return 0, 0, 0, false
@@ -149,7 +151,7 @@ func (p *Player) openStation(r *world.Region, u *BlockUse, kind byte) bool {
 
 // tickWorkbench closes a crafting or smithing window when its table is gone or too far.
 func (p *Player) tickWorkbench() {
-	if !p.window.workbench && !p.window.smithing {
+	if !p.window.station() {
 		return
 	}
 	r := p.entity.Region()
@@ -168,11 +170,7 @@ func (p *Player) tickWorkbench() {
 // chunk counts as gone, as for a chest.
 func (p *Player) workbenchThere(r *world.Region, pos cube.Pos) bool {
 	block, ok := r.Block(pos, 0)
-	want := craftingTable
-	if p.window.smithing {
-		want = smithingTable
-	}
-	if !ok || p.s.reg.Blocks.Name(block) != want {
+	if !ok || !p.window.standsOn(p.s.reg.Blocks.Name(block)) {
 		return false
 	}
 	d := p.entity.Position().Sub(blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
@@ -198,6 +196,9 @@ func (p *Player) recipeFor(id uint32) (*crafting.Recipe, uint8) {
 func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, []slotRef) {
 	if p.window.smithing {
 		return p.craftSmithing(a)
+	}
+	if p.window.enchanting {
+		return p.craftEnchant(a)
 	}
 	c := &p.requests.craft
 	start, size, width, ok := p.craftGrid()

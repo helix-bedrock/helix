@@ -67,6 +67,12 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useCraftingTable(r, u)
 	case smithingTable:
 		return p.useSmithingTable(r, u)
+	case enchantingTable:
+		return p.useEnchantingTable(r, u)
+	case grindstone:
+		return p.useGrindstone(r, u)
+	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
+		return p.useAnvil(r, u)
 	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)

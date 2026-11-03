@@ -28,6 +28,9 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 		p.respawn = respawnStart
 	}
 	p.inventory.load(data, func() int32 { return p.s.stackIDs.Add(1) })
+	if seed, isInt := data[enchantSeedTag].(int32); isInt {
+		p.enchant.seed, p.enchant.seeded = seed, true
+	}
 	if id, isInt := data["UniqueID"].(int64); isInt {
 		p.uniqueID = id
 	}
@@ -75,6 +78,9 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	p.abilities.save(data)
 	p.attributes.save(data)
 	p.inventory.save(data)
+	if p.enchant.seeded {
+		data[enchantSeedTag] = p.enchant.seed
+	}
 	if err := p.s.playerStore.StorePlayer(p.ids, data); err != nil {
 		p.s.log.Error("save player", "name", p.name, "err", err)
 	}

@@ -425,6 +425,13 @@ func (s *Server) SetTuning(t player.Tune, v float32) bool {
 	return host != nil && host.SetTuning(t, v)
 }
 
+// EditEnchantment changes a registered enchantment while the server runs. fn gets a
+// copy, and may run more than once.
+func (s *Server) EditEnchantment(id int16, fn func(e *player.Enchantment)) bool {
+	host := s.players.Load()
+	return host != nil && host.EditEnchantment(id, fn)
+}
+
 // ClearTuning puts a player.Tune back to its default.
 func (s *Server) ClearTuning(t player.Tune) {
 	if host := s.players.Load(); host != nil {

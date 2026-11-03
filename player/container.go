@@ -30,9 +30,21 @@ type windowState struct {
 	// workbench means the open window is the crafting table at workbenchPos.
 	workbench bool
 	// smithing means it is the smithing table at workbenchPos.
-	smithing     bool
-	workbenchPos cube.Pos
-	workbenchDim *world.Dimension
+	smithing bool
+	// enchanting, anvil and grindstone mean it is that block's screen at workbenchPos.
+	enchanting, anvil, grindstone bool
+	workbenchPos                  cube.Pos
+	workbenchDim                  *world.Dimension
+}
+
+// clearStations marks no window open.
+func (w *windowState) clearStations() {
+	w.open, w.workbench, w.smithing, w.enchanting, w.anvil, w.grindstone = false, false, false, false, false, false
+}
+
+// station reports whether the window is a block's with no items of its own.
+func (w *windowState) station() bool {
+	return w.workbench || w.smithing || w.enchanting || w.anvil || w.grindstone
 }
 
 // nextID moves to the next window ID.
@@ -78,7 +90,7 @@ func handleContainerClose(p *Player, _ *packet.ContainerClose) {
 	if p.entity != nil {
 		p.leaveChest(p.entity.Region(), false)
 	}
-	p.window.open, p.window.workbench, p.window.smithing = false, false, false
+	p.window.clearStations()
 	p.send(&packet.ContainerClose{WindowID: p.window.id, ContainerType: containerTypeNone})
 	p.flush()
 }

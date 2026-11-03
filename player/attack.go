@@ -201,6 +201,7 @@ func vanillaAttack(p, target *Player) bool {
 				target.entity.Send(&packet.Animate{ActionType: packet.AnimateActionCriticalHit, EntityRuntimeID: target.runtimeID, Data: critEventData})
 			}
 			p.hurtHeld(g.hitWear(p.inventory.Held().Name))
+			target.armorAfterHurt(p)
 		} else {
 			sound = packet.SoundEventAttackNoDamage
 		}
@@ -229,8 +230,8 @@ func vanillaAttackDamage(p, target *Player) float32 {
 	}
 	var enchants float32
 	enchantLevels(held, func(id, level int16) {
-		if e, ok := g.enchants[id]; ok && e.Melee != nil {
-			enchants += e.Melee(level, target)
+		if e, ok := g.enchant(id); ok && e.Melee != nil {
+			enchants += e.Melee(p, level, target)
 		}
 	})
 	v += float32(math.Floor(float64(enchants)))
@@ -245,7 +246,9 @@ func vanillaAttackDamage(p, target *Player) float32 {
 }
 
 // sharpnessDamage is BDS's Sharpness.
-func sharpnessDamage(level int16, _ *Player) float32 { return float32(level) * sharpnessPerLevel }
+func sharpnessDamage(_ *Player, level int16, _ *Player) float32 {
+	return float32(level) * sharpnessPerLevel
+}
 
 // strengthAttack is BDS's Strength: once per level.
 func strengthAttack(amplifier int32, v float32) float32 {

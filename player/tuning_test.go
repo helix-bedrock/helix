@@ -83,13 +83,13 @@ func TestTuningChangesDamage(t *testing.T) {
 	p := testPlayer(t)
 	p.s.game = &gameplay{tuning: vanillaTuning(exhaustionValues{}), combat: &combatTable{}}
 	p.s.ClearAllTuning()
-	vanilla := p.afterArmor(10, DamageEntityAttack)
+	vanilla := p.afterArmor(10, DamageSource{Cause: DamageEntityAttack})
 	p.SetTuning(TuneArmor, 10)
-	if got := p.afterArmor(10, DamageEntityAttack); got >= vanilla {
+	if got := p.afterArmor(10, DamageSource{Cause: DamageEntityAttack}); got >= vanilla {
 		t.Errorf("more armour: %v, was %v", got, vanilla)
 	}
 	p.ClearTuning(TuneArmor)
-	if got := p.afterArmor(10, DamageEntityAttack); got != vanilla {
+	if got := p.afterArmor(10, DamageSource{Cause: DamageEntityAttack}); got != vanilla {
 		t.Errorf("cleared: %v, was %v", got, vanilla)
 	}
 	p.SetTuning(TuneKnockbackPush, 0)

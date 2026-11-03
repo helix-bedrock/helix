@@ -28,28 +28,6 @@ type BreakInfo struct {
 	Enchantable bool
 }
 
-// Enchantment is an enchantment's entry. Vanilla's carry BDS 1.26.60's
-// numbers; plugins may change them or add their own.
-type Enchantment struct {
-	// ID is the ID saved in an item's "ench" list.
-	ID   int16
-	Name string
-	// ToolSpeed changes the held tool's speed when the enchantment is on it
-	// at level. Nil changes nothing.
-	ToolSpeed func(b *BreakInfo, level int16, speed float32) float32
-	// Underwater, on the worn helmet, lifts the under-water slowdown.
-	Underwater bool
-	// DamageChance is the percent chance, at level, that an item with the
-	// enchantment takes damage when it would (Unbreaking). Nil always
-	// takes it.
-	DamageChance func(level int16) int32
-	// Melee is the damage the enchantment adds to a hit on target. Nil adds none.
-	Melee func(level int16, target *Player) float32
-	// Protection is what the enchantment, on worn armour, counts for against
-	// damage of cause. Nil counts for nothing.
-	Protection func(level int16, cause DamageCause) int32
-}
-
 // Effect is a status effect's entry. Vanilla's carry BDS's numbers.
 type Effect struct {
 	// ID is BDS's effect ID, sent in MobEffect.
@@ -92,22 +70,6 @@ type ActiveEffect struct {
 
 // breakEnd is the progress at which BDS counts a block as broken.
 const breakEnd = 0.99999
-
-// vanillaEnchantments are BDS's enchantments that change the break speed.
-func vanillaEnchantments() []Enchantment {
-	return []Enchantment{
-		{ID: EnchantAquaAffinity, Name: "minecraft:aqua_affinity", Underwater: true},
-		{ID: EnchantEfficiency, Name: "minecraft:efficiency", ToolSpeed: efficiencySpeed},
-		{ID: EnchantUnbreaking, Name: "minecraft:unbreaking", DamageChance: unbreakingChance},
-		{ID: EnchantSharpness, Name: "minecraft:sharpness", Melee: sharpnessDamage},
-		{ID: EnchantKnockback, Name: "minecraft:knockback"},
-		{ID: EnchantProtection, Name: "minecraft:protection", Protection: protectionKind(protectAll)},
-		{ID: EnchantFireProtection, Name: "minecraft:fire_protection", Protection: protectionKind(protectFire)},
-		{ID: EnchantFeatherFalling, Name: "minecraft:feather_falling", Protection: protectionKind(protectFall)},
-		{ID: EnchantBlastProtection, Name: "minecraft:blast_protection", Protection: protectionKind(protectBlast)},
-		{ID: EnchantProjectileProtection, Name: "minecraft:projectile_protection", Protection: protectionKind(protectProjectile)},
-	}
-}
 
 // efficiencySpeed is BDS's Efficiency: level² + 1 on a tool whose own speed
 // applied.
@@ -311,7 +273,7 @@ func (g *gameplay) vanillaBreakTime(b *BreakInfo) float32 {
 	if b.DestroyTime > 0 {
 		speed := g.sys.ToolSpeed(b)
 		enchantLevels(b.Item, func(id, lvl int16) {
-			if e, ok := g.enchants[id]; ok && e.ToolSpeed != nil {
+			if e, ok := g.enchant(id); ok && e.ToolSpeed != nil {
 				speed = e.ToolSpeed(b, lvl, speed)
 			}
 		})
@@ -346,7 +308,7 @@ func (g *gameplay) vanillaBreakTime(b *BreakInfo) float32 {
 func (g *gameplay) underwaterHelmet(p *Player) bool {
 	found := false
 	enchantLevels(p.inventory.armor[0], func(id, lvl int16) {
-		if e, ok := g.enchants[id]; ok && e.Underwater && lvl > 0 {
+		if e, ok := g.enchant(id); ok && e.Underwater && lvl > 0 {
 			found = true
 		}
 	})

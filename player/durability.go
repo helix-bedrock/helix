@@ -91,7 +91,7 @@ func (p *Player) wearStack(s *ItemStack, n int32) (changed, broke bool) {
 	}
 	skip := false
 	enchantLevels(*s, func(id, lvl int16) {
-		if e, ok := g.enchants[id]; ok && e.DamageChance != nil && lvl > 0 && p.rng.Int32N(100) >= e.DamageChance(lvl) {
+		if e, ok := g.enchant(id); ok && e.DamageChance != nil && lvl > 0 && p.rng.Int32N(100) >= e.DamageChance(lvl) {
 			skip = true
 		}
 	})

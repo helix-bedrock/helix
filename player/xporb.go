@@ -327,7 +327,7 @@ func (o *XPOrb) nearestPlayer(r *world.Region, pos mgl32.Vec3) *Player {
 }
 
 // touch is BDS's player touch: one chance in xpOrbTakeOneIn each tick, then the
-// player takes it. Mending comes with the enchantment work.
+// player takes it. Worn or held items with Mending drink what they can first.
 func (o *XPOrb) touch(r *world.Region, e *world.Entity, p *Player) {
 	if rand.IntN(xpOrbTakeOneIn) != 0 { //nolint:gosec // an orb's timing, not a secret
 		return
@@ -335,7 +335,9 @@ func (o *XPOrb) touch(r *world.Region, e *world.Entity, p *Player) {
 	e.Send(&packet.TakeItemActor{ItemEntityRuntimeID: e.RuntimeID(), TakerEntityRuntimeID: p.runtimeID})
 	levelEvent(r, floorPos(e.Position()), e.Position(), levelEventXPPickup, 0)
 	o.remove(e)
-	p.AddExperience(o.value)
+	if rest := p.mend(o.value); rest > 0 {
+		p.AddExperience(rest)
+	}
 }
 
 // ExperienceEvent is a player about to gain experience from any source. Change Amount

@@ -1,6 +1,6 @@
 # What Helix does
 
-Status as of 2026-11-02. Helix was **restarted from scratch with its own architecture.** Players can
+Status as of 2026-11-03. Helix was **restarted from scratch with its own architecture.** Players can
 join, spawn in a BDS world, see each other, use their inventory, break and place blocks, and
 sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 
@@ -165,16 +165,26 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Block drops (first pass, not yet tested in game):** survival players breaking a block with the
   right tool get BDS 1.26.60's drops for all 1,480 blocks (new `loot` package, from helix-data's
   `bds/block_drops.json` and its block loot tables). Plugins can change all of it (see Plugins above).
-  Blocks give BDS's experience orbs, which follow the nearest player and raise its level (Mending, how
+  Blocks give BDS's experience orbs, which follow the nearest player and raise its level (how
   far they spread at first and what BDS sends about them are not compared yet). Not done yet: items built from a block entity (the plain item drops), chests filling
   from `LootTable`, enchantment loot functions, drops from anything but a player breaking the block. The
   speed items leave a broken block at was not read from BDS.
+- **Enchanting (first pass, not yet tested in game):** all 42 of BDS 1.26.60's enchantments are registered on the same
+  `Enchantment` struct plugins use, from helix-data's `bds/enchantments.json`: max level, weight, slots, group, costs,
+  compatibility and every hook can be changed in `Setup`, or while running with `Host.EditEnchantment`, `SetEnchantment`
+  and `RemoveEnchantment`. **Enchanting tables** (BDS's seed and draw, bookshelves, lapis and levels, `OnEnchantOptions`,
+  `OnEnchant`), **anvils** (materials, merging, books, names, the price of earlier work, `OnAnvil`) and **grindstones**
+  (curses kept, experience back, `OnGrindstone`) work, each with a `Systems` hook. **Effects built:** Thorns, Breach, Density, Impaling in water and
+  Mending, with Sharpness, Efficiency, Unbreaking, Aqua Affinity, Silk Touch, Fortune and the armour kinds from before. Not done yet:
+  anvils wearing out (BDS's chance was not found), anvils on maps, Fire Aspect (needs burning), Impaling in rain, Smite and Bane (no mobs),
+  bows, crossbows, tridents, fishing, Depth Strider, Respiration, Soul Speed, Swift Sneak, Frost Walker and Fire Protection's burn
+  time, and enchant loot functions. Run with `-testcmds`, `/enchanttest` gives levels and changes a maximum.
 - **Crafting** is a first pass from BDS 1.26.60: the inventory's small grid and the crafting table's large
   one, by hand and from the recipe book, with `OnCraft` to change the results or refuse. Recipes come from the
   `CraftingData` packet, so plugins change them through `Registry.Crafting`. Not done yet: which recipes a player
   has unlocked (the recipe book may show few or none), `doLimitedCrafting`, BDS's 14 special recipes (fireworks,
   map copies, banners, repairs...), the 1,456 recipes that keep an item's data (dyeing bundles and such), and the
-  other screens (furnace, anvil, stonecutter...). **Smithing tables** work for every BDS recipe, upgrades and armour trims, with a
+  other screens (furnace, stonecutter...). **Smithing tables** work for every BDS recipe, upgrades and armour trims, with a
   plugin API: `Registry.EditSmithing` and `Setup.EditSmithing` clear, remove or change recipes (`Clear`, `Remove`,
   `RemoveFor`, `Set`), and `OnSmith` changes or refuses one use; `Setup.EditTrims` and `Registry.Trims` change the
   trim patterns and materials. **All recipes** have the same API: `Registry.EditRecipes` and

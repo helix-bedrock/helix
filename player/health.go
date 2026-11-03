@@ -197,7 +197,7 @@ func (p *Player) takeHealth(damage float32, src DamageSource) {
 // vanillaReduceDamage is BDS's damage after armour, then its enchantments, then each
 // effect's Resist for causes it applies to.
 func vanillaReduceDamage(p *Player, damage float32, src DamageSource) float32 {
-	damage = p.afterArmor(damage, src.Cause)
+	damage = p.afterArmor(damage, src)
 	damage = p.afterProtection(damage, src.Cause)
 	if resisted(src.Cause) {
 		for _, a := range p.effects {
@@ -229,7 +229,8 @@ func resisted(cause DamageCause) bool {
 
 // afterArmor is BDS's armour: a helmet takes a quarter off falling blocks; armour and
 // toughness then take a share.
-func (p *Player) afterArmor(damage float32, cause DamageCause) float32 {
+func (p *Player) afterArmor(damage float32, src DamageSource) float32 {
+	cause := src.Cause
 	if armorBypassed(cause) {
 		return damage
 	}
@@ -254,7 +255,7 @@ func (p *Player) afterArmor(damage float32, cause DamageCause) float32 {
 	if v <= armorFullPoints {
 		share = max(v, armor*armorMinShare) / armorPerPoint
 	}
-	return damage * (1 - share)
+	return damage * (1 - src.Attacker.breached(share))
 }
 
 // afterProtection is BDS's armour enchantments: each piece's points count, up to a
@@ -269,7 +270,7 @@ func (p *Player) afterProtection(damage float32, cause DamageCause) float32 {
 			continue
 		}
 		enchantLevels(s, func(id, level int16) {
-			if e, ok := p.s.game.enchants[id]; ok && e.Protection != nil && points < maxProtectionCount {
+			if e, ok := p.s.game.enchant(id); ok && e.Protection != nil && points < maxProtectionCount {
 				points += e.Protection(level, cause)
 			}
 		})

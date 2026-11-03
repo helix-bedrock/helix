@@ -53,6 +53,8 @@ type requestState struct {
 	chest []ItemStack
 	// craft is what the running request's craft still has to do.
 	craft craftState
+	// filter is the running request's strings, such as an anvil's new name.
+	filter []string
 	// refresh means a listener changed what a request did, so the player must be
 	// sent its items after the response.
 	refresh bool
@@ -90,6 +92,7 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	st.work.open = p.loadChestWork()
 	st.drops = st.drops[:0]
 	st.craft = craftState{}
+	st.filter = req.FilterStrings
 	var touched []slotRef
 	for _, a := range req.Actions {
 		if status := p.preCraftAction(a); status != protocol.ItemStackResponseStatusOK {
@@ -113,6 +116,8 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	p.inventory = st.work
 	p.commitChestWork()
 	p.spawnDrops()
+	p.afterCraft(st.craft.after)
+	p.refreshEnchantOptions()
 	p.sendEquipment()
 
 	resp := protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusOK, RequestID: req.RequestID}
@@ -190,6 +195,10 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 		return p.createAction(a)
 	case *protocol.CraftCreativeStackRequestAction:
 		return p.craftCreative(a)
+	case *protocol.CraftRecipeOptionalStackRequestAction:
+		return p.craftAnvil(a)
+	case *protocol.CraftGrindstoneRecipeStackRequestAction:
+		return p.craftGrindstone(a)
 	case *protocol.CraftResultsDeprecatedStackRequestAction:
 		// The client follows every craft (creative ones too) with the
 		// items it expects; the server made the result itself, so the
@@ -252,6 +261,12 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 	case protocol.ContainerSmithingTableTemplate, protocol.ContainerSmithingTableInput, protocol.ContainerSmithingTableMaterial:
 		_, at := smithSlot(container)
 		if !p.window.smithing || int(slot) != at {
+			return r, false
+		}
+		r.stack = &inv.ui[slot]
+	case protocol.ContainerEnchantingInput, protocol.ContainerEnchantingMaterial, protocol.ContainerAnvilInput, protocol.ContainerAnvilMaterial,
+		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional:
+		if !p.window.holds(container, slot) {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]
@@ -465,6 +480,10 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	case protocol.ContainerSmithingTableTemplate, protocol.ContainerSmithingTableInput, protocol.ContainerSmithingTableMaterial:
 		slot, _ := smithSlot(r.kind)
 		return p.s.Recipes().SmithingAllows(slot, p.craftItem(s))
+	case protocol.ContainerEnchantingInput:
+		return s.Count == 1
+	case protocol.ContainerEnchantingMaterial:
+		return s.Name == itemLapis
 	}
 	return true
 }

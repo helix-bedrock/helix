@@ -2,6 +2,7 @@ package player
 
 import (
 	"maps"
+	"sync/atomic"
 
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/loot"
@@ -21,6 +22,11 @@ import (
 //
 // They run on the player's region tick.
 type Systems struct {
+	// EnchantOptions makes an enchanting table's options, Anvil and Grindstone their
+	// screens' results.
+	EnchantOptions EnchantOptionsFunc
+	Anvil          AnvilFunc
+	Grindstone     GrindstoneFunc
 	// Breaking.
 	BreakStart  BreakStartFunc
 	BreakTime   BreakTimeFunc
@@ -118,11 +124,14 @@ type Replaceable interface {
 
 // gameplay is the frozen gameplay setup.
 type gameplay struct {
-	sys      Systems
-	enchants map[int16]*Enchantment
-	effects  map[int32]*Effect
-	blocks   map[string]BlockBehaviour
-	mining   *mining
+	sys Systems
+	// enchants is swapped whole when a plugin changes an enchantment while running.
+	enchants atomic.Pointer[enchantTable]
+	// enchanting is what enchanting reads about items and blocks.
+	enchanting *enchanting
+	effects    map[int32]*Effect
+	blocks     map[string]BlockBehaviour
+	mining     *mining
 	// durability, replaceables and notReplacedBy are helix-data's
 	// bds/break_place.json.
 	durability    map[string]data.Durability
@@ -146,6 +155,11 @@ type gameplay struct {
 	blockEv      listeners[PlayerBlockEvent]
 	totemEv      listeners[PlayerTotemEvent]
 	armorEquipEv listeners[ArmorEquipEvent]
+	// The events of enchanting tables, anvils and grindstones.
+	enchantOptionsEv listeners[EnchantOptionsEvent]
+	enchantEv        listeners[EnchantEvent]
+	anvilEv          listeners[AnvilEvent]
+	grindstoneEv     listeners[GrindstoneEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -167,11 +181,18 @@ type gameplay struct {
 type gameState struct {
 	sys      Systems
 	enchants map[int16]*Enchantment
-	effects  map[int32]*Effect
-	blocks   map[string]BlockBehaviour
-	breakEv  listeners[BlockBreakEvent]
-	placeEv  listeners[BlockPlaceEvent]
-	useEv    listeners[BlockUseEvent]
+	// enchanting is what enchanting reads about items and blocks.
+	enchanting *enchanting
+	// The events of enchanting tables, anvils and grindstones.
+	enchantOptionsEv listeners[EnchantOptionsEvent]
+	enchantEv        listeners[EnchantEvent]
+	anvilEv          listeners[AnvilEvent]
+	grindstoneEv     listeners[GrindstoneEvent]
+	effects          map[int32]*Effect
+	blocks           map[string]BlockBehaviour
+	breakEv          listeners[BlockBreakEvent]
+	placeEv          listeners[BlockPlaceEvent]
+	useEv            listeners[BlockUseEvent]
 	// The events of using items, hitting and being hurt.
 	itemUseEv listeners[ItemUseEvent]
 	itemEatEv listeners[ItemEatEvent]
@@ -204,7 +225,7 @@ type gameState struct {
 }
 
 func newGameState() *gameState {
-	return &gameState{enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), out: &gameplay{}}
+	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), out: &gameplay{}}
 }
 
 // Systems returns the breaking and placing steps to replace or wrap. Not
@@ -320,10 +341,8 @@ func addListener[E any](s *Setup, l *listeners[E], fn func(e *E), p Priority) er
 
 // vanillaGameplay registers BDS's enchantments, effects and steps.
 func vanillaGameplay(s *Setup) error {
-	for _, e := range vanillaEnchantments() {
-		if err := s.RegisterEnchantment(e); err != nil {
-			return err
-		}
+	if err := vanillaEnchanting(s); err != nil {
+		return err
 	}
 	for _, e := range vanillaEffects() {
 		if err := s.RegisterEffect(e); err != nil {
@@ -331,6 +350,9 @@ func vanillaGameplay(s *Setup) error {
 		}
 	}
 	sys, g := s.Systems(), s.h.game.out
+	sys.EnchantOptions = vanillaEnchantOptions
+	sys.Anvil = vanillaAnvil
+	sys.Grindstone = vanillaGrindstone
 	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
 	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }
 	sys.BreakTime = g.vanillaBreakTime
@@ -396,14 +418,20 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g := gs.out
 	*g = gameplay{
 		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv,
-		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
+		sys: gs.sys, enchanting: gs.enchanting, effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
+		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
 	}
+	g.enchants.Store(newEnchantTable(gs.enchants))
+	g.enchantOptionsEv.freeze()
+	g.enchantEv.freeze()
+	g.anvilEv.freeze()
+	g.grindstoneEv.freeze()
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
 	}

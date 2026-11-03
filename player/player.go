@@ -101,6 +101,8 @@ type Player struct {
 	// lastLevelSound is the tick of the last level sound.
 	lastLevelSound int64
 	reachScale     float32
+	// enchant is the player's enchanting table state.
+	enchant enchantState
 	// rng is the player's random source (item wear).
 	rng *rand.Rand
 }
