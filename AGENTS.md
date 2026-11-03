@@ -227,6 +227,7 @@ sibling library folders, so unreleased library changes are used.
   item API (private drops, lifetimes per player's drops and server-wide).
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.
+- `direction`: every direction beyond `cube`'s faces and positions: `Cardinal` and the numberings block states use for it, the orders BDS walks a block's sides in (`Updates`, `Spread`, `Clockwise`, `Sides`), yaw to direction, axes and BDS's table sine. Systems name what they mean here instead of keeping tables of numbers; a test pins each numbering and order to BDS's.
 - `connect`: the arms of fences, panes and bars, kept in their block states since 1.26, from helix-data's rules.
 - Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
   `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`; `Dimension.SetBlockEntities` names who

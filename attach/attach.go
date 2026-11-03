@@ -6,6 +6,7 @@ package attach
 
 import (
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -32,29 +33,10 @@ const (
 // snowFull is the height state of a full block of snow layers.
 const snowFull = 7
 
-// torchSides is the order a torch tries the blocks around it: the side of each
-// neighbour that faces it.
-var torchSides = [...]cube.Face{cube.FaceNorth, cube.FaceEast, cube.FaceSouth, cube.FaceWest}
-
-// ladderSides is the order a ladder tries the blocks around it.
-var ladderSides = [...]cube.Face{cube.FaceNorth, cube.FaceSouth, cube.FaceWest, cube.FaceEast}
-
-// trapdoorSides is the face an open trapdoor holds things on, by its direction.
-var trapdoorSides = [4]cube.Face{cube.FaceWest, cube.FaceEast, cube.FaceNorth, cube.FaceSouth}
-
-// shelfSide is the face a shelf holds things on, by its direction.
-func shelfSide(direction string) (cube.Face, bool) {
-	switch direction {
-	case "south":
-		return cube.FaceNorth, true
-	case "west":
-		return cube.FaceEast, true
-	case "north":
-		return cube.FaceSouth, true
-	case "east":
-		return cube.FaceWest, true
-	}
-	return 0, false
+// shelfSide is the face a shelf holds things on: its back, away from its direction.
+func shelfSide(state string) (cube.Face, bool) {
+	c, ok := direction.Parse(state)
+	return c.Opposite().Face(), ok
 }
 
 // Table holds the rules. It does not change after New, so any region may read
@@ -105,7 +87,7 @@ func (t *Table) Supports(block uint32, face cube.Face) bool {
 	case "bottom":
 		return face == cube.FaceDown
 	case "ends":
-		return isEnd(face)
+		return direction.Vertical(face)
 	case "not_top":
 		return face != cube.FaceUp
 	case "stairs":
@@ -116,13 +98,13 @@ func (t *Table) Supports(block uint32, face cube.Face) bool {
 	case "trapdoor":
 		return trapdoorHolds(states, face)
 	case "shelf":
-		side, ok := shelfSide(stateString(states, "minecraft:cardinal_direction"))
+		side, ok := shelfSide(stateString(states, direction.CardinalState))
 		return ok && side == face
 	case "chain":
-		return stateString(states, "pillar_axis") == "y" && isEnd(face)
+		return stateString(states, "pillar_axis") == "y" && direction.Vertical(face)
 	case "rod":
 		f := stateInt(states, "facing_direction")
-		return (f == int(cube.FaceDown) || f == int(cube.FaceUp)) && isEnd(face)
+		return (f == int(cube.FaceDown) || f == int(cube.FaceUp)) && direction.Vertical(face)
 	case "skull":
 		return face == cube.FaceDown && stateInt(states, "facing_direction") == int(cube.FaceUp)
 	case "piston_arm":
@@ -144,8 +126,6 @@ func (t *Table) Supports(block uint32, face cube.Face) bool {
 	return false
 }
 
-func isEnd(face cube.Face) bool { return face == cube.FaceDown || face == cube.FaceUp }
-
 // stairsHold is a stair's full faces: its flat side, top or bottom, and its back.
 func stairsHold(states map[string]any, face cube.Face) bool {
 	upside := stateInt(states, "upside_down_bit") != 0
@@ -155,17 +135,18 @@ func stairsHold(states map[string]any, face cube.Face) bool {
 	case cube.FaceUp:
 		return upside
 	}
-	return int(face) == int(cube.FaceEast)-stateInt(states, "weirdo_direction")
+	c, ok := direction.FromEastFirst(stateInt(states, "weirdo_direction"))
+	return ok && c.Face() == face
 }
 
 // trapdoorHolds is a trapdoor's flat side: its panel shut, or standing open.
 func trapdoorHolds(states map[string]any, face cube.Face) bool {
 	open := stateInt(states, "open_bit") != 0
-	if isEnd(face) {
+	if direction.Vertical(face) {
 		return !open && (stateInt(states, "upside_down_bit") != 0) == (face == cube.FaceUp)
 	}
-	d := stateInt(states, "direction")
-	return open && d >= 0 && d < len(trapdoorSides) && trapdoorSides[d] == face
+	c, ok := direction.FromEastFirst(stateInt(states, "direction"))
+	return open && ok && c.Opposite().Face() == face
 }
 
 func stateString(states map[string]any, key string) string {
@@ -228,10 +209,10 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	case kindLantern:
 		return t.onFloor(r, pos) || t.canHang(r, pos)
 	case kindLadder:
-		if isEnd(clicked) {
+		if direction.Vertical(clicked) {
 			return false
 		}
-		for _, f := range ladderSides {
+		for _, f := range direction.Sides() {
 			if t.isSolid(r, pos.Side(f.Opposite())) {
 				return true
 			}
@@ -255,7 +236,7 @@ func (t *Table) torchMayPlace(r *world.Region, pos cube.Pos, name string) bool {
 			}
 		}
 	}
-	for _, f := range torchSides {
+	for _, f := range direction.Clockwise() {
 		if t.holdsTorch(r, pos.Side(f.Opposite()), f) {
 			return true
 		}
@@ -270,7 +251,7 @@ func (t *Table) TorchFace(r *world.Region, pos cube.Pos, clicked cube.Face) cube
 	if clicked != cube.FaceDown && t.holdsTorch(r, pos.Side(clicked.Opposite()), clicked) {
 		return clicked
 	}
-	for _, f := range torchSides {
+	for _, f := range direction.Clockwise() {
 		if b, ok := r.Block(pos.Side(f.Opposite()), 0); ok && t.Supports(b, f) {
 			return f
 		}
@@ -290,7 +271,7 @@ func (t *Table) LadderFace(r *world.Region, pos cube.Pos, clicked cube.Face) (cu
 	if t.isSolid(r, pos.Side(clicked.Opposite())) {
 		return clicked, true
 	}
-	for _, f := range ladderSides {
+	for _, f := range direction.Sides() {
 		if t.isSolid(r, pos.Side(f.Opposite())) {
 			return f, true
 		}
@@ -301,15 +282,8 @@ func (t *Table) LadderFace(r *world.Region, pos cube.Pos, clicked cube.Face) (cu
 // TorchState is the torch_facing_direction of a torch on face of its holder. The
 // state names the way the torch leans, away from the face it sits on.
 func TorchState(face cube.Face) string {
-	switch face {
-	case cube.FaceNorth:
-		return "south"
-	case cube.FaceSouth:
-		return "north"
-	case cube.FaceWest:
-		return "east"
-	case cube.FaceEast:
-		return "west"
+	if c, ok := direction.Of(face); ok {
+		return c.Opposite().String()
 	}
 	return "top"
 }
@@ -317,15 +291,8 @@ func TorchState(face cube.Face) string {
 // torchFaceOf is TorchState turned around; an unknown direction counts as the
 // floor, as in BDS.
 func torchFaceOf(state string) cube.Face {
-	switch state {
-	case "south":
-		return cube.FaceNorth
-	case "north":
-		return cube.FaceSouth
-	case "east":
-		return cube.FaceWest
-	case "west":
-		return cube.FaceEast
+	if c, ok := direction.Parse(state); ok {
+		return c.Opposite().Face()
 	}
 	return cube.FaceUp
 }

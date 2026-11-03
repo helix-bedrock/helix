@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -18,11 +19,6 @@ const (
 	dropRandomUp        = 0.2
 	dropPickupDelay     = 10
 	dropThrowTime       = 40
-	// sineUnitsPerRadian and sineQuarter are BDS's sine table: 65536 entries
-	// a full turn.
-	sineUnitsPerRadian = 10430.378
-	sineQuarter        = 16384
-	degToRad           = 0.017453292
 )
 
 // worldSlotDrop is the slot of a world action that throws an item out.
@@ -35,13 +31,6 @@ type DropItemFunc func(p *Player, s ItemStack, randomly bool) bool
 
 // PickUpFunc gives the player an item it touches, once its delays ended.
 type PickUpFunc func(p *Player, i *ItemActor)
-
-// mcSin is BDS's table sine.
-func mcSin(units float32) float32 {
-	return float32(math.Sin(float64(uint16(int32(units))) * 2 * math.Pi / 65536))
-}
-
-func mcCos(units float32) float32 { return mcSin(units + sineQuarter) }
 
 // vanillaDropItem is BDS's player drop: the swing, then the item from below
 // the eyes, thrown where the player looks or at random.
@@ -77,18 +66,18 @@ func vanillaDropItem(p *Player, s ItemStack, randomly bool) bool {
 func (p *Player) dropVelocity(rot world.Rotation, randomly bool) mgl32.Vec3 {
 	if randomly {
 		speed := p.rng.Float32() * dropRandomSpeed
-		angle := p.rng.Float32() * 2 * math.Pi * sineUnitsPerRadian
-		return mgl32.Vec3{-mcSin(angle) * speed, dropRandomUp, mcCos(angle) * speed}
+		angle := p.rng.Float32() * 2 * math.Pi * direction.UnitsPerRadian
+		return mgl32.Vec3{-direction.Sin(angle) * speed, dropRandomUp, direction.Cos(angle) * speed}
 	}
-	yaw := rot.Yaw * degToRad * sineUnitsPerRadian
-	pitch := rot.Pitch * degToRad * sineUnitsPerRadian
-	flat := mcCos(pitch) * dropSpeed
-	angle := p.rng.Float32() * 2 * math.Pi * sineUnitsPerRadian
+	yaw := direction.Units(rot.Yaw)
+	pitch := direction.Units(rot.Pitch)
+	flat := direction.Cos(pitch) * dropSpeed
+	angle := p.rng.Float32() * 2 * math.Pi * direction.UnitsPerRadian
 	spread := p.rng.Float32() * dropSpread
 	return mgl32.Vec3{
-		-mcSin(yaw)*flat + mcCos(angle)*spread,
-		-mcSin(pitch) * dropSpeed,
-		mcCos(yaw)*flat + mcSin(angle)*spread,
+		-direction.Sin(yaw)*flat + direction.Cos(angle)*spread,
+		-direction.Sin(pitch) * dropSpeed,
+		direction.Cos(yaw)*flat + direction.Sin(angle)*spread,
 	}
 }
 

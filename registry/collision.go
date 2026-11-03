@@ -1,6 +1,10 @@
 package registry
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/helix-bedrock/helix/direction"
+)
 
 // The shape rules of the blocks whose collision BDS 1.26.60 computes in code
 // (helix-data's bds/collision.json names each block's rule). Rules that
@@ -15,13 +19,12 @@ const fenceHeight = 1.5
 // The value order BDS uses for its string block states: the index BDS's
 // shape code reads for each value.
 var (
-	cardinalOrder = []string{"south", "west", "north", "east"}
-	cornerOrder   = []string{"none", "inner_left", "inner_right", "outer_left", "outer_right"}
-	axisOrder     = []string{"y", "x", "z"}
-	faceOrder     = []string{"down", "up", "north", "south", "west", "east"}
-	attachOrder   = []string{"standing", "hanging", "side", "multiple"}
-	dripOrder     = []string{"tip", "frustum", "middle", "base", "merge"}
-	tiltOrder     = []string{"none", "unstable", "partial_tilt", "full_tilt"}
+	cornerOrder = []string{"none", "inner_left", "inner_right", "outer_left", "outer_right"}
+	axisOrder   = []string{"y", "x", "z"}
+	faceOrder   = []string{"down", "up", "north", "south", "west", "east"}
+	attachOrder = []string{"standing", "hanging", "side", "multiple"}
+	dripOrder   = []string{"tip", "frustum", "middle", "base", "merge"}
+	tiltOrder   = []string{"none", "unstable", "partial_tilt", "full_tilt"}
 )
 
 // The stair corners by index.
@@ -73,6 +76,13 @@ func enum(s map[string]any, key string, order []string) int {
 		}
 	}
 	return 0
+}
+
+// cardinalOf returns a state's cardinal direction by BDS's index, 0 when missing.
+func cardinalOf(s map[string]any) int {
+	v, _ := s[direction.CardinalState].(string)
+	c, _ := direction.Parse(v)
+	return int(c)
 }
 
 // slabShape: a double slab is a full block; a single one is the top or
@@ -237,7 +247,7 @@ func fenceGateShape(_ string, s map[string]any) []Box {
 	if num(s, "open_bit") != 0 {
 		return nil
 	}
-	if d := enum(s, "minecraft:cardinal_direction", cardinalOrder); d == 0 || d == 2 {
+	if d := cardinalOf(s); d == 0 || d == 2 {
 		return []Box{{0, 0, 0.375, 1, fenceHeight, 0.625}}
 	}
 	return []Box{{0.375, 0, 0, 0.625, fenceHeight, 1}}
@@ -261,7 +271,7 @@ func Door(lower, upper map[string]any) Box {
 		{0, 0, far, 1, 1, 1},
 		{0, 0, 0, thin, 1, 1},
 	}
-	dir := enum(lower, "minecraft:cardinal_direction", cardinalOrder)
+	dir := cardinalOf(lower)
 	hinge := num(upper, "door_hinge_bit")
 	if num(lower, "open_bit") == 0 {
 		return panels[(dir+3)%4]

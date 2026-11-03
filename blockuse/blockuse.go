@@ -6,10 +6,10 @@ package blockuse
 
 import (
 	"maps"
-	"math"
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -22,23 +22,13 @@ const (
 	stateUpper    = "upper_block_bit"
 	stateHinge    = "door_hinge_bit"
 	statePressed  = "button_pressed_bit"
-	stateCardinal = "minecraft:cardinal_direction"
+	stateCardinal = direction.CardinalState
 )
 
 // Ticks a pressed button waits before it pops out.
 const (
 	buttonTicksStone = 20
 	buttonTicksWood  = 30
-)
-
-// cardinals are minecraft:cardinal_direction's values by BDS's index.
-var cardinals = [4]string{"south", "west", "north", "east"}
-
-// Which way a door's two sides lie for each direction: its left neighbour is
-// the door minus this offset, its right neighbour the door plus it.
-var (
-	doorSideX = [4]int{0, -1, 0, 1}
-	doorSideZ = [4]int{1, 0, -1, 0}
 )
 
 // kind is the vanilla block class a block belongs to.
@@ -117,9 +107,9 @@ func useGate(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint3
 	open := bit(blocks, block, stateOpen)
 	next := block
 	if !open {
-		d := int(math.Floor(float64(yaw*4/360+0.5))) & 3
-		if d^cardinal(blocks, block) == 2 {
-			next = with(blocks, next, stateCardinal, cardinals[d])
+		d := direction.FromYaw(yaw)
+		if c, ok := cardinal(blocks, block); ok && c == d.Opposite() {
+			next = with(blocks, next, stateCardinal, d.String())
 		}
 	}
 	setAndUpdate(r, pos, with(blocks, next, stateOpen, flag(!open)))
@@ -168,7 +158,8 @@ func PlaceDoor(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uin
 		return false
 	}
 	upper := with(blocks, block, stateUpper, flag(true))
-	upper = with(blocks, upper, stateHinge, flag(hingeOnRight(blocks, r, pos, cardinal(blocks, block))))
+	c, ok := cardinal(blocks, block)
+	upper = with(blocks, upper, stateHinge, flag(ok && hingeOnRight(blocks, r, pos, c)))
 	upperPos := pos.Side(cube.FaceUp)
 	r.SetBlock(upperPos, 0, upper)
 	r.UpdateNeighbours(pos)
@@ -176,13 +167,11 @@ func PlaceDoor(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uin
 	return true
 }
 
-// hingeOnRight picks the hinge from the blocks either side of a door facing d.
-func hingeOnRight(blocks *registry.Blocks, r *world.Region, pos cube.Pos, d int) bool {
-	if d < 0 {
-		return false
-	}
-	side := func(sign int) (door bool, solid int) {
-		at := cube.Pos{pos[0] + sign*doorSideX[d], pos[1], pos[2] + sign*doorSideZ[d]}
+// hingeOnRight picks the hinge from the blocks either side of a door facing d:
+// its right neighbour is the one in direction d, its left the one opposite.
+func hingeOnRight(blocks *registry.Blocks, r *world.Region, pos cube.Pos, d direction.Cardinal) bool {
+	side := func(f cube.Face) (door bool, solid int) {
+		at := pos.Side(f)
 		for range 2 {
 			if b, ok := r.Block(at, 0); ok {
 				door = door || IsDoor(blocks, b)
@@ -194,8 +183,8 @@ func hingeOnRight(blocks *registry.Blocks, r *world.Region, pos cube.Pos, d int)
 		}
 		return door, solid
 	}
-	leftDoor, leftSolid := side(-1)
-	rightDoor, rightSolid := side(1)
+	leftDoor, leftSolid := side(d.Opposite().Face())
+	rightDoor, rightSolid := side(d.Face())
 	if leftDoor && !rightDoor {
 		return true
 	}
@@ -315,15 +304,10 @@ func bit(blocks *registry.Blocks, block uint32, key string) bool {
 	return v != 0
 }
 
-// cardinal is a block's direction as BDS's index, -1 if it has none.
-func cardinal(blocks *registry.Blocks, block uint32) int {
+// cardinal is a block's direction; false if it has none.
+func cardinal(blocks *registry.Blocks, block uint32) (direction.Cardinal, bool) {
 	v, _ := blocks.States(block)[stateCardinal].(string)
-	for i, c := range cardinals {
-		if c == v {
-			return i
-		}
-	}
-	return -1
+	return direction.Parse(v)
 }
 
 // with returns block with one state changed, or block if it has no such state.

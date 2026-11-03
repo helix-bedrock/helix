@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -25,9 +26,6 @@ const (
 type blockReader interface {
 	Block(pos cube.Pos, layer uint8) (uint32, bool)
 }
-
-// flowSides are the sides BDS looks at, in its order: -z, +x, +z, -x.
-var flowSides = [...][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
 
 // liquidDepth returns the depth of a liquid of the given Material at pos, as
 // saved, and false if there is none. The second layer is read first, as BDS's
@@ -72,8 +70,9 @@ func liquidFlow(reg *registry.Registry, r blockReader, pos cube.Pos, material ui
 		depth = flatDepth(own)
 	}
 	var f mgl32.Vec3
-	for _, s := range flowSides {
-		side := cube.Pos{pos[0] + s[0], pos[1], pos[2] + s[1]}
+	// BDS looks at the sides clockwise from north.
+	for _, s := range direction.Clockwise() {
+		side := pos.Side(s)
 		var step int32
 		if n, same := liquidDepth(reg, r, side, material); same {
 			step = flatDepth(n) - depth
@@ -84,12 +83,13 @@ func liquidFlow(reg *registry.Registry, r blockReader, pos cube.Pos, material ui
 		} else {
 			continue
 		}
-		f[0] += float32(s[0] * int(step))
-		f[2] += float32(s[1] * int(step))
+		to := cube.Pos{}.Side(s)
+		f[0] += float32(to[0] * int(step))
+		f[2] += float32(to[2] * int(step))
 	}
 	if ok && own >= liquidFalling {
-		for _, s := range flowSides {
-			side := cube.Pos{pos[0] + s[0], pos[1], pos[2] + s[1]}
+		for _, s := range direction.Clockwise() {
+			side := pos.Side(s)
 			if solidAt(reg, r, side) || solidAt(reg, r, cube.Pos{side[0], side[1] + 1, side[2]}) {
 				f = unitOrZero(f)
 				f[1] -= fallingFlowDown

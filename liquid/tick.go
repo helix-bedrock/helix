@@ -1,23 +1,14 @@
 package liquid
 
 import (
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
 
 // horizontal are the four sides, in the order BDS spreads to them.
-func horizontal(i int) cube.Pos {
-	switch i {
-	case 0:
-		return cube.Pos{-1, 0, 0}
-	case 1:
-		return cube.Pos{1, 0, 0}
-	case 2:
-		return cube.Pos{0, 0, -1}
-	}
-	return cube.Pos{0, 0, 1}
-}
+func horizontal(i int) cube.Face { return direction.Spread()[i&3] }
 
 // opposite is the side opposite side i of horizontal.
 func opposite(i int) int { return i ^ 1 }
@@ -66,7 +57,7 @@ func (l *Liquids) settle(r *world.Region, pos cube.Pos, k Kind, drop int) int {
 	sources, shallowest := 0, -100
 	for i := range 4 {
 		d := horizontal(i)
-		shallowest = l.shallower(r, pos.Add(d), k, shallowest, &sources)
+		shallowest = l.shallower(r, pos.Side(d), k, shallowest, &sources)
 	}
 	depth := shallowest + drop
 	if depth >= falling || shallowest < 0 {
@@ -190,7 +181,7 @@ func (l *Liquids) flow(r *world.Region, pos cube.Pos, k Kind, depth, drop int) {
 	for i := range costs {
 		costs[i] = noCost
 		d := horizontal(i)
-		n := pos.Add(d)
+		n := pos.Side(d)
 		if l.blocking(r, n, pos) || l.source(r, n, k) {
 			continue
 		}
@@ -215,7 +206,7 @@ func (l *Liquids) flow(r *world.Region, pos cube.Pos, k Kind, depth, drop int) {
 	for i, c := range costs {
 		if c == least {
 			d := horizontal(i)
-			l.spreadTo(r, pos.Add(d), pos, k, next)
+			l.spreadTo(r, pos.Side(d), pos, k, next)
 		}
 	}
 }
@@ -239,7 +230,7 @@ func (l *Liquids) slope(r *world.Region, pos cube.Pos, k Kind, dist, from int) i
 			continue
 		}
 		d := horizontal(i)
-		n := pos.Add(d)
+		n := pos.Side(d)
 		if l.blocking(r, n, pos) || l.source(r, n, k) {
 			continue
 		}
@@ -307,8 +298,8 @@ func (l *Liquids) solidifyAround(r *world.Region, pos cube.Pos, k Kind) {
 	if k != Lava {
 		return
 	}
-	for _, d := range [5]cube.Pos{{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}} {
-		l.solidify(r, pos, pos.Add(d))
+	for _, d := range [5]cube.Face{cube.FaceSouth, cube.FaceNorth, cube.FaceEast, cube.FaceWest, cube.FaceUp} {
+		l.solidify(r, pos, pos.Side(d))
 	}
 }
 

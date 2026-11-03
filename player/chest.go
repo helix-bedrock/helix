@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -58,32 +59,15 @@ const (
 	chestEnder
 )
 
-// Cardinal directions in a chest's state, numbered as BDS numbers them.
-const (
-	cardinalSouth int8 = iota
-	cardinalWest
-	cardinalNorth
-	cardinalEast
-)
-
 // cardinalState is the block state a chest faces by.
-const cardinalState = "minecraft:cardinal_direction"
-
-// chestSides are the two neighbours a chest placed facing each direction tries to
-// pair with, in BDS's order.
-var chestSides = [...][2]cube.Face{
-	cardinalSouth: {cube.FaceEast, cube.FaceWest},
-	cardinalWest:  {cube.FaceNorth, cube.FaceSouth},
-	cardinalNorth: {cube.FaceEast, cube.FaceWest},
-	cardinalEast:  {cube.FaceNorth, cube.FaceSouth},
-}
+const cardinalState = direction.CardinalState
 
 // chestTable holds the chest facts of every block state. It does not change after
 // it is built, so any region may read it.
 type chestTable struct {
 	kind []int8
 	// dir is the direction a chest state faces.
-	dir []int8
+	dir []direction.Cardinal
 	// clear marks the states that never stop a chest under them opening.
 	clear []bool
 }
@@ -99,13 +83,14 @@ func newChestTable(blocks *registry.Blocks) (*chestTable, error) {
 		whole[name] = true
 	}
 	n := blocks.BlockCount()
-	t := &chestTable{kind: make([]int8, n), dir: make([]int8, n), clear: make([]bool, n)}
+	t := &chestTable{kind: make([]int8, n), dir: make([]direction.Cardinal, n), clear: make([]bool, n)}
 	for id := range n {
 		state := uint32(id) //nolint:gosec // state IDs fit uint32
 		name, states := blocks.Name(state), blocks.States(state)
 		t.kind[id] = chestKindOf(name)
 		if dir, ok := states[cardinalState].(string); ok {
-			t.dir[id] = cardinalOf(dir)
+			// A value BDS does not have counts as south, its first.
+			t.dir[id], _ = direction.Parse(dir)
 		}
 		t.clear[id] = whole[name] || slices.ContainsFunc(obstruction.States[name], func(listed map[string]any) bool {
 			return sameStates(listed, states)
@@ -127,19 +112,6 @@ func chestKindOf(name string) int8 {
 		return chestEnder
 	}
 	return chestNone
-}
-
-// cardinalOf numbers a direction.
-func cardinalOf(dir string) int8 {
-	switch dir {
-	case "west":
-		return cardinalWest
-	case "north":
-		return cardinalNorth
-	case "east":
-		return cardinalEast
-	}
-	return cardinalSouth
 }
 
 // sameStates reports whether states read from JSON, where numbers are floats, are
@@ -310,7 +282,8 @@ func (c *Chest) BlockEntityPlaced(r *world.Region, pos cube.Pos) {
 	if !ok {
 		return
 	}
-	for _, side := range chestSides[c.s.chests.dir[block]] {
+	// BDS tries the two neighbours beside the way the chest faces, in this order.
+	for _, side := range c.s.chests.dir[block].Beside() {
 		c.tryPair(r, pos.Side(side))
 	}
 }
@@ -353,7 +326,7 @@ func (c *Chest) canPair(r *world.Region, o *Chest) bool {
 	if t.kind[a] == chestNone || t.kind[a] == chestEnder || t.kind[a] != t.kind[b] || t.dir[a] != t.dir[b] {
 		return false
 	}
-	alongX := t.dir[a]&^2 == 0
+	alongX := t.dir[a].FacesZ()
 	if o.pos[0] == c.pos[0] {
 		return !alongX
 	}

@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
@@ -172,8 +173,8 @@ func (r *Region) UpdateNeighbours(pos cube.Pos) {
 		return
 	}
 	air := r.d.conf.Blocks.Air()
-	for _, d := range [6]cube.Pos{{-1, 0, 0}, {1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}} {
-		n := pos.Add(d)
+	for _, f := range direction.Updates() {
+		n := pos.Side(f)
 		for layer := range uint8(2) {
 			if b, ok := r.Block(n, layer); ok && b != air {
 				t.NeighbourChanged(r, n, pos, b, layer)

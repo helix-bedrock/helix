@@ -101,7 +101,7 @@ func candleShape(_ string, s map[string]any) []Box {
 // shelfShape is a board 5/16 deep against the side opposite its facing.
 func shelfShape(_ string, s map[string]any) []Box {
 	const depth = 0.3125
-	switch enum(s, "minecraft:cardinal_direction", cardinalOrder) {
+	switch cardinalOf(s) {
 	case 1:
 		return []Box{{1 - depth, 0, 0, 1, 1, 1}}
 	case 2:
@@ -207,7 +207,7 @@ func amethystShape(name string, s map[string]any) []Box {
 
 // anvilShape is the anvil's full-height body along its facing.
 func anvilShape(_ string, s map[string]any) []Box {
-	if d := enum(s, "minecraft:cardinal_direction", cardinalOrder); d == 1 || d == 3 {
+	if d := cardinalOf(s); d == 1 || d == 3 {
 		return []Box{{0, 0, 0.125, 1, 1, 0.875}}
 	}
 	return []Box{{0.125, 0, 0, 0.875, 1, 1}}
