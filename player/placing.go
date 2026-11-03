@@ -164,8 +164,30 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	return sys.Place(pl)
 }
 
-// itemBlock returns the block a block item places: its saved block state,
-// else the default state of the block with the item's name.
+// plantedBlocks is the block of each item named differently from what it places.
+// Signs and banners are not here: their block depends on the face clicked and
+// their block entities are not built.
+var plantedBlocks = map[string]string{
+	"minecraft:redstone":          "minecraft:redstone_wire",
+	"minecraft:repeater":          "minecraft:unpowered_repeater",
+	"minecraft:comparator":        "minecraft:unpowered_comparator",
+	"minecraft:string":            "minecraft:trip_wire",
+	"minecraft:sugar_cane":        "minecraft:reeds",
+	"minecraft:wheat_seeds":       "minecraft:wheat",
+	"minecraft:beetroot_seeds":    "minecraft:beetroot",
+	"minecraft:carrot":            "minecraft:carrots",
+	"minecraft:potato":            "minecraft:potatoes",
+	"minecraft:melon_seeds":       "minecraft:melon_stem",
+	"minecraft:pumpkin_seeds":     "minecraft:pumpkin_stem",
+	"minecraft:torchflower_seeds": "minecraft:torchflower_crop",
+	"minecraft:pitcher_pod":       "minecraft:pitcher_crop",
+	"minecraft:sweet_berries":     "minecraft:sweet_berry_bush",
+	"minecraft:glow_berries":      "minecraft:cave_vines",
+	"minecraft:cocoa_beans":       "minecraft:cocoa",
+}
+
+// itemBlock returns the block a block item places: its saved block state, else
+// the default state of the block it plants or of the block with its name.
 func (p *Player) itemBlock(s ItemStack) (uint32, bool) {
 	blocks := p.s.reg.Blocks
 	if s.Block != nil {
@@ -174,6 +196,9 @@ func (p *Player) itemBlock(s ItemStack) (uint32, bool) {
 		if id, ok := blocks.StateID(name, states); ok {
 			return id, true
 		}
+	}
+	if name, ok := plantedBlocks[s.Name]; ok {
+		return blocks.Block(name)
 	}
 	return blocks.Block(s.Name)
 }
