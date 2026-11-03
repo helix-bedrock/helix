@@ -66,16 +66,28 @@ func (p *Player) hurtHeld(n int32) {
 // hurtStack damages a stack by n; true if it changed, for the caller to tell the
 // client.
 func (p *Player) hurtStack(s *ItemStack, n int32) bool {
+	changed, broke := p.wearStack(s, n)
+	if broke {
+		if r := p.entity.Region(); r != nil {
+			r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventBreak, Position: p.entity.Position(), ExtraData: -1}, nil)
+		}
+	}
+	return changed
+}
+
+// wearStack damages a stack by n, without a sound; it reports whether the stack
+// changed, for the caller to tell the client, and whether an item broke.
+func (p *Player) wearStack(s *ItemStack, n int32) (changed, broke bool) {
 	if n <= 0 {
-		return false
+		return false, false
 	}
 	g := p.s.game
 	d, ok := g.durability[s.Name]
 	if s.Empty() || !ok || d.MaxDamage <= 0 {
-		return false
+		return false, false
 	}
 	if u, _ := s.Tag["Unbreakable"].(uint8); u != 0 {
-		return false
+		return false, false
 	}
 	skip := false
 	enchantLevels(*s, func(id, lvl int16) {
@@ -84,7 +96,7 @@ func (p *Player) hurtStack(s *ItemStack, n int32) bool {
 		}
 	})
 	if skip {
-		return false
+		return false, false
 	}
 	damage := itemDamage(*s) + n
 	if s.Tag == nil {
@@ -92,11 +104,7 @@ func (p *Player) hurtStack(s *ItemStack, n int32) bool {
 	}
 	s.Tag["Damage"] = damage
 	if damage > int32(d.MaxDamage) { //nolint:gosec // max damage is small
-		r := p.entity.Region()
-		if r != nil {
-			pos := p.entity.Position()
-			r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventBreak, Position: pos, ExtraData: -1}, nil)
-		}
+		broke = true
 		s.Count--
 		if s.Count == 0 {
 			*s = ItemStack{}
@@ -104,7 +112,7 @@ func (p *Player) hurtStack(s *ItemStack, n int32) bool {
 			delete(s.Tag, "Damage")
 		}
 	}
-	return true
+	return true, broke
 }
 
 // durabilityTable indexes helix-data's durability by item name.

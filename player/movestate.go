@@ -99,6 +99,9 @@ func (p *Player) actorFlags() int64 {
 	return f
 }
 
+// actorFlagsTwo are the player's second set of actor flags as other players see them.
+func (p *Player) actorFlagsTwo() int64 { return ownFlagsTwo | p.shieldFlags() }
+
 // sendActorFlags shows the player's actor flags to the players who see it. The
 // client set them itself when it asked.
 func (p *Player) sendActorFlags() {
@@ -108,7 +111,7 @@ func (p *Player) sendActorFlags() {
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), &packet.SetActorData{
 			EntityRuntimeID: p.runtimeID,
-			EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags()},
+			EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags(), protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()},
 			Tick:            p.entity.Tick(),
 		}, p.viewer)
 	}

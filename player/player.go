@@ -79,6 +79,7 @@ type Player struct {
 	using      usingState
 	food       foodState
 	hurt       hurtState
+	shield     shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
 	// lastUse is what the first click of the held button did, a use constant.

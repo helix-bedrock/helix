@@ -49,14 +49,18 @@ type Systems struct {
 	FoodTick     FoodTickFunc
 	Die          DieFunc
 	Respawn      RespawnFunc
+	ShieldUp     ShieldUpFunc
+	ShieldBlock  ShieldBlockFunc
+	Totem        TotemFunc
 	// Hitting.
 	Attack       AttackFunc
 	AttackDamage AttackDamageFunc
 	Knockback    KnockbackFunc
 	// Using items in the air.
-	UseItem UseItemFunc
-	FoodOf  FoodOfFunc
-	Eat     EatFunc
+	UseItem    UseItemFunc
+	EquipArmor EquipArmorFunc
+	FoodOf     FoodOfFunc
+	Eat        EatFunc
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
@@ -138,6 +142,10 @@ type gameplay struct {
 	itemEatEv listeners[ItemEatEvent]
 	attackEv  listeners[PlayerAttackEvent]
 	hurtEv    listeners[PlayerHurtEvent]
+	// The events of shields, totems and armour.
+	blockEv      listeners[PlayerBlockEvent]
+	totemEv      listeners[PlayerTotemEvent]
+	armorEquipEv listeners[ArmorEquipEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -169,6 +177,10 @@ type gameState struct {
 	itemEatEv listeners[ItemEatEvent]
 	attackEv  listeners[PlayerAttackEvent]
 	hurtEv    listeners[PlayerHurtEvent]
+	// The events of shields, totems and armour.
+	blockEv      listeners[PlayerBlockEvent]
+	totemEv      listeners[PlayerTotemEvent]
+	armorEquipEv listeners[ArmorEquipEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -350,6 +362,10 @@ func vanillaGameplay(s *Setup) error {
 	sys.Eat = vanillaEat
 	sys.Die = vanillaDie
 	sys.Respawn = vanillaRespawn
+	sys.ShieldUp = vanillaShieldUp
+	sys.ShieldBlock = vanillaShieldBlock
+	sys.Totem = vanillaTotem
+	sys.EquipArmor = vanillaEquipArmor
 	ex, err := vanillaExhaustionValues()
 	if err != nil {
 		return err
@@ -386,6 +402,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
+		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 	}
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
@@ -394,6 +411,9 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.itemEatEv.freeze()
 	g.attackEv.freeze()
 	g.hurtEv.freeze()
+	g.blockEv.freeze()
+	g.totemEv.freeze()
+	g.armorEquipEv.freeze()
 	g.breakEv.freeze()
 	g.placeEv.freeze()
 	g.useEv.freeze()

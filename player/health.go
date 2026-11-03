@@ -125,13 +125,17 @@ func (p *Player) tickHurt() {
 // effects leave, the hurt time letting only what is above the last hurt through,
 // absorption first and health for the rest, then the hurt effects (hurt time, knockback,
 // the hurt event), armour wear and the damage exhaustion. At no health left the Die
-// system runs. Shields, totems and damage sensors are not built yet. Returns whether
-// the player was hurt.
+// system runs, unless a totem saves the player. A shield stops the hit before any of
+// this. Damage sensors are not built yet. Returns whether the player was hurt.
 func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 	if damage <= 0 || p.dead() || p.invulnerable() && src.Cause != DamageVoid {
 		return false
 	}
 	g := p.s.game
+	if g.sys.ShieldBlock(p, damage, src) {
+		p.flush()
+		return false
+	}
 	if g.hurtEv.Has() {
 		e := PlayerHurtEvent{Player: p, Damage: damage, Source: src}
 		g.hurtEv.fire(p.s.log, &e)
@@ -152,7 +156,7 @@ func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 		}
 		damage -= p.hurt.last
 	}
-	p.takeHealth(damage, src.Cause)
+	p.takeHealth(damage, src)
 	if p.hurt.ticks > 0 {
 		p.hurt.last += damage
 	} else {
@@ -174,14 +178,20 @@ func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 	return true
 }
 
-// takeHealth takes damage off absorption, then health.
-func (p *Player) takeHealth(damage float32, cause DamageCause) {
-	if abs := p.attributes.get(attrAbsorption); abs > 0 && cause != DamageSelfDestruct {
+// takeHealth takes damage off absorption, then health. A hit that would kill goes to
+// the totem first: BDS's health only changes for those who see the player at the end
+// of its tick, so they never see it at 0 when a totem saves it.
+func (p *Player) takeHealth(damage float32, src DamageSource) {
+	if abs := p.attributes.get(attrAbsorption); abs > 0 && src.Cause != DamageSelfDestruct {
 		used := min(abs, damage)
 		damage -= used
 		p.setAttributes(attrAbsorption, abs-used)
 	}
-	p.SetHealth(p.Health() - damage)
+	left := p.Health() - damage
+	if left <= 0 && p.s.game.sys.Totem(p, src) {
+		return
+	}
+	p.SetHealth(left)
 }
 
 // vanillaReduceDamage is BDS's damage after armour, then its enchantments, then each

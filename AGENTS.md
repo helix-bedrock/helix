@@ -214,7 +214,7 @@ sibling library folders, so unreleased library changes are used.
   enchantments, each effect's `Resist`, 10 hurt ticks letting through only what is above the last hurt, absorption,
   armour wear). `hunger.go` also has the food tick: regaining health and starving. `attack.go`: players hitting players
   (BDS's checks, damage from the attribute, item, enchantments and effects, critical hits, knockback, item wear, arm
-  swing relay); numbers from helix-data's `bds/item_combat.json`. `eat.go`: items used in the air, so far foods, read from each
+  swing relay); numbers from helix-data's `bds/item_combat.json`. `shield.go`: BDS's shield (`ShieldUp`, `ShieldBlock`, `OnPlayerBlock`, actor flags in the second set), `totem.go`: its totem (`Totem`, `OnPlayerTotem`, asked before health reaches 0 so those who see the player never see it dead), `armoruse.go`: using armour swaps it with what is worn (`EquipArmor`, `OnArmorEquip`). Effects have `Added`, `Removed` and `Tick` hooks (Regeneration, Absorption). `eat.go`: items used in the air, so far foods, read from each
   item's own data. `bucket.go` fills and pours; `world.Region.SetBlock` keeps a water source in the second layer of a block
   that can hold it. All are `Systems` hooks (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, ReduceDamage, Exhaust,
   FoodTick, Attack, AttackDamage, Knockback, UseItem, FoodOf, Eat), with events `OnPlayerAttack`,

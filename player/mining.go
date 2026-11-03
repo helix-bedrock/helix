@@ -65,6 +65,11 @@ type Effect struct {
 	Attack func(amplifier int32, damage float32) float32
 	// Resist changes the damage the player takes, for causes it applies to.
 	Resist func(amplifier int32, damage float32) float32
+	// Added runs when the player gets the effect, Removed when it loses it, and Tick
+	// each tick it has it, with the ticks left before this one counts.
+	Added   func(p *Player, amplifier int32)
+	Removed func(p *Player)
+	Tick    func(p *Player, amplifier, left int32)
 }
 
 // Vanilla enchantment and effect IDs used by the break speed (BDS 1.26.60:
@@ -124,6 +129,9 @@ func vanillaEffects() []Effect {
 		{ID: EffectStrength, Name: "minecraft:strength", Attack: strengthAttack},
 		{ID: EffectWeakness, Name: "minecraft:weakness", Attack: weaknessAttack},
 		{ID: EffectResistance, Name: "minecraft:resistance", Resist: resistanceDamage},
+		{ID: EffectRegeneration, Name: "minecraft:regeneration", Tick: regenerationTick},
+		{ID: EffectAbsorption, Name: "minecraft:absorption", Added: absorptionAdded, Removed: absorptionRemoved},
+		{ID: EffectFireResistance, Name: "minecraft:fire_resistance"},
 	}
 }
 

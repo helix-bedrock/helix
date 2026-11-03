@@ -329,6 +329,7 @@ func handleAnimate(p *Player, pk *packet.Animate) {
 	if pk.ActionType != packet.AnimateActionSwingArm || p.entity == nil || p.dead() {
 		return
 	}
+	p.startSwing()
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), &packet.Animate{ActionType: pk.ActionType, EntityRuntimeID: p.runtimeID, SwingSource: pk.SwingSource}, p.viewer)
 	}

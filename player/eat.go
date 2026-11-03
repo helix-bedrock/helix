@@ -164,8 +164,9 @@ func (p *Player) handleUseAir(d *protocol.UseItemTransactionData) {
 	}
 }
 
-// vanillaUseItem is BDS's useItem as far as built: foods start being eaten when the
-// player may eat. Potions, bows, milk and other items used in the air come later.
+// vanillaUseItem is BDS's useItem as far as built: armour goes on, and foods start
+// being eaten when the player may eat. Potions, bows, milk and other items used in the
+// air come later.
 func vanillaUseItem(p *Player, held ItemStack) bool {
 	g := p.s.game
 	if g.itemUseEv.Has() {
@@ -174,6 +175,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		if e.Cancelled() {
 			return false
 		}
+	}
+	if g.sys.EquipArmor(p, held) {
+		return true
 	}
 	food, ok := g.sys.FoodOf(p, held)
 	if !ok || !p.mayEat(food) {

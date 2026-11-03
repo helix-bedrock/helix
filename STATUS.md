@@ -77,7 +77,12 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   sprinting. Armour, toughness and armour enchantments reduce damage, a hit gives 10 ticks where only harder hits count, and
   absorption goes first. A full player regains health and an empty one starves, by difficulty. Empty buckets take
   liquids, and a block that can hold water keeps the source it is placed in. Not done yet: potions, milk, bows,
-  tridents, shields, totems, mace, cooldowns, interacting with entities, mobs.
+  tridents, mace, most item cooldowns, interacting with entities, mobs.
+- **Shields, totems and putting armour on by using it (built from BDS 1.26.60, not yet tested in game):** sneaking raises a shield in the
+  offhand or hand, and after 5 ticks it stops hits from in front, wears down, shakes and pushes the attacker back; an axe puts it on
+  cooldown for 5 seconds. A totem in either hand saves a player from a killing hit, except from the void: 1 health, its effects and
+  its animation. Regeneration and Absorption now work, for golden apples too. Using a piece of armour swaps it with what is worn,
+  unless the worn piece has the Curse of Binding. Plugins can change the numbers, replace each step and listen to each.
 - **Changing health, hunger and combat numbers (not yet tested in game):** a plugin can change how fast hunger drains, how
   health recovers and starving hurts, the most health and hunger, food's worth, armour and protection added or taken away,
   fall damage, hit damage and every part of knockback. A value can be set for one player or the whole server, and clearing it

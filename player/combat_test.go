@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
@@ -120,6 +121,95 @@ func TestOffhandShown(t *testing.T) {
 	p.inventory.offhand.Count = 2
 	if !p.offhandChanged() {
 		t.Error("new count not noticed")
+	}
+}
+
+// TestShieldRaise lifts a shield by BDS's rule: it blocks once it has been up long
+// enough, not while swinging or on cooldown, and starts over when it comes down.
+func TestShieldRaise(t *testing.T) {
+	p := testPlayer(t)
+	p.s.game = &gameplay{tuning: vanillaTuning(exhaustionValues{})}
+	p.s.game.sys.ShieldUp = vanillaShieldUp
+	p.attributes = DefaultAttributes()
+	p.inventory.offhand = ItemStack{Name: itemShield, Count: 1, netID: 3}
+	p.move.flags = 1 << MoveSneaking
+	if got := p.blocksAfter(shieldRaiseTicks); got != shieldRaiseTicks+1 {
+		t.Errorf("raised after %d ticks", got)
+	}
+	p.move.flags = 0
+	p.tickShield()
+	if p.Blocking() || p.shield.raisedAt != 0 {
+		t.Error("still up after standing up")
+	}
+	p.move.flags = 1 << MoveSneaking
+	p.shield.cooldown = 3
+	p.tickShield()
+	if p.shield.blocking {
+		t.Error("up during its cooldown")
+	}
+	p.shield.cooldown = 0
+	p.startSwing()
+	p.tickShield()
+	if p.shield.blocking {
+		t.Error("up during a swing")
+	}
+	p.inventory.offhand = ItemStack{}
+	p.inventory.main[p.inventory.held] = ItemStack{Name: itemShield, Count: 1, netID: 4}
+	if p.heldShield() != &p.inventory.main[p.inventory.held] {
+		t.Error("a held shield is not found")
+	}
+}
+
+// blocksAfter counts the ticks until the player blocks, up to limit+2.
+func (p *Player) blocksAfter(limit int) int {
+	for i := 1; i <= limit+2; i++ {
+		p.tickShield()
+		if p.Blocking() {
+			return i
+		}
+	}
+	return limit + 3
+}
+
+// TestShieldFlags keeps the shield's flags in the second set, where BDS's numbers put them.
+func TestShieldFlags(t *testing.T) {
+	p := testPlayer(t)
+	p.shield.blocking, p.shield.blocked = true, true
+	want := int64(ownFlagsTwo | 1<<(protocol.EntityDataFlagBlocking-64) | 1<<(protocol.EntityDataFlagBlockedUsingShield-64))
+	if got := p.actorFlagsTwo(); got != want {
+		t.Errorf("flags = %x, want %x", got, want)
+	}
+}
+
+// TestEffectNumbers pins Regeneration's interval to BDS's.
+func TestEffectNumbers(t *testing.T) {
+	for _, c := range []struct{ amplifier, every int32 }{{0, 50}, {1, 25}, {5, 1}, {40, 1}} {
+		if got := max(int32(regenerationBase)>>min(c.amplifier, 31), 1); got != c.every {
+			t.Errorf("level %d heals every %d", c.amplifier, got)
+		}
+	}
+}
+
+// TestEquipRefused leaves what may not go on where it is; putting armour on sends
+// packets, so it is tested in game.
+func TestEquipRefused(t *testing.T) {
+	p := testPlayer(t)
+	p.s.game = &gameplay{combat: &combatTable{armor: map[string]data.ArmorValue{"minecraft:iron_helmet": {}}}}
+	if vanillaEquipArmor(p, ItemStack{Name: "minecraft:stick", Count: 1}) {
+		t.Error("a stick went on")
+	}
+	if vanillaEquipArmor(p, ItemStack{Name: "minecraft:skull", Count: 1}) {
+		t.Error("a head went on")
+	}
+	cursed := ItemStack{Name: "minecraft:iron_helmet", Count: 1, Tag: map[string]any{"ench": []any{map[string]any{"id": int16(bindingCurse), "lvl": int16(1)}}}}
+	p.inventory.armor[0] = cursed
+	if vanillaEquipArmor(p, ItemStack{Name: "minecraft:iron_helmet", Count: 1}) {
+		t.Error("a cursed helmet came off")
+	}
+	locked := ItemStack{Name: "minecraft:iron_helmet", Count: 1, Tag: map[string]any{"minecraft:item_lock": uint8(itemLockInSlot)}}
+	p.inventory.armor[0] = ItemStack{}
+	if vanillaEquipArmor(p, locked) {
+		t.Error("a locked helmet went on")
 	}
 }
 

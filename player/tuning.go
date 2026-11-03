@@ -108,6 +108,15 @@ const (
 	TuneKnockbackCap
 	// TuneKnockbackTakenScale multiplies every push the player gets.
 	TuneKnockbackTakenScale
+	// TuneShieldRaise is the ticks a shield must be up before it blocks,
+	// TuneShieldCooldown the ticks an axe's hit keeps it down, and TuneShieldPush and
+	// TuneShieldLift how hard a blocked hit pushes the attacker.
+	TuneShieldRaise
+	TuneShieldCooldown
+	TuneShieldPush
+	TuneShieldLift
+	// TuneTotemHealth is the health a totem leaves.
+	TuneTotemHealth
 
 	tuneCount
 )
@@ -174,6 +183,11 @@ var tuneSpecs = [tuneCount]tuneSpec{
 	TuneKnockbackLiftScale:   {"knockback_lift_scale", knockbackLift},
 	TuneKnockbackCap:         {"knockback_cap", knockbackCap},
 	TuneKnockbackTakenScale:  {"knockback_taken_scale", 1},
+	TuneShieldRaise:          {"shield_raise", shieldRaiseTicks},
+	TuneShieldCooldown:       {"shield_cooldown", shieldCooldownTicks},
+	TuneShieldPush:           {"shield_push", shieldPush},
+	TuneShieldLift:           {"shield_lift", shieldLift},
+	TuneTotemHealth:          {"totem_health", totemHealth},
 }
 
 // tuneTable is one value per Tune.

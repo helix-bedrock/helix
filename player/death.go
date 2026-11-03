@@ -43,6 +43,7 @@ func (p *Player) dead() bool { return p.Health() <= 0 }
 // respawn sequence starts. Experience is not dropped yet.
 func vanillaDie(p *Player, src DamageSource) {
 	p.stopUsing()
+	p.lowerShield()
 	p.hurt = hurtState{}
 	p.leaveChest(p.entity.Region(), true)
 	if !p.s.level.KeepInventory {

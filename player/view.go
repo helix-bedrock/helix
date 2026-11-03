@@ -21,11 +21,12 @@ func (p *Player) listEntry() protocol.PlayerListEntry {
 func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 	pos, rot := e.Position(), e.Rotation()
 	meta := protocol.EntityMetadata{
-		protocol.EntityDataKeyFlags:  p.actorFlags(),
-		protocol.EntityDataKeyName:   p.name,
-		protocol.EntityDataKeyWidth:  float32(0.6),
-		protocol.EntityDataKeyHeight: float32(1.8),
-		protocol.EntityDataKeyScale:  float32(1),
+		protocol.EntityDataKeyFlags:    p.actorFlags(),
+		protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo(),
+		protocol.EntityDataKeyName:     p.name,
+		protocol.EntityDataKeyWidth:    float32(0.6),
+		protocol.EntityDataKeyHeight:   float32(1.8),
+		protocol.EntityDataKeyScale:    float32(1),
 	}
 	return []packet.Packet{&packet.AddPlayer{
 		UUID: p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
@@ -64,6 +65,13 @@ const playerWidth = 0.6
 
 // ownFlags are the actor flags BDS gives a player on joining.
 const ownFlags = 1<<protocol.EntityDataFlagHasCollision | 1<<protocol.EntityDataFlagHasGravity
+
+// ownFlagsTwo is the second set of actor flags BDS gives a player on joining. flagsPerSet
+// is how many flags each set holds.
+const (
+	ownFlagsTwo = 35184405643264
+	flagsPerSet = 64
+)
 
 // ownMetadata is the synched actor data BDS 1.26.60 sends a joining player
 // about itself, entry for entry, as captured from a real join. The client
@@ -109,7 +117,7 @@ func (p *Player) ownMetadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyScore:                            "",
 		protocol.EntityDataKeyAgent:                            int64(-1),
 		protocol.EntityDataKeyEatingCounter:                    int32(0),
-		protocol.EntityDataKeyFlagsTwo:                         int64(35184405643264),
+		protocol.EntityDataKeyFlagsTwo:                         int64(ownFlagsTwo),
 		protocol.EntityDataKeyInteractText:                     "",
 		protocol.EntityDataKeyTradeTier:                        int32(0),
 		protocol.EntityDataKeyMaxTradeTier:                     int32(0),
