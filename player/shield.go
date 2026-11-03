@@ -140,7 +140,23 @@ func (p *Player) tickShield() {
 		sh.raisedAt, sh.raisedID = sh.clock, held.netID
 	}
 	if p.shieldFlags() != before {
-		p.sendActorFlags()
+		p.sendShieldFlags()
+	}
+}
+
+// sendShieldFlags shows the shield's flags to those who see the player and to the
+// player: its client raises its own shield from them. Only the second set goes, which
+// holds nothing else the client sets itself.
+func (p *Player) sendShieldFlags() {
+	if p.entity == nil {
+		return
+	}
+	if r := p.entity.Region(); r != nil {
+		r.Broadcast(p.blockPos(), &packet.SetActorData{
+			EntityRuntimeID: p.runtimeID,
+			EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()},
+			Tick:            p.entity.Tick(),
+		}, nil)
 	}
 }
 
@@ -211,7 +227,7 @@ func (p *Player) lowerShield() {
 	sh.blocking, sh.transition, sh.blocked, sh.broke = false, false, false, false
 	sh.raisedAt, sh.seenAt, sh.raisedID, sh.swing, sh.swinging = 0, 0, 0, 0, false
 	if before != 0 {
-		p.sendActorFlags()
+		p.sendShieldFlags()
 	}
 }
 
@@ -276,13 +292,7 @@ func vanillaShieldBlock(p *Player, damage float32, src DamageSource) bool {
 			p.sendEquipment()
 		}
 	}
-	// The client's own shield shakes from these flags too, unlike its other flags,
-	// which it sets itself.
-	r.Broadcast(at, &packet.SetActorData{
-		EntityRuntimeID: p.runtimeID,
-		EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags(), protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()},
-		Tick:            p.entity.Tick(),
-	}, nil)
+	p.sendShieldFlags()
 	return true
 }
 
