@@ -562,6 +562,10 @@ func (r *Region) sendMovement() {
 	}
 }
 
+// AppendEntities appends every entity in this region to dst, so a caller reusing dst
+// allocates nothing. Runs: owner.
+func (r *Region) AppendEntities(dst []*Entity) []*Entity { return append(dst, r.entities...) }
+
 // AppendEntitiesIn appends the entities in this region standing in the chunks
 // the area touches to dst, so a caller reusing dst allocates nothing. The
 // caller checks positions. Runs: owner.

@@ -5,6 +5,8 @@
 package attach
 
 import (
+	"strings"
+
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
@@ -215,6 +217,9 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	case wire:
 		return t.WireSurvives(r, pos)
 	case repeaterOff, repeaterOn, comparator, comparatorOn:
+		return t.DiodeSurvives(r, pos)
+	}
+	if strings.HasSuffix(name, "_pressure_plate") {
 		return t.DiodeSurvives(r, pos)
 	}
 	switch t.kinds[name] {

@@ -245,6 +245,10 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	s.players.Store(host)
 	if s.circuits != nil {
 		s.circuits.SetDispense(host.Dispense)
+		s.circuits.SetEntityBox(host.EntityBox)
+		host.SetCircuitHooks(player.CircuitHooks{
+			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, ChestViewers: s.circuits.SetChestViewers,
+		})
 		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
 	}
 	defer host.Close(packet.DisconnectReasonShutdown)

@@ -1,9 +1,11 @@
 package circuit_test
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/liquid"
@@ -19,8 +21,9 @@ const surfaceY = -60
 
 // testWorld is a flat world with circuits around chunk 0,0.
 type testWorld struct {
-	reg *registry.Registry
-	d   *world.Dimension
+	reg      *registry.Registry
+	circuits *circuit.Ticker
+	d        *world.Dimension
 	// fell is every block the circuit broke.
 	fell chan cube.Pos
 }
@@ -75,7 +78,7 @@ func openWorld(t *testing.T) *testWorld {
 	case <-time.After(10 * time.Second):
 		t.Fatal("zone never loaded")
 	}
-	w.d = d
+	w.d, w.circuits = d, circuits
 	return w
 }
 
@@ -402,4 +405,146 @@ func TestPistonIgnoresPowerAtItsFront(t *testing.T) {
 			t.Error("piston was powered through its front")
 		}
 	})
+}
+
+func TestObserverPulses(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	front := cube.Pos{5, surfaceY, 4}
+	lamp := cube.Pos{3, surfaceY, 4}
+	observer := w.state(t, "minecraft:observer", map[string]any{"minecraft:facing_direction": "east"})
+	var sawLit, sawPowered bool
+	w.run(func(r *world.Region) {
+		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
+		place(r, at, observer)
+	})
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return b == observer
+	})
+	w.run(func(r *world.Region) { place(r, front, w.state(t, "minecraft:stone", nil)) })
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		powered, _ := w.reg.Blocks.States(b)["powered_bit"].(uint8)
+		sawPowered = sawPowered || powered == 1
+		sawLit = sawLit || w.name(r, lamp) == "minecraft:lit_redstone_lamp"
+		return sawPowered && sawLit && powered == 0
+	})
+}
+
+func TestObserverIgnoresItsBack(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	observer := w.state(t, "minecraft:observer", map[string]any{"minecraft:facing_direction": "east"})
+	w.run(func(r *world.Region) {
+		place(r, at, observer)
+		place(r, cube.Pos{3, surfaceY, 4}, w.state(t, "minecraft:stone", nil))
+	})
+	for range 10 {
+		w.run(func(r *world.Region) {
+			if b, _ := r.Block(at, 0); b != observer {
+				t.Error("an observer fired for its back")
+			}
+		})
+		time.Sleep(world.TickDuration)
+	}
+}
+
+func TestPlateGoesDownAndComesUp(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	on := atomic.Bool{}
+	on.Store(true)
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+		if !on.Load() {
+			return lo, hi, false, false
+		}
+		return mgl32.Vec3{4.2, surfaceY, 4.2}, mgl32.Vec3{4.8, surfaceY + 2, 4.8}, true, true
+	})
+	id := w.d.AddEntity(world.EntityConfig{UniqueID: 900, RuntimeID: 900, Pos: mgl32.Vec3{4.5, surfaceY, 4.5}})
+	t.Cleanup(id.Remove)
+	lamp := cube.Pos{4, surfaceY - 1, 5}
+	w.run(func(r *world.Region) {
+		place(r, cube.Pos{4, surfaceY - 1, 4}, w.state(t, "minecraft:stone", nil))
+		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
+		place(r, at, w.state(t, "minecraft:stone_pressure_plate", nil))
+	})
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return w.reg.Blocks.States(b)["redstone_signal"] == int32(1) && w.name(r, lamp) == "minecraft:lit_redstone_lamp"
+	})
+	on.Store(false)
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return w.reg.Blocks.States(b)["redstone_signal"] == int32(0)
+	})
+}
+
+func TestNoteBlockTunes(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	block := w.state(t, "minecraft:noteblock", nil)
+	w.run(func(r *world.Region) {
+		place(r, at, block)
+		for range 26 {
+			if !w.circuits.UseBlock(r, at, block) {
+				t.Error("a note block did not take a use")
+			}
+		}
+		be, ok := r.BlockEntity(at)
+		if !ok {
+			t.Fatal("no block entity")
+		}
+		saved := be.SaveData(at)
+		if saved["id"] != "Music" || saved["note"] != uint8(1) {
+			t.Errorf("saved %v, want Music at note 1 after 26 uses", saved)
+		}
+	})
+}
+
+func TestDaylightSensorSwaps(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	block := w.state(t, "minecraft:daylight_detector", nil)
+	w.run(func(r *world.Region) {
+		place(r, at, block)
+		w.circuits.UseBlock(r, at, block)
+		if got := w.name(r, at); got != "minecraft:daylight_detector_inverted" {
+			t.Errorf("after use it is %s", got)
+		}
+	})
+}
+
+func TestWireJoinsObserverBack(t *testing.T) {
+	w := openWorld(t)
+	wire := cube.Pos{4, surfaceY, 4}
+	w.run(func(r *world.Region) {
+		place(r, cube.Pos{5, surfaceY, 4}, w.state(t, "minecraft:observer", map[string]any{"minecraft:facing_direction": "east"}))
+		place(r, wire, w.state(t, "minecraft:redstone_wire", nil))
+	})
+	// Joined on one side, wire runs straight through. Joined on none it would show all
+	// four sides.
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(wire, 0)
+		s := w.reg.Blocks.States(b)
+		return s["redstone_east"] == "side" && s["redstone_north"] == "none"
+	})
+}
+
+func TestTrappedChestPowersWhileOpen(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	lamp := cube.Pos{5, surfaceY, 4}
+	w.run(func(r *world.Region) {
+		place(r, at, w.state(t, "minecraft:trapped_chest", nil))
+		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
+	})
+	w.wait(t, func(r *world.Region) bool {
+		_, ok := r.Block(lamp, 0)
+		return ok
+	})
+	w.run(func(r *world.Region) { w.circuits.SetChestViewers(r, at, 1) })
+	w.wait(t, func(r *world.Region) bool { return w.name(r, lamp) == "minecraft:lit_redstone_lamp" })
+	w.run(func(r *world.Region) { w.circuits.SetChestViewers(r, at, 0) })
+	w.wait(t, func(r *world.Region) bool { return w.name(r, lamp) == "minecraft:redstone_lamp" })
 }

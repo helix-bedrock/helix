@@ -97,6 +97,12 @@ const (
 	kindPiston
 	kindHopper
 	kindDispenser
+	kindObserver
+	kindPlate
+	kindNote
+	kindTarget
+	kindTrapped
+	kindDaylight
 )
 
 // kindOf returns the class of the block called name.
@@ -122,8 +128,20 @@ func kindOf(name string) kind {
 		return kindHopper
 	case nameDispenser, nameDropper:
 		return kindDispenser
+	case nameObserver:
+		return kindObserver
+	case nameNote:
+		return kindNote
+	case nameTarget:
+		return kindTarget
+	case nameTrapped:
+		return kindTrapped
+	case nameDaylight, nameDaylightInverted:
+		return kindDaylight
 	}
 	switch {
+	case strings.HasSuffix(name, "_pressure_plate"):
+		return kindPlate
 	case strings.HasSuffix(name, "_button"):
 		return kindButton
 	case strings.HasSuffix(name, "_door"):
@@ -147,8 +165,10 @@ func componentKind(k kind) redstone.Kind {
 		return redstone.KindRepeater
 	case kindComparator:
 		return redstone.KindComparator
-	case kindBlock, kindLever, kindButton:
+	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight:
 		return redstone.KindProducer
+	case kindObserver:
+		return redstone.KindPulse
 	}
 	return redstone.KindConsumer
 }
@@ -182,6 +202,10 @@ type Ticker struct {
 	stops []bool
 	// signals is what a comparator reads from a state.
 	signals []signal
+	// noteAbove and noteBelow are what each state plays on and under a note block.
+	noteAbove, noteBelow []uint8
+	// entityBox is how plates see entities. Set before any player joins.
+	entityBox EntityBoxFunc
 }
 
 // localKey finds a region's circuit state on it.
@@ -195,6 +219,8 @@ type regionCircuit struct {
 	seeded bool
 	// recheck asks for paths stopped at chunks a merge brought in to be tried again.
 	recheck bool
+	// moving and found are kept to look for entities without allocating.
+	moving, found []*world.Entity
 }
 
 // NewTicker returns a Ticker with BDS's conductivity.
@@ -212,6 +238,9 @@ func NewTicker(reg *registry.Registry, attached *attach.Table, fall FallFunc, ne
 		t.moving = id
 	}
 	n := blocks.Count()
+	if err := t.loadInstruments(n); err != nil {
+		return nil, fmt.Errorf("circuit: %w", err)
+	}
 	t.power, t.kinds, t.stops = make([]redstone.Power, n), make([]kind, n), make([]bool, n)
 	t.joins, t.signals = make([]join, n), make([]signal, n)
 	for id := range uint32(n) { //nolint:gosec // states fit
@@ -266,6 +295,7 @@ func (t *Ticker) BeforeBlockTicks(r *world.Region) {
 		c.recheck = false
 		c.sys.RecheckWaiting(c)
 	}
+	t.entitiesOnPlates(c)
 	c.sys.UpdateDependencies(c)
 	if c.sys.Tick() {
 		c.sys.Evaluate(c)
@@ -368,6 +398,12 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			}
 		case kindPiston:
 			t.armNeighbour(r, pos, block)
+		case kindObserver:
+			t.observerHeard(r, pos, from, block)
+		case kindPlate:
+			if !t.attach.DiodeSurvives(r, pos) {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
 		default:
 			if t.isArm(block) {
 				t.armNeighbour(r, pos, block)
@@ -505,11 +541,10 @@ func (t *Ticker) joinsWire(block uint32, f redstone.Face) bool {
 		return f == d || f == d.Opposite()
 	case joinFacing:
 		states := t.blocks.States(block)
-		v, ok := states[stateFacing].(int32)
-		if !ok {
-			v, _ = states[stateFacingNamed].(int32)
+		if v, ok := states[stateFacing].(int32); ok {
+			return faceFromIndex(v) == f
 		}
-		return faceFromIndex(v) == f
+		return observerFace(states) == f
 	}
 	return false
 }
@@ -537,6 +572,10 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		if t.dispense != nil {
 			t.dispense(r, pos, block)
 		}
+	case kindObserver:
+		t.observerTick(t.circuitOf(r), pos, block)
+	case kindPlate:
+		t.plateTick(t.circuitOf(r), pos, block)
 	default:
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
@@ -638,6 +677,39 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetAllowUp(true)
 			comp.SetBlockedFace(pistonBlockedFace(block, t))
 		}
+	case kindObserver:
+		if comp := c.sys.Create(p, redstone.KindPulse, observerFace(states)); comp != nil {
+			comp.SetAttach(true)
+			comp.SetAllowUp(true)
+			powered := bitState(states, statePowered)
+			switch {
+			case powered && load:
+				comp.SetStrength(fullPower)
+			case powered:
+				// A new observer starts off, however it came to be set.
+				t.setByCircuit(c, pos, t.with(block, statePowered, flag(false)))
+			}
+		}
+	case kindPlate:
+		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
+			comp.SetStrength(t.plateState(block))
+			comp.SetAttach(true)
+			comp.SetAllowUp(true)
+		}
+	case kindDaylight:
+		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
+			comp.SetStrength(intState(states, stateSignal))
+			comp.SetAllowUp(true)
+		}
+	case kindTarget, kindTrapped:
+		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
+			comp.SetAttach(true)
+			comp.SetAllowUp(true)
+		}
+	case kindNote:
+		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
+			comp.SetAllowUp(true)
+		}
 	}
 }
 
@@ -706,6 +778,10 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 		}
 	case kindHopper:
 		t.setByCircuit(c, pos, t.with(block, stateToggle, flag(on)))
+	case kindNote:
+		if !first {
+			t.notePower(c.r, pos, on)
+		}
 	case kindDispenser:
 		triggered := bitState(t.blocks.States(block), stateTriggered)
 		switch {

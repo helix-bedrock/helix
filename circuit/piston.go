@@ -457,6 +457,10 @@ func (m *movingEntity) place(r *world.Region, pos cube.Pos) {
 		}
 	}
 	r.UpdateNeighbours(pos)
+	// An observer that was moved fires.
+	if m.t.kind(m.block) == kindObserver {
+		m.t.turnObserver(m.t.circuitOf(r), pos, m.t.with(m.block, statePowered, flag(false)), true)
+	}
 }
 
 // blockCompound is a block as BDS saves one inside another.

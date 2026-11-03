@@ -580,6 +580,7 @@ func (c *Chest) addViewer(r *world.Region, p *Player) {
 	}
 	c.viewers = append(c.viewers, p)
 	c.open = true
+	c.viewersChanged(r)
 	if len(c.viewers) == 1 {
 		c.blockEvent(r)
 	}
@@ -592,6 +593,7 @@ func (c *Chest) removeViewer(r *world.Region, p *Player) {
 		return
 	}
 	c.viewers = slices.Delete(c.viewers, i, i+1)
+	c.viewersChanged(r)
 	if len(c.viewers) == 0 {
 		c.open = false
 		c.blockEvent(r)

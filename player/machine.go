@@ -283,6 +283,52 @@ func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
 	return false
 }
 
+// CircuitHooks are the blocks redstone answers for. Any may be nil.
+type CircuitHooks struct {
+	// Use is a player using a block; false if it does nothing.
+	Use func(r *world.Region, pos cube.Pos, block uint32) bool
+	// Attack is a player starting to break a block.
+	Attack func(r *world.Region, pos cube.Pos, block uint32)
+	// ChestViewers says how many have the trapped chest at pos open.
+	ChestViewers func(r *world.Region, pos cube.Pos, n int32)
+}
+
+// SetCircuitHooks sets what redstone answers for. Call it before any player joins.
+func (s *Host) SetCircuitHooks(h CircuitHooks) { s.circuits = h }
+
+// viewersChanged tells a trapped chest, both halves of a double one, who has it open.
+func (c *Chest) viewersChanged(r *world.Region) {
+	report := c.s.circuits.ChestViewers
+	if report == nil {
+		return
+	}
+	b, ok := r.Block(c.pos, 0)
+	if !ok || c.s.chests.kind[b] != chestTrapped {
+		return
+	}
+	lead, follower := c.halves(r)
+	n := int32(len(lead.viewers)) //nolint:gosec // few players
+	report(r, lead.pos, n)
+	if follower != nil {
+		report(r, follower.pos, n)
+	}
+}
+
+// EntityBox is what pressure plates see of an entity: players and dropped items, not
+// experience orbs. Runs: owner of the entity's region.
+func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+	at := e.Position()
+	switch e.Owner().(type) {
+	case *Player:
+		lo = mgl32.Vec3{at[0] - playerHalfWidth, at[1] - eyeHeight, at[2] - playerHalfWidth}
+		return lo, mgl32.Vec3{at[0] + playerHalfWidth, lo[1] + playerHeight, at[2] + playerHalfWidth}, true, true
+	case *ItemActor:
+		lo = mgl32.Vec3{at[0] - itemHalfSize, at[1], at[2] - itemHalfSize}
+		return lo, mgl32.Vec3{at[0] + itemHalfSize, at[1] + 2*itemHalfSize, at[2] + itemHalfSize}, false, true
+	}
+	return lo, hi, false, false
+}
+
 // collectItems takes in whatever items lie in the box above the hopper. A stack that
 // fits goes in whole.
 func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {

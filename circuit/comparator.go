@@ -384,6 +384,8 @@ func (e comparatorEntities) New(block uint32) world.BlockEntity {
 		return &comparatorEntity{t: e.t}
 	case kindPiston:
 		return &pistonEntity{t: e.t, sticky: e.t.blocks.Name(block) == nameStickyPiston}
+	case kindNote:
+		return &noteEntity{}
 	}
 	if block == e.t.moving {
 		return &movingEntity{t: e.t, block: e.t.blocks.Air()}
@@ -401,6 +403,8 @@ func (e comparatorEntities) Load(pos cube.Pos, saved map[string]any) (world.Bloc
 		return e.t.loadPiston(saved), true
 	case movingEntityID:
 		return e.t.loadMoving(saved), true
+	case noteEntityID:
+		return loadNote(saved), true
 	}
 	if id, _ := saved["id"].(string); id == comparatorEntityID {
 		v, _ := saved[outputSignalTag].(int32)

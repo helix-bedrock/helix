@@ -77,5 +77,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)
 	}
+	if use := p.s.circuits.Use; use != nil && use(r, u.Pos, u.Block) {
+		return true
+	}
 	return blockuse.Use(blocks, r, u.Pos, u.Block, p.entity.Rotation().Yaw)
 }

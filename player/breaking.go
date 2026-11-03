@@ -195,6 +195,11 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 		pos := toCube(a.BlockPos)
 		switch a.Action {
 		case protocol.PlayerActionStartBreak:
+			if attack := p.s.circuits.Attack; attack != nil {
+				if b, ok := r.Block(pos, 0); ok {
+					attack(r, pos, b)
+				}
+			}
 			if p.startBreak(r, pos, a.Face) {
 				destroyed = true
 			}

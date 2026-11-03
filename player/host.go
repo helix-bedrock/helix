@@ -78,6 +78,8 @@ type Host struct {
 	connections *connect.Table
 	// attach is what holds torches, lanterns and ladders.
 	attach *attach.Table
+	// circuits is what redstone answers for. Set before any player joins.
+	circuits CircuitHooks
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
 	// drops holds what each block drops.
