@@ -28,9 +28,6 @@ const (
 	respawnWaitAction
 )
 
-// curseOfVanishing is the enchantment that makes an item vanish on death.
-const curseOfVanishing = 28
-
 // keepOnDeathTag is the item tag that keeps an item on a dying player.
 const keepOnDeathTag = "minecraft:keep_on_death"
 
@@ -113,7 +110,7 @@ func (p *Player) dropSlots(slots []ItemStack, vanishingOnly bool) {
 			continue
 		}
 		if vanishingOnly {
-			if hasEnchant(s, curseOfVanishing) {
+			if p.s.game.itemHas(s, func(e *Enchantment) bool { return e.VanishesOnDeath }) {
 				slots[i] = ItemStack{}
 			}
 			continue

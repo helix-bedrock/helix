@@ -16,6 +16,15 @@ func enchantPlayer(t *testing.T) *Player {
 	return p
 }
 
+func setupForTest(t *testing.T) *Setup {
+	t.Helper()
+	s, err := NewSetup(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 func stack(name string, damage int32, enchants ...EnchantLevel) ItemStack {
 	s := ItemStack{Name: name, Count: 1}
 	if damage != 0 {
@@ -73,7 +82,7 @@ func TestDraw(t *testing.T) {
 // TestOptionCosts pins BDS's three costs with 15 shelves: the last is always 30.
 func TestOptionCosts(t *testing.T) {
 	for seed := range uint32(50) {
-		c := optionCosts(newMT(seed), 40)
+		c := optionCosts(newMT(seed), 40, enchantMaxShelves)
 		if c[2] != 30 || c[0] < 1 || c[1] <= c[0] {
 			t.Fatalf("seed %d: costs %v", seed, c)
 		}
@@ -119,10 +128,14 @@ func TestAnvil(t *testing.T) {
 	}
 
 	dear := withTag(stack("minecraft:iron_sword", 200), repairCostTag, int32(40))
-	if out = vanillaAnvil(p, dear, stack("minecraft:iron_sword", 200), ""); !out.Result.Empty() {
-		t.Fatal("too expensive made a result")
+	if out = vanillaAnvil(p, dear, stack("minecraft:iron_sword", 200), ""); !out.TooExpensive {
+		t.Fatal("not too expensive")
 	}
-	p.attributes.set(attrLevel, anvilNameOnly)
+	p.SetTuning(TuneAnvilTooExpensive, 1000)
+	if out = vanillaAnvil(p, dear, stack("minecraft:iron_sword", 200), ""); out.TooExpensive {
+		t.Fatal("the limit did not change")
+	}
+	p.ClearAllTuning()
 	if out = vanillaAnvil(p, dear, ItemStack{}, "Old"); out.Cost != anvilNameOnly {
 		t.Fatalf("name only held at %d", out.Cost)
 	}
@@ -232,5 +245,98 @@ func TestMending(t *testing.T) {
 	}
 	if picks = p.mendable(); len(picks) != 0 {
 		t.Fatalf("a whole item is still mendable: %v", picks)
+	}
+}
+
+// TestRemoved checks a removed enchantment stops counting on items and in draws.
+func TestRemoved(t *testing.T) {
+	p := enchantPlayer(t)
+	g := p.s.game
+	cursed := stack("minecraft:iron_helmet", 0, EnchantLevel{ID: enchantBinding, Level: 1})
+	worn := func(e *Enchantment) bool { return e.StaysWorn }
+	if !g.itemHas(cursed, worn) {
+		t.Fatal("binding does nothing")
+	}
+	p.s.RemoveEnchantment(enchantBinding)
+	if g.itemHas(cursed, worn) {
+		t.Fatal("removed binding still counts")
+	}
+	p.s.RemoveEnchantment(EnchantSharpness)
+	for seed := range uint32(100) {
+		l := g.drawEnchants(newMT(seed), "minecraft:diamond_sword", 30, 0, false)
+		for _, list := range l.lists {
+			for _, v := range list {
+				if v.ID == EnchantSharpness {
+					t.Fatal("removed sharpness drawn")
+				}
+			}
+		}
+	}
+	s := setupForTest(t)
+	if err := s.RemoveEnchantment(EnchantSharpness); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.Enchantment(EnchantSharpness); ok {
+		t.Fatal("still registered")
+	}
+}
+
+// TestRequire lets a plugin ask for nothing, with no lapis there, and for less than the
+// client will use, which is settled after the request.
+func TestRequire(t *testing.T) {
+	p, _ := apiWorld(t, func(s *Setup) {
+		s.Systems().EnchantRequire = func(*Player, EnchantOption, int32) EnchantRequirement { return EnchantRequirement{} }
+	})
+	p.rng = rand.New(rand.NewPCG(1, 2))
+	p.window.enchanting, p.window.open = true, true
+	sword := p.s.freshStack(stack("minecraft:iron_sword", 0))
+	p.inventory.ui[enchantInputSlot] = sword
+	p.enchant.seeded = true
+	p.enchant.options = vanillaEnchantOptions(p, sword, 15)
+	id := p.enchant.options[2].NetworkID
+	action := &protocol.CraftRecipeStackRequestAction{RecipeNetworkID: id, NumberOfCrafts: 1}
+	p.requests.work = p.inventory
+	if status, _ := p.craftEnchant(action); status != protocol.ItemStackResponseStatusOK {
+		t.Fatalf("no lapis, level 0: status %d", status)
+	}
+	c := &p.requests.craft
+	if len(c.slots) != 1 || c.after.levels != 0 {
+		t.Fatalf("slots %+v levels %d", c.slots, c.after.levels)
+	}
+
+	p.requests.craft = craftState{}
+	p.inventory.ui[enchantLapisSlot] = p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
+	p.requests.work = p.inventory
+	if status, _ := p.craftEnchant(action); status != protocol.ItemStackResponseStatusOK {
+		t.Fatalf("with lapis: status %d", status)
+	}
+	if !c.slots[1].upTo || c.slots[1].left != 5 || !c.after.settle || c.after.materialLeft != 5 {
+		t.Fatalf("not settled: %+v %+v", c.slots[1], c.after)
+	}
+	p.inventory.ui[enchantLapisSlot].Count = 2
+	p.afterCraft(craftAfter{settle: true, materialLeft: 5})
+	if p.inventory.ui[enchantLapisSlot].Count != 5 {
+		t.Fatalf("lapis %d", p.inventory.ui[enchantLapisSlot].Count)
+	}
+}
+
+// TestLiveRules changes an item's enchant rule while running.
+func TestLiveRules(t *testing.T) {
+	p := enchantPlayer(t)
+	g := p.s.game
+	p.s.SetItemEnchantable("minecraft:stick", 16, 10)
+	if g.rules().items["minecraft:stick"].Value != 10 {
+		t.Fatal("not set")
+	}
+	if l := g.drawEnchants(newMT(1), "minecraft:stick", 30, 0, false); len(l.lists[0])+len(l.lists[1])+len(l.lists[2]) == 0 {
+		t.Fatal("a stick draws nothing")
+	}
+	p.s.SetEnchantMaterial("minecraft:emerald")
+	if !p.mayPlace(slotRef{kind: protocol.ContainerEnchantingMaterial}, ItemStack{Name: "minecraft:emerald", Count: 1}) {
+		t.Fatal("emerald refused")
+	}
+	it := ItemStack{Name: "minecraft:stick", Count: 1}.WithEnchant(EnchantSharpness, 99)
+	if it.Enchants()[0].Level != 99 || len(it.WithoutEnchant(EnchantSharpness).Enchants()) != 0 {
+		t.Fatalf("item api: %+v", it.Enchants())
 	}
 }

@@ -20,10 +20,6 @@ const (
 // Item locks, as BDS keeps them in an item's "minecraft:item_lock" tag.
 const itemLockInSlot = 1
 
-// bindingCurse is the enchantment that keeps armour on a player who is not
-// in creative.
-const bindingCurse = 27
-
 // assignmentsKept is how many past requests' slots a request may name by
 // request ID (the client does so for requests not yet answered).
 const assignmentsKept = 32
@@ -458,7 +454,7 @@ func (p *Player) mayRemove(r slotRef, s ItemStack) bool {
 	if lock, _ := s.Tag["minecraft:item_lock"].(uint8); lock == itemLockInSlot {
 		return false
 	}
-	return r.kind != containerArmor || p.creative() || !hasEnchant(s, bindingCurse)
+	return r.kind != containerArmor || p.creative() || !p.s.game.itemHas(s, func(e *Enchantment) bool { return e.StaysWorn })
 }
 
 // mayPlace applies BDS's rules for putting an item in a slot: armour takes
@@ -483,7 +479,8 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	case protocol.ContainerEnchantingInput:
 		return s.Count == 1
 	case protocol.ContainerEnchantingMaterial:
-		return s.Name == itemLapis
+		material := p.s.game.rules().material
+		return material == "" || s.Name == material
 	}
 	return true
 }

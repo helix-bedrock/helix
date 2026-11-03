@@ -2,6 +2,7 @@ package player
 
 import (
 	"math/rand/v2"
+	"slices"
 	"strings"
 
 	"github.com/helix-bedrock/helix/world"
@@ -17,7 +18,7 @@ const (
 	enchantLapisSlot   = 15
 	enchantSeedTag     = "EnchantmentSeed"
 	enchantOptionCount = 3
-	maxBookshelves     = 15
+	enchantMaxShelves  = 15
 	// optionWordKinds and optionWordsMin make an option's name 3 or 4 words.
 	optionWordKinds = 2
 	optionWordsMin  = 3
@@ -103,6 +104,21 @@ type EnchantOption struct {
 // though the client's screen shows three.
 type EnchantOptionsFunc func(p *Player, item ItemStack, shelves int32) []EnchantOption
 
+// EnchantRequirement is what picking one of a table's options asks of a player.
+type EnchantRequirement struct {
+	// Refuse turns the player away whatever it has.
+	Refuse bool
+	// MinLevel is the level it must have, Levels what is taken. Lapis is what the material
+	// slot must hold and what is taken from it.
+	MinLevel, Levels, Lapis int32
+}
+
+// EnchantRequireFunc says what picking an option asks of p; place is its place, 1 to 3.
+type EnchantRequireFunc func(p *Player, option EnchantOption, place int32) EnchantRequirement
+
+// BookshelvesFunc counts the shelves powering the table at pos.
+type BookshelvesFunc func(p *Player, r *world.Region, pos cube.Pos) int32
+
 // AnvilFunc works out what an anvil makes of first and second, with name its new name
 // ("" to leave off). A result with no item means it makes nothing.
 type AnvilFunc func(p *Player, first, second ItemStack, name string) AnvilResult
@@ -159,12 +175,24 @@ type craftAfter struct {
 	newSeed bool
 	// experience is spawned where the player is.
 	experience int32
+	// settle sets the material slot to materialLeft: a plugin changed what is taken, so
+	// what the client used is not the answer.
+	settle       bool
+	materialLeft uint8
 }
 
 // afterCraft does what the request's craft left to do.
 func (p *Player) afterCraft(a craftAfter) {
 	if a.levels != 0 {
 		p.SetLevel(p.Level()-a.levels, p.ExperienceProgress())
+	}
+	if a.settle {
+		lapis := &p.inventory.ui[enchantLapisSlot]
+		if a.materialLeft == 0 {
+			*lapis = ItemStack{}
+		} else if !lapis.Empty() {
+			lapis.Count = a.materialLeft
+		}
 	}
 	if a.newSeed {
 		p.enchant.seed, p.enchant.seeded = newMT(rand.Uint32()).positive(), true //nolint:gosec // a table's draw, not a secret
@@ -237,7 +265,7 @@ func (p *Player) refreshEnchantOptions() {
 		if !p.enchant.seeded {
 			p.enchant.seed, p.enchant.seeded = int32(rand.Uint32()>>1), true //nolint:gosec // a table's draw, not a secret
 		}
-		opts = p.s.game.sys.EnchantOptions(p, item, p.s.countBookshelves(r, p.window.workbenchPos))
+		opts = p.s.game.sys.EnchantOptions(p, item, p.s.game.sys.Bookshelves(p, r, p.window.workbenchPos))
 	}
 	if g := p.s.game; g.enchantOptionsEv.Has() {
 		e := EnchantOptionsEvent{Player: p, Item: item, Options: opts}
@@ -245,11 +273,7 @@ func (p *Player) refreshEnchantOptions() {
 		opts = e.Options
 	}
 	p.enchant.options = opts
-	pk := &packet.PlayerEnchantOptions{Options: make([]protocol.EnchantmentOption, len(opts))}
-	for i, o := range opts {
-		pk.Options[i] = o.network()
-	}
-	p.send(pk)
+	p.sendEnchantOptions(opts)
 }
 
 // network is the option as the packet carries it.
@@ -270,7 +294,7 @@ func (o EnchantOption) network() protocol.EnchantmentOption {
 // clear on both levels, and then the shelves behind it count on both levels, with the
 // two beside the corner for a corner spot.
 func (s *Host) countBookshelves(r *world.Region, at cube.Pos) int32 {
-	en := s.game.enchanting
+	en := s.game.rules()
 	name := func(x, y, z int) string {
 		b, ok := r.Block(cube.Pos{at[0] + x, at[1] + y, at[2] + z}, 0)
 		if !ok {
@@ -301,9 +325,14 @@ func (s *Host) countBookshelves(r *world.Region, at cube.Pos) int32 {
 	return n
 }
 
-// optionCosts is BDS's sum of a table's three costs.
-func optionCosts(m *mt19937, shelves int32) [enchantOptionCount]int32 {
-	b := min(shelves, maxBookshelves)
+// vanillaBookshelves is BDS's count around a table.
+func vanillaBookshelves(p *Player, r *world.Region, pos cube.Pos) int32 {
+	return p.s.countBookshelves(r, pos)
+}
+
+// optionCosts is BDS's sum of a table's three costs; limit is the most shelves that count.
+func optionCosts(m *mt19937, shelves, limit int32) [enchantOptionCount]int32 {
+	b := min(shelves, limit)
 	base := m.intN(8) + b>>1
 	base += m.intN(b + 1)
 	return [enchantOptionCount]int32{max((base+1)/3, 1), (2*base+2)/3 + 1, max(base+1, 2*b)}
@@ -314,11 +343,11 @@ func optionCosts(m *mt19937, shelves int32) [enchantOptionCount]int32 {
 // the player's seed, so the same item shows the same options until the player enchants.
 func vanillaEnchantOptions(p *Player, item ItemStack, shelves int32) []EnchantOption {
 	g := p.s.game
-	if item.Empty() || item.Tag[enchantTag] != nil || g.enchanting.items[item.Name].Value <= 0 {
+	if item.Empty() || item.Tag[enchantTag] != nil || g.rules().items[item.Name].Value <= 0 {
 		return nil
 	}
 	m := newMT(uint32(p.enchant.seed)) //nolint:gosec // BDS seeds with the same bits
-	costs := optionCosts(m, shelves)
+	costs := optionCosts(m, shelves, int32(p.Tuning(TuneEnchantMaxShelves)))
 	opts := make([]EnchantOption, 0, enchantOptionCount)
 	var name strings.Builder
 	for _, cost := range costs {
@@ -326,7 +355,7 @@ func vanillaEnchantOptions(p *Player, item ItemStack, shelves int32) []EnchantOp
 		words := m.intN(optionWordKinds) + optionWordsMin
 		name.Reset()
 		for range words {
-			name.WriteString(g.enchanting.words[m.intN(int32(len(g.enchanting.words)))]) //nolint:gosec // a short list
+			name.WriteString(g.rules().words[m.intN(int32(len(g.rules().words)))]) //nolint:gosec // a short list
 		}
 		opts = append(opts, EnchantOption{Cost: cost, Slot: l.slot, Enchants: l.lists, Name: name.String(), NetworkID: p.s.enchantIDs.Add(1) + enchantIDBase})
 	}
@@ -344,7 +373,7 @@ type drawEntry struct {
 // reaches; one is picked by weight, then more while chance allows, each only if it fits
 // with those picked. BDS never reads the maximum cost here.
 func (g *gameplay) drawEnchants(m *mt19937, item string, cost, bonus int32, treasure bool) enchantList {
-	it := g.enchanting.items[item]
+	it := g.rules().items[item]
 	l := enchantList{slot: it.Slot}
 	if it.Slot == 0 || bonus+it.Value <= 0 {
 		return l
@@ -439,9 +468,17 @@ func (s *Host) EnchantItem(it ItemStack, cost, bonus int32, treasure bool) ItemS
 	return it
 }
 
-// craftEnchant is BDS's enchanting action: the option must be on show, the item there;
-// outside creative the player's level must reach the cost, and the lapis cover the
-// option's place, which is also the levels taken.
+// vanillaEnchantRequire is BDS's requirement: outside creative the level must reach the
+// option's cost, and its place is both the lapis and the levels taken.
+func vanillaEnchantRequire(p *Player, option EnchantOption, place int32) EnchantRequirement {
+	if p.creative() {
+		return EnchantRequirement{}
+	}
+	return EnchantRequirement{MinLevel: option.Cost, Levels: place, Lapis: place}
+}
+
+// craftEnchant is BDS's enchanting action: the option must be on show and the item there,
+// then Systems.EnchantRequire says what it asks of the player.
 func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8, []slotRef) {
 	st := &p.requests
 	c := &st.craft
@@ -463,23 +500,24 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	if item.Empty() {
 		return protocol.ItemStackResponseStatusMissingInputItem, nil
 	}
-	pay := int32(index) + 1 //nolint:gosec // a short list
-	if p.creative() {
-		pay = 0
-	} else {
-		if option.Cost > p.Level() {
-			return protocol.ItemStackResponseStatusInsufficientPlayerLevelToEnchant, nil
-		}
-		if lapis.Empty() || pay > int32(lapis.Count) {
-			return protocol.ItemStackResponseStatusFailedToEnchant, nil
-		}
-	}
 	g := p.s.game
+	place := int32(index) + 1 //nolint:gosec // a short list
+	req := g.sys.EnchantRequire(p, option, place)
+	if req.Refuse {
+		return protocol.ItemStackResponseStatusFailedToEnchant, nil
+	}
+	if req.MinLevel > p.Level() {
+		return protocol.ItemStackResponseStatusInsufficientPlayerLevelToEnchant, nil
+	}
+	if req.Lapis > 0 && (lapis.Empty() || req.Lapis > int32(lapis.Count)) {
+		return protocol.ItemStackResponseStatusFailedToEnchant, nil
+	}
 	result := item
 	result.Count = 1
 	g.applyEnchants(&result, enchantList{lists: option.Enchants})
+	levels, taken := req.Levels, req.Lapis
 	if g.enchantEv.Has() {
-		e := EnchantEvent{Player: p, Option: option, Item: item, Result: result, Levels: pay, Lapis: pay}
+		e := EnchantEvent{Player: p, Option: option, Item: item, Result: result, Levels: levels, Lapis: taken}
 		g.enchantEv.fire(p.s.log, &e)
 		if e.Cancelled() {
 			return protocol.ItemStackResponseStatusFailedToEnchant, nil
@@ -487,26 +525,70 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 		if !sameStack(e.Result, result) {
 			st.refresh = true
 		}
-		result = e.Result
-		if e.Lapis != pay {
-			st.refresh = true
-		}
-		c.after.levels = e.Levels
-		pay = e.Lapis
-	} else {
-		c.after.levels = pay
+		result, levels, taken = e.Result, e.Levels, e.Lapis
 	}
 	if result.Empty() {
 		return protocol.ItemStackResponseStatusInvalidCraftResultItem, nil
 	}
 	c.active, c.times = true, 1
-	c.after.newSeed = true
+	c.after.newSeed, c.after.levels = true, levels
 	c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingInput, slot: enchantInputSlot, item: item, left: 1})
-	if pay > 0 {
-		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingMaterial, slot: enchantLapisSlot, item: lapis, left: uint8(min(pay, 255))}) //nolint:gosec // clamped
+	clientPays := place
+	if p.creative() {
+		clientPays = 0
+	}
+	taken = max(min(taken, int32(lapis.Count)), 0)
+	switch {
+	case taken != clientPays:
+		// The client takes what vanilla would, so it may use anything up to the whole
+		// slot; the slot is then set to what the plugin asked and sent again.
+		if !lapis.Empty() {
+			c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingMaterial, slot: enchantLapisSlot, item: lapis, left: lapis.Count, upTo: true})
+		}
+		c.after.settle, c.after.materialLeft = true, lapis.Count-uint8(taken) //nolint:gosec // clamped to the slot
+		st.refresh = true
+	case taken > 0:
+		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingMaterial, slot: enchantLapisSlot, item: lapis, left: uint8(taken)}) //nolint:gosec // clamped to the slot
 	}
 	c.results = append(c.results, craftResult{stack: result, left: int32(result.Count)})
 	return protocol.ItemStackResponseStatusOK, nil
+}
+
+// EnchantSeed returns the seed the player's table options come from. Runs: the player's
+// region.
+func (p *Player) EnchantSeed() int32 { return p.enchant.seed }
+
+// SetEnchantSeed sets the seed and works out a table's options again if one is open.
+// Runs: the player's region.
+func (p *Player) SetEnchantSeed(seed int32) {
+	p.enchant.seed, p.enchant.seeded = seed, true
+	p.enchant.input = -1
+	p.refreshEnchantOptions()
+}
+
+// EnchantOptions returns a copy of the options on show. Runs: the player's region.
+func (p *Player) EnchantOptions() []EnchantOption { return slices.Clone(p.enchant.options) }
+
+// SetEnchantOptions shows other options on the player's open table, until the item in it
+// changes. An option with no NetworkID gets one. Runs: the player's region.
+func (p *Player) SetEnchantOptions(opts []EnchantOption) {
+	opts = slices.Clone(opts)
+	for i := range opts {
+		if opts[i].NetworkID == 0 {
+			opts[i].NetworkID = p.s.enchantIDs.Add(1) + enchantIDBase
+		}
+	}
+	p.enchant.options = opts
+	p.sendEnchantOptions(opts)
+}
+
+// sendEnchantOptions tells the client what its table shows.
+func (p *Player) sendEnchantOptions(opts []EnchantOption) {
+	pk := &packet.PlayerEnchantOptions{Options: make([]protocol.EnchantmentOption, len(opts))}
+	for i, o := range opts {
+		pk.Options[i] = o.network()
+	}
+	p.send(pk)
 }
 
 // playSound plays a level sound where the player is, for those who hear it.

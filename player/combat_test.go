@@ -201,7 +201,8 @@ func TestEquipRefused(t *testing.T) {
 	if vanillaEquipArmor(p, ItemStack{Name: "minecraft:skull", Count: 1}) {
 		t.Error("a head went on")
 	}
-	cursed := ItemStack{Name: "minecraft:iron_helmet", Count: 1, Tag: map[string]any{"ench": []any{map[string]any{"id": int16(bindingCurse), "lvl": int16(1)}}}}
+	p.s.game.enchants.Store(newEnchantTable(map[int16]*Enchantment{enchantBinding: {ID: enchantBinding, StaysWorn: true}}))
+	cursed := ItemStack{Name: "minecraft:iron_helmet", Count: 1, Tag: map[string]any{"ench": []any{map[string]any{"id": enchantBinding, "lvl": int16(1)}}}}
 	p.inventory.armor[0] = cursed
 	if vanillaEquipArmor(p, ItemStack{Name: "minecraft:iron_helmet", Count: 1}) {
 		t.Error("a cursed helmet came off")

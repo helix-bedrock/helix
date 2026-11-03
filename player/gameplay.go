@@ -25,6 +25,10 @@ type Systems struct {
 	// EnchantOptions makes an enchanting table's options, Anvil and Grindstone their
 	// screens' results.
 	EnchantOptions EnchantOptionsFunc
+	// EnchantRequire says what picking a table's option asks of the player, Bookshelves
+	// how many shelves count around a table.
+	EnchantRequire EnchantRequireFunc
+	Bookshelves    BookshelvesFunc
 	Anvil          AnvilFunc
 	Grindstone     GrindstoneFunc
 	// Breaking.
@@ -127,11 +131,11 @@ type gameplay struct {
 	sys Systems
 	// enchants is swapped whole when a plugin changes an enchantment while running.
 	enchants atomic.Pointer[enchantTable]
-	// enchanting is what enchanting reads about items and blocks.
-	enchanting *enchanting
-	effects    map[int32]*Effect
-	blocks     map[string]BlockBehaviour
-	mining     *mining
+	// enchantRules is what enchanting reads about items and blocks, swapped whole too.
+	enchantRules atomic.Pointer[enchanting]
+	effects      map[int32]*Effect
+	blocks       map[string]BlockBehaviour
+	mining       *mining
 	// durability, replaceables and notReplacedBy are helix-data's
 	// bds/break_place.json.
 	durability    map[string]data.Durability
@@ -351,6 +355,8 @@ func vanillaGameplay(s *Setup) error {
 	}
 	sys, g := s.Systems(), s.h.game.out
 	sys.EnchantOptions = vanillaEnchantOptions
+	sys.EnchantRequire = vanillaEnchantRequire
+	sys.Bookshelves = vanillaBookshelves
 	sys.Anvil = vanillaAnvil
 	sys.Grindstone = vanillaGrindstone
 	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
@@ -418,7 +424,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g := gs.out
 	*g = gameplay{
 		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv,
-		sys: gs.sys, enchanting: gs.enchanting, effects: maps.Clone(gs.effects),
+		sys: gs.sys, effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
@@ -428,6 +434,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
 	}
 	g.enchants.Store(newEnchantTable(gs.enchants))
+	g.enchantRules.Store(gs.enchanting)
 	g.enchantOptionsEv.freeze()
 	g.enchantEv.freeze()
 	g.anvilEv.freeze()

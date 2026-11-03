@@ -196,10 +196,14 @@ func (p *Player) breakContext(r *world.Region, pos cube.Pos) *loot.Context {
 	held := p.inventory.Held()
 	c := &loot.Context{Tool: held.Name, CustomName: customNameAt(r, pos)}
 	enchantLevels(held, func(id, level int16) {
-		switch id {
-		case enchantSilkTouch:
+		e, ok := p.s.game.enchant(id)
+		if !ok {
+			return
+		}
+		if e.SilkTouch {
 			c.Silk = level > 0
-		case enchantFortune:
+		}
+		if e.Fortune {
 			c.Fortune = int32(level)
 		}
 	})

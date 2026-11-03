@@ -56,8 +56,7 @@ const (
 // grindstoneCurseCost is the result's RepairCost by how many curses it kept.
 var grindstoneCurseCost = [grindstoneMaxCurses + 1]int32{0, 1, 3}
 
-// The curses a grindstone leaves on an item and pays nothing for. BDS names one more ID
-// that no enchantment has.
+// The curses. BDS's grindstone names one more ID that no enchantment has.
 const (
 	enchantBinding   int16 = 27
 	enchantVanishing int16 = 28
@@ -135,6 +134,10 @@ type AnvilResult struct {
 	Cost int32
 	// SecondUsed is how many of the second slot's items go. The first slot is used whole.
 	SecondUsed uint8
+	// MinLevel is the level the player must have.
+	MinLevel int32
+	// TooExpensive refuses it however many levels the player has.
+	TooExpensive bool
 }
 
 // AnvilEvent fires when an anvil's result has passed BDS's checks. Cancel refuses it.
@@ -229,7 +232,7 @@ func (p *Player) maxDamage(name string) int32 {
 	if d, ok := g.durability[name]; ok && d.MaxDamage > 0 {
 		return int32(d.MaxDamage)
 	}
-	if r, ok := g.enchanting.repairable[name]; ok {
+	if r, ok := g.rules().repairable[name]; ok {
 		return r.max
 	}
 	return 0
@@ -237,7 +240,7 @@ func (p *Player) maxDamage(name string) int32 {
 
 // repairRuleFor is the component rule that takes other as a repair of item.
 func (p *Player) repairRuleFor(item string, other ItemStack) *repairRule {
-	r, ok := p.s.game.enchanting.repairable[item]
+	r, ok := p.s.game.rules().repairable[item]
 	if !ok {
 		return nil
 	}
@@ -291,7 +294,7 @@ func (p *Player) anvilMerge(first, second, result ItemStack, book bool) (ItemSta
 	after := g.enchantWeight(g.itemEnchants(merged), book)
 	cost := after - before
 	if cost > 0 && first.Count >= 2 {
-		cost = anvilStackCost
+		cost = int32(p.Tuning(TuneAnvilStackCost))
 	}
 	return merged, cost
 }
@@ -335,22 +338,20 @@ func vanillaAnvil(p *Player, first, second ItemStack, name string) AnvilResult {
 	total := cost + prior
 	nameOnly := renamed == cost && renamed != 0
 	creative := p.creative()
+	tooExpensive := false
 	switch {
 	case nameOnly:
-		total = min(total, anvilNameOnly)
-	case total >= anvilTooExpensive && !creative:
-		return AnvilResult{}
-	}
-	if !creative && (total < 0 || total > p.Level()) {
-		return AnvilResult{}
+		total = min(total, int32(p.Tuning(TuneAnvilNameLimit)))
+	case total >= int32(p.Tuning(TuneAnvilTooExpensive)) && !creative:
+		tooExpensive = true
 	}
 	price := max(repairCost(result), repairCost(second))
 	if !nameOnly {
 		price = 2*price + 1
 	}
-	out := AnvilResult{Result: withTag(result, repairCostTag, price), Cost: total, SecondUsed: uint8(max(min(used, 255), 0))} //nolint:gosec // clamped
+	out := AnvilResult{Result: withTag(result, repairCostTag, price), Cost: total, SecondUsed: uint8(max(min(used, 255), 0)), MinLevel: total, TooExpensive: tooExpensive} //nolint:gosec // clamped
 	if creative {
-		out.Cost = 0
+		out.Cost, out.MinLevel = 0, 0
 	}
 	return out
 }
@@ -367,7 +368,7 @@ func (p *Player) anvilCombine(first, second ItemStack, book bool) (result ItemSt
 			cost = used << 1
 		}
 		if same && p.maxDamage(result.Name) > 0 {
-			bonus := min(anvilRepairableBonus*p.maxDamage(result.Name)/100, itemDamage(result))
+			bonus := min(int32(p.Tuning(TuneAnvilRepairableBonus))*p.maxDamage(result.Name)/100, itemDamage(result))
 			if d := itemDamage(result); d > bonus {
 				result = withDamage(result, d-bonus)
 			}
@@ -380,8 +381,9 @@ func (p *Player) anvilCombine(first, second ItemStack, book bool) (result ItemSt
 		}
 		return result, cost, used, true
 	}
-	if p.damageable(result) && p.s.game.enchanting.repair[result.Name][second.Name] {
-		step := func(damage int32) int32 { return min(p.maxDamage(result.Name)/anvilMaterialShare, damage) }
+	if p.damageable(result) && p.s.game.rules().repair[result.Name][second.Name] {
+		share := max(int32(p.Tuning(TuneAnvilMaterialShare)), 1)
+		step := func(damage int32) int32 { return min(p.maxDamage(result.Name)/share, damage) }
 		damage := itemDamage(result)
 		if step(damage) <= 0 {
 			return result, 0, 0, false
@@ -398,10 +400,10 @@ func (p *Player) anvilCombine(first, second ItemStack, book bool) (result ItemSt
 	var repaired int32
 	if !book && p.damageable(result) {
 		limit := p.maxDamage(result.Name)
-		damage := max(itemDamage(first)+itemDamage(second)-limit-anvilMergeBonus*limit/100, 0)
+		damage := max(itemDamage(first)+itemDamage(second)-limit-int32(p.Tuning(TuneAnvilMergeBonus))*limit/100, 0)
 		if damage < itemDamage(result) {
 			result = withDamage(result, damage)
-			repaired = anvilMergeCost
+			repaired = int32(p.Tuning(TuneAnvilMergeCost))
 		}
 	}
 	merged, extra := p.anvilMerge(first, second, result, book)
@@ -460,6 +462,9 @@ func (p *Player) craftAnvil(a *protocol.CraftRecipeOptionalStackRequestAction) (
 			return protocol.ItemStackResponseStatusInvalidCraftResultItem, nil
 		}
 	}
+	if out.TooExpensive || out.MinLevel > p.Level() {
+		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
+	}
 	c.active, c.times = true, 1
 	c.after.levels = out.Cost
 	c.slots = append(c.slots, expectedSlot{container: protocol.ContainerAnvilInput, slot: anvilFirstSlot, item: first, left: first.Count})
@@ -473,11 +478,11 @@ func (p *Player) craftAnvil(a *protocol.CraftRecipeOptionalStackRequestAction) (
 // keepCurses takes every enchantment but the curses off result, keeps the curses of
 // inputs, and prices it by how many. ok false means too many for BDS's price table.
 func (g *gameplay) keepCurses(result ItemStack, inputs ...ItemStack) (out ItemStack, kept, ok bool) {
-	l := enchantList{slot: g.enchanting.items[result.Name].Slot}
+	l := enchantList{slot: g.rules().items[result.Name].Slot}
 	count := 0
 	for _, in := range inputs {
 		enchantLevels(in, func(id, level int16) {
-			if id == enchantBinding || id == enchantVanishing {
+			if e, ok := g.enchant(id); ok && e.Curse {
 				g.add(&l, EnchantLevel{ID: id, Level: level})
 				kept = true
 				count++
@@ -509,10 +514,7 @@ func flatEnchants(s ItemStack) []EnchantLevel {
 func (g *gameplay) grindstoneExperience(s ItemStack) int32 {
 	var sum int32
 	enchantLevels(s, func(id, level int16) {
-		if id == enchantBinding || id == enchantVanishing {
-			return
-		}
-		if e, ok := g.enchant(id); ok && e.MinCost != nil {
+		if e, ok := g.enchant(id); ok && !e.Curse && e.MinCost != nil {
 			sum += e.MinCost(int32(level))
 		}
 	})
@@ -573,7 +575,7 @@ func (p *Player) grindstoneMerged(first, second ItemStack) ItemStack {
 		base = second
 	}
 	limit := p.maxDamage(first.Name)
-	return withDamage(base, max(itemDamage(first)+itemDamage(second)-limit-limit/grindstoneBonusShare, 0))
+	return withDamage(base, max(itemDamage(first)+itemDamage(second)-limit-limit/max(int32(p.Tuning(TuneGrindstoneBonusShare)), 1), 0))
 }
 
 // craftGrindstone is the grindstone's action. The client names the price it expects,
@@ -607,7 +609,7 @@ func (p *Player) craftGrindstone(a *protocol.CraftGrindstoneRecipeStackRequestAc
 		}
 	}
 	c.active, c.times = true, 1
-	if half := (out.Experience + 1) / 2; half > 0 {
+	if half := (int32(float32(out.Experience)*p.Tuning(TuneGrindstoneXPScale)) + 1) / 2; half > 0 {
 		c.after.experience = half + p.rng.Int32N(half)
 	}
 	if !first.Empty() {

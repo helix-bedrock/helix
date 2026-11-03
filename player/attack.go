@@ -279,7 +279,7 @@ func (p *Player) canCrit() bool {
 func (p *Player) knockbackOf() float32 {
 	var level int16
 	enchantLevels(p.inventory.Held(), func(id, l int16) {
-		if id == EnchantKnockback {
+		if e, ok := p.s.game.enchant(id); ok && e.Knockback {
 			level = l
 		}
 	})

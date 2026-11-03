@@ -117,6 +117,26 @@ const (
 	TuneShieldLift
 	// TuneTotemHealth is the health a totem leaves.
 	TuneTotemHealth
+	// TuneEnchantMaxShelves is the most bookshelves that count around a table.
+	TuneEnchantMaxShelves
+	// TuneAnvilTooExpensive is the price a player out of creative is refused at,
+	// TuneAnvilNameLimit what a rename alone is held to, and TuneAnvilStackCost what
+	// merging enchantments onto a stack costs.
+	TuneAnvilTooExpensive
+	TuneAnvilNameLimit
+	TuneAnvilStackCost
+	// TuneAnvilMergeBonus and TuneAnvilRepairableBonus are the percent of durability merging
+	// two items gives on top, plain and through the repairable component;
+	// TuneAnvilMaterialShare is the part of it one material restores (4 is a quarter), and
+	// TuneAnvilMergeCost what a merge that repairs costs.
+	TuneAnvilMergeBonus
+	TuneAnvilRepairableBonus
+	TuneAnvilMaterialShare
+	TuneAnvilMergeCost
+	// TuneGrindstoneBonusShare is the part of durability two merged items get on top (20
+	// is a twentieth), TuneGrindstoneXPScale multiplies the experience given back.
+	TuneGrindstoneBonusShare
+	TuneGrindstoneXPScale
 
 	tuneCount
 )
@@ -188,6 +208,16 @@ var tuneSpecs = [tuneCount]tuneSpec{
 	TuneShieldPush:           {"shield_push", shieldPush},
 	TuneShieldLift:           {"shield_lift", shieldLift},
 	TuneTotemHealth:          {"totem_health", totemHealth},
+	TuneEnchantMaxShelves:    {"enchant_max_shelves", enchantMaxShelves},
+	TuneAnvilTooExpensive:    {"anvil_too_expensive", anvilTooExpensive},
+	TuneAnvilNameLimit:       {"anvil_name_limit", anvilNameOnly},
+	TuneAnvilStackCost:       {"anvil_stack_cost", anvilStackCost},
+	TuneAnvilMergeBonus:      {"anvil_merge_bonus", anvilMergeBonus},
+	TuneAnvilRepairableBonus: {"anvil_repairable_bonus", anvilRepairableBonus},
+	TuneAnvilMaterialShare:   {"anvil_material_share", anvilMaterialShare},
+	TuneAnvilMergeCost:       {"anvil_merge_cost", anvilMergeCost},
+	TuneGrindstoneBonusShare: {"grindstone_bonus_share", grindstoneBonusShare},
+	TuneGrindstoneXPScale:    {"grindstone_xp_scale", 1},
 }
 
 // tuneTable is one value per Tune.

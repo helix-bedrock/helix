@@ -55,6 +55,9 @@ type expectedSlot struct {
 	slot      byte
 	item      ItemStack
 	left      uint8
+	// upTo lets the client use less than left: a plugin changed what is taken, and the
+	// client still acts on vanilla's sum.
+	upTo bool
 }
 
 // expectedAnywhere is an ingredient and how many items must still be consumed for it.
@@ -450,7 +453,7 @@ func (p *Player) finishCraft() uint8 {
 		}
 	}
 	for _, e := range c.slots {
-		if e.left != 0 {
+		if e.left != 0 && !e.upTo {
 			return protocol.ItemStackResponseStatusExpectedItemSlotNotFullyConsumed
 		}
 	}

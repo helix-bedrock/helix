@@ -109,6 +109,16 @@ type Enchantment struct {
 	AfterHurt func(wearer, attacker *Player, level int16)
 	// Mends lets an item with it drink experience as it is picked up.
 	Mends bool
+	// Knockback makes its level count toward a hit's extra knockback.
+	Knockback bool
+	// SilkTouch and Fortune make its level count in what a broken block drops.
+	SilkTouch, Fortune bool
+	// StaysWorn keeps armour with it on a player out of creative.
+	StaysWorn bool
+	// VanishesOnDeath destroys an item with it when the player dies keeping its items.
+	VanishesOnDeath bool
+	// Curse stays on through a grindstone and pays nothing back.
+	Curse bool
 }
 
 // compatibleWith is the enchantment's rule against other.
@@ -137,6 +147,26 @@ func newEnchantTable(all map[int16]*Enchantment) *enchantTable {
 	return t
 }
 
+// itemHas reports whether an enchantment on s is registered and passes want. A removed
+// enchantment counts for nothing.
+func (g *gameplay) itemHas(s ItemStack, want func(e *Enchantment) bool) bool {
+	found := false
+	enchantLevels(s, func(id, _ int16) {
+		if e, ok := g.enchant(id); ok && want(e) {
+			found = true
+		}
+	})
+	return found
+}
+
+// rules is what enchanting reads about items and blocks. Runs: anywhere.
+func (g *gameplay) rules() *enchanting {
+	if r := g.enchantRules.Load(); r != nil {
+		return r
+	}
+	return newEnchanting()
+}
+
 // enchant returns the enchantment with id. Runs: anywhere.
 func (g *gameplay) enchant(id int16) (*Enchantment, bool) {
 	t := g.enchants.Load()
@@ -154,6 +184,16 @@ func (s *Host) Enchantment(id int16) (Enchantment, bool) {
 		return Enchantment{}, false
 	}
 	return *e, true
+}
+
+// Enchantments returns a copy of every registered enchantment, in ID order. Runs: anywhere.
+func (s *Host) Enchantments() []Enchantment {
+	t := s.game.enchants.Load()
+	out := make([]Enchantment, len(t.order))
+	for i, e := range t.order {
+		out[i] = *e
+	}
+	return out
 }
 
 // EditEnchantment changes the enchantment with id while the server runs. fn gets a
@@ -209,6 +249,8 @@ type enchanting struct {
 	transmit  map[string]bool
 	bookshelf string
 	words     []string
+	// material is what a table's lapis slot takes; "" takes anything.
+	material string
 	// repairable are the items with BDS's repairable component, which work out repairs
 	// through their own rules.
 	repairable map[string]*repairRules
@@ -218,6 +260,105 @@ func newEnchanting() *enchanting {
 	return &enchanting{items: map[string]data.EnchantItem{}, repair: map[string]map[string]bool{}, transmit: map[string]bool{}, repairable: map[string]*repairRules{}}
 }
 
+// clone is a copy that can be changed without touching what others read.
+func (r *enchanting) clone() *enchanting {
+	c := *r
+	c.items, c.repair, c.transmit = maps.Clone(r.items), maps.Clone(r.repair), maps.Clone(r.transmit)
+	return &c
+}
+
+// setItem, setRepair, setPath are one rule's change, for boot and while running.
+func (r *enchanting) setItem(item string, slot uint32, value int32) {
+	if slot == 0 && value == 0 {
+		delete(r.items, item)
+		return
+	}
+	r.items[item] = data.EnchantItem{Slot: slot, Value: value}
+}
+
+func (r *enchanting) setRepair(item string, materials []string) {
+	if len(materials) == 0 {
+		delete(r.repair, item)
+		return
+	}
+	r.repair[item] = set(materials)
+}
+
+func (r *enchanting) setPath(block string, passes bool) {
+	if passes {
+		r.transmit[block] = true
+	} else {
+		delete(r.transmit, block)
+	}
+}
+
+// editRules swaps in changed rules. Runs: anywhere.
+func (s *Host) editRules(fn func(r *enchanting)) {
+	for {
+		old := s.game.enchantRules.Load()
+		next := old.clone()
+		fn(next)
+		if s.game.enchantRules.CompareAndSwap(old, next) {
+			return
+		}
+	}
+}
+
+// SetItemEnchantable is Setup.SetItemEnchantable while running. Runs: anywhere.
+func (s *Host) SetItemEnchantable(item string, slot uint32, value int32) {
+	s.editRules(func(r *enchanting) { r.setItem(item, slot, value) })
+}
+
+// SetItemRepair is Setup.SetItemRepair while running. Runs: anywhere.
+func (s *Host) SetItemRepair(item string, materials ...string) {
+	s.editRules(func(r *enchanting) { r.setRepair(item, materials) })
+}
+
+// SetEnchantPathBlock is Setup.SetEnchantPathBlock while running. Runs: anywhere.
+func (s *Host) SetEnchantPathBlock(block string, passes bool) {
+	s.editRules(func(r *enchanting) { r.setPath(block, passes) })
+}
+
+// SetEnchantBookshelf is Setup.SetEnchantBookshelf while running. Runs: anywhere.
+func (s *Host) SetEnchantBookshelf(block string) {
+	s.editRules(func(r *enchanting) { r.bookshelf = block })
+}
+
+// SetEnchantMaterial is Setup.SetEnchantMaterial while running. Runs: anywhere.
+func (s *Host) SetEnchantMaterial(item string) {
+	s.editRules(func(r *enchanting) { r.material = item })
+}
+
+// RemoveEnchantment takes a registered enchantment out, vanilla's too: no table offers
+// it, and on items it counts for nothing. Not usable after the Setup froze.
+func (s *Setup) RemoveEnchantment(id int16) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	delete(s.h.game.enchants, id)
+	return nil
+}
+
+// SetEnchantBookshelf sets the block that powers an enchanting table. Not usable after
+// the Setup froze.
+func (s *Setup) SetEnchantBookshelf(block string) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.enchanting.bookshelf = block
+	return nil
+}
+
+// SetEnchantMaterial sets the item a table's lapis slot takes; "" takes anything. Not
+// usable after the Setup froze.
+func (s *Setup) SetEnchantMaterial(item string) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.enchanting.material = item
+	return nil
+}
+
 // SetItemEnchantable sets which enchantments an item takes (a bit set of slots) and how
 // well (a table's power rises with value). Zero for both takes it off tables. Not
 // usable after the Setup froze.
@@ -225,7 +366,7 @@ func (s *Setup) SetItemEnchantable(item string, slot uint32, value int32) error 
 	if s.h.frozen {
 		return registry.ErrFrozen
 	}
-	s.h.game.enchanting.items[item] = data.EnchantItem{Slot: slot, Value: value}
+	s.h.game.enchanting.setItem(item, slot, value)
 	return nil
 }
 
@@ -234,7 +375,7 @@ func (s *Setup) SetItemRepair(item string, materials ...string) error {
 	if s.h.frozen {
 		return registry.ErrFrozen
 	}
-	s.h.game.enchanting.repair[item] = set(materials)
+	s.h.game.enchanting.setRepair(item, materials)
 	return nil
 }
 
@@ -244,11 +385,7 @@ func (s *Setup) SetEnchantPathBlock(block string, passes bool) error {
 	if s.h.frozen {
 		return registry.ErrFrozen
 	}
-	if passes {
-		s.h.game.enchanting.transmit[block] = true
-	} else {
-		delete(s.h.game.enchanting.transmit, block)
-	}
+	s.h.game.enchanting.setPath(block, passes)
 	return nil
 }
 
@@ -267,7 +404,7 @@ func vanillaEnchanting(s *Setup) error {
 		return err
 	}
 	s.h.game.enchanting = &enchanting{
-		items: d.Items, repair: rep, transmit: set(d.Transmit), bookshelf: d.Bookshelf, words: d.OptionWords, repairable: rules,
+		items: d.Items, repair: rep, transmit: set(d.Transmit), bookshelf: d.Bookshelf, words: d.OptionWords, repairable: rules, material: itemLapis,
 	}
 	for _, v := range d.Enchantments {
 		e := enchantmentFromData(v)
@@ -321,6 +458,16 @@ func vanillaEnchantHooks(e *Enchantment) {
 		e.DamageChance = unbreakingChance
 	case EnchantMending:
 		e.Mends = true
+	case EnchantKnockback:
+		e.Knockback = true
+	case enchantSilkTouch:
+		e.SilkTouch = true
+	case enchantFortune:
+		e.Fortune = true
+	case enchantBinding:
+		e.StaysWorn, e.Curse = true, true
+	case enchantVanishing:
+		e.VanishesOnDeath, e.Curse = true, true
 	case EnchantImpaling:
 		e.Melee = impalingDamage
 	case EnchantDensity:
@@ -432,7 +579,7 @@ func (g *gameplay) activationOf(id int16) uint8 {
 
 // itemEnchants reads the enchantments on s.
 func (g *gameplay) itemEnchants(s ItemStack) enchantList {
-	l := enchantList{slot: g.enchanting.items[s.Name].Slot}
+	l := enchantList{slot: g.rules().items[s.Name].Slot}
 	enchantLevels(s, func(id, level int16) {
 		a := g.activationOf(id)
 		l.lists[a] = append(l.lists[a], EnchantLevel{ID: id, Level: level})
@@ -570,4 +717,45 @@ func (g *gameplay) enchantWeight(l enchantList, book bool) int32 {
 		}
 	}
 	return sum
+}
+
+// Enchants returns the enchantments saved on the item, in the order it saves them.
+func (s ItemStack) Enchants() []EnchantLevel { return flatEnchants(s) }
+
+// WithEnchant returns the item with an enchantment at level, whatever the rules say:
+// level replaces one already there. Use Host.AddEnchant for the rules.
+func (s ItemStack) WithEnchant(id, level int16) ItemStack {
+	list := s.WithoutEnchant(id).Enchants()
+	var l enchantList
+	l.lists[0] = append(list, EnchantLevel{ID: id, Level: level})
+	writeEnchants(&s, l)
+	return s
+}
+
+// WithoutEnchant returns the item without an enchantment.
+func (s ItemStack) WithoutEnchant(id int16) ItemStack {
+	var l enchantList
+	for _, v := range flatEnchants(s) {
+		if v.ID != id {
+			l.lists[0] = append(l.lists[0], v)
+		}
+	}
+	writeEnchants(&s, l)
+	return s
+}
+
+// RepairCost returns what anvils have added to the item's price.
+func (s ItemStack) RepairCost() int32 { return repairCost(s) }
+
+// WithRepairCost returns the item with that price.
+func (s ItemStack) WithRepairCost(cost int32) ItemStack { return withTag(s, repairCostTag, cost) }
+
+// AddEnchant adds an enchantment by the rules a table's own go by, and reports whether
+// it went on. A book becomes an enchanted book. Runs: anywhere.
+func (s *Host) AddEnchant(it ItemStack, id, level int16) (ItemStack, bool) {
+	var one enchantList
+	one.lists[0] = []EnchantLevel{{ID: id, Level: level}}
+	before := flatEnchants(it)
+	s.game.applyEnchants(&it, one)
+	return it, !slices.Equal(before, flatEnchants(it))
 }

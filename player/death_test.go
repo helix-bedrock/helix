@@ -8,6 +8,7 @@ func TestDropSlots(t *testing.T) {
 	p := testPlayer(t)
 	var thrown []string
 	p.s.game = &gameplay{}
+	p.s.game.enchants.Store(newEnchantTable(map[int16]*Enchantment{enchantVanishing: {ID: enchantVanishing, VanishesOnDeath: true}}))
 	p.s.game.sys.DropItem = func(_ *Player, s ItemStack, randomly bool) bool {
 		if !randomly {
 			t.Error("a death throws at random")
@@ -18,7 +19,7 @@ func TestDropSlots(t *testing.T) {
 	slots := []ItemStack{
 		{Name: "minecraft:stone", Count: 1},
 		{Name: "minecraft:dirt", Count: 1, Tag: map[string]any{keepOnDeathTag: uint8(1)}},
-		{Name: "minecraft:emerald", Count: 1, Tag: map[string]any{"ench": []any{map[string]any{"id": int16(curseOfVanishing)}}}},
+		{Name: "minecraft:emerald", Count: 1, Tag: map[string]any{"ench": []any{map[string]any{"id": enchantVanishing}}}},
 	}
 	p.dropSlots(slots, true)
 	if !slots[2].Empty() || slots[0].Empty() || len(thrown) != 0 {
