@@ -2,6 +2,7 @@ package player
 
 import (
 	"math/rand/v2"
+	"strings"
 	"testing"
 
 	"github.com/helix-bedrock/helix/world"
@@ -249,6 +250,35 @@ func TestEnchantSwappedItem(t *testing.T) {
 	status, _ := p.craftEnchant(&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: p.enchant.options[0].NetworkID, NumberOfCrafts: 1})
 	if status != protocol.ItemStackResponseStatusFailedToEnchant {
 		t.Fatalf("status %d", status)
+	}
+}
+
+// TestAnvilNameLength checks a name over the text box's limit is refused, counted in
+// characters, and that the limit can be changed.
+func TestAnvilNameLength(t *testing.T) {
+	p, _ := apiWorld(t, func(*Setup) {})
+	p.rng = rand.New(rand.NewPCG(1, 2))
+	p.attributes.set(attrLevel, 30)
+	p.window.anvil, p.window.open = true, true
+	p.inventory.ui[anvilFirstSlot] = p.s.freshStack(stack("minecraft:stick", 0))
+	try := func(name string) uint8 {
+		t.Helper()
+		p.requests.work = p.inventory
+		p.requests.craft = craftState{}
+		p.requests.filter = []string{name}
+		status, _ := p.craftAnvil(&protocol.CraftRecipeOptionalStackRequestAction{})
+		return status
+	}
+	if s := try(strings.Repeat("é", anvilNameLength)); s != protocol.ItemStackResponseStatusOK {
+		t.Fatalf("at the limit: status %d", s)
+	}
+	long := strings.Repeat("a", anvilNameLength+1)
+	if s := try(long); s != protocol.ItemStackResponseStatusInvalidCraftRequest {
+		t.Fatalf("over the limit: status %d", s)
+	}
+	p.SetTuning(TuneAnvilNameLength, anvilNameLength+1)
+	if s := try(long); s != protocol.ItemStackResponseStatusOK {
+		t.Fatalf("limit raised: status %d", s)
 	}
 }
 

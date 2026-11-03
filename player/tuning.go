@@ -135,6 +135,8 @@ const (
 	TuneAnvilMergeCost
 	// TuneAnvilWearChance is the chance a use out of creative wears the anvil a step.
 	TuneAnvilWearChance
+	// TuneAnvilNameLength is the most characters a name given on an anvil may have.
+	TuneAnvilNameLength
 	// TuneGrindstoneBonusShare is the part of durability two merged items get on top (20
 	// is a twentieth), TuneGrindstoneXPScale multiplies the experience given back.
 	TuneGrindstoneBonusShare
@@ -219,6 +221,7 @@ var tuneSpecs = [tuneCount]tuneSpec{
 	TuneAnvilMaterialShare:   {"anvil_material_share", anvilMaterialShare},
 	TuneAnvilMergeCost:       {"anvil_merge_cost", anvilMergeCost},
 	TuneAnvilWearChance:      {"anvil_wear_chance", anvilWearChance},
+	TuneAnvilNameLength:      {"anvil_name_length", anvilNameLength},
 	TuneGrindstoneBonusShare: {"grindstone_bonus_share", grindstoneBonusShare},
 	TuneGrindstoneXPScale:    {"grindstone_xp_scale", 1},
 }

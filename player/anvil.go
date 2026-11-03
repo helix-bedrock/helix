@@ -4,6 +4,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
@@ -36,6 +37,11 @@ const (
 	anvilTooExpensive = 40
 	// anvilWearChance is the chance a use out of creative wears the anvil a step.
 	anvilWearChance = 0.12
+	// anvilNameLength is the most characters a name may have, from the text box's
+	// max_length in bedrock-samples' anvil_screen.json. BDS's anvil code has no limit, but
+	// the name is the client's text kept on the item, so longer ones are refused: the
+	// lead's decision, and the game's own screen can never send one.
+	anvilNameLength = 30
 	anvilNameOnly   = 39
 	// anvilStackCost is what merging enchantments onto a stack costs, whatever they are.
 	anvilStackCost = 40
@@ -447,6 +453,9 @@ func (p *Player) craftAnvil(a *protocol.CraftRecipeOptionalStackRequestAction) (
 	var name string
 	if i := int(a.FilterStringIndex); i >= 0 && i < len(st.filter) {
 		name = st.filter[i]
+	}
+	if utf8.RuneCountInString(name) > int(p.Tuning(TuneAnvilNameLength)) {
+		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
 	}
 	g := p.s.game
 	out := g.sys.Anvil(p, first, second, name)

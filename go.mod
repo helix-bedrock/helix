@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/helix-bedrock/helix-data v0.0.0-20261103134954-826b947fb1e9
 	github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca
-	github.com/helix-bedrock/protocol v0.0.0-20261103160056-b062b93d7551
+	github.com/helix-bedrock/protocol v0.0.0-20261103164222-3ff45038b903
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
 	github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551
 	github.com/pion/ice/v4 v4.4.8

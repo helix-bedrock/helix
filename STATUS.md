@@ -173,7 +173,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   `Enchantment` struct plugins use, from helix-data's `bds/enchantments.json`: max level, weight, slots, group, costs,
   compatibility and every hook can be changed or removed in `Setup`, or while running with `Host.EditEnchantment`, `SetEnchantment`
   and `RemoveEnchantment`; a removed one does nothing on items, Silk Touch and curses included. `Systems.EnchantRequire` sets what a table's option
-  asks for (level, levels taken, lapis), `SetEnchantMaterial` the item in place of lapis, `Systems.Bookshelves` the shelf count, and the anvil's and grindstone's numbers are Tunes.
+  asks for (level, levels taken, lapis), `SetEnchantMaterial` the item in place of lapis, `Systems.Bookshelves` the shelf count, and the anvil's and grindstone's numbers are Tunes. Anvils wear as BDS's do, and a name over 30 characters is refused (`TuneAnvilNameLength`, the limit of the game's own text box; BDS has none).
   Items have `Enchants`, `WithEnchant`, `WithoutEnchant`, `RepairCost`; players `EnchantSeed` and `SetEnchantOptions`. **Enchanting tables** (BDS's seed and draw, bookshelves, lapis and levels, `OnEnchantOptions`,
   `OnEnchant`), **anvils** (materials, merging, books, names, the price of earlier work, `OnAnvil`) and **grindstones**
   (curses kept, experience back, `OnGrindstone`) work, each with a `Systems` hook. **Effects built:** Thorns, Breach, Density, Impaling in water and
