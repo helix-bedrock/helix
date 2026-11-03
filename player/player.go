@@ -90,6 +90,8 @@ type Player struct {
 	shownSlot uint8
 	// shownArmor is the stack IDs of the armour those who see the player were shown.
 	shownArmor [armorSize]int32
+	// shownOffhand is the offhand item those who see the player were shown.
+	shownOffhand ItemStack
 	// breakSpeed multiplies the player's break speed; reachScale its
 	// reach. Both 1 by default.
 	breakSpeed float32

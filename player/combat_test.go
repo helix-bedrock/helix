@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -95,6 +96,30 @@ func TestArmorShown(t *testing.T) {
 	p.inventory.armor[0] = ItemStack{}
 	if !p.armorChanged() {
 		t.Error("armour taken off, not noticed")
+	}
+}
+
+// TestOffhandShown notices a new item and a new count, and sends BDS's window.
+func TestOffhandShown(t *testing.T) {
+	p := testPlayer(t)
+	if p.offhandChanged() {
+		t.Fatal("nothing held, yet changed")
+	}
+	p.inventory.offhand = ItemStack{Name: "minecraft:totem_of_undying", Count: 1, netID: 9}
+	if !p.offhandChanged() {
+		t.Fatal("new item not noticed")
+	}
+	pk := p.offhandEquipment()
+	if pk.WindowID != protocol.WindowIDOffHand || pk.InventorySlot != 0 || pk.HotBarSlot != 0 || pk.NewItem.Stack.Count != 1 {
+		t.Errorf("packet = %+v", pk)
+	}
+	p.showOffhand()
+	if p.offhandChanged() {
+		t.Error("shown, still changed")
+	}
+	p.inventory.offhand.Count = 2
+	if !p.offhandChanged() {
+		t.Error("new count not noticed")
 	}
 }
 

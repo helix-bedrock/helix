@@ -298,6 +298,7 @@ func (p *Player) Give(s ItemStack) ItemStack {
 		p.send(&packet.InventorySlot{WindowID: protocol.WindowIDOffHand, NewItem: off.network(p.s.reg)})
 	}
 	if s.Count == 0 {
+		p.sendEquipment()
 		p.flush()
 		return ItemStack{}
 	}
@@ -321,6 +322,9 @@ func (p *Player) sendEquipment() {
 	if p.armorChanged() {
 		p.showArmor()
 	}
+	if p.offhandChanged() {
+		p.showOffhand()
+	}
 	inv := &p.inventory
 	held := inv.Held()
 	if p.entity == nil || (held.netID == p.shownHeld.netID && held.Count == p.shownHeld.Count && inv.held == p.shownSlot) {
@@ -334,6 +338,28 @@ func (p *Player) sendEquipment() {
 	r.Broadcast(p.blockPos(), &packet.MobEquipment{
 		EntityRuntimeID: p.runtimeID, NewItem: held.network(p.s.reg), InventorySlot: inv.held, HotBarSlot: inv.held, WindowID: protocol.WindowIDInventory,
 	}, p.viewer)
+}
+
+// offhandChanged reports whether the offhand item differs from what those who see the
+// player were last shown.
+func (p *Player) offhandChanged() bool {
+	off := &p.inventory.offhand
+	return off.netID != p.shownOffhand.netID || off.Count != p.shownOffhand.Count
+}
+
+// offhandEquipment is the offhand item as those who see the player get it, as BDS
+// sends a change of that slot: slots 0 in the offhand window.
+func (p *Player) offhandEquipment() *packet.MobEquipment {
+	return &packet.MobEquipment{EntityRuntimeID: p.runtimeID, NewItem: p.inventory.offhand.network(p.s.reg), WindowID: protocol.WindowIDOffHand}
+}
+
+// showOffhand shows those who see the player its offhand item. Its own client has it
+// from its inventory.
+func (p *Player) showOffhand() {
+	p.shownOffhand = p.inventory.offhand
+	if p.entity != nil {
+		p.entity.Send(p.offhandEquipment())
+	}
 }
 
 // armorChanged reports whether what the player wears differs from what those who see

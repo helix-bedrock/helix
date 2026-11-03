@@ -33,7 +33,7 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		GameType: p.gameMode, EntityMetadata: meta,
 		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().network(p.s.reg),
 		DeviceID: string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
-	}, p.armorEquipment()}
+	}, p.armorEquipment(), p.offhandEquipment()}
 }
 
 // broadcast sends packets to every other player online, from the global
