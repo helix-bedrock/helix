@@ -100,11 +100,12 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		if err != nil {
 			return err
 		}
-		circuits, err := circuit.NewTicker(s.reg.Blocks, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks)))))
+		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks)))))
 		if err != nil {
 			return err
 		}
 		conf.Ticker = circuits
+		s.circuits = circuits
 	}
 	r, _ := mcdb.Overworld.Range()
 	switch {

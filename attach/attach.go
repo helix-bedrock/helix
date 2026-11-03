@@ -27,6 +27,14 @@ const (
 	water        = "minecraft:water"
 	flowingWater = "minecraft:flowing_water"
 	lava         = "minecraft:lava"
+	glowstone    = "minecraft:glowstone"
+	lamp         = "minecraft:redstone_lamp"
+	litLamp      = "minecraft:lit_redstone_lamp"
+	wire         = "minecraft:redstone_wire"
+	repeaterOff  = "minecraft:unpowered_repeater"
+	repeaterOn   = "minecraft:powered_repeater"
+	comparator   = "minecraft:unpowered_comparator"
+	comparatorOn = "minecraft:powered_comparator"
 	flowingLava  = "minecraft:flowing_lava"
 )
 
@@ -203,6 +211,12 @@ func (t *Table) onFloor(r *world.Region, pos cube.Pos) bool {
 // the block, wherever the player clicked. True for every other block.
 func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cube.Face) bool {
 	name := t.blocks.Name(block)
+	switch name {
+	case wire:
+		return t.WireSurvives(r, pos)
+	case repeaterOff, repeaterOn, comparator, comparatorOn:
+		return t.DiodeSurvives(r, pos)
+	}
 	switch t.kinds[name] {
 	case kindTorch:
 		return t.torchMayPlace(r, pos, name)
@@ -221,6 +235,36 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	}
 	return true
 }
+
+// WireSurvives is BDS's canSurvive for redstone wire: no water in the block, and
+// below it a top face that holds things, glowstone or a lamp.
+func (t *Table) WireSurvives(r *world.Region, pos cube.Pos) bool {
+	if b, ok := r.Block(pos, 1); ok {
+		if n := t.blocks.Name(b); n == water || n == flowingWater {
+			return false
+		}
+	}
+	b, ok := r.Block(pos.Side(cube.FaceDown), 0)
+	if !ok {
+		return false
+	}
+	if t.Supports(b, cube.FaceUp) {
+		return true
+	}
+	n := t.blocks.Name(b)
+	return n == glowstone || n == lamp || n == litLamp
+}
+
+// DiodeSurvives is BDS's canSurvive for repeaters and comparators: below them a
+// top face that holds things.
+func (t *Table) DiodeSurvives(r *world.Region, pos cube.Pos) bool {
+	b, ok := r.Block(pos.Side(cube.FaceDown), 0)
+	return ok && t.Supports(b, cube.FaceUp)
+}
+
+// Solid is the check for a solid block, as a ladder makes of what it leans on and
+// a comparator of what it reads through.
+func (t *Table) Solid(block uint32) bool { return t.solid[t.blocks.Name(block)] }
 
 // torchMayPlace refuses a torch in a liquid (an underwater torch only in lava)
 // and needs a holder on one of the sides or below. BDS looks at the clicked face

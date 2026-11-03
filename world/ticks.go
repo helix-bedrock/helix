@@ -44,6 +44,11 @@ type RegionTicker interface {
 	ChunkTicked(r *Region, pos mcdb.ChunkPos)
 	// ChunkArrived runs when a chunk has loaded into the region.
 	ChunkArrived(r *Region, pos mcdb.ChunkPos)
+	// RegionsMerged runs when dst took over everything src held. Neither is
+	// ticking and src ends after this.
+	RegionsMerged(dst, src *Region)
+	// RegionSplit runs when n took the chunks in says from r. Neither is ticking.
+	RegionSplit(r, n *Region, in func(pos mcdb.ChunkPos) bool)
 }
 
 const (
@@ -178,6 +183,35 @@ func (r *Region) ScheduleRandomTick(pos cube.Pos, block uint32, delay, priority 
 func (r *Region) HasScheduledTick(pos cube.Pos, block uint32) bool {
 	c, ok := r.chunkAt(pos)
 	return ok && (c.ticks.has(r, pos, block) || c.randomTicks.has(r, pos, block))
+}
+
+// CancelTick removes every tick for block's type waiting at pos on the ticking
+// queue, as a lamp that gets power again does. Runs: owner.
+func (r *Region) CancelTick(pos cube.Pos, block uint32) {
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return
+	}
+	typ, _ := r.d.conf.Blocks.Type(block)
+	q := &c.ticks
+	kept := q.ticks[:0]
+	for _, t := range q.ticks {
+		if tt, _ := r.d.conf.Blocks.Type(t.block); t.pos != pos || tt != typ {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) == len(q.ticks) {
+		return
+	}
+	q.ticks = kept
+	// A sorted list is a valid heap.
+	slices.SortFunc(q.ticks, func(a, b scheduledTick) int {
+		if a.before(&b) {
+			return -1
+		}
+		return 1
+	})
+	c.ticksDirty = true
 }
 
 // ScheduledTickAt reports whether a tick for block's type is waiting at pos

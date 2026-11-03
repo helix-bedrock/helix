@@ -109,7 +109,10 @@ func Use(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, y
 		delay, _ := blocks.States(block)[stateDelay].(int32)
 		setAndUpdate(r, pos, with(blocks, block, stateDelay, (delay+1)%repeaterDelays))
 	case kindComparator:
-		setAndUpdate(r, pos, with(blocks, block, stateSubtract, flag(!bit(blocks, block, stateSubtract))))
+		subtract := bit(blocks, block, stateSubtract)
+		next := with(blocks, block, stateSubtract, flag(!subtract))
+		sound(blocks, r, pos, choose(subtract, packet.SoundEventPowerOn, packet.SoundEventPowerOff), next)
+		setAndUpdate(r, pos, next)
 	default:
 		return false
 	}

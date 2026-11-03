@@ -1,7 +1,7 @@
 // Package circuit connects vanilla's redstone blocks to the redstone library, as
 // BDS 1.26.60's blocks do: which component each block makes, and what it does when
 // its power changes. Each region has a System of its own; regions that merge or
-// split build theirs again from the blocks, as BDS does when a chunk loads.
+// split move their components with their chunks, so nothing a player sees changes.
 package circuit
 
 import (
@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -31,6 +32,8 @@ const (
 	statePressed  = "button_pressed_bit"
 	stateFacing   = "facing_direction"
 	stateLever    = "lever_direction"
+	// stateFacingNamed is the facing state of observers.
+	stateFacingNamed = "minecraft:facing_direction"
 )
 
 // Blocks that come in a lit and an unlit form.
@@ -46,7 +49,6 @@ const (
 	nameCompare     = "minecraft:powered_comparator"
 	nameCompareOff  = "minecraft:unpowered_comparator"
 	nameLever       = "minecraft:lever"
-	nameGlowstone   = "minecraft:glowstone"
 )
 
 // lampOffDelay is how many ticks a lamp stays lit after losing power.
@@ -121,17 +123,27 @@ func componentKind(k kind) redstone.Kind {
 	return redstone.KindConsumer
 }
 
+// FallFunc removes a block that lost what held it and throws out its drops.
+type FallFunc func(r *world.Region, pos cube.Pos, block uint32)
+
 // Ticker gives a world its circuits and hands every other block matter to the
 // BlockTicker it embeds.
 type Ticker struct {
 	world.BlockTicker
 	blocks *registry.Blocks
-	// power and kinds are by block state. They are made once and only read, as
-	// regions tick in parallel.
+	items  *registry.Items
+	attach *attach.Table
+	fall   FallFunc
+	// These are by block state. They are made once and only read, as regions tick
+	// in parallel.
 	power []redstone.Power
 	kinds []kind
-	// stops says which states stop wire stepping up past them.
+	// joins is how wire connects to a state, stops whether a state is a conductor
+	// that is no signal source, which keeps wire from stepping past it.
+	joins []join
 	stops []bool
+	// signals is what a comparator reads from a state.
+	signals []signal
 }
 
 // localKey finds a region's circuit state on it.
@@ -143,29 +155,35 @@ type regionCircuit struct {
 	r      *world.Region
 	sys    *redstone.System
 	seeded bool
+	// recheck asks for paths stopped at chunks a merge brought in to be tried again.
+	recheck bool
 }
 
 // NewTicker returns a Ticker with BDS's conductivity.
-func NewTicker(blocks *registry.Blocks, next world.BlockTicker) (*Ticker, error) {
+func NewTicker(reg *registry.Registry, attached *attach.Table, fall FallFunc, next world.BlockTicker) (*Ticker, error) {
+	blocks := reg.Blocks
 	table, err := data.RedstoneConductivity()
 	if err != nil {
 		return nil, fmt.Errorf("circuit: %w", err)
 	}
-	t := &Ticker{BlockTicker: next, blocks: blocks}
+	t := &Ticker{BlockTicker: next, blocks: blocks, items: reg.Items, attach: attached, fall: fall}
 	n := blocks.Count()
 	t.power, t.kinds, t.stops = make([]redstone.Power, n), make([]kind, n), make([]bool, n)
+	t.joins, t.signals = make([]join, n), make([]signal, n)
 	for id := range uint32(n) { //nolint:gosec // states fit
 		name := blocks.Name(id)
 		t.kinds[id] = kindOf(name)
+		t.joins[id] = joinOf(name)
+		t.signals[id] = signalOf(name)
 		answer := table[name].Power
 		if c := table[name]; c.State != "" {
 			answer = c.Values[fmt.Sprint(blocks.States(id)[c.State])]
 		}
 		switch answer {
 		case "conductor":
-			t.power[id], t.stops[id] = redstone.PowerConductor, true
+			t.power[id], t.stops[id] = redstone.PowerConductor, !signalSource(name)
 		case "insulator":
-			t.power[id], t.stops[id] = redstone.PowerInsulator, name == nameGlowstone
+			t.power[id] = redstone.PowerInsulator
 		}
 	}
 	return t, nil
@@ -196,10 +214,32 @@ func (t *Ticker) BeforeBlockTicks(r *world.Region) {
 		c.seeded = true
 		r.EachChunk(func(pos mcdb.ChunkPos) { t.seedChunk(c, pos) })
 	}
+	if c.recheck {
+		c.recheck = false
+		c.sys.RecheckWaiting(c)
+	}
 	c.sys.UpdateDependencies(c)
 	if c.sys.Tick() {
 		c.sys.Evaluate(c)
 	}
+}
+
+// RegionsMerged moves src's circuits into dst. A region that never ticked has
+// nothing to move: its chunks are seeded with dst's next tick.
+func (t *Ticker) RegionsMerged(dst, src *world.Region) {
+	d, s := t.circuitOf(dst), t.circuitOf(src)
+	d.sys.Merge(s.sys)
+	d.seeded = d.seeded && s.seeded
+	d.recheck = true
+}
+
+// RegionSplit moves the circuits of the chunks that left r to n.
+func (t *Ticker) RegionSplit(r, n *world.Region, in func(pos mcdb.ChunkPos) bool) {
+	from, to := t.circuitOf(r), t.circuitOf(n)
+	from.sys.SplitOff(to.sys, func(origin redstone.Pos) bool {
+		return in(mcdb.ChunkPos{origin.X >> 4, origin.Z >> 4})
+	})
+	to.seeded = from.seeded
 }
 
 // ChunkTicked tells the blocks of a chunk what changed. Runs: owner of the region.
@@ -225,7 +265,7 @@ func (t *Ticker) isRedstone(block uint32) bool { return t.kind(block) != kindNon
 // seedChunk makes a component for each redstone block in a chunk.
 func (t *Ticker) seedChunk(c *regionCircuit, pos mcdb.ChunkPos) {
 	c.r.FindBlocks(pos, t.isRedstone, func(p cube.Pos, block uint32) {
-		t.setup(c, p, block)
+		t.setup(c, p, block, true)
 	})
 }
 
@@ -243,20 +283,26 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 	}
 	p := toPos(pos)
 	k := t.kind(block)
-	if old := c.sys.At(p); old != nil && (k == kindNone || old.Kind() != componentKind(k)) {
+	old := c.sys.At(p)
+	wasWire := old != nil && old.Kind() == redstone.KindWire
+	if old != nil && (k == kindNone || old.Kind() != componentKind(k)) {
 		c.sys.Remove(p)
 	}
 	if k != kindNone {
-		t.setup(c, pos, block)
+		t.setup(c, pos, block, false)
 	}
 	c.sys.Invalidate(p)
-	if k == kindWire {
+	switch {
+	case k == kindWire:
 		t.refreshWire(c, pos)
+		t.tickWireAround(c, pos, false)
+	case wasWire:
+		t.tickWireAround(c, pos, true)
 	}
-	t.tickWireAround(r, pos)
 }
 
-// NeighbourChanged lets a burnt out torch try again and joins wire up.
+// NeighbourChanged lets a burnt out torch try again, has wire look at its
+// connections and whatever lost its support fall, each a tick later as BDS does.
 func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uint32, layer uint8) {
 	if layer == 0 {
 		switch t.kind(block) {
@@ -265,21 +311,29 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 				comp.ResetBurnOut()
 			}
 		case kindWire:
-			t.refreshWire(t.circuitOf(r), pos)
+			if !t.attach.WireSurvives(r, pos) || t.wireState(r, pos, block) != block {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
+		case kindRepeater, kindComparator:
+			if !t.attach.DiodeSurvives(r, pos) {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
 		}
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }
 
 // tickWireAround has the wire on the levels above and below pos look at its
-// connections next tick: it is not next to pos, so it hears nothing else.
-func (t *Ticker) tickWireAround(r *world.Region, pos cube.Pos) {
+// connections next tick: it is not next to pos, so it hears nothing else. When
+// wire went away every one does; when wire came only those that would change.
+func (t *Ticker) tickWireAround(c *regionCircuit, pos cube.Pos, removed bool) {
 	for _, f := range wireSides {
 		n := fromPos(toPos(pos).Side(f.face))
-		for _, dy := range [...]int{-1, 1} {
+		for _, dy := range [...]int{1, -1} {
 			at := cube.Pos{n[0], n[1] + dy, n[2]}
-			if b, ok := r.Block(at, 0); ok && t.kind(b) == kindWire {
-				r.ScheduleTick(at, b, 1, 0)
+			b, ok := c.r.Block(at, 0)
+			if ok && t.kind(b) == kindWire && (removed || t.wireState(c.r, at, b) != b) {
+				c.r.ScheduleTick(at, b, 1, 0)
 			}
 		}
 	}
@@ -307,16 +361,12 @@ const (
 // wireNames are the state values of a connection.
 var wireNames = [...]string{"none", "side", "up"}
 
-// refreshWire works out how the wire at pos joins its sides. With one side joined
-// the wire runs on straight through; with none it joins all four.
-func (t *Ticker) refreshWire(c *regionCircuit, pos cube.Pos) {
-	block, ok := c.r.Block(pos, 0)
-	if !ok || t.kind(block) != kindWire {
-		return
-	}
+// wireState is the state wire at pos should have. With one side joined the wire
+// runs on straight through; with none it joins all four.
+func (t *Ticker) wireState(r *world.Region, pos cube.Pos, block uint32) uint32 {
 	var v [4]int
 	for i, f := range wireSides {
-		v[i] = t.wireConnection(c.r, pos, f.face)
+		v[i] = t.wireConnection(r, pos, f.face)
 	}
 	n, e, s, w := v[0], v[1], v[2], v[3]
 	if n|s|v[3] == 0 {
@@ -335,20 +385,33 @@ func (t *Ticker) refreshWire(c *regionCircuit, pos cube.Pos) {
 	for i, val := range [...]int{n, e, s, w} {
 		next[wireSides[i].state] = wireNames[val]
 	}
-	id, ok := t.blocks.StateID(t.blocks.Name(block), next)
-	if !ok || id == block {
-		return
+	if id, ok := t.blocks.StateID(t.blocks.Name(block), next); ok {
+		return id
 	}
-	t.setByCircuit(c, pos, id)
+	return block
 }
 
-// wireConnection is how wire at pos joins the block on side f.
+// refreshWire gives the wire at pos the connections it should have.
+func (t *Ticker) refreshWire(c *regionCircuit, pos cube.Pos) {
+	block, ok := c.r.Block(pos, 0)
+	if !ok || t.kind(block) != kindWire {
+		return
+	}
+	if id := t.wireState(c.r, pos, block); id != block {
+		t.setByCircuit(c, pos, id)
+	}
+}
+
+// wireConnection is how wire at pos joins the block on side f. Wire one level up
+// comes first, unless a conductor above stops it, then what is on the side, then
+// wire one level down, unless a conductor on the side stops it.
 func (t *Ticker) wireConnection(r *world.Region, pos cube.Pos, f redstone.Face) int {
 	side := fromPos(toPos(pos).Side(f))
+	aboveSide := cube.Pos{side[0], side[1] + 1, side[2]}
 	above, _ := r.Block(cube.Pos{pos[0], pos[1] + 1, pos[2]}, 0)
 	if !t.stopsWire(above) {
-		if b, ok := r.Block(cube.Pos{side[0], side[1] + 1, side[2]}, 0); ok && t.kind(b) == kindWire {
-			if s, _ := r.Block(side, 0); t.stopsWire(s) {
+		if b, ok := r.Block(aboveSide, 0); ok && t.kind(b) == kindWire && t.attach.WireSurvives(r, aboveSide) {
+			if s, ok := r.Block(side, 0); ok && t.attach.Supports(s, cube.Face(f.Opposite())) {
 				return wireUp
 			}
 			return wireSide
@@ -375,38 +438,56 @@ func (t *Ticker) stopsWire(block uint32) bool {
 	return int(block) < len(t.stops) && t.stops[block]
 }
 
-// joinsWire is whether wire connects to a state on its side f. A repeater only
-// joins along its line.
+// joinsWire is whether wire connects to a state on its side f.
 func (t *Ticker) joinsWire(block uint32, f redstone.Face) bool {
-	switch t.kind(block) {
-	case kindWire, kindTorch, kindBlock, kindLever, kindButton, kindComparator:
+	if int(block) >= len(t.joins) {
+		return false
+	}
+	switch t.joins[block] {
+	case joinAll:
 		return true
-	case kindRepeater:
+	case joinLine:
 		d := cardinalFace(t.blocks.States(block))
 		return f == d || f == d.Opposite()
+	case joinFacing:
+		states := t.blocks.States(block)
+		v, ok := states[stateFacing].(int32)
+		if !ok {
+			v, _ = states[stateFacingNamed].(int32)
+		}
+		return faceFromIndex(v) == f
 	}
 	return false
 }
 
-// QueuedTick turns a lamp off if it is still unpowered when its delay is up.
+// QueuedTick breaks wire, a repeater or a comparator that lost its support, joins
+// wire up, and turns a lit lamp with no power off.
 func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
-	if t.kind(block) == kindWire {
+	switch t.kind(block) {
+	case kindWire:
+		if !t.attach.WireSurvives(r, pos) {
+			t.fall(r, pos, block)
+			return
+		}
 		t.refreshWire(t.circuitOf(r), pos)
-		return
-	}
-	if t.blocks.Name(block) != nameLampOn {
+	case kindRepeater, kindComparator:
+		if !t.attach.DiodeSurvives(r, pos) {
+			t.fall(r, pos, block)
+		}
+	case kindLamp:
+		c := t.circuitOf(r)
+		if t.blocks.Name(block) == nameLampOn && c.sys.Strength(toPos(pos)) == 0 {
+			t.setByCircuit(c, pos, t.named(nameLamp, block))
+		}
+	default:
 		t.BlockTicker.QueuedTick(r, pos, block)
-		return
-	}
-	c := t.circuitOf(r)
-	if c.sys.Strength(toPos(pos)) == 0 {
-		t.setByCircuit(c, pos, t.named(nameLamp, block))
 	}
 }
 
 // setup makes the component of block at pos, or brings an existing one up to date
-// with the block's state.
-func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32) {
+// with the block's state. load says the block came with its chunk rather than
+// being placed.
+func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) {
 	p := toPos(pos)
 	name := t.blocks.Name(block)
 	states := t.blocks.States(block)
@@ -444,12 +525,13 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32) {
 			}
 		}
 	case kindComparator:
+		created := c.sys.Component(p, redstone.KindComparator) == nil
 		if comp := c.sys.Create(p, redstone.KindComparator, cardinalFace(states)); comp != nil {
 			comp.SetAttach(true)
 			comp.SetSubtract(bitState(states, stateSubtract))
-			comp.SetRearSignal(-1)
-			if bitState(states, stateLit) {
-				comp.SetStrength(fullPower)
+			e := t.ensureComparator(c.r, pos)
+			if created && load {
+				comp.LoadSignal(e.signal)
 			}
 		}
 	case kindLever:
@@ -516,7 +598,7 @@ func (c *regionCircuit) BlockPower(p redstone.Pos) redstone.Power {
 }
 
 // PowerChanged implements redstone.World: the block's onRedstoneUpdate.
-func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, _ int16, first bool) {
+func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, first bool) {
 	t, pos := c.t, fromPos(p)
 	block, ok := c.r.Block(pos, 0)
 	if !ok {
@@ -530,10 +612,12 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, _ int16, first bo
 	case kindTorch:
 		t.updateTorch(c, pos, block, name, on)
 	case kindLamp:
-		switch {
-		case on && name != nameLampOn:
-			t.setByCircuit(c, pos, t.named(nameLampOn, block))
-		case !on:
+		if on {
+			c.r.CancelTick(pos, block)
+			if name != nameLampOn {
+				t.setByCircuit(c, pos, t.named(nameLampOn, block))
+			}
+		} else {
 			c.r.ScheduleTick(pos, block, lampOffDelay, 0)
 		}
 	case kindRepeater:
@@ -541,13 +625,7 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, _ int16, first bo
 			t.setByCircuit(c, pos, t.named(want, block))
 		}
 	case kindComparator:
-		next := t.with(block, stateLit, flag(on))
-		if want := choose(on, nameCompare, nameCompareOff); want != name {
-			next = t.named(want, next)
-		}
-		if next != block {
-			t.setByCircuit(c, pos, next)
-		}
+		t.updateComparator(c, pos, block, strength, previous)
 	case kindDoor:
 		if !first {
 			t.updateDoor(c, pos, block, p, on)

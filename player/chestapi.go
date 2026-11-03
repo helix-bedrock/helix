@@ -3,6 +3,7 @@ package player
 import (
 	"slices"
 
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -548,4 +549,18 @@ func (p *Player) refreshItems() {
 	if c := p.s.chestAt(r, p.window.chestPos); c != nil {
 		p.send(&packet.InventoryContent{WindowID: uint32(p.window.id), Content: p.chestContent(r, c)})
 	}
+}
+
+// ComparatorSignal is what a comparator reads from the chest: how full it and its
+// other half are. An ender chest's items belong to players, so it reads as empty.
+func (c *Chest) ComparatorSignal(r *world.Region, _ cube.Pos) int32 {
+	var sum circuit.ContainerSum
+	for _, it := range c.Items(r) {
+		maxStack := 0
+		if t, ok := c.s.reg.Items.ByName(it.Name); ok {
+			maxStack = int(t.MaxStack)
+		}
+		sum.Add(int(it.Count), maxStack)
+	}
+	return sum.Signal(c.Size(r))
 }

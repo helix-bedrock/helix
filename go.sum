@@ -20,6 +20,8 @@ github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24 h1:LfqBsExOqu
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24/go.mod h1:yQ1PGHcnA4woFMDY+OWLn49Rwp81/oZzcceMTNYCRms=
 github.com/helix-bedrock/redstone v0.0.0-20261103171927-d2ae972be2a8 h1:VmZs6bPjV5YAzu6Z4Ug5q6cHOrk6cQ5YKKI+xZhrRx8=
 github.com/helix-bedrock/redstone v0.0.0-20261103171927-d2ae972be2a8/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
+github.com/helix-bedrock/redstone v0.0.0-20261103174520-8304daaf76b9 h1:gOQDMHAgsp23JiPmSXJxTZNTER0Y7Lwh3ROc0Ck63Xs=
+github.com/helix-bedrock/redstone v0.0.0-20261103174520-8304daaf76b9/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
 github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551 h1:8Ar+N7h0fbI/xSkKOmhoDwePv9Lw6cYpzcPsjKkXm9Q=
 github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=

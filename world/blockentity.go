@@ -51,6 +51,15 @@ type BlockEntities interface {
 // joins: chunks loaded earlier keep theirs saved. Runs: anywhere.
 func (d *Dimension) SetBlockEntities(b BlockEntities) { d.blockEntities.Store(&b) }
 
+// BlockEntityMaker returns who makes block entities now, or nil, so another can
+// wrap it. Runs: anywhere.
+func (d *Dimension) BlockEntityMaker() BlockEntities {
+	if m := d.blockEntities.Load(); m != nil {
+		return *m
+	}
+	return nil
+}
+
 // networkHidden are the saved fields the client never needs.
 var networkHidden = [...]string{"Items", "Findable", "LootTable", "LootTableSeed"}
 

@@ -249,6 +249,9 @@ func (d *Dimension) absorb(dst, src *Region) {
 	src.in = nil
 	dst.inMu.Unlock()
 	src.inMu.Unlock()
+	if rt, ok := d.conf.Ticker.(RegionTicker); ok {
+		rt.RegionsMerged(dst, src)
+	}
 	d.kill(src)
 }
 
@@ -312,6 +315,9 @@ func (d *Dimension) split(r *Region) {
 		moveIf(n.holds, r.holds, in)
 		moveIf(n.loading, r.loading, in)
 		moveIf(n.awaiting, r.awaiting, in)
+		if rt, ok := d.conf.Ticker.(RegionTicker); ok {
+			rt.RegionSplit(r, n, in)
+		}
 		kept := r.tickets[:0]
 		for _, h := range r.tickets {
 			var mine, theirs []mcdb.ChunkPos

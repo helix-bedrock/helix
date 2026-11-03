@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
@@ -145,6 +146,7 @@ type Server struct {
 	listener *network.Listener
 	serverID int64
 	reg      *registry.Registry
+	circuits *circuit.Ticker
 
 	db          *mcdb.DB
 	worldStore  mcdb.WorldStore
@@ -241,6 +243,9 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		return err
 	}
 	s.players.Store(host)
+	if s.circuits != nil {
+		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
+	}
 	defer host.Close(packet.DisconnectReasonShutdown)
 	if err := s.openTransports(); err != nil {
 		_ = s.listener.Close()
