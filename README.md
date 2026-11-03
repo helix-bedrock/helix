@@ -69,7 +69,7 @@ What works today and what is left is in [STATUS.md](STATUS.md).
 | Players (spawn, movement, seeing each other, abilities, attributes) | 🟡 in progress |
 | Inventory | 🟡 changes checked as BDS does; dropping and crafting not done |
 | Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | ⬜ not hooked up |
-| Redstone ([redstone](https://github.com/helix-bedrock/redstone)) | 🟡 first pass, not yet tested in game |
+| Redstone ([redstone](https://github.com/helix-bedrock/redstone)) | 🟡 written from BDS's code, not fully tested |
 | Mobs ([entity](https://github.com/helix-bedrock/entity)), combat, commands, UI | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
