@@ -190,6 +190,22 @@ func (r *Region) SetBlockEntity(pos cube.Pos, be BlockEntity) bool {
 	return true
 }
 
+// TakeBlockEntity takes the block entity at pos out of the chunk without telling it,
+// for something that moves it elsewhere. Runs: owner.
+func (r *Region) TakeBlockEntity(pos cube.Pos) (BlockEntity, bool) {
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return nil, false
+	}
+	be, ok := c.removeBlockEntity(pos)
+	if ok {
+		c.dirty = true
+		c.netChanged()
+		r.d.cache.drop(c.pos)
+	}
+	return be, ok
+}
+
 // SaveBlockEntity marks a block entity changed in a way only the save sees, such
 // as a chest's items. Runs: owner.
 func (r *Region) SaveBlockEntity(pos cube.Pos) {

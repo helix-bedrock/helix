@@ -207,7 +207,7 @@ func (c *Chest) Size(r *world.Region) int {
 	if _, follower := c.halves(r); follower != nil {
 		return 2 * chestSize
 	}
-	return chestSize
+	return c.halfSize()
 }
 
 // slotAt returns the half holding a slot of the whole chest and the slot in it.
@@ -217,7 +217,7 @@ func (c *Chest) slotAt(r *world.Region, slot int) (*Chest, int) {
 	}
 	lead, follower := c.halves(r)
 	switch {
-	case slot < chestSize:
+	case slot < c.halfSize():
 		return lead, slot
 	case slot < 2*chestSize && follower != nil:
 		return follower, slot - chestSize
@@ -240,7 +240,7 @@ func (c *Chest) Items(r *world.Region) []ItemStack {
 		return nil
 	}
 	lead, follower := c.halves(r)
-	items := slices.Clone(lead.items[:])
+	items := slices.Clone(lead.items[:c.halfSize()])
 	if follower != nil {
 		items = append(items, follower.items[:]...)
 	}

@@ -298,3 +298,108 @@ func TestLampPowerCancelsOff(t *testing.T) {
 		}
 	})
 }
+
+// name is the block at pos's name.
+func (w *testWorld) name(r *world.Region, pos cube.Pos) string {
+	b, _ := r.Block(pos, 0)
+	return w.reg.Blocks.Name(b)
+}
+
+// Facing state 3 of a piston points north, so it pushes towards smaller z.
+func TestPistonPushesAndComesBack(t *testing.T) {
+	w := openWorld(t)
+	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(3)})
+	stone := w.state(t, "minecraft:stone", nil)
+	block := w.state(t, "minecraft:redstone_block", nil)
+	at := cube.Pos{1, surfaceY, 8}
+	arm := cube.Pos{1, surfaceY, 7}
+	pushed := cube.Pos{1, surfaceY, 7}
+	moved := cube.Pos{1, surfaceY, 6}
+	power := cube.Pos{1, surfaceY, 9}
+	w.run(func(r *world.Region) {
+		place(r, at, piston)
+		place(r, pushed, stone)
+		place(r, power, block)
+	})
+	w.wait(t, func(r *world.Region) bool {
+		return w.name(r, arm) == "minecraft:piston_arm_collision" && w.name(r, moved) == "minecraft:stone"
+	})
+	w.run(func(r *world.Region) { place(r, power, w.reg.Blocks.Air()) })
+	w.wait(t, func(r *world.Region) bool {
+		return w.name(r, arm) == "minecraft:air" && w.name(r, moved) == "minecraft:stone"
+	})
+}
+
+func TestStickyPistonPullsBack(t *testing.T) {
+	w := openWorld(t)
+	piston := w.state(t, "minecraft:sticky_piston", map[string]any{"facing_direction": int32(3)})
+	stone := w.state(t, "minecraft:stone", nil)
+	block := w.state(t, "minecraft:redstone_block", nil)
+	at := cube.Pos{1, surfaceY, 8}
+	first := cube.Pos{1, surfaceY, 7}
+	moved := cube.Pos{1, surfaceY, 6}
+	power := cube.Pos{1, surfaceY, 9}
+	w.run(func(r *world.Region) {
+		place(r, at, piston)
+		place(r, first, stone)
+		place(r, power, block)
+	})
+	w.wait(t, func(r *world.Region) bool { return w.name(r, moved) == "minecraft:stone" })
+	w.run(func(r *world.Region) { place(r, power, w.reg.Blocks.Air()) })
+	w.wait(t, func(r *world.Region) bool {
+		return w.name(r, first) == "minecraft:stone" && w.name(r, moved) == "minecraft:air"
+	})
+}
+
+func TestPistonStoppedByObsidian(t *testing.T) {
+	w := openWorld(t)
+	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(3)})
+	obsidian := w.state(t, "minecraft:obsidian", nil)
+	block := w.state(t, "minecraft:redstone_block", nil)
+	at := cube.Pos{1, surfaceY, 8}
+	front := cube.Pos{1, surfaceY, 7}
+	w.run(func(r *world.Region) {
+		place(r, at, piston)
+		place(r, front, obsidian)
+		place(r, cube.Pos{1, surfaceY, 9}, block)
+	})
+	time.Sleep(400 * time.Millisecond)
+	w.run(func(r *world.Region) {
+		if n := w.name(r, front); n != "minecraft:obsidian" {
+			t.Errorf("obsidian became %s", n)
+		}
+	})
+}
+
+func TestPistonBreaksTorchInFront(t *testing.T) {
+	w := openWorld(t)
+	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(3)})
+	torch := w.state(t, "minecraft:torch", nil)
+	block := w.state(t, "minecraft:redstone_block", nil)
+	at := cube.Pos{1, surfaceY, 8}
+	front := cube.Pos{1, surfaceY, 7}
+	w.run(func(r *world.Region) {
+		place(r, at, piston)
+		r.SetBlock(front, 0, torch)
+		place(r, cube.Pos{1, surfaceY, 9}, block)
+	})
+	w.wait(t, func(r *world.Region) bool { return w.name(r, front) == "minecraft:piston_arm_collision" })
+}
+
+func TestPistonIgnoresPowerAtItsFront(t *testing.T) {
+	w := openWorld(t)
+	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(3)})
+	block := w.state(t, "minecraft:redstone_block", nil)
+	at := cube.Pos{1, surfaceY, 8}
+	front := cube.Pos{1, surfaceY, 7}
+	w.run(func(r *world.Region) {
+		place(r, at, piston)
+		place(r, front, block)
+	})
+	time.Sleep(400 * time.Millisecond)
+	w.run(func(r *world.Region) {
+		if n := w.name(r, cube.Pos{1, surfaceY, 6}); n == "minecraft:redstone_block" {
+			t.Error("piston was powered through its front")
+		}
+	})
+}

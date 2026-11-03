@@ -185,6 +185,9 @@ func (r *Region) HasScheduledTick(pos cube.Pos, block uint32) bool {
 	return ok && (c.ticks.has(r, pos, block) || c.randomTicks.has(r, pos, block))
 }
 
+// CurrentTick returns the world's tick. Runs: anywhere.
+func (r *Region) CurrentTick() int64 { return r.d.sched.CurrentTick() }
+
 // CancelTick removes every tick for block's type waiting at pos on the ticking
 // queue, as a lamp that gets power again does. Runs: owner.
 func (r *Region) CancelTick(pos cube.Pos, block uint32) {

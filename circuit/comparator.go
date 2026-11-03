@@ -379,8 +379,14 @@ func (t *Ticker) Entities(next world.BlockEntities) world.BlockEntities {
 
 // New returns a comparator's block entity, or asks next.
 func (e comparatorEntities) New(block uint32) world.BlockEntity {
-	if e.t.kind(block) == kindComparator {
+	switch e.t.kind(block) {
+	case kindComparator:
 		return &comparatorEntity{t: e.t}
+	case kindPiston:
+		return &pistonEntity{t: e.t, sticky: e.t.blocks.Name(block) == nameStickyPiston}
+	}
+	if block == e.t.moving {
+		return &movingEntity{t: e.t, block: e.t.blocks.Air()}
 	}
 	if e.next != nil {
 		return e.next.New(block)
@@ -390,6 +396,12 @@ func (e comparatorEntities) New(block uint32) world.BlockEntity {
 
 // Load brings back a comparator's block entity, or asks next.
 func (e comparatorEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEntity, bool) {
+	switch id, _ := saved["id"].(string); id {
+	case pistonEntityID:
+		return e.t.loadPiston(saved), true
+	case movingEntityID:
+		return e.t.loadMoving(saved), true
+	}
 	if id, _ := saved["id"].(string); id == comparatorEntityID {
 		v, _ := saved[outputSignalTag].(int32)
 		kept := maps.Clone(saved)

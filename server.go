@@ -244,6 +244,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 	s.players.Store(host)
 	if s.circuits != nil {
+		s.circuits.SetDispense(host.Dispense)
 		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
 	}
 	defer host.Close(packet.DisconnectReasonShutdown)

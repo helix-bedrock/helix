@@ -57,6 +57,7 @@ const (
 	chestTrapped
 	chestCopper
 	chestEnder
+	chestMachine
 )
 
 // cardinalState is the block state a chest faces by.
@@ -110,6 +111,8 @@ func chestKindOf(name string) int8 {
 		return chestCopper
 	case name == "minecraft:ender_chest":
 		return chestEnder
+	case machineSpecs[name] != nil:
+		return chestMachine
 	}
 	return chestNone
 }
@@ -153,7 +156,13 @@ type Chest struct {
 	s     *Host
 	pos   cube.Pos
 	ender bool
-	items [chestSize]ItemStack
+	// machine says this is a hopper, dispenser or dropper rather than a chest: the
+	// same slots and window, without a lid or a partner.
+	machine *machineSpec
+	// cooldown and lastTick are a hopper's, in ticks.
+	cooldown int32
+	lastTick int64
+	items    [chestSize]ItemStack
 	// saved keeps the other fields of the saved chest (CustomName, LootTable...),
 	// written back as they were.
 	saved map[string]any
@@ -189,6 +198,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if int(block) >= len(t.kind) || t.kind[block] == chestNone {
 		return nil
 	}
+	if spec := machineSpecs[e.s.reg.Blocks.Name(block)]; spec != nil {
+		return &Chest{s: e.s, lead: true, machine: spec}
+	}
 	return &Chest{s: e.s, lead: true, ender: t.kind[block] == chestEnder}
 }
 
@@ -198,6 +210,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	id, _ := saved["id"].(string)
 	if id == enchantTableEntityID {
 		return &enchantTableEntity{saved: maps.Clone(saved)}, true
+	}
+	if spec := machineByID(id); spec != nil {
+		return e.s.loadMachine(pos, saved, spec), true
 	}
 	if id != chestEntityID && id != enderChestEntityID {
 		return nil, false
@@ -243,6 +258,9 @@ func (c *Chest) NetworkData(pos cube.Pos) map[string]any {
 	if c.ender {
 		m["id"] = enderChestEntityID
 	}
+	if c.machine != nil {
+		m["id"] = c.machine.id
+	}
 	m["x"], m["y"], m["z"] = int32(pos[0]), int32(pos[1]), int32(pos[2]) //nolint:gosec // block coordinates fit int32
 	switch {
 	case c.paired || c.pending:
@@ -268,6 +286,12 @@ func (c *Chest) SaveData(pos cube.Pos) map[string]any {
 		}
 	}
 	m["Items"], m["Findable"] = items, boolByte(c.findable)
+	if c.machine != nil {
+		delete(m, "Findable")
+		if c.machine.hopper {
+			m[transferCooldownTag] = c.cooldown
+		}
+	}
 	return m
 }
 
@@ -281,7 +305,7 @@ func boolByte(b bool) uint8 {
 // BlockEntityPlaced tries the two neighbours a chest facing this way can pair with.
 func (c *Chest) BlockEntityPlaced(r *world.Region, pos cube.Pos) {
 	c.pos = pos
-	if c.ender {
+	if c.ender || c.machine != nil {
 		return
 	}
 	block, ok := r.Block(pos, 0)
@@ -439,6 +463,12 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		c.changed = false
 		r.SendBlockEntity(pos)
 	}
+	if c.machine != nil {
+		if c.machine.hopper {
+			c.tickHopper(r, pos, hopperDepth)
+		}
+		return
+	}
 	c.tickPair(r)
 	if c.open {
 		c.resend++
@@ -534,6 +564,9 @@ func (c *Chest) lidSound(r *world.Region, sound string) {
 
 // blockEvent tells the players near how the lid stands.
 func (c *Chest) blockEvent(r *world.Region) {
+	if c.machine != nil {
+		return
+	}
 	r.Broadcast(c.pos, &packet.BlockEvent{
 		Position:  protocol.BlockPos{int32(c.pos[0]), int32(c.pos[1]), int32(c.pos[2])}, //nolint:gosec // block coordinates fit int32
 		EventType: chestEventOpen, EventData: int32(boolByte(c.open)),
@@ -591,7 +624,7 @@ func (c *Chest) closeViewers(r *world.Region) {
 func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	c := p.s.chestAt(r, u.Pos)
 	if c == nil {
-		c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder}
+		c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder, machine: machineSpecs[p.s.reg.Blocks.Name(u.Block)]}
 		if !r.SetBlockEntity(u.Pos, c) {
 			return false
 		}
@@ -617,6 +650,9 @@ func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 // canOpen is BDS's check of the block above: listed blocks never stop the lid, any
 // other does if a collision box of it reaches the lid. Cats come with mobs.
 func (c *Chest) canOpen(r *world.Region, pos cube.Pos) bool {
+	if c.machine != nil {
+		return true
+	}
 	above, ok := r.Block(pos.Side(cube.FaceUp), 0)
 	if !ok || c.s.chests.clear[above] {
 		return true
@@ -648,7 +684,7 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 	w.nextID()
 	w.open, w.chest, w.chestPos, w.chestDim = true, true, pos, r.Dimension()
 	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: byte(protocol.ContainerTypeContainer),
+		WindowID: w.id, ContainerType: c.windowType(),
 		ContainerPosition:       protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
 		ContainerEntityUniqueID: -1,
 	})
@@ -741,7 +777,7 @@ func (p *Player) loadChestWork() []ItemStack {
 		return st.chest
 	}
 	lead, follower := c.halves(r)
-	st.chest = append(st.chest, lead.items[:]...)
+	st.chest = append(st.chest, lead.items[:c.halfSize()]...)
 	if follower != nil {
 		st.chest = append(st.chest, follower.items[:]...)
 	}

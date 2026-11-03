@@ -51,6 +51,27 @@ const (
 	nameLever       = "minecraft:lever"
 )
 
+// Blocks that move or hold items when powered.
+const (
+	namePiston       = "minecraft:piston"
+	nameStickyPiston = "minecraft:sticky_piston"
+	nameArm          = "minecraft:piston_arm_collision"
+	nameStickyArm    = "minecraft:sticky_piston_arm_collision"
+	nameMoving       = "minecraft:moving_block"
+	nameHopper       = "minecraft:hopper"
+	nameDispenser    = "minecraft:dispenser"
+	nameDropper      = "minecraft:dropper"
+)
+
+// States of those blocks.
+const (
+	stateToggle    = "toggle_bit"
+	stateTriggered = "triggered_bit"
+)
+
+// dispenseDelay is how many ticks a dispenser waits after being powered.
+const dispenseDelay = 4
+
 // lampOffDelay is how many ticks a lamp stays lit after losing power.
 const lampOffDelay = 4
 
@@ -73,6 +94,9 @@ const (
 	kindDoor
 	kindTrapdoor
 	kindGate
+	kindPiston
+	kindHopper
+	kindDispenser
 )
 
 // kindOf returns the class of the block called name.
@@ -92,6 +116,12 @@ func kindOf(name string) kind {
 		return kindComparator
 	case nameLever:
 		return kindLever
+	case namePiston, nameStickyPiston:
+		return kindPiston
+	case nameHopper:
+		return kindHopper
+	case nameDispenser, nameDropper:
+		return kindDispenser
 	}
 	switch {
 	case strings.HasSuffix(name, "_button"):
@@ -126,6 +156,9 @@ func componentKind(k kind) redstone.Kind {
 // FallFunc removes a block that lost what held it and throws out its drops.
 type FallFunc func(r *world.Region, pos cube.Pos, block uint32)
 
+// DispenseFunc fires a dispenser or dropper.
+type DispenseFunc func(r *world.Region, pos cube.Pos, block uint32)
+
 // Ticker gives a world its circuits and hands every other block matter to the
 // BlockTicker it embeds.
 type Ticker struct {
@@ -133,7 +166,12 @@ type Ticker struct {
 	blocks *registry.Blocks
 	items  *registry.Items
 	attach *attach.Table
-	fall   FallFunc
+	// pistons is what pistons do with each block, moving the moving block's state.
+	pistons pistonRules
+	moving  uint32
+	// dispense fires dispensers and droppers. Set before any player joins.
+	dispense DispenseFunc
+	fall     FallFunc
 	// These are by block state. They are made once and only read, as regions tick
 	// in parallel.
 	power []redstone.Power
@@ -167,6 +205,12 @@ func NewTicker(reg *registry.Registry, attached *attach.Table, fall FallFunc, ne
 		return nil, fmt.Errorf("circuit: %w", err)
 	}
 	t := &Ticker{BlockTicker: next, blocks: blocks, items: reg.Items, attach: attached, fall: fall}
+	if t.pistons, err = loadPistonRules(); err != nil {
+		return nil, fmt.Errorf("circuit: %w", err)
+	}
+	if id, ok := blocks.Block(nameMoving); ok {
+		t.moving = id
+	}
 	n := blocks.Count()
 	t.power, t.kinds, t.stops = make([]redstone.Power, n), make([]kind, n), make([]bool, n)
 	t.joins, t.signals = make([]join, n), make([]signal, n)
@@ -188,6 +232,10 @@ func NewTicker(reg *registry.Registry, attached *attach.Table, fall FallFunc, ne
 	}
 	return t, nil
 }
+
+// SetDispense sets what fires dispensers and droppers. Call it before any player
+// joins.
+func (t *Ticker) SetDispense(fn DispenseFunc) { t.dispense = fn }
 
 // kind returns the class of a state.
 func (t *Ticker) kind(block uint32) kind {
@@ -317,6 +365,12 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		case kindRepeater, kindComparator:
 			if !t.attach.DiodeSurvives(r, pos) {
 				r.ScheduleTick(pos, block, 1, 0)
+			}
+		case kindPiston:
+			t.armNeighbour(r, pos, block)
+		default:
+			if t.isArm(block) {
+				t.armNeighbour(r, pos, block)
 			}
 		}
 	}
@@ -479,6 +533,10 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		if t.blocks.Name(block) == nameLampOn && c.sys.Strength(toPos(pos)) == 0 {
 			t.setByCircuit(c, pos, t.named(nameLamp, block))
 		}
+	case kindDispenser:
+		if t.dispense != nil {
+			t.dispense(r, pos, block)
+		}
 	default:
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
@@ -564,6 +622,22 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetStrength(onOff(bitState(states, stateOpen)))
 			comp.SetAllowUp(true)
 		}
+	case kindHopper:
+		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
+			comp.SetStrength(onOff(bitState(states, stateToggle)))
+			comp.SetAllowUp(true)
+		}
+	case kindDispenser:
+		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
+			comp.SetStrength(onOff(bitState(states, stateTriggered)))
+			comp.SetAllowUp(true)
+		}
+	case kindPiston:
+		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
+			comp.SetAnyDirection(true)
+			comp.SetAllowUp(true)
+			comp.SetBlockedFace(pistonBlockedFace(block, t))
+		}
 	}
 }
 
@@ -629,6 +703,17 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 	case kindDoor:
 		if !first {
 			t.updateDoor(c, pos, block, p, on)
+		}
+	case kindHopper:
+		t.setByCircuit(c, pos, t.with(block, stateToggle, flag(on)))
+	case kindDispenser:
+		triggered := bitState(t.blocks.States(block), stateTriggered)
+		switch {
+		case on && !triggered:
+			t.setByCircuit(c, pos, t.with(block, stateTriggered, flag(true)))
+			c.r.ScheduleTick(pos, t.with(block, stateTriggered, flag(true)), dispenseDelay, 0)
+		case !on && triggered:
+			t.setByCircuit(c, pos, t.with(block, stateTriggered, flag(false)))
 		}
 	case kindTrapdoor, kindGate:
 		if !first {

@@ -12,6 +12,8 @@ github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/helix-bedrock/helix-data v0.0.0-20261103171928-310055a2f4a0 h1:rW+R8Bd0WvFiCnSDBR4UdPD+uQv84T/gtqq84ABnWMM=
 github.com/helix-bedrock/helix-data v0.0.0-20261103171928-310055a2f4a0/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
+github.com/helix-bedrock/helix-data v0.0.0-20261103181753-d14c2be1d585 h1:wAUHgRz5mdowoIdbt21IndzXHZ9RIq2ghNKyCEucOQY=
+github.com/helix-bedrock/helix-data v0.0.0-20261103181753-d14c2be1d585/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca h1:9+s3TkTTsPDcnpIH3Oj5Mp2IkC1O53fwpHtvKikWqSQ=
 github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca/go.mod h1:VG7/D0ZD96mBSXIWCpynz0SDid0AEtpM/VclYhDAjRw=
 github.com/helix-bedrock/protocol v0.0.0-20261103164222-3ff45038b903 h1:DpyN2sj5DGSXjCIQmY8ByMMWfIaQTUen2oYBZyDVSOE=
@@ -22,6 +24,8 @@ github.com/helix-bedrock/redstone v0.0.0-20261103171927-d2ae972be2a8 h1:VmZs6bPj
 github.com/helix-bedrock/redstone v0.0.0-20261103171927-d2ae972be2a8/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
 github.com/helix-bedrock/redstone v0.0.0-20261103174520-8304daaf76b9 h1:gOQDMHAgsp23JiPmSXJxTZNTER0Y7Lwh3ROc0Ck63Xs=
 github.com/helix-bedrock/redstone v0.0.0-20261103174520-8304daaf76b9/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
+github.com/helix-bedrock/redstone v0.0.0-20261103182315-a80a5b94ff13 h1:XDlp7FZu/B9OsnAiSmZ2raa/VMzeM+mW8wGOxT/u97s=
+github.com/helix-bedrock/redstone v0.0.0-20261103182315-a80a5b94ff13/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
 github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551 h1:8Ar+N7h0fbI/xSkKOmhoDwePv9Lw6cYpzcPsjKkXm9Q=
 github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
