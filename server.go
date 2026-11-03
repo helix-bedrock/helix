@@ -417,6 +417,28 @@ func (s *Server) SetItemLifetime(ticks int32) {
 	}
 }
 
+// SetTuning changes a player.Tune for every player without its own value, false if
+// it could not. Does nothing until Run started: to set a default from the start, use
+// player.Setup's SetTuning in Config.Setup.
+func (s *Server) SetTuning(t player.Tune, v float32) bool {
+	host := s.players.Load()
+	return host != nil && host.SetTuning(t, v)
+}
+
+// ClearTuning puts a player.Tune back to its default.
+func (s *Server) ClearTuning(t player.Tune) {
+	if host := s.players.Load(); host != nil {
+		host.ClearTuning(t)
+	}
+}
+
+// ClearAllTuning puts every player.Tune back to its default.
+func (s *Server) ClearAllTuning() {
+	if host := s.players.Load(); host != nil {
+		host.ClearAllTuning()
+	}
+}
+
 // PlayerCount returns how many players are online.
 func (s *Server) PlayerCount() int { return len(s.Players()) }
 

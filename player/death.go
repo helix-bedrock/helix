@@ -171,7 +171,7 @@ func vanillaRespawn(p *Player, pos mgl32.Vec3) {
 	for _, e := range p.Effects() {
 		p.RemoveEffect(e.ID)
 	}
-	p.setAttributes(attrHealth, playerAttributes[attrHealth].def, attrHunger, playerAttributes[attrHunger].def,
+	p.setAttributes(attrHealth, p.attributes.maximum(attrHealth), attrHunger, p.attributes.maximum(attrHunger),
 		attrSaturation, playerAttributes[attrSaturation].def, attrExhaustion, playerAttributes[attrExhaustion].def)
 	p.move = moveState{}
 	p.food = foodState{}

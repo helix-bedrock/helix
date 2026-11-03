@@ -94,13 +94,22 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "item", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
 		}}},
 	}
+	tune := protocol.Command{
+		Name: tuneTestCommand, Description: "Tests the number API: <name> <value>, clear [name], server <name> <value>, serverclear [name].",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
+			{Name: "name", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
+			{Name: "value", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
+		}}},
+	}
 	return &packet.AvailableCommands{
 		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions),
 		Enums: []protocol.CommandEnum{
 			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
 			{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
 		},
-		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe},
+		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune},
 	}
 }
 
@@ -124,6 +133,60 @@ func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestD
 		left := i.TicksLeft() / ticksPerSecond
 		v.Name = fmt.Sprintf("%d:%02d %s", left/60, left%60, p.Name())
 	})
+}
+
+// tuneTestCommand is the command that tries the number API.
+const tuneTestCommand = "tune"
+
+// tuneTest runs /tune on the player who ran it, or on the server, and says what the
+// player now runs on: <name> <value>, clear [name], server <name> <value>, serverclear
+// [name]. Without a name, clear drops all.
+func tuneTest(p *player.Player, args []string) string {
+	host := p.Host()
+	if len(args) == 1 && args[0] == "clear" {
+		p.ClearAllTuning()
+		return "Your numbers cleared."
+	}
+	if len(args) == 1 && args[0] == "serverclear" {
+		host.ClearAllTuning()
+		return "Server numbers cleared."
+	}
+	if len(args) == 2 && (args[0] == "clear" || args[0] == "serverclear") {
+		t, ok := player.TuneByName(args[1])
+		if !ok {
+			return "No number called " + args[1]
+		}
+		if args[0] == "clear" {
+			p.ClearTuning(t)
+		} else {
+			host.ClearTuning(t)
+		}
+		return fmt.Sprintf("%s is now %v.", t, p.Tuning(t))
+	}
+	server := len(args) == 3 && args[0] == "server"
+	if server {
+		args = args[1:]
+	}
+	if len(args) != 2 {
+		return "/tune <name> <value>, clear [name], server <name> <value>, serverclear [name]"
+	}
+	t, ok := player.TuneByName(args[0])
+	if !ok {
+		return "No number called " + args[0]
+	}
+	v, err := strconv.ParseFloat(args[1], 32)
+	if err != nil {
+		return "Not a number: " + args[1]
+	}
+	if server {
+		ok = host.SetTuning(t, float32(v))
+	} else {
+		ok = p.SetTuning(t, float32(v))
+	}
+	if !ok {
+		return "Refused: " + args[1]
+	}
+	return fmt.Sprintf("%s is now %v.", t, p.Tuning(t))
 }
 
 // smithTestCommand is the command that tries the smithing API.
@@ -445,6 +508,11 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) > 1 && args[0] == tuneTestCommand {
+			// A failed write means the connection is closing, as above.
+			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: tuneTest(p, args[1:])})
+			return
+		}
 		if (len(args) == 2 || len(args) == 3) && args[0] == recipeTestCommand {
 			if msg, ok := recipeTestPlayer(p, args[1], recipeTestItem(args[2:])); ok {
 				// A failed write means the connection is closing, as above.

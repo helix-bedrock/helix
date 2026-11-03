@@ -7,9 +7,9 @@ import (
 	"github.com/helix-bedrock/helix-data/data"
 )
 
-// ExhaustionValues are how much exhaustion each action costs, as the
+// exhaustionValues are how much exhaustion each action costs, as the
 // player definition's minecraft:exhaustion_values gives them.
-type ExhaustionValues struct {
+type exhaustionValues struct {
 	Heal       float32 `json:"heal"`
 	Jump       float32 `json:"jump"`
 	SprintJump float32 `json:"sprint_jump"`
@@ -39,7 +39,7 @@ func (p *Player) Food() Food {
 }
 
 // SetFood sets the player's hunger, saturation and exhaustion, each
-// clamped to 0 to 20, and tells the player. Runs: the player's region.
+// clamped to its range (hunger's top is TuneMaxHunger), and tells the player. Runs: the player's region.
 func (p *Player) SetFood(f Food) {
 	p.setAttributes(attrHunger, f.Hunger, attrSaturation, f.Saturation, attrExhaustion, f.Exhaustion)
 }
@@ -54,15 +54,15 @@ func vanillaExhaust(p *Player, amount float32) {
 		return
 	}
 	f := p.Food()
-	f.Exhaustion = min(f.Exhaustion+amount, playerAttributes[attrExhaustion].max)
-	if f.Exhaustion >= exhaustionStep {
-		f.Exhaustion -= exhaustionStep
+	f.Exhaustion = min(f.Exhaustion+amount*p.Tuning(TuneExhaustScale), playerAttributes[attrExhaustion].max)
+	if step := p.Tuning(TuneExhaustStep); f.Exhaustion >= step {
+		f.Exhaustion -= step
 		switch {
 		case p.invulnerable():
 		case f.Saturation > 0:
-			f.Saturation = max(f.Saturation-1, 0)
+			f.Saturation = max(f.Saturation-p.Tuning(TuneBurnSaturation), 0)
 		case p.s.level.Difficulty != difficultyPeaceful:
-			f.Hunger = max(f.Hunger-1, 0)
+			f.Hunger = max(f.Hunger-p.Tuning(TuneBurnHunger), 0)
 		}
 	}
 	p.SetFood(f)
@@ -108,29 +108,29 @@ func vanillaFoodTick(p *Player) {
 	lv, st := &p.s.level, &p.food
 	st.count++
 	health, hunger := p.Health(), p.attributes.get(attrHunger)
-	maxHealth := playerAttributes[attrHealth].max
+	maxHealth := p.attributes.maximum(attrHealth)
 	peaceful := lv.Difficulty == difficultyPeaceful
-	if peaceful && st.count%peacefulHungerEvery == 0 {
-		p.setAttributes(attrHunger, hunger+1)
+	if peaceful && everyTicks(st.count, p.Tuning(TunePeacefulHungerEvery)) {
+		p.setAttributes(attrHunger, hunger+p.Tuning(TunePeacefulHungerAmount))
 	}
-	if peaceful && lv.NaturalRegeneration && st.count%peacefulHealthEvery == 0 {
-		p.SetHealth(health + 1)
+	if peaceful && lv.NaturalRegeneration && everyTicks(st.count, p.Tuning(TunePeacefulHealthEvery)) {
+		p.SetHealth(health + p.Tuning(TunePeacefulHealthAmount))
 	}
 	sys := p.s.game.sys
 	switch {
-	case hunger >= regenHunger && lv.NaturalRegeneration && health > 0 && health < maxHealth:
+	case hunger >= p.Tuning(TuneRegenHunger) && lv.NaturalRegeneration && health > 0 && health < maxHealth:
 		st.timer++
-		if st.timer >= foodTimerEnd {
+		if timerDone(st.timer, p.Tuning(TuneRegenEvery)) {
 			st.timer = 0
-			p.SetHealth(p.Health() + 1)
-			sys.Exhaust(p, sys.Exhaustion.Heal)
+			p.SetHealth(p.Health() + p.Tuning(TuneRegenAmount))
+			sys.Exhaust(p, p.Tuning(TuneExhaustHeal))
 		}
 	case hunger <= 0:
 		st.timer++
-		if st.timer >= foodTimerEnd {
+		if timerDone(st.timer, p.Tuning(TuneStarveEvery)) {
 			st.timer = 0
-			if lv.Difficulty == difficultyHard || health > starveEasyFloor || lv.Difficulty == difficultyNormal && health >= starveNormalFloor {
-				sys.Hurt(p, starveDamage, DamageSource{Cause: DamageStarve})
+			if lv.Difficulty == difficultyHard || health > p.Tuning(TuneStarveFloorEasy) || lv.Difficulty == difficultyNormal && health >= p.Tuning(TuneStarveFloorNormal) {
+				sys.Hurt(p, p.Tuning(TuneStarveDamage), DamageSource{Cause: DamageStarve})
 			}
 		}
 	default:
@@ -139,8 +139,8 @@ func vanillaFoodTick(p *Player) {
 }
 
 // vanillaExhaustionValues reads the player definition's exhaustion values.
-func vanillaExhaustionValues() (ExhaustionValues, error) {
-	var v ExhaustionValues
+func vanillaExhaustionValues() (exhaustionValues, error) {
+	var v exhaustionValues
 	defs, err := data.Entities()
 	if err != nil {
 		return v, err
@@ -148,7 +148,7 @@ func vanillaExhaustionValues() (ExhaustionValues, error) {
 	var def struct {
 		Entity struct {
 			Components struct {
-				Values *ExhaustionValues `json:"minecraft:exhaustion_values"`
+				Values *exhaustionValues `json:"minecraft:exhaustion_values"`
 			} `json:"components"`
 		} `json:"minecraft:entity"`
 	}

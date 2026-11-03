@@ -63,11 +63,12 @@ func TestProtection(t *testing.T) {
 
 // TestKnockbackStep pins one push: away along the direction, kept to the cap upward.
 func TestKnockbackStep(t *testing.T) {
-	v := knockbackStep([3]float32{}, 3, 4, knockbackPush, knockbackPush)
+	p := testPlayer(t)
+	v := p.knockbackStep([3]float32{}, 3, 4, knockbackPush, knockbackPush)
 	if !near(v[0], 0.24) || !near(v[2], 0.32) || !near(v[1], knockbackCap) {
 		t.Errorf("push = %v", v)
 	}
-	if v := knockbackStep([3]float32{}, 0, 0, knockbackPush, 0); v[0] != 0 || v[2] != 0 {
+	if v := p.knockbackStep([3]float32{}, 0, 0, knockbackPush, 0); v[0] != 0 || v[2] != 0 {
 		t.Errorf("no direction = %v", v)
 	}
 }

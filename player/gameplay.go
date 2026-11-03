@@ -46,7 +46,6 @@ type Systems struct {
 	Hurt         HurtFunc
 	ReduceDamage ReduceDamageFunc
 	Exhaust      ExhaustFunc
-	Exhaustion   ExhaustionValues
 	FoodTick     FoodTickFunc
 	Die          DieFunc
 	Respawn      RespawnFunc
@@ -132,6 +131,8 @@ type gameplay struct {
 	useEv     listeners[BlockUseEvent]
 	// combat is helix-data's bds/item_combat.json.
 	combat *combatTable
+	// tuning is the default of every Tune, which clearing goes back to.
+	tuning tuneTable
 	// The events of using items, hitting and being hurt.
 	itemUseEv listeners[ItemUseEvent]
 	itemEatEv listeners[ItemEatEvent]
@@ -183,13 +184,15 @@ type gameState struct {
 	xpEv         listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
+	// tuning is the default of every Tune.
+	tuning tuneTable
 	// out is the gameplay freeze fills; vanilla's steps read its tables,
 	// so they can be wrapped before the freeze.
 	out *gameplay
 }
 
 func newGameState() *gameState {
-	return &gameState{enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, dropRules: map[string]loot.Rule{}, out: &gameplay{}}
+	return &gameState{enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), out: &gameplay{}}
 }
 
 // Systems returns the breaking and placing steps to replace or wrap. Not
@@ -351,7 +354,7 @@ func vanillaGameplay(s *Setup) error {
 	if err != nil {
 		return err
 	}
-	sys.Exhaustion = ex
+	s.h.game.tuning = vanillaTuning(ex)
 	return nil
 }
 
@@ -376,7 +379,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	gs := s.h.game
 	g := gs.out
 	*g = gameplay{
-		combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv,
+		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv,
 		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},

@@ -38,8 +38,12 @@ type DamageSource struct {
 	Extra     float32
 }
 
-// fallBigDamage is the damage from which BDS plays the big fall sound.
-const fallBigDamage = 5
+// fallBigDamage is the damage from which BDS plays the big fall sound; fallFree is
+// how far a fall costs nothing.
+const (
+	fallBigDamage = 5
+	fallFree      = 3
+)
 
 // vanillaFall is BDS's fall distance (Actor::checkFallDamage, with the
 // resets of climbing, gliding and slow falling that BDS's movement does
@@ -81,7 +85,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 	if amp, ok := p.Effect(EffectJumpBoost); ok {
 		boost = float32(amp + 1)
 	}
-	damage := float32(math.Ceil(float64(distance - 3 - boost)))
+	damage := float32(math.Ceil(float64(distance-p.Tuning(TuneFallFree)-boost))) * p.Tuning(TuneFallDamageScale)
 	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
 	pos := vecPos(feet)
 	if damage > 0 && !p.invulnerable() {

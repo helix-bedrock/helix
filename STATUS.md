@@ -78,6 +78,10 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   absorption goes first. A full player regains health and an empty one starves, by difficulty. Empty buckets take
   liquids, and a block that can hold water keeps the source it is placed in. Not done yet: potions, milk, bows,
   tridents, shields, totems, mace, cooldowns, interacting with entities, mobs.
+- **Changing health, hunger and combat numbers (not yet tested in game):** a plugin can change how fast hunger drains, how
+  health recovers and starving hurts, the most health and hunger, food's worth, armour and protection added or taken away,
+  fall damage, hit damage and every part of knockback. A value can be set for one player or the whole server, and clearing it
+  goes back to the default. Values for one player are not saved.
 - **Joining and game modes (not yet tested in game):** the spawn position, difficulty, commands flag and game rules are
   sent in BDS's order, and a game mode change sends what BDS sends.
 - **Movement state, falling and hunger (first pass, not yet tested in game):** sneaking,

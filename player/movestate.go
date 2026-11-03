@@ -137,12 +137,11 @@ func vanillaJump(p *Player) {
 	if p.creative() {
 		return
 	}
-	g := p.s.game
-	cost := g.sys.Exhaustion.Jump
+	cost := p.Tuning(TuneExhaustJump)
 	if p.Moving(MoveSprinting) {
-		cost = g.sys.Exhaustion.SprintJump
+		cost = p.Tuning(TuneExhaustSprintJump)
 	}
-	g.sys.Exhaust(p, cost)
+	p.s.game.sys.Exhaust(p, cost)
 }
 
 // afterMove runs the systems that follow a movement: fall distance and the
@@ -195,18 +194,17 @@ func vanillaMoveCost(p *Player, m *MoveInfo) float32 {
 	if p.creative() {
 		return 0
 	}
-	ex := &p.s.game.sys.Exhaustion
 	d := m.To.Sub(m.From)
 	flat := float32(math.Sqrt(float64(d[0]*d[0] + d[2]*d[2])))
 	switch {
 	case m.HeadInWater:
-		return d.Len() * ex.Swim
+		return d.Len() * p.Tuning(TuneExhaustSwim)
 	case m.InWater:
-		return flat * ex.Swim
+		return flat * p.Tuning(TuneExhaustSwim)
 	case m.OnGround && p.Moving(MoveSprinting):
-		return flat * ex.Sprint
+		return flat * p.Tuning(TuneExhaustSprint)
 	case m.OnGround:
-		return flat * ex.Walk
+		return flat * p.Tuning(TuneExhaustWalk)
 	}
 	return 0
 }

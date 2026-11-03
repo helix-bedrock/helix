@@ -49,6 +49,8 @@ const (
 // attributeValue is an attribute's base and current value.
 type attributeValue struct {
 	base, current float32
+	// limit is the most it can be; 0 is its definition's maximum.
+	limit float32
 }
 
 // Attributes are a player's attribute values, in playerAttributes' order.
@@ -89,7 +91,8 @@ func (a *Attributes) load(data map[string]any) {
 			if !ok {
 				cur = base
 			}
-			a[i] = attributeValue{base: base, current: cur}
+			// A value kept under a higher Tune fits again only once that is set.
+			a[i] = attributeValue{base: base, current: min(cur, d.max)}
 		}
 	}
 }
@@ -101,12 +104,20 @@ func (a *Attributes) get(i int) float32 { return a[i].current }
 // it; false if that changed nothing.
 func (a *Attributes) set(i int, v float32) bool {
 	d := playerAttributes[i]
-	v = min(max(v, d.min), d.max)
+	v = min(max(v, d.min), a.maximum(i))
 	if a[i].current == v {
 		return false
 	}
 	a[i].current = v
 	return true
+}
+
+// maximum returns the most attribute i can be.
+func (a *Attributes) maximum(i int) float32 {
+	if l := a[i].limit; l != 0 {
+		return l
+	}
+	return playerAttributes[i].max
 }
 
 // save writes the attributes BDS saves, as it writes them, into the
@@ -166,7 +177,7 @@ func (a *Attributes) list() []protocol.Attribute {
 func (a *Attributes) entry(i int) protocol.Attribute {
 	d := playerAttributes[i]
 	return protocol.Attribute{
-		AttributeValue: protocol.AttributeValue{Name: d.name, Value: a[i].current, Min: d.min, Max: d.max},
+		AttributeValue: protocol.AttributeValue{Name: d.name, Value: a[i].current, Min: d.min, Max: a.maximum(i)},
 		DefaultMin:     d.min, DefaultMax: d.max, Default: d.def,
 	}
 }

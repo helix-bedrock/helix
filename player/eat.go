@@ -187,7 +187,7 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 // always be eaten.
 func (p *Player) mayEat(food FoodItem) bool {
 	return p.creative() || p.s.level.Difficulty == difficultyPeaceful || food.CanAlwaysEat ||
-		p.attributes.get(attrHunger) < playerAttributes[attrHunger].max
+		p.attributes.get(attrHunger) < p.attributes.maximum(attrHunger)
 }
 
 // startUsing is BDS's startUsingItem: nothing changes while the same item in the same
@@ -286,8 +286,8 @@ func vanillaEat(p *Player, held ItemStack, food FoodItem) {
 // goes up by twice the nutrition times the modifier.
 func (p *Player) feed(nutrition int32, modifier float32) {
 	f := p.Food()
-	f.Hunger = min(f.Hunger+float32(nutrition), playerAttributes[attrHunger].max)
-	gain := modifier * float32(nutrition)
+	f.Hunger = min(f.Hunger+float32(nutrition)*p.Tuning(TuneFoodNutritionScale), p.attributes.maximum(attrHunger))
+	gain := modifier * float32(nutrition) * p.Tuning(TuneFoodSaturationScale)
 	f.Saturation = min(f.Saturation+gain+gain, f.Hunger)
 	p.SetFood(f)
 }

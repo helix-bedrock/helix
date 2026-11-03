@@ -177,8 +177,9 @@ func vanillaAttack(p, target *Player) bool {
 	a := Attack{Attacker: p, Target: target, Damage: g.sys.AttackDamage(p, target)}
 	if a.Damage > 0 {
 		if a.Critical = p.canCrit(); a.Critical {
-			a.Damage *= critMultiplier
+			a.Damage *= p.Tuning(TuneCritMultiplier)
 		}
+		a.Damage *= p.Tuning(TuneDamageDealtScale)
 		a.Knockback = p.knockbackOf()
 	}
 	if g.attackEv.Has() {
@@ -195,7 +196,7 @@ func vanillaAttack(p, target *Player) bool {
 			sound = packet.SoundEventAttackCritical
 		}
 		if g.sys.Hurt(target, a.Damage, DamageSource{Cause: DamageEntityAttack, Attacker: p, Knockback: true, Extra: a.Knockback}) {
-			g.sys.Exhaust(p, g.sys.Exhaustion.Attack)
+			g.sys.Exhaust(p, p.Tuning(TuneExhaustAttack))
 			if a.Critical {
 				target.entity.Send(&packet.Animate{ActionType: packet.AnimateActionCriticalHit, EntityRuntimeID: target.runtimeID, Data: critEventData})
 			}
@@ -222,7 +223,7 @@ func (g *gameplay) hitWear(item string) int32 {
 // item, its enchantments' damage floored, then each effect's Attack in order.
 func vanillaAttackDamage(p, target *Player) float32 {
 	g, held := p.s.game, p.inventory.Held()
-	v := p.attributes.get(attrAttackDamage)
+	v := p.attributes.get(attrAttackDamage) + p.Tuning(TuneAttackDamage)
 	if !held.Empty() {
 		v += float32(g.combat.damage[held.Name])
 	}
@@ -279,9 +280,9 @@ func (p *Player) knockbackOf() float32 {
 			level = l
 		}
 	})
-	v := float32(level) * knockbackPerLevel
+	v := float32(level) * p.Tuning(TuneKnockbackPerLevel)
 	if p.Moving(MoveSprinting) {
-		v += sprintKnockback
+		v += p.Tuning(TuneKnockbackSprint)
 	}
 	return v
 }
@@ -294,28 +295,29 @@ func vanillaKnockback(target, attacker *Player, extra float32) {
 	if target.entity == nil || attacker == nil || attacker.entity == nil {
 		return
 	}
-	resist := max(1-target.attributes.get(attrKnockbackResistance), 0)
+	resist := max(1-target.attributes.get(attrKnockbackResistance), 0) * target.Tuning(TuneKnockbackTakenScale) * attacker.Tuning(TuneKnockbackDealtScale)
 	away := target.entity.Position().Sub(attacker.entity.Position())
-	vel := knockbackStep(target.move.velocity, away[0], away[2], knockbackPush*resist, knockbackPush*resist)
+	vel := target.knockbackStep(target.move.velocity, away[0], away[2], target.Tuning(TuneKnockbackPush)*resist, target.Tuning(TuneKnockbackLift)*resist)
 	if extra > 0 {
 		yaw := direction.Units(attacker.entity.Rotation().Yaw)
-		vel = knockbackStep(vel, -direction.Sin(yaw), direction.Cos(yaw), extra*knockbackExtraPush*resist, extra*knockbackExtraLift*resist)
+		vel = target.knockbackStep(vel, -direction.Sin(yaw), direction.Cos(yaw), extra*target.Tuning(TuneKnockbackExtraPush)*resist, extra*target.Tuning(TuneKnockbackExtraLift)*resist)
 	}
 	target.move.velocity = vel
 	target.send(&packet.SetActorMotion{EntityRuntimeID: target.runtimeID, Velocity: vel, Tick: target.entity.Tick()})
 	target.flush()
 }
 
-// knockbackStep is one push of BDS's knockback in the direction (x, z).
-func knockbackStep(vel mgl32.Vec3, x, z, push, lift float32) mgl32.Vec3 {
+// knockbackStep is one push of BDS's knockback on the player in the direction (x, z).
+func (p *Player) knockbackStep(vel mgl32.Vec3, x, z, push, lift float32) mgl32.Vec3 {
+	retain := p.Tuning(TuneKnockbackRetain)
 	var dx, dz float32
 	if l := float32(math.Sqrt(float64(x*x + z*z))); l >= knockbackMinLength {
 		dx, dz = x/l, z/l
 	}
 	return mgl32.Vec3{
-		clampKnockback(vel[0]*knockbackRetain + dx*push),
-		min(vel[1]*knockbackRetain+lift*knockbackLift, knockbackCap),
-		clampKnockback(vel[2]*knockbackRetain + dz*push),
+		clampKnockback(vel[0]*retain + dx*push),
+		min(vel[1]*retain+lift*p.Tuning(TuneKnockbackLiftScale), p.Tuning(TuneKnockbackCap)),
+		clampKnockback(vel[2]*retain + dz*push),
 	}
 }
 

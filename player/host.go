@@ -88,7 +88,9 @@ type Host struct {
 	stackIDs   atomic.Int32
 	// itemLifetime is the live age items vanish at; 0 is vanilla's.
 	itemLifetime atomic.Int32
-	wg           sync.WaitGroup
+	// tuning is the live value of every Tune.
+	tuning atomic.Pointer[tuneTable]
+	wg     sync.WaitGroup
 }
 
 // NewHost freezes setup and returns the Host that runs players with it.
@@ -124,6 +126,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests,
 	}
 	h.itemLifetime.Store(g.sys.ItemLifetime)
+	h.ClearAllTuning()
 	conf.Overworld.SetEntityLoader(h.loadEntity)
 	conf.Overworld.SetBlockEntities(chestEntities{s: h})
 	return h, nil

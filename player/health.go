@@ -100,8 +100,8 @@ func OnPlayerHurt(s *Setup, fn func(e *PlayerHurtEvent), p Priority) error {
 // Health returns the player's health. Runs: the player's region.
 func (p *Player) Health() float32 { return p.attributes.get(attrHealth) }
 
-// SetHealth sets the player's health, clamped to 0 to 20, and tells the
-// player. Runs: the player's region.
+// SetHealth sets the player's health, clamped to 0 to TuneMaxHealth, and tells
+// the player. Runs: the player's region.
 func (p *Player) SetHealth(v float32) { p.setAttributes(attrHealth, v) }
 
 // invulnerable reports whether nothing but the void hurts the player:
@@ -140,6 +140,10 @@ func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 		}
 		damage = e.Damage
 	}
+	damage *= p.Tuning(TuneDamageTakenScale)
+	if damage <= 0 {
+		return false
+	}
 	raw := damage
 	damage = g.sys.ReduceDamage(p, damage, src)
 	if p.hurt.ticks > 0 && src.Cause != DamageNone && src.Cause != DamageSelfDestruct {
@@ -154,7 +158,7 @@ func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 	} else {
 		p.hurt.last = damage
 	}
-	p.hurt.ticks = hurtTicks
+	p.hurt.ticks = int32(p.Tuning(TuneHurtTicks))
 	if src.Knockback && src.Attacker != nil {
 		g.sys.Knockback(p, src.Attacker, src.Extra)
 	}
@@ -162,7 +166,7 @@ func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 		r.Broadcast(p.blockPos(), &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventHurt}, nil)
 	}
 	p.wearArmor(raw, src.Cause)
-	g.sys.Exhaust(p, g.sys.Exhaustion.Damage)
+	g.sys.Exhaust(p, p.Tuning(TuneExhaustDamage))
 	if p.dead() {
 		g.sys.Die(p, src)
 	}
@@ -233,8 +237,10 @@ func (p *Player) afterArmor(damage float32, cause DamageCause) float32 {
 			tough += float32(v.Toughness)
 		}
 	}
+	armor = max(armor+p.Tuning(TuneArmor), 0)
+	tough = max(tough+p.Tuning(TuneToughness), 0)
 	v := damage/(tough*toughnessShare+toughnessBase) + armor
-	share := float32(armorMaxShare)
+	share := p.Tuning(TuneArmorMaxShare)
 	if v <= armorFullPoints {
 		share = max(v, armor*armorMinShare) / armorPerPoint
 	}
@@ -258,7 +264,8 @@ func (p *Player) afterProtection(damage float32, cause DamageCause) float32 {
 			}
 		})
 	}
-	return damage * (float32(min(points, protectionLimit))*-protectionPoint + 1)
+	counted := max(min(float32(points)+p.Tuning(TuneProtection), p.Tuning(TuneProtectionLimit)), 0)
+	return damage * (counted*-p.Tuning(TuneProtectionPoint) + 1)
 }
 
 // protectionKind is BDS's armour enchantment of one kind: its level, times what the
