@@ -322,14 +322,27 @@ func (p *Player) wearArmor(damage float32, cause DamageCause) {
 // player the ones that changed in one UpdateAttributes.
 func (p *Player) setAttributes(kv ...any) {
 	var changed []protocol.Attribute
+	health := false
 	for i := 0; i+1 < len(kv); i += 2 {
 		idx, ok := kv[i].(int)
 		v, okv := kv[i+1].(float32)
 		if ok && okv && p.attributes.set(idx, v) {
 			changed = append(changed, p.attributes.entry(idx))
+			health = health || idx == attrHealth
 		}
 	}
 	if len(changed) > 0 {
 		p.send(&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: changed, Tick: p.entity.Tick()})
 	}
+	if health {
+		p.showHealth()
+	}
+}
+
+// showHealth tells those who see the player its health. Their clients keep a player
+// that died as dead until they hear otherwise, and do not let it be hit. BDS sends
+// every changed attribute to those who see the actor; only health goes so far, as
+// exhaustion changes with every step.
+func (p *Player) showHealth() {
+	p.entity.Send(&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: []protocol.Attribute{p.attributes.entry(attrHealth)}, Tick: p.entity.Tick()})
 }

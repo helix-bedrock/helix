@@ -360,4 +360,5 @@ func (p *Player) tickMaxes() {
 	a.set(attrHunger, a.get(attrHunger))
 	// Sent even when the values fit: the client needs the new maximums.
 	p.send(&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: []protocol.Attribute{a.entry(attrHealth), a.entry(attrHunger)}, Tick: p.entity.Tick()})
+	p.showHealth()
 }
