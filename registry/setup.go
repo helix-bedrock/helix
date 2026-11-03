@@ -74,6 +74,7 @@ type Properties struct {
 const (
 	MaterialWater        = 5
 	MaterialLava         = 6
+	MaterialPowderSnow   = 14
 	MaterialBubbleColumn = 18
 )
 

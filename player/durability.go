@@ -56,18 +56,26 @@ func itemDamage(s ItemStack) int32 {
 // for an unbreakable item, each enchantment's DamageChance may skip it, and
 // past its max damage the item breaks with the break sound.
 func (p *Player) hurtHeld(n int32) {
+	inv := &p.inventory
+	if p.hurtStack(&inv.main[inv.held], n) {
+		p.sendHeld()
+		p.flush()
+	}
+}
+
+// hurtStack damages a stack by n; true if it changed, for the caller to tell the
+// client.
+func (p *Player) hurtStack(s *ItemStack, n int32) bool {
 	if n <= 0 {
-		return
+		return false
 	}
 	g := p.s.game
-	inv := &p.inventory
-	s := &inv.main[inv.held]
 	d, ok := g.durability[s.Name]
 	if s.Empty() || !ok || d.MaxDamage <= 0 {
-		return
+		return false
 	}
 	if u, _ := s.Tag["Unbreakable"].(uint8); u != 0 {
-		return
+		return false
 	}
 	skip := false
 	enchantLevels(*s, func(id, lvl int16) {
@@ -76,7 +84,7 @@ func (p *Player) hurtHeld(n int32) {
 		}
 	})
 	if skip {
-		return
+		return false
 	}
 	damage := itemDamage(*s) + n
 	if s.Tag == nil {
@@ -96,8 +104,7 @@ func (p *Player) hurtHeld(n int32) {
 			delete(s.Tag, "Damage")
 		}
 	}
-	p.sendHeld()
-	p.flush()
+	return true
 }
 
 // durabilityTable indexes helix-data's durability by item name.

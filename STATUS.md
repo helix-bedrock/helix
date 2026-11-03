@@ -71,6 +71,15 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   this the player floated. Opening the inventory (Interact) and closing a container answer as
   BDS does.
 
+- **Using items, hitting, health and hunger (built from BDS 1.26.60, not yet tested in game):** foods are eaten
+  by holding the use button, with hunger, saturation, leftovers such as bowls and effects. Players hit each other with BDS's
+  checks and damage: the held item, Sharpness, Strength, Weakness, critical hits, knockback, the Knockback enchantment and
+  sprinting. Armour, toughness and armour enchantments reduce damage, a hit gives 10 ticks where only harder hits count, and
+  absorption goes first. A full player regains health and an empty one starves, by difficulty. Empty buckets take
+  liquids, and a block that can hold water keeps the source it is placed in. Not done yet: potions, milk, bows,
+  tridents, shields, totems, mace, cooldowns, interacting with entities, mobs.
+- **Joining and game modes (not yet tested in game):** the spawn position, difficulty, commands flag and game rules are
+  sent in BDS's order, and a game mode change sends what BDS sends.
 - **Movement state, falling and hunger (first pass, not yet tested in game):** sneaking,
   sprinting, swimming, gliding and crawling are taken from the client's start and stop input and
   shown to other players. Fall distance follows BDS (cleared in water, on ladders and vines, while

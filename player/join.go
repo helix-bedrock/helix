@@ -73,7 +73,8 @@ func (p *Player) announce() {
 }
 
 // sendJoin sends the join packets in the order BDS 1.26.60 sends them
-// (others between them are not sent yet). False if the connection failed.
+// (SyncActorProperty, SyncWorldClocks, PlayerFog and the camera packets between
+// them are not sent yet). False if the connection failed.
 func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) bool {
 	s, lv := p.s, p.s.level
 	p.send(s.reg.JigsawStructures, s.reg.VoxelShapes, &packet.StartGame{
@@ -90,6 +91,9 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 
 	// The adventure settings and abilities are broadcast, so the player
 	// gets its abilities twice, as from BDS.
+	p.send(&packet.SetSpawnPosition{SpawnType: packet.SpawnTypeWorld, Position: worldSpawn, SpawnPosition: worldSpawn},
+		&packet.SetDifficulty{Difficulty: uint32(lv.Difficulty)}, //nolint:gosec // difficulties are small
+		&packet.SetCommandsEnabled{Enabled: true})
 	adventure := &packet.UpdateAdventureSettings{AutoJump: true}
 	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
 	p.broadcast(adventure, abilities)
@@ -97,7 +101,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 	for _, o := range s.global.online() {
 		list.Entries = append(list.Entries, o.listEntry())
 	}
-	p.send(adventure, abilities, list, abilities,
+	p.send(adventure, abilities, &packet.GameRulesChanged{GameRules: lv.GameRules}, list, abilities,
 		s.reg.Biomes.DefinitionPacket(), s.reg.EntityTypes.IdentifiersPacket(),
 		&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()},
 		s.reg.Creative.Packet(), s.reg.Trims.Packet())

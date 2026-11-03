@@ -66,6 +66,7 @@ func (s *Server) openWorld() error {
 		Name: ldat.LevelName, Seed: ldat.RandomSeed, GameMode: ldat.GameType, Difficulty: ldat.Difficulty,
 		Spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ}, Generator: ldat.Generator,
 		KeepInventory: ldat.KeepInventory, ShowDeathMessages: ldat.ShowDeathMessages,
+		PVP: ldat.PVP, NaturalRegeneration: ldat.NaturalRegeneration, GameRules: gameRules(ldat),
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)

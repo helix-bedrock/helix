@@ -134,6 +134,13 @@ func (s *Setup) freezeItems() (*Items, error) {
 // Count returns the number of item types.
 func (it *Items) Count() int { return len(it.types) }
 
+// Each runs fn for every item type, in order.
+func (it *Items) Each(fn func(ItemType)) {
+	for _, t := range it.types {
+		fn(t)
+	}
+}
+
 // ByName returns an item type by name.
 func (it *Items) ByName(name string) (ItemType, bool) {
 	i, ok := it.byName[name]

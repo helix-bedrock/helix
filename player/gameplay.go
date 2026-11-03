@@ -43,11 +43,21 @@ type Systems struct {
 	FallDamage FallDamageFunc
 	MoveCost   MoveCostFunc
 	// Health and food.
-	Hurt       HurtFunc
-	Exhaust    ExhaustFunc
-	Exhaustion ExhaustionValues
-	Die        DieFunc
-	Respawn    RespawnFunc
+	Hurt         HurtFunc
+	ReduceDamage ReduceDamageFunc
+	Exhaust      ExhaustFunc
+	Exhaustion   ExhaustionValues
+	FoodTick     FoodTickFunc
+	Die          DieFunc
+	Respawn      RespawnFunc
+	// Hitting.
+	Attack       AttackFunc
+	AttackDamage AttackDamageFunc
+	Knockback    KnockbackFunc
+	// Using items in the air.
+	UseItem UseItemFunc
+	FoodOf  FoodOfFunc
+	Eat     EatFunc
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
@@ -74,7 +84,14 @@ type FallDamageFunc func(p *Player, distance float32)
 type MoveCostFunc func(p *Player, m *MoveInfo) float32
 
 // HurtFunc deals damage to the player; false if it was not hurt.
-type HurtFunc func(p *Player, damage float32, cause DamageCause) bool
+type HurtFunc func(p *Player, damage float32, src DamageSource) bool
+
+// ReduceDamageFunc is what is left of damage after what the player wears and has:
+// armour, its enchantments and effects.
+type ReduceDamageFunc func(p *Player, damage float32, src DamageSource) float32
+
+// FoodTickFunc is the player's hunger once a tick: regaining health and starving.
+type FoodTickFunc func(p *Player)
 
 // ExhaustFunc adds exhaustion to the player and burns its food.
 type ExhaustFunc func(p *Player, amount float32)
@@ -113,6 +130,13 @@ type gameplay struct {
 	breakEv   listeners[BlockBreakEvent]
 	placeEv   listeners[BlockPlaceEvent]
 	useEv     listeners[BlockUseEvent]
+	// combat is helix-data's bds/item_combat.json.
+	combat *combatTable
+	// The events of using items, hitting and being hurt.
+	itemUseEv listeners[ItemUseEvent]
+	itemEatEv listeners[ItemEatEvent]
+	attackEv  listeners[PlayerAttackEvent]
+	hurtEv    listeners[PlayerHurtEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -139,6 +163,11 @@ type gameState struct {
 	breakEv  listeners[BlockBreakEvent]
 	placeEv  listeners[BlockPlaceEvent]
 	useEv    listeners[BlockUseEvent]
+	// The events of using items, hitting and being hurt.
+	itemUseEv listeners[ItemUseEvent]
+	itemEatEv listeners[ItemEatEvent]
+	attackEv  listeners[PlayerAttackEvent]
+	hurtEv    listeners[PlayerHurtEvent]
 	// itemDropEv and itemLoadEv are the item events.
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
@@ -265,6 +294,15 @@ func OnItemLoad(s *Setup, fn func(e *ItemLoadEvent), p Priority) error {
 	return nil
 }
 
+// addListener adds fn to one of the Setup's event lists.
+func addListener[E any](s *Setup, l *listeners[E], fn func(e *E), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	l.add(s.owner, p, fn)
+	return nil
+}
+
 // vanillaGameplay registers BDS's enchantments, effects and steps.
 func vanillaGameplay(s *Setup) error {
 	for _, e := range vanillaEnchantments() {
@@ -298,7 +336,15 @@ func vanillaGameplay(s *Setup) error {
 	sys.FallDamage = vanillaFallDamage
 	sys.MoveCost = vanillaMoveCost
 	sys.Hurt = vanillaHurt
+	sys.ReduceDamage = vanillaReduceDamage
 	sys.Exhaust = vanillaExhaust
+	sys.FoodTick = vanillaFoodTick
+	sys.Attack = vanillaAttack
+	sys.AttackDamage = vanillaAttackDamage
+	sys.Knockback = vanillaKnockback
+	sys.UseItem = vanillaUseItem
+	sys.FoodOf = vanillaFoodOf
+	sys.Eat = vanillaEat
 	sys.Die = vanillaDie
 	sys.Respawn = vanillaRespawn
 	ex, err := vanillaExhaustionValues()
@@ -323,9 +369,14 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	if err != nil {
 		return nil, err
 	}
+	combat, err := loadCombat()
+	if err != nil {
+		return nil, err
+	}
 	gs := s.h.game
 	g := gs.out
 	*g = gameplay{
+		combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv,
 		sys: gs.sys, enchants: maps.Clone(gs.enchants), effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
@@ -336,6 +387,10 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	for name, by := range bp.NotReplacedBy {
 		g.notReplacedBy[name] = set(by)
 	}
+	g.itemUseEv.freeze()
+	g.itemEatEv.freeze()
+	g.attackEv.freeze()
+	g.hurtEv.freeze()
 	g.breakEv.freeze()
 	g.placeEv.freeze()
 	g.useEv.freeze()

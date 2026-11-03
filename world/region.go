@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/helix-bedrock/helix/direction"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
@@ -125,7 +126,9 @@ func (r *Region) Block(pos cube.Pos, layer uint8) (uint32, bool) {
 
 // SetBlock sets the block at pos on layer, as BDS's chunk does: setting
 // air on layer 0 over a block holding something in its second layer (water
-// in a waterlogged block) moves that down to layer 0 instead. When the
+// in a waterlogged block) moves that down to layer 0 instead. A block that can
+// hold a liquid, set where a water source is, keeps it in its second layer, and
+// keeps water already there; any other block clears the second layer. When the
 // state changes, the Ticker's Placed runs for the new block. Neighbours
 // are not told; call UpdateNeighbours for that. It returns false, changing
 // nothing, if the chunk is not loaded in this region or the call is made
@@ -143,6 +146,9 @@ func (r *Region) SetBlock(pos cube.Pos, layer uint8, block uint32) bool {
 		}
 	}
 	old, _ := r.Block(pos, layer)
+	if layer == 0 && block != air {
+		r.keepWater(c, pos, old, block)
+	}
 	r.set(c, pos, layer, block)
 	if layer == 0 && old != block {
 		r.blockTypeChanged(c, pos, old, block)
@@ -151,6 +157,36 @@ func (r *Region) SetBlock(pos cube.Pos, layer uint8, block uint32) bool {
 		t.Placed(r, pos, block, layer)
 	}
 	return true
+}
+
+// keepWater is BDS's chunk setting a block over a second layer: old, the block being
+// replaced, moves into the second layer if block holds it; else what is there stays
+// only if block holds it.
+func (r *Region) keepWater(c *Chunk, pos cube.Pos, old, block uint32) {
+	air := r.d.conf.Blocks.Air()
+	extra, _ := r.Block(pos, 1)
+	switch {
+	case r.holdsLiquid(block, old):
+		if extra != old {
+			r.set(c, pos, 1, old)
+			if t := r.d.conf.Ticker; t != nil {
+				t.Placed(r, pos, old, 1)
+			}
+		}
+	case extra != air && !r.holdsLiquid(block, extra):
+		r.set(c, pos, 1, air)
+	}
+}
+
+// holdsLiquid is BDS's test of block keeping liquid in its second layer: a block that
+// can contain liquid, and a water source.
+func (r *Region) holdsLiquid(block, liquid uint32) bool {
+	blocks := r.d.conf.Blocks
+	if !blocks.Properties(block).CanContainLiquid || blocks.Properties(liquid).Material != registry.MaterialWater {
+		return false
+	}
+	depth, _ := blocks.States(liquid)["liquid_depth"].(int32)
+	return depth == 0
 }
 
 // set changes the block at pos on layer and queues its update.

@@ -7,7 +7,7 @@ import (
 )
 
 // DieFunc runs when the player's health reaches 0.
-type DieFunc func(p *Player, cause DamageCause)
+type DieFunc func(p *Player, src DamageSource)
 
 // RespawnFunc brings a dead player back at pos, its eye position.
 type RespawnFunc func(p *Player, pos mgl32.Vec3)
@@ -41,7 +41,9 @@ func (p *Player) dead() bool { return p.Health() <= 0 }
 // go, then armour, offhand, the cursor and the inventory are thrown at random;
 // the death event, the death info and the death message follow, and the
 // respawn sequence starts. Experience is not dropped yet.
-func vanillaDie(p *Player, cause DamageCause) {
+func vanillaDie(p *Player, src DamageSource) {
+	p.stopUsing()
+	p.hurt = hurtState{}
 	p.leaveChest(p.entity.Region(), true)
 	if !p.s.level.KeepInventory {
 		p.dropAllOnDeath()
@@ -51,10 +53,14 @@ func vanillaDie(p *Player, cause DamageCause) {
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventDeath}, nil)
 	}
-	if key := deathMessage(cause); key != "" {
-		p.send(&packet.DeathInfo{Cause: key, Messages: []string{p.name}})
+	if key := deathMessage(src.Cause); key != "" {
+		params := []string{p.name}
+		if src.Attacker != nil {
+			params = append(params, src.Attacker.name)
+		}
+		p.send(&packet.DeathInfo{Cause: key, Messages: params})
 		if p.s.level.ShowDeathMessages {
-			text := &packet.Text{TextType: packet.TextTypeTranslation, NeedsTranslation: true, Message: key, Parameters: []string{p.name}}
+			text := &packet.Text{TextType: packet.TextTypeTranslation, NeedsTranslation: true, Message: key, Parameters: params}
 			p.send(text)
 			p.broadcast(text)
 		}
@@ -67,8 +73,13 @@ func vanillaDie(p *Player, cause DamageCause) {
 // Helix deals; empty for any other. BDS also has a second key for some falls,
 // whose condition is not read yet.
 func deathMessage(cause DamageCause) string {
-	if cause == DamageFall {
+	switch cause {
+	case DamageFall:
 		return "death.attack.fall"
+	case DamageEntityAttack:
+		return "death.attack.player"
+	case DamageStarve:
+		return "death.attack.starve"
 	}
 	return ""
 }
@@ -163,6 +174,7 @@ func vanillaRespawn(p *Player, pos mgl32.Vec3) {
 	p.setAttributes(attrHealth, playerAttributes[attrHealth].def, attrHunger, playerAttributes[attrHunger].def,
 		attrSaturation, playerAttributes[attrSaturation].def, attrExhaustion, playerAttributes[attrExhaustion].def)
 	p.move = moveState{}
+	p.food = foodState{}
 	p.s.handlers.movement(p, moveTo(pos, p.entity.Rotation(), p.entity.Tick()))
 	p.send(&packet.SetHealth{Health: int32(p.Health())})
 	if r := p.entity.Region(); r != nil {

@@ -48,17 +48,31 @@ type PlaceCheckFunc func(pl *Placement) bool
 // item used up. False if nothing was placed.
 type PlaceFunc func(pl *Placement) bool
 
-// handleInventoryTransaction handles the legacy drop and item use on a
-// block. Clicking air and using items on entities come later.
+// handleInventoryTransaction handles the legacy drop, item use on a block or in
+// the air, using an item on an entity and letting an item go.
 func handleInventoryTransaction(p *Player, pk *packet.InventoryTransaction) {
-	if _, normal := pk.TransactionData.(*protocol.NormalTransactionData); normal {
+	switch d := pk.TransactionData.(type) {
+	case *protocol.NormalTransactionData:
 		p.handleNormalTransaction(pk.Actions)
-		return
+	case *protocol.UseItemOnEntityTransactionData:
+		p.handleUseOnEntity(d)
+	case *protocol.ReleaseItemTransactionData:
+		p.stopUsing()
+	case *protocol.UseItemTransactionData:
+		if p.dead() {
+			return
+		}
+		switch d.ActionType {
+		case protocol.UseItemActionClickBlock:
+			p.handleClickBlock(d)
+		case protocol.UseItemActionClickAir:
+			p.handleUseAir(d)
+		}
 	}
-	d, ok := pk.TransactionData.(*protocol.UseItemTransactionData)
-	if !ok || d.ActionType != protocol.UseItemActionClickBlock || p.dead() {
-		return
-	}
+}
+
+// handleClickBlock is an item used on a block.
+func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 	if !p.selectUsed(d) {
 		p.sendHeld()
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
@@ -126,6 +140,9 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
 	if _, ok := bucketLiquids[held.Name]; ok {
 		return p.pourBucket(clicked, face, held)
+	}
+	if held.Name == emptyBucket {
+		return p.fillBucket(clicked)
 	}
 	block, ok := p.itemBlock(held)
 	if !ok {
@@ -300,15 +317,21 @@ func (p *Player) resendPlace(clicked cube.Pos, face int32) {
 // What is used is the server's stack either way; a client that names another
 // item gets its slot back.
 func (p *Player) selectUsed(d *protocol.UseItemTransactionData) bool {
-	if d.HotBarSlot < 0 || d.HotBarSlot >= hotbarSize {
+	return p.selectSlot(d.HotBarSlot, d.HeldItem.Stack.NetworkID)
+}
+
+// selectSlot applies the slot a client names and compares the item it thinks it
+// holds with the server's.
+func (p *Player) selectSlot(slot, networkID int32) bool {
+	if slot < 0 || slot >= hotbarSize {
 		return false
 	}
-	p.inventory.held = uint8(d.HotBarSlot) //nolint:gosec // checked above
+	p.inventory.held = uint8(slot) //nolint:gosec // checked above
 	p.sendEquipment()
 	held := p.inventory.Held()
 	if held.Empty() {
-		return d.HeldItem.Stack.NetworkID == 0
+		return networkID == 0
 	}
 	t, ok := p.s.reg.Items.ByName(held.Name)
-	return ok && int32(t.ID) == d.HeldItem.Stack.NetworkID
+	return ok && int32(t.ID) == networkID
 }

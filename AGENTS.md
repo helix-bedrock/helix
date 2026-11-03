@@ -147,7 +147,7 @@ sibling library folders, so unreleased library changes are used.
   `abilities.go`: BDS's layered abilities (base and spectator layers),
   permission levels and the per-game-mode rules, read from and saved in
   the player's BDS data; `attributes.go`: BDS's 17 player attributes in
-  its join order. `SetGameMode` exists; its packets are a first pass.
+  its join order. `SetGameMode` sends what BDS sends: UpdatePlayerGameType to all, then the abilities.
   `item.go`, `inventory.go`, `stackrequest.go`: the server-held inventory
   (BDS's saved format and join packets) and BDS's checks on stack
   requests (take, place, swap, destroy, creative items), applied all or
@@ -210,10 +210,15 @@ sibling library folders, so unreleased library changes are used.
   as actor flags; after each movement BDS's fall distance (cleared in
   water, on climbable blocks, gliding, slow falling) and fall damage, and
   BDS's exhaustion for moving, jumping, mining and damage (values from
-  the player definition), burning saturation then hunger. `Hurt` is a
-  first pass (health and the hurt event only). All are `Systems` hooks
-  (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, Exhaust,
-  Exhaustion). `death.go`: BDS's death (`Die`: items thrown unless
+  the player definition), burning saturation then hunger. `health.go`: BDS's hurt (armour and toughness, armour
+  enchantments, each effect's `Resist`, 10 hurt ticks letting through only what is above the last hurt, absorption,
+  armour wear). `hunger.go` also has the food tick: regaining health and starving. `attack.go`: players hitting players
+  (BDS's checks, damage from the attribute, item, enchantments and effects, critical hits, knockback, item wear, arm
+  swing relay); numbers from helix-data's `bds/item_combat.json`. `eat.go`: items used in the air, so far foods, read from each
+  item's own data. `bucket.go` fills and pours; `world.Region.SetBlock` keeps a water source in the second layer of a block
+  that can hold it. All are `Systems` hooks (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, ReduceDamage, Exhaust,
+  Exhaustion, FoodTick, Attack, AttackDamage, Knockback, UseItem, FoodOf, Eat), with events `OnPlayerAttack`,
+  `OnPlayerHurt`, `OnItemUse`, `OnItemEat`. `death.go`: BDS's death (`Die`: items thrown unless
   `keepinventory`, death event and message) and its Respawn packet sequence
   (`Respawn`), a first pass without the spawn search. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
   on the minimal event core (named priorities, registration order, no

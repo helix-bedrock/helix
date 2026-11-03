@@ -34,9 +34,13 @@ type Level struct {
 	// Surface is the Y a player stands on in a flat world, used while the
 	// spawn has no height yet; 0 when unknown.
 	Surface int32
-	// KeepInventory and ShowDeathMessages are level.dat's game rules.
-	KeepInventory     bool
-	ShowDeathMessages bool
+	// KeepInventory, ShowDeathMessages, PVP and NaturalRegeneration are level.dat's
+	// game rules the engine reads. GameRules is all of them, as the client is told.
+	KeepInventory       bool
+	ShowDeathMessages   bool
+	PVP                 bool
+	NaturalRegeneration bool
+	GameRules           []protocol.GameRule
 }
 
 // HostConfig is what the server gives the players.
@@ -76,6 +80,8 @@ type Host struct {
 	chests *chestTable
 	// drops holds what each block drops.
 	drops *loot.Table
+	// foods holds what each item does when eaten, from the items' own data.
+	foods map[string]FoodItem
 	// runtimeIDs numbers players' entities; stackIDs numbers item stacks
 	// for the network, as BDS does with one counter for the whole server.
 	runtimeIDs atomic.Uint64
@@ -112,8 +118,8 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		drops.Set(name, rule)
 	}
 	h := &Host{
-		drops: drops,
-		log:   conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
+		drops: drops, foods: foodTable(conf.Registry.Items),
+		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests,
 	}

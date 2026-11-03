@@ -57,14 +57,16 @@ func (p *Player) logSendError(err error, pk packet.Packet) {
 // sendBlock sends the block at pos as the region has it, to undo what the
 // client predicted.
 func (p *Player) sendBlock(r *world.Region, pos cube.Pos) {
-	b, ok := r.Block(pos, 0)
-	if !ok {
-		return
+	for layer := range uint8(2) {
+		b, ok := r.Block(pos, layer)
+		if !ok {
+			return
+		}
+		p.send(&packet.UpdateBlock{
+			Position:          protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
+			NewBlockRuntimeID: p.s.reg.Blocks.Hash(b), Flags: world.UpdateBlockFlags, Layer: uint32(layer),
+		})
 	}
-	p.send(&packet.UpdateBlock{
-		Position:          protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
-		NewBlockRuntimeID: p.s.reg.Blocks.Hash(b), Flags: world.UpdateBlockFlags,
-	})
 }
 
 // sendHeld sends the held slot as the server has it.

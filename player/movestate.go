@@ -63,17 +63,7 @@ func (p *Player) SetMoving(f MoveFlag, on bool) {
 		return
 	}
 	p.move.flags ^= 1 << f
-	r := p.entity.Region()
-	if r == nil {
-		return
-	}
-	// The client set the flag itself when it asked; the others learn it
-	// from the player's actor data.
-	r.Broadcast(p.blockPos(), &packet.SetActorData{
-		EntityRuntimeID: p.runtimeID,
-		EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags()},
-		Tick:            p.entity.Tick(),
-	}, p.viewer)
+	p.sendActorFlags()
 }
 
 // FallDistance returns how far the player has fallen since it last stood
@@ -88,6 +78,10 @@ func (p *Player) SetFallDistance(d float32) { p.move.fall = d }
 type moveState struct {
 	flags uint8
 	fall  float32
+	// velocity is the player's last movement, as knockback starts from it.
+	velocity mgl32.Vec3
+	// climbing and inWater are what the last movement found.
+	climbing, inWater bool
 }
 
 // actorFlags are the player's actor flags as other players see them.
@@ -99,7 +93,25 @@ func (p *Player) actorFlags() int64 {
 			f |= 1 << in.actor
 		}
 	}
+	if p.using.active {
+		f |= 1 << protocol.EntityDataFlagUsingItem
+	}
 	return f
+}
+
+// sendActorFlags shows the player's actor flags to the players who see it. The
+// client set them itself when it asked.
+func (p *Player) sendActorFlags() {
+	if p.entity == nil {
+		return
+	}
+	if r := p.entity.Region(); r != nil {
+		r.Broadcast(p.blockPos(), &packet.SetActorData{
+			EntityRuntimeID: p.runtimeID,
+			EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags()},
+			Tick:            p.entity.Tick(),
+		}, p.viewer)
+	}
 }
 
 // vanillaMoveFlags takes the player's movement states from its input's
@@ -152,6 +164,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 	if b, ok := r.Block(feet, 0); ok {
 		m.Climbing = p.s.reg.Blocks.Properties(b).Climbable
 	}
+	p.move.climbing, p.move.inWater = m.Climbing, m.InWater
 	sys := p.s.game.sys
 	sys.Fall(p, &m)
 	if cost := sys.MoveCost(p, &m); cost > 0 {

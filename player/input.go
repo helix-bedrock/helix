@@ -50,12 +50,17 @@ func (q *inputQueue) take() []packet.Packet {
 // handlers, in order, on its region's tick (world.EntityConfig.Input).
 func (p *Player) handleInput(*world.Entity) {
 	p.tickEffects()
+	p.tickHurt()
 	run := p.input.take()
 	for i, pk := range run {
 		if h := p.s.handlers.handler(pk.ID()); h != nil {
 			h(p, pk)
 		}
 		run[i] = nil
+	}
+	p.tickUsing()
+	if !p.dead() {
+		p.s.game.sys.FoodTick(p)
 	}
 	p.tickRespawn()
 	p.tickPickup()
@@ -90,6 +95,9 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handlePlayerAction); err != nil {
 		return err
 	}
+	if err := Handle(s, handleAnimate); err != nil {
+		return err
+	}
 	if err := vanillaGameplay(s); err != nil {
 		return err
 	}
@@ -113,6 +121,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 			sys.Jump(p)
 		}
 	}
+	p.move.velocity = pk.Delta
 	collided := pk.InputData.Load(packet.InputFlagVerticalCollision)
 	var from mgl32.Vec3
 	if p.entity != nil {

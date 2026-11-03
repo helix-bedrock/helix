@@ -131,6 +131,15 @@ func (inv *Inventory) save(data map[string]any) {
 	data["SelectedInventorySlot"] = int32(inv.held)
 }
 
+// armorPacket is the worn armour as the client gets it.
+func (inv *Inventory) armorPacket(reg *registry.Registry) packet.Packet {
+	items := make([]protocol.ItemInstance, 0, armorSize)
+	for _, s := range inv.armor {
+		items = append(items, s.network(reg))
+	}
+	return &packet.InventoryContent{WindowID: protocol.WindowIDArmour, Content: items}
+}
+
 // contentPackets are the inventory packets of the join, in BDS 1.26.60's
 // order: inventory, armour, UI, offhand, then the selected hotbar slot.
 func (inv *Inventory) contentPackets(reg *registry.Registry) []packet.Packet {

@@ -76,6 +76,9 @@ type Player struct {
 	brk        breakState
 	move       moveState
 	window     windowState
+	using      usingState
+	food       foodState
+	hurt       hurtState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
 	// lastUse is what the first click of the held button did, a use constant.
@@ -137,16 +140,21 @@ func (p *Player) Conn() *network.Conn { return p.conn }
 func (p *Player) Entity() *world.Entity { return p.entity }
 
 // SetGameMode changes the player's game mode and the abilities that come
-// with it, and tells the player and everyone online. The packets are a
-// first pass, not yet checked against what BDS sends on a change. Runs:
-// owner of the player's entity.
+// with it, and tells the player and everyone online, as BDS's
+// setPlayerGameType: UpdatePlayerGameType to all (BDS never sends
+// SetPlayerGameType itself), then the abilities. Runs: owner of the player's
+// entity.
 func (p *Player) SetGameMode(mode int32) {
 	p.gameMode = mode
 	p.abilities.SetGameMode(mode, p.s.level.GameMode)
 	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
-	p.send(&packet.SetPlayerGameType{GameType: mode}, abilities)
+	update := &packet.UpdatePlayerGameType{GameType: mode, PlayerUniqueID: p.uniqueID}
+	if p.entity != nil {
+		update.Tick = p.entity.Tick()
+	}
+	p.send(update, abilities)
 	p.flush()
-	p.broadcast(&packet.UpdatePlayerGameType{GameType: mode, PlayerUniqueID: p.uniqueID}, abilities)
+	p.broadcast(update, abilities)
 }
 
 // SetBreakSpeed sets the multiplier on the player's break speed (1 by

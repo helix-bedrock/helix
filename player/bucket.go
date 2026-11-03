@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/liquid"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -22,6 +23,66 @@ var bucketLiquids = map[string]bucketLiquid{
 // emptyBucket is what a bucket becomes once poured outside creative.
 const emptyBucket = "minecraft:bucket"
 
+// bucketFills are what an empty bucket takes, by the material of the block, with the
+// bucket that makes and the sound.
+var bucketFills = map[uint8]struct{ item, sound string }{
+	registry.MaterialWater:      {"minecraft:water_bucket", packet.SoundEventBucketFillWater},
+	registry.MaterialLava:       {"minecraft:lava_bucket", packet.SoundEventBucketFillLava},
+	registry.MaterialPowderSnow: {"minecraft:powder_snow_bucket", packet.SoundEventBucketFillPowderSnow},
+}
+
+// fillBucket is BDS's empty bucket: the liquid at the clicked block, the second layer
+// first, must be a source (powder snow always is). It goes, the sound plays, and the
+// bucket becomes the filled one; a stack of buckets gives one up and the filled one
+// goes to the inventory, or the ground when full. False if nothing was taken.
+func (p *Player) fillBucket(clicked cube.Pos) bool {
+	r := p.entity.Region()
+	if r == nil || !p.inReach(clicked) {
+		return false
+	}
+	blocks := p.s.reg.Blocks
+	layer := uint8(1)
+	b, ok := r.Block(clicked, layer)
+	if !ok {
+		return false
+	}
+	if b == blocks.Air() {
+		layer = 0
+		b, _ = r.Block(clicked, layer)
+	}
+	material := blocks.Properties(b).Material
+	fill, ok := bucketFills[material]
+	if !ok {
+		return false
+	}
+	if material != registry.MaterialPowderSnow {
+		if depth, _ := blocks.States(b)["liquid_depth"].(int32); depth != 0 {
+			return false
+		}
+	}
+	if !r.SetBlock(clicked, layer, blocks.Air()) {
+		return false
+	}
+	r.UpdateNeighbours(clicked)
+	r.Broadcast(clicked, &packet.LevelSoundEvent{SoundType: fill.sound, Position: blockVec(clicked).Add(mgl32.Vec3{0.5, 0.5, 0.5}), ExtraData: -1}, nil)
+	if p.creative() {
+		return true
+	}
+	filled := ItemStack{Name: fill.item, Count: 1, netID: p.s.stackIDs.Add(1)}
+	inv := &p.inventory
+	if inv.main[inv.held].Count <= 1 {
+		inv.main[inv.held] = filled
+		p.sendHeld()
+		p.sendEquipment()
+		return true
+	}
+	p.useHeld()
+	if rest := p.Give(filled); !rest.Empty() {
+		p.s.game.sys.DropItem(p, rest, false)
+	}
+	return true
+}
+
 // pourBucket is BDS's bucket emptying for water and lava: the liquid goes
 // in the clicked block if it can be built over, else in its neighbour on
 // the clicked face if that can. There, water goes in the second layer of a
@@ -29,9 +90,9 @@ const emptyBucket = "minecraft:bucket"
 // whose material is not solid. Neighbours are told, the liquid is ticked
 // after its delay, the empty sound plays and the bucket becomes an empty
 // bucket outside creative. Not yet read from BDS: how the block is picked
-// (the built-over rule above is Helix's), picking liquids up, items a
-// replaced block drops, the nether's rule for water, and buckets of fish
-// and powder snow. False if nothing was poured.
+// (the built-over rule above is Helix's), items a replaced block drops, the
+// nether's rule for water, and buckets of fish and powder snow. False if
+// nothing was poured.
 func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 	liq, ok := bucketLiquids[held.Name]
 	r := p.entity.Region()

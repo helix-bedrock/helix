@@ -37,10 +37,13 @@ var playerAttributes = [...]attributeDef{
 
 // Indexes into playerAttributes of the attributes gameplay changes.
 const (
-	attrHealth     = 0
-	attrHunger     = 12
-	attrSaturation = 13
-	attrExhaustion = 14
+	attrHealth              = 0
+	attrKnockbackResistance = 2
+	attrAttackDamage        = 6
+	attrAbsorption          = 7
+	attrHunger              = 12
+	attrSaturation          = 13
+	attrExhaustion          = 14
 )
 
 // attributeValue is an attribute's base and current value.

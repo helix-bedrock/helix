@@ -18,10 +18,25 @@ const (
 // it.
 type DamageCause int32
 
-// The damage causes Helix deals so far.
+// The damage causes Helix deals so far, and those BDS's damage rules name.
 const (
-	DamageFall DamageCause = 5
+	DamageNone         DamageCause = 0
+	DamageEntityAttack DamageCause = 2
+	DamageFall         DamageCause = 5
+	DamageVoid         DamageCause = 12
+	DamageSelfDestruct DamageCause = 13
+	DamageStarve       DamageCause = 16
 )
+
+// DamageSource is where a hurt comes from.
+type DamageSource struct {
+	Cause DamageCause
+	// Attacker is the player behind it, if any.
+	Attacker *Player
+	// Knockback pushes the player away from Attacker; Extra adds to the push.
+	Knockback bool
+	Extra     float32
+}
 
 // fallBigDamage is the damage from which BDS plays the big fall sound.
 const fallBigDamage = 5
@@ -75,7 +90,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 			sound = packet.SoundEventFallBig
 		}
 		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: sound, Position: feet, ExtraData: -1, EntityType: "minecraft:player"}, p.viewer)
-		p.s.game.sys.Hurt(p, damage, DamageFall)
+		p.s.game.sys.Hurt(p, damage, DamageSource{Cause: DamageFall})
 	}
 	sound := packet.SoundEventLand
 	if damage > 0 {

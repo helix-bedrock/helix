@@ -68,8 +68,75 @@ func vanillaExhaust(p *Player, amount float32) {
 	p.SetFood(f)
 }
 
-// difficultyPeaceful is level.dat's peaceful difficulty.
-const difficultyPeaceful = 0
+// level.dat's difficulties.
+const (
+	difficultyPeaceful = 0
+	difficultyNormal   = 2
+	difficultyHard     = 3
+)
+
+// Numbers of BDS 1.26.60's hunger.
+const (
+	// foodTimerEnd is the tick at which regaining health or starving acts.
+	foodTimerEnd = 80
+	// regenHunger is the hunger from which health comes back.
+	regenHunger = 18
+	// starveDamage is what starving deals; starveEasyFloor and starveNormalFloor
+	// are the health it stops at on easy and normal.
+	starveDamage      = 1
+	starveEasyFloor   = 10
+	starveNormalFloor = 2
+	// peacefulHungerEvery and peacefulHealthEvery are how often peaceful gives them
+	// back.
+	peacefulHungerEvery = 10
+	peacefulHealthEvery = 20
+)
+
+// foodState is BDS's hunger timers.
+type foodState struct {
+	timer, count int32
+}
+
+// vanillaFoodTick is BDS's hunger attribute tick and the health attribute's peaceful
+// regeneration: peaceful gives hunger and health back, a nearly full player regains
+// health at the cost of exhaustion, and an empty one starves to the difficulty's limit.
+// Nothing in creative or spectator.
+func vanillaFoodTick(p *Player) {
+	if p.invulnerable() {
+		return
+	}
+	lv, st := &p.s.level, &p.food
+	st.count++
+	health, hunger := p.Health(), p.attributes.get(attrHunger)
+	maxHealth := playerAttributes[attrHealth].max
+	peaceful := lv.Difficulty == difficultyPeaceful
+	if peaceful && st.count%peacefulHungerEvery == 0 {
+		p.setAttributes(attrHunger, hunger+1)
+	}
+	if peaceful && lv.NaturalRegeneration && st.count%peacefulHealthEvery == 0 {
+		p.SetHealth(health + 1)
+	}
+	sys := p.s.game.sys
+	switch {
+	case hunger >= regenHunger && lv.NaturalRegeneration && health > 0 && health < maxHealth:
+		st.timer++
+		if st.timer >= foodTimerEnd {
+			st.timer = 0
+			p.SetHealth(p.Health() + 1)
+			sys.Exhaust(p, sys.Exhaustion.Heal)
+		}
+	case hunger <= 0:
+		st.timer++
+		if st.timer >= foodTimerEnd {
+			st.timer = 0
+			if lv.Difficulty == difficultyHard || health > starveEasyFloor || lv.Difficulty == difficultyNormal && health >= starveNormalFloor {
+				sys.Hurt(p, starveDamage, DamageSource{Cause: DamageStarve})
+			}
+		}
+	default:
+		st.timer = 0
+	}
+}
 
 // vanillaExhaustionValues reads the player definition's exhaustion values.
 func vanillaExhaustionValues() (ExhaustionValues, error) {

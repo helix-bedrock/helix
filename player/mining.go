@@ -43,6 +43,11 @@ type Enchantment struct {
 	// enchantment takes damage when it would (Unbreaking). Nil always
 	// takes it.
 	DamageChance func(level int16) int32
+	// Melee is the damage the enchantment adds to a hit on target. Nil adds none.
+	Melee func(level int16, target *Player) float32
+	// Protection is what the enchantment, on worn armour, counts for against
+	// damage of cause. Nil counts for nothing.
+	Protection func(level int16, cause DamageCause) int32
 }
 
 // Effect is a status effect's entry. Vanilla's carry BDS's numbers.
@@ -56,6 +61,10 @@ type Effect struct {
 	// BreakRate changes the progress a tick, applied after BreakSpeed. BDS
 	// applies Haste and Mining Fatigue at both stages.
 	BreakRate func(b *BreakInfo, amplifier int32, rate float32) float32
+	// Attack changes the damage of the player's hits.
+	Attack func(amplifier int32, damage float32) float32
+	// Resist changes the damage the player takes, for causes it applies to.
+	Resist func(amplifier int32, damage float32) float32
 }
 
 // Vanilla enchantment and effect IDs used by the break speed (BDS 1.26.60:
@@ -85,6 +94,13 @@ func vanillaEnchantments() []Enchantment {
 		{ID: EnchantAquaAffinity, Name: "minecraft:aqua_affinity", Underwater: true},
 		{ID: EnchantEfficiency, Name: "minecraft:efficiency", ToolSpeed: efficiencySpeed},
 		{ID: EnchantUnbreaking, Name: "minecraft:unbreaking", DamageChance: unbreakingChance},
+		{ID: EnchantSharpness, Name: "minecraft:sharpness", Melee: sharpnessDamage},
+		{ID: EnchantKnockback, Name: "minecraft:knockback"},
+		{ID: EnchantProtection, Name: "minecraft:protection", Protection: protectionKind(protectAll)},
+		{ID: EnchantFireProtection, Name: "minecraft:fire_protection", Protection: protectionKind(protectFire)},
+		{ID: EnchantFeatherFalling, Name: "minecraft:feather_falling", Protection: protectionKind(protectFall)},
+		{ID: EnchantBlastProtection, Name: "minecraft:blast_protection", Protection: protectionKind(protectBlast)},
+		{ID: EnchantProjectileProtection, Name: "minecraft:projectile_protection", Protection: protectionKind(protectProjectile)},
 	}
 }
 
@@ -105,6 +121,9 @@ func vanillaEffects() []Effect {
 		{ID: EffectHaste, Name: "minecraft:haste", BreakSpeed: hasteSpeed(EffectHaste), BreakRate: hasteRate(EffectHaste)},
 		{ID: EffectConduitPower, Name: "minecraft:conduit_power", BreakSpeed: hasteSpeed(EffectConduitPower), BreakRate: hasteRate(EffectConduitPower)},
 		{ID: EffectMiningFatigue, Name: "minecraft:mining_fatigue", BreakSpeed: fatigueSpeed, BreakRate: fatigueRate},
+		{ID: EffectStrength, Name: "minecraft:strength", Attack: strengthAttack},
+		{ID: EffectWeakness, Name: "minecraft:weakness", Attack: weaknessAttack},
+		{ID: EffectResistance, Name: "minecraft:resistance", Resist: resistanceDamage},
 	}
 }
 
