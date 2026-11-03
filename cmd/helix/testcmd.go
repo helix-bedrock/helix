@@ -87,10 +87,11 @@ func testCommandList() *packet.AvailableCommands {
 		}}},
 	}
 	recipe := protocol.Command{
-		Name: recipeTestCommand, Description: "Tests the recipe API: clear, table, remove, change, add, reset.",
+		Name: recipeTestCommand, Description: "Tests the recipe API: clear, table, remove [item], change, add, reset.",
 		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
 		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
 			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 4},
+			{Name: "item", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
 		}}},
 	}
 	return &packet.AvailableCommands{
@@ -175,19 +176,57 @@ func smithTest(reg *registry.Registry, start *packet.CraftingData, action string
 // recipeTestCommand is the command that tries the recipe API.
 const recipeTestCommand = "recipetest"
 
+// recipeTestStick is the item recipeTestCommand changes, and removes when not told
+// another.
+const recipeTestStick = "minecraft:stick"
+
 // recipeTestActions are what recipeTestCommand takes: clear every recipe, table clears
-// the crafting table's, remove the stick's, change the stick to make apples, add a
-// recipe making a diamond from a stick and an apple, reset to what the server started
-// with.
+// the crafting table's, remove the recipes of an item, change the stick to make apples,
+// add a recipe making a diamond from a stick and an apple, reset to what the server
+// started with.
 var recipeTestActions = []string{"clear", "table", "remove", "change", "add", "reset"}
 
-// recipeTest runs the recipe test on the live recipes and says what happened.
-func recipeTest(reg *registry.Registry, start *packet.CraftingData, action string) string {
+// recipeTestItem is the item a command names, with or without "minecraft:".
+func recipeTestItem(args []string) string {
+	if len(args) == 0 {
+		return recipeTestStick
+	}
+	if strings.Contains(args[0], ":") {
+		return args[0]
+	}
+	return "minecraft:" + args[0]
+}
+
+// recipeTestRemove removes every recipe that makes an item, smithing ones too.
+func recipeTestRemove(reg *registry.Registry, item string) string {
+	removed := 0
+	err := reg.EditRecipes(func(s *registry.Recipes) error {
+		removed += s.RemoveFor(item)
+		return nil
+	})
+	if err == nil {
+		err = reg.EditSmithing(func(s *registry.Smithing) error {
+			removed += s.RemoveFor(item)
+			return nil
+		})
+	}
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("Removed %d recipes for %s.", removed, item)
+}
+
+// recipeTest runs the recipe test on the live recipes and says what happened. Only
+// remove reads the item.
+func recipeTest(reg *registry.Registry, start *packet.CraftingData, action, item string) string {
 	if action == "reset" {
 		reg.Crafting.Update(func(p *packet.CraftingData) { *p = *start })
 		return "Recipes reset."
 	}
-	const stick = "minecraft:stick"
+	if action == "remove" {
+		return recipeTestRemove(reg, item)
+	}
+	const stick = recipeTestStick
 	var msg string
 	err := reg.EditRecipes(func(s *registry.Recipes) error {
 		switch action {
@@ -196,8 +235,6 @@ func recipeTest(reg *registry.Registry, start *packet.CraftingData, action strin
 			msg = "All recipes cleared."
 		case "table":
 			msg = fmt.Sprintf("Removed %d crafting table recipes.", s.ClearBlock("crafting_table"))
-		case "remove":
-			msg = fmt.Sprintf("Removed %d stick recipes.", s.RemoveFor(stick))
 		case "change":
 			r, ok := s.Get(stick)
 			if !ok {
@@ -388,12 +425,12 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
-		if len(args) == 2 && args[0] == recipeTestCommand {
+		if (len(args) == 2 || len(args) == 3) && args[0] == recipeTestCommand {
 			if server := srv.Load(); server != nil {
 				reg := server.Registry()
 				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())
 				// A failed write means the connection is closing, as above.
-				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: recipeTest(reg, smithStart.Load(), args[1])})
+				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: recipeTest(reg, smithStart.Load(), args[1], recipeTestItem(args[2:]))})
 			}
 			return
 		}
