@@ -22,6 +22,8 @@ const (
 	largeGridWidth = 3
 	// craftingTable is the block that opens the large grid.
 	craftingTable = "minecraft:crafting_table"
+	// craftingTableRecipes is the block tag of the recipes the grids make.
+	craftingTableRecipes = "crafting_table"
 	// craftViewRange is how far a player may be from an open crafting table: the
 	// range chests use, as the same check keeps both windows open.
 	craftViewRange = chestViewRange
@@ -177,10 +179,12 @@ func (p *Player) workbenchThere(r *world.Region, pos cube.Pos) bool {
 	return d.Dot(d) <= craftViewRange*craftViewRange
 }
 
-// recipeFor finds a request's recipe, as BDS's checks start.
+// recipeFor finds a request's recipe, as BDS's checks start. The client names the
+// recipe, so one tagged for another block counts as not found: stricter than BDS as
+// read, or a grid would smelt ore and cut stone for anyone who asked.
 func (p *Player) recipeFor(id uint32) (*crafting.Recipe, uint8) {
 	r, ok := p.s.Recipes().Recipe(id)
-	if !ok {
+	if !ok || r.Block != craftingTableRecipes {
 		return nil, protocol.ItemStackResponseStatusFailedToFindRecipeByNetId
 	}
 	if _, size, _, _ := p.craftGrid(); r.Large() && size != largeGridSize {

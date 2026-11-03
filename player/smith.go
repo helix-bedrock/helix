@@ -69,7 +69,9 @@ func (p *Player) trimmed(template, base, addition ItemStack) (ItemStack, bool) {
 	if old, ok := base.Tag[trimTag].(map[string]any); ok && old[trimMaterial] == material && old[trimPattern] == pattern {
 		return ItemStack{}, false
 	}
+	// One base is consumed, so one comes out however many the slot holds.
 	result := base
+	result.Count = 1
 	result.Tag = maps.Clone(base.Tag)
 	if result.Tag == nil {
 		result.Tag = map[string]any{}

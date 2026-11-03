@@ -91,7 +91,7 @@ func TestCraftRefused(t *testing.T) {
 	}{
 		"item left unused": {[]protocol.StackRequestAction{&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: stick, NumberOfCrafts: 1}, consume(p, 28), out}, protocol.ItemStackResponseStatusExpectedItemSlotNotFullyConsumed},
 		"unknown recipe":   {[]protocol.StackRequestAction{&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: 1 << 30, NumberOfCrafts: 1}}, protocol.ItemStackResponseStatusFailedToFindRecipeByNetId},
-		"too big":          {[]protocol.StackRequestAction{&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: recipeID(t, p, "minecraft:barrel"), NumberOfCrafts: 1}}, protocol.ItemStackResponseStatusMismatchedCraftingSize},
+		"too big":          {[]protocol.StackRequestAction{&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: recipeID(t, p, "minecraft:furnace"), NumberOfCrafts: 1}}, protocol.ItemStackResponseStatusMismatchedCraftingSize},
 		"wrong grid":       {[]protocol.StackRequestAction{&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: recipeID(t, p, "minecraft:torch"), NumberOfCrafts: 1}}, protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems},
 		"no craft running": {[]protocol.StackRequestAction{consume(p, 28)}, protocol.ItemStackResponseStatusInvalidCraftRequest},
 	} {
@@ -319,6 +319,50 @@ func TestCraftClientCannotLie(t *testing.T) {
 	p.window.chest = true
 	if status, _ := p.craftRecipe(craft(1)); status != protocol.ItemStackResponseStatusInvalidCraftRequest {
 		t.Errorf("craft in a chest window: status %d", status)
+	}
+}
+
+// TestCraftOtherBlocksRecipe checks a grid refuses a recipe of another block when the
+// client names it, by hand or from the recipe book, though the items fit.
+func TestCraftOtherBlocksRecipe(t *testing.T) {
+	p := testPlayer(t)
+	craftGame(t, p, nil)
+	p.window.open = true
+	seen := map[string]bool{}
+	for _, r := range p.s.reg.Crafting.Packet().ShapelessRecipes {
+		if r.Block == craftingTableRecipes || r.Block == "deprecated" || seen[r.Block] || len(r.Input) != 1 {
+			continue
+		}
+		in := crafting.ReadIngredient(r.Input[0])
+		if in.Name == "" {
+			continue
+		}
+		seen[r.Block] = true
+		meta := int16(0)
+		if in.Meta != 0x7FFF {
+			meta = int16(in.Meta)
+		}
+		p.inventory.ui[smallGridStart] = p.s.freshStack(ItemStack{Name: in.Name, Meta: meta, Count: 4})
+		before := p.inventory
+		rec, ok := p.s.Recipes().Recipe(r.RecipeNetworkID)
+		if !ok || !rec.Fits(crafting.Grid{Items: []crafting.Item{p.craftItem(before.ui[smallGridStart])}, Width: smallGridWidth}) {
+			t.Fatalf("%s: the items should fit", r.RecipeID)
+		}
+		for name, a := range map[string]protocol.StackRequestAction{
+			"by hand": &protocol.CraftRecipeStackRequestAction{RecipeNetworkID: r.RecipeNetworkID, NumberOfCrafts: 1},
+			"auto":    &protocol.AutoCraftRecipeStackRequestAction{RecipeNetworkID: r.RecipeNetworkID, NumberOfCrafts: 1},
+		} {
+			got := p.stackRequest(protocol.ItemStackRequest{RequestID: 2, Actions: []protocol.StackRequestAction{a}})
+			if got.Status != protocol.ItemStackResponseStatusFailedToFindRecipeByNetId {
+				t.Errorf("%s %s: status %d", r.Block, name, got.Status)
+			}
+		}
+	}
+	if len(seen) < 3 {
+		t.Fatalf("only tried %v", seen)
+	}
+	if !seen["furnace"] || !seen["stonecutter"] {
+		t.Fatalf("tried %v", seen)
 	}
 }
 

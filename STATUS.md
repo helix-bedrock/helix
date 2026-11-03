@@ -162,7 +162,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   trim patterns and materials. **All recipes** have the same API: `Registry.EditRecipes` and
   `Setup.EditRecipes` list, clear (`Clear`, `ClearBlock`, `ClearSpecial`, `ClearBrewing`), remove (`Remove`,
   `RemoveFor`) or change and add (`Set`) shaped and shapeless recipes of any block, at boot or while running. Screens
-  not built yet list their recipes but cannot use them. Items left in a grid stay there when the window closes:
+  not built yet list their recipes but cannot use them. A grid only makes recipes tagged for the crafting table, whatever recipe the client names. Items left in a grid stay there when the window closes:
   no return was found in BDS, so the client is taken to move them, which is not confirmed. **Item entities** are a first pass: they are saved with their chunk
   (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
   infinite world's ungenerated ones), do not burn in lava or fire, are not pushed out of a block placed on them, and their
