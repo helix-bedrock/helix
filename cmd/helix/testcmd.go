@@ -454,6 +454,12 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 			if server := srv.Load(); server != nil {
 				reg := server.Registry()
 				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())
+				// Reset is back to how the server started, so nobody keeps a hidden recipe.
+				if args[1] == "reset" {
+					for _, o := range server.Players() {
+						o.EditRecipes(func(r *player.PlayerRecipes) { r.Reset() })
+					}
+				}
 				// A failed write means the connection is closing, as above.
 				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: recipeTest(reg, smithStart.Load(), args[1], recipeTestItem(args[2:]))})
 			}
