@@ -8,6 +8,7 @@ import (
 
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
@@ -99,7 +100,11 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		if err != nil {
 			return err
 		}
-		conf.Ticker = attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks))))
+		circuits, err := circuit.NewTicker(s.reg.Blocks, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks)))))
+		if err != nil {
+			return err
+		}
+		conf.Ticker = circuits
 	}
 	r, _ := mcdb.Overworld.Range()
 	switch {

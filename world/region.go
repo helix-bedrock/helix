@@ -261,6 +261,9 @@ func (r *Region) tick() {
 	r.drain()
 	r.tickEntities()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
+	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
+		rt.BeforeBlockTicks(r)
+	}
 	r.tickBlocks()
 	r.sendChunkPackets()
 	r.updateVisibility()
@@ -377,6 +380,9 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 			fn(r)
 			r.release(pos)
 		}
+	}
+	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
+		rt.ChunkArrived(r, pos)
 	}
 }
 

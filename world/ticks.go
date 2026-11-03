@@ -1,9 +1,11 @@
 package world
 
 import (
+	"cmp"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
+	"slices"
 )
 
 // Block ticks, as BDS 1.26.60 runs them (API_DESIGN.md, "Regions and
@@ -31,6 +33,17 @@ type BlockTicker interface {
 	// NeighbourChanged runs for block at pos on layer when UpdateNeighbours
 	// is called for its neighbour from, as BDS's neighborChanged.
 	NeighbourChanged(r *Region, pos, from cube.Pos, block uint32, layer uint8)
+}
+
+// RegionTicker is a BlockTicker that also works per region and per chunk, for
+// systems such as circuits that span blocks. Runs: owner of the region.
+type RegionTicker interface {
+	// BeforeBlockTicks runs once per region tick, before its chunks tick.
+	BeforeBlockTicks(r *Region)
+	// ChunkTicked runs after a chunk's block ticks.
+	ChunkTicked(r *Region, pos mcdb.ChunkPos)
+	// ChunkArrived runs when a chunk has loaded into the region.
+	ChunkArrived(r *Region, pos mcdb.ChunkPos)
 }
 
 const (
@@ -296,6 +309,9 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 	r.runQueue(c, &c.ticks, now)
 	r.runQueue(c, &c.randomTicks, c.randomTicks.clock+int64(speed))
 	r.tickBlockEntities(c)
+	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
+		rt.ChunkTicked(r, pos)
+	}
 }
 
 // randomTicks gives random blocks of c a random tick: speed times 2.5 per
@@ -345,6 +361,69 @@ func (r *Region) randomTicks(c *Chunk, speed int32) {
 }
 
 // subEmpty reports whether every layer of sub is all air.
+// EachChunk calls fn for each chunk the region holds, in a repeatable order.
+// Runs: owner.
+func (r *Region) EachChunk(fn func(pos mcdb.ChunkPos)) {
+	list := make([]mcdb.ChunkPos, 0, len(r.chunks))
+	for pos := range r.chunks {
+		list = append(list, pos)
+	}
+	slices.SortFunc(list, func(a, b mcdb.ChunkPos) int {
+		if c := cmp.Compare(a[0], b[0]); c != 0 {
+			return c
+		}
+		return cmp.Compare(a[1], b[1])
+	})
+	for _, pos := range list {
+		fn(pos)
+	}
+}
+
+// FindBlocks calls fn for each block of the chunk at pos on layer 0 that want
+// accepts. want is asked once per palette entry, so a chunk without any is cheap.
+// fn may change blocks. Runs: owner.
+func (r *Region) FindBlocks(pos mcdb.ChunkPos, want func(block uint32) bool, fn func(p cube.Pos, block uint32)) {
+	c, ok := r.chunks[pos]
+	if !ok {
+		return
+	}
+	type found struct {
+		p     cube.Pos
+		block uint32
+	}
+	var hits []found
+	baseX, baseZ := int(pos[0])<<4, int(pos[1])<<4
+	for i, sub := range c.col.Chunk.Sub() {
+		if sub == nil || len(sub.Layers()) == 0 {
+			continue
+		}
+		layer := sub.Layers()[0]
+		palette := layer.Palette()
+		any := false
+		for j := range palette.Len() {
+			if want(palette.Value(uint16(j))) { //nolint:gosec // palettes are small
+				any = true
+				break
+			}
+		}
+		if !any {
+			continue
+		}
+		for x := range byte(16) {
+			for z := range byte(16) {
+				for y := range byte(16) {
+					if b := layer.At(x, y, z); want(b) {
+						hits = append(hits, found{cube.Pos{baseX + int(x), r.d.r[0] + i<<4 + int(y), baseZ + int(z)}, b})
+					}
+				}
+			}
+		}
+	}
+	for _, h := range hits {
+		fn(h.p, h.block)
+	}
+}
+
 func subEmpty(sub *chunk.SubChunk, air uint32) bool {
 	if sub == nil {
 		return true

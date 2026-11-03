@@ -197,7 +197,8 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
   infinite world's ungenerated ones), do not burn in lava or fire, are not pushed out of a block placed on them, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
-- **Everything else** (mobs, combat, redstone, commands, UI) comes after core player gameplay.
+- **Redstone (first pass, not yet tested in game):** the circuits are the new `redstone` library, connected by the `circuit` package: wire with its connection states, torches, repeaters, comparators, levers, buttons, redstone blocks, lamps, doors, trapdoors and fence gates. Pistons, observers, pressure plates, rails, hoppers, dispensers, note blocks, TNT, daylight sensors and comparators reading containers are not done.
+- **Everything else** (mobs, combat, commands, UI) comes after core player gameplay.
   [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which
   topics are designed.
 - **The API is not stable yet.** Names and behaviour may still change between commits.

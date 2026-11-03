@@ -1,7 +1,6 @@
 // Package blockuse is what vanilla's doors, trapdoors, fence gates, levers and
 // buttons do when used, as BDS 1.26.60 does it: their state, their sounds and
-// the blocks that react later. Nothing here sends redstone power, which is not
-// built yet.
+// the blocks that react later. Power itself is the circuit package's.
 package blockuse
 
 import (
@@ -23,7 +22,12 @@ const (
 	stateHinge    = "door_hinge_bit"
 	statePressed  = "button_pressed_bit"
 	stateCardinal = direction.CardinalState
+	stateDelay    = "repeater_delay"
+	stateSubtract = "output_subtract_bit"
 )
+
+// repeaterDelays is how many delay settings a repeater has.
+const repeaterDelays = 4
 
 // Ticks a pressed button waits before it pops out.
 const (
@@ -41,6 +45,8 @@ const (
 	kindGate
 	kindLever
 	kindButton
+	kindRepeater
+	kindComparator
 )
 
 // kindOf returns the class of the block called name.
@@ -56,6 +62,10 @@ func kindOf(name string) kind {
 		return kindLever
 	case strings.HasSuffix(name, "_button"):
 		return kindButton
+	case strings.HasSuffix(name, "_repeater"):
+		return kindRepeater
+	case strings.HasSuffix(name, "_comparator"):
+		return kindComparator
 	}
 	return kindNone
 }
@@ -95,6 +105,11 @@ func Use(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, y
 			sound(blocks, r, pos, packet.SoundEventButtonClickOn, block)
 			r.ScheduleTick(pos, next, buttonTicks(name), 0)
 		}
+	case kindRepeater:
+		delay, _ := blocks.States(block)[stateDelay].(int32)
+		setAndUpdate(r, pos, with(blocks, block, stateDelay, (delay+1)%repeaterDelays))
+	case kindComparator:
+		setAndUpdate(r, pos, with(blocks, block, stateSubtract, flag(!bit(blocks, block, stateSubtract))))
 	default:
 		return false
 	}
@@ -136,6 +151,41 @@ func useDoor(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint3
 	}
 	sound(blocks, r, lowerPos, choose(open, packet.SoundEventDoorClose, packet.SoundEventDoorOpen), lower)
 	return true
+}
+
+// SetPowered opens or closes a door, trapdoor or fence gate because of redstone,
+// if it is not that way already, with its sound. A gate keeps its direction.
+// Runs: owner of the region.
+func SetPowered(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, on bool) {
+	switch kindOf(blocks.Name(block)) {
+	case kindDoor:
+		lower, lowerPos := block, pos
+		if bit(blocks, block, stateUpper) {
+			lowerPos = pos.Side(cube.FaceDown)
+			var ok bool
+			if lower, ok = r.Block(lowerPos, 0); !ok {
+				return
+			}
+		}
+		if bit(blocks, lower, stateOpen) != on {
+			useDoor(blocks, r, lowerPos, lower)
+		}
+	case kindTrapdoor:
+		if bit(blocks, block, stateOpen) != on {
+			setAndUpdate(r, pos, with(blocks, block, stateOpen, flag(on)))
+			sound(blocks, r, pos, choose(on, packet.SoundEventTrapdoorOpen, packet.SoundEventTrapdoorClose), block)
+		}
+	case kindGate:
+		if bit(blocks, block, stateOpen) != on {
+			setAndUpdate(r, pos, with(blocks, block, stateOpen, flag(on)))
+			sound(blocks, r, pos, choose(on, packet.SoundEventFenceGateOpen, packet.SoundEventFenceGateClose), block)
+		}
+	}
+}
+
+// Sound plays a block's sound at its centre to everyone near.
+func Sound(blocks *registry.Blocks, r *world.Region, pos cube.Pos, event string, block uint32) {
+	sound(blocks, r, pos, event, block)
 }
 
 // IsDoor reports whether block is a door, which is placed in two halves.
