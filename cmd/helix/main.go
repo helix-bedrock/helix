@@ -15,6 +15,7 @@ import (
 func main() {
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
 	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
+	publicIP := flag.String("public-ip", "", "this network's public IP, so players outside it can join; forward TCP and UDP 19132 on the router")
 	flag.Parse()
 	level := slog.LevelInfo
 	if *debug {
@@ -26,6 +27,7 @@ func main() {
 
 	conf := helix.DefaultConfig()
 	conf.Log = log
+	conf.NetherNet.PublicIP = *publicIP
 	var testServer atomic.Pointer[helix.Server]
 	if *testcmds {
 		conf.Setup = testCommands(&testServer)

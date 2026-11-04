@@ -47,6 +47,10 @@ type NetherNetConfig struct {
 	// UDPPort, when not 0, carries every connection over one UDP port. Else
 	// the operating system picks a port per connection.
 	UDPPort uint16
+	// PublicIP, when not empty, is offered to players next to the machine's
+	// own addresses, so players outside its network can reach a server behind
+	// a router. The router must forward UDP to the same port.
+	PublicIP string
 	// AllowAnonymous accepts clients without a NetherNet identity. BDS
 	// refuses them, online or offline.
 	AllowAnonymous bool
@@ -78,6 +82,17 @@ func NetherNet(conf NetherNetConfig) (Transport, error) {
 		return err
 	}
 	var se webrtc.SettingEngine
+	if conf.PublicIP != "" {
+		// Appended, not replacing: players on the same network as the server
+		// still need its private addresses.
+		if err := se.SetICEAddressRewriteRules(webrtc.ICEAddressRewriteRule{
+			External:        []string{conf.PublicIP},
+			AsCandidateType: webrtc.ICECandidateTypeHost,
+			Mode:            webrtc.ICEAddressRewriteAppend,
+		}); err != nil {
+			return nil, fmt.Errorf("network: nethernet public ip %q: %w", conf.PublicIP, err)
+		}
+	}
 	if conf.UDPPort != 0 {
 		mux, err := ice.NewMultiUDPMuxFromPort(int(conf.UDPPort))
 		if err != nil {

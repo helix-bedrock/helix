@@ -95,6 +95,10 @@ type NetherNetConfig struct {
 	SaveIdentityKey bool
 	// UDPPort carries every connection over one UDP port when not 0.
 	UDPPort uint16
+	// PublicIP is the address players outside this network reach the server
+	// on, for a server behind a router. Empty offers only the machine's own
+	// addresses.
+	PublicIP string
 	// AllowAnonymous accepts clients that send no NetherNet identity. BDS
 	// 1.26.60 refuses them (signaling error 37, IdentityNotAllowed) even
 	// with online mode off, so it is off by default; turn it on only for
@@ -282,7 +286,7 @@ func (s *Server) openTransports() error {
 			return err
 		}
 		t, err := network.NetherNet(network.NetherNetConfig{
-			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort,
+			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort, PublicIP: s.conf.NetherNet.PublicIP,
 			AllowAnonymous: s.conf.NetherNet.AllowAnonymous, Log: s.log.With("part", "nethernet"),
 		})
 		if err != nil {
