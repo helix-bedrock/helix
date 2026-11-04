@@ -378,18 +378,20 @@ func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
 	p.flush()
 }
 
-// collectItems takes in whatever items lie in the box above the hopper. A stack that
-// fits goes in whole.
+// collectItems takes in whatever items touch the box above the hopper. A stack that
+// fits goes in whole. An item only some players may see stays out, as those players' own;
+// a name tag or lifetime changes nothing about what the item is.
 func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {
 	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
 	var buf [16]*world.Entity
 	for _, o := range r.AppendEntitiesIn(buf[:0], x, z, x+1, z+1) {
 		i, ok := o.Owner().(*ItemActor)
-		if !ok || i.taken || i.custom() || i.pickupDelay == itemNeverPickedUp {
+		if !ok || i.taken || i.rule != nil || i.pickupDelay == itemNeverPickedUp {
 			continue
 		}
 		at := o.Position()
-		if at[0] < x || at[0] > x+1 || at[2] < z || at[2] > z+1 || at[1] < y+hopperReachLow || at[1] > y+hopperReachHigh {
+		if at[0]+itemHalfSize <= x || at[0]-itemHalfSize >= x+1 || at[2]+itemHalfSize <= z || at[2]-itemHalfSize >= z+1 ||
+			at[1]+2*itemHalfSize <= y+hopperReachLow || at[1] >= y+hopperReachHigh {
 			continue
 		}
 		left := c.AddItem(r, i.stack)

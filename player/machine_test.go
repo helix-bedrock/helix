@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -87,6 +88,20 @@ func TestHopperMovesChestToChest(t *testing.T) {
 		c := p.s.chestAt(r, low)
 		return c != nil && c.Item(r, 0).Count == 2 && p.s.chestAt(r, top).Item(r, 3).Empty()
 	})
+}
+
+func TestHopperCollectsItemsAbove(t *testing.T) {
+	p, d := machineWorld(t)
+	at := cube.Pos{1, 69, 1}
+	var c *Chest
+	onRegion(d, func(r *world.Region) {
+		setNamed(t, p, r, at, "minecraft:hopper", nil)
+		c = p.s.chestAt(r, at)
+	})
+	// One with a name tag, as -testcmds gives every dropped item, is still just an item.
+	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl32.Vec3{1.5, 70, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+	onRegion(d, func(*world.Region) { i.SetView(func(*Player, *ItemView) {}) })
+	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 3 })
 }
 
 func TestHopperTurnedOffHolds(t *testing.T) {
