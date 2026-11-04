@@ -134,8 +134,11 @@ func (p *Player) showSeat(on bool) {
 	}
 	pk := &packet.SetActorData{EntityRuntimeID: p.entity.RuntimeID(), EntityMetadata: meta}
 	p.entity.Send(pk)
-	p.send(pk)
-	p.flush()
+	// A player with no connection has no client to tell.
+	if p.conn != nil {
+		p.send(pk)
+		p.flush()
+	}
 }
 
 // rideBlocks is the world for the search for a place to land.
