@@ -209,6 +209,9 @@ func (t *Table) onFloor(r *world.Region, pos cube.Pos) bool {
 	return ok && t.Supports(b, cube.FaceUp)
 }
 
+// tripwireHook hangs on the side of a block.
+const tripwireHook = "minecraft:tripwire_hook"
+
 // MayPlace is BDS's mayPlace for these blocks: something around pos must hold
 // the block, wherever the player clicked. True for every other block.
 func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cube.Face) bool {
@@ -221,6 +224,10 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	}
 	if strings.HasSuffix(name, "_pressure_plate") {
 		return t.DiodeSurvives(r, pos)
+	}
+	if name == tripwireHook {
+		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
+		return ok && !direction.Vertical(clicked) && t.Supports(b, clicked)
 	}
 	switch t.kinds[name] {
 	case kindTorch:

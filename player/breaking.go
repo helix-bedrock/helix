@@ -382,6 +382,9 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		}
 		becomes, wear = e.Becomes, e.Wear
 	}
+	if destroy := p.s.circuits.Destroy; destroy != nil {
+		destroy(r, pos, b.Block, p.inventory.main[p.inventory.held].Name)
+	}
 	p.hurtHeld(wear)
 	drops, xp := p.blockDrops(r, pos, b.Block)
 	if !r.SetBlock(pos, 0, becomes) {

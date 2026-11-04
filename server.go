@@ -247,7 +247,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		s.circuits.SetDispense(host.Dispense)
 		s.circuits.SetEntityBox(host.EntityBox)
 		host.SetCircuitHooks(player.CircuitHooks{
-			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, ChestViewers: s.circuits.SetChestViewers,
+			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers,
 		})
 		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
 	}

@@ -289,6 +289,8 @@ type CircuitHooks struct {
 	Use func(r *world.Region, pos cube.Pos, block uint32) bool
 	// Attack is a player starting to break a block.
 	Attack func(r *world.Region, pos cube.Pos, block uint32)
+	// Destroy is a player about to break a block with the item called item in hand.
+	Destroy func(r *world.Region, pos cube.Pos, block uint32, item string)
 	// ChestViewers says how many have the trapped chest at pos open.
 	ChestViewers func(r *world.Region, pos cube.Pos, n int32)
 }

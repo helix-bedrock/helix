@@ -103,6 +103,8 @@ const (
 	kindTarget
 	kindTrapped
 	kindDaylight
+	kindHook
+	kindTripWire
 )
 
 // kindOf returns the class of the block called name.
@@ -138,6 +140,10 @@ func kindOf(name string) kind {
 		return kindTrapped
 	case nameDaylight, nameDaylightInverted:
 		return kindDaylight
+	case nameHook:
+		return kindHook
+	case nameTripWire:
+		return kindTripWire
 	}
 	switch {
 	case strings.HasSuffix(name, "_pressure_plate"):
@@ -165,7 +171,7 @@ func componentKind(k kind) redstone.Kind {
 		return redstone.KindRepeater
 	case kindComparator:
 		return redstone.KindComparator
-	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight:
+	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook:
 		return redstone.KindProducer
 	case kindObserver:
 		return redstone.KindPulse
@@ -371,6 +377,13 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 	}
 	c.sys.Invalidate(p)
 	switch {
+	case k == kindHook:
+		t.hookLook(c, pos, block, hookNoSource)
+		if !t.hookHeld(r, pos, block) {
+			r.ScheduleTick(pos, block, 1, 0)
+		}
+	case k == kindTripWire:
+		t.tellHooks(c, pos)
 	case k == kindWire:
 		t.refreshWire(c, pos)
 		t.tickWireAround(c, pos, false)
@@ -402,6 +415,10 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			t.observerHeard(r, pos, from, block)
 		case kindPlate:
 			if !t.attach.DiodeSurvives(r, pos) {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
+		case kindHook:
+			if !t.hookHeld(r, pos, block) {
 				r.ScheduleTick(pos, block, 1, 0)
 			}
 		default:
@@ -576,6 +593,12 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		t.observerTick(t.circuitOf(r), pos, block)
 	case kindPlate:
 		t.plateTick(t.circuitOf(r), pos, block)
+	case kindHook:
+		t.hookTick(t.circuitOf(r), pos, block)
+	case kindTripWire:
+		if bitState(t.blocks.States(block), statePowered) {
+			t.wireUpdate(t.circuitOf(r), pos, block)
+		}
 	default:
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
@@ -703,6 +726,13 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 		}
 	case kindTarget, kindTrapped:
 		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
+			comp.SetAttach(true)
+			comp.SetAllowUp(true)
+		}
+	case kindHook:
+		f := hookHolders[hookDirection(states)]
+		if comp := c.sys.Create(p, redstone.KindProducer, f); comp != nil {
+			comp.SetStrength(onOff(bitState(states, statePowered)))
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)
 		}

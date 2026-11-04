@@ -261,7 +261,7 @@ func (t *Ticker) stepOn(c *regionCircuit, pos cube.Pos, block uint32) {
 	}
 }
 
-// entitiesOnPlates finds the plates entities touch. Runs: owner of the region.
+// entitiesOnPlates finds the plates and tripwires entities touch. Runs: owner of the region.
 func (t *Ticker) entitiesOnPlates(c *regionCircuit) {
 	if t.entityBox == nil {
 		return
@@ -276,8 +276,17 @@ func (t *Ticker) entitiesOnPlates(c *regionCircuit) {
 			for z := floor(lo[2]); z <= floor(hi[2]); z++ {
 				for y := floor(lo[1]); y <= floor(hi[1]); y++ {
 					pos := cube.Pos{x, y, z}
-					if b, ok := c.r.Block(pos, 0); ok && t.kind(b) == kindPlate {
+					b, ok := c.r.Block(pos, 0)
+					if !ok {
+						continue
+					}
+					switch t.kind(b) {
+					case kindPlate:
 						t.stepOn(c, pos, b)
+					case kindTripWire:
+						if !bitState(t.blocks.States(b), statePowered) {
+							t.wireUpdate(c, pos, b)
+						}
 					}
 				}
 			}

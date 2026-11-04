@@ -531,6 +531,82 @@ func TestWireJoinsObserverBack(t *testing.T) {
 	})
 }
 
+// tripwire builds hooks with wire between them along x, each hook held by stone, and
+// returns the west hook, the east hook and the middle wire.
+func (w *testWorld) tripwire(t *testing.T, r *world.Region) (west, east, mid cube.Pos) {
+	t.Helper()
+	y := surfaceY
+	stone := w.state(t, "minecraft:stone", nil)
+	place(r, cube.Pos{1, y, 4}, stone)
+	place(r, cube.Pos{6, y, 4}, stone)
+	west, east, mid = cube.Pos{2, y, 4}, cube.Pos{5, y, 4}, cube.Pos{3, y, 4}
+	place(r, west, w.state(t, "minecraft:tripwire_hook", map[string]any{"direction": int32(3)}))
+	place(r, east, w.state(t, "minecraft:tripwire_hook", map[string]any{"direction": int32(1)}))
+	place(r, mid, w.state(t, "minecraft:trip_wire", nil))
+	place(r, cube.Pos{4, y, 4}, w.state(t, "minecraft:trip_wire", nil))
+	return west, east, mid
+}
+
+func TestTripwireAttachesAndFires(t *testing.T) {
+	w := openWorld(t)
+	var west, east, mid cube.Pos
+	w.run(func(r *world.Region) { west, east, mid = w.tripwire(t, r) })
+	bit := func(r *world.Region, pos cube.Pos, key string) bool {
+		b, _ := r.Block(pos, 0)
+		v, _ := w.reg.Blocks.States(b)[key].(uint8)
+		return v == 1
+	}
+	w.wait(t, func(r *world.Region) bool {
+		return bit(r, west, "attached_bit") && bit(r, east, "attached_bit") && bit(r, mid, "attached_bit")
+	})
+	on := atomic.Bool{}
+	on.Store(true)
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+		if !on.Load() {
+			return lo, hi, false, false
+		}
+		return mgl32.Vec3{3.2, surfaceY, 4.2}, mgl32.Vec3{3.8, surfaceY + 2, 4.8}, true, true
+	})
+	e := w.d.AddEntity(world.EntityConfig{UniqueID: 901, RuntimeID: 901, Pos: mgl32.Vec3{3.5, surfaceY, 4.5}})
+	t.Cleanup(e.Remove)
+	lamp := cube.Pos{2, surfaceY, 5}
+	w.run(func(r *world.Region) { place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil)) })
+	w.wait(t, func(r *world.Region) bool {
+		return bit(r, mid, "powered_bit") && bit(r, west, "powered_bit") && bit(r, east, "powered_bit") &&
+			w.name(r, lamp) == "minecraft:lit_redstone_lamp"
+	})
+	on.Store(false)
+	w.wait(t, func(r *world.Region) bool { return !bit(r, mid, "powered_bit") && !bit(r, west, "powered_bit") })
+}
+
+func TestTripwireCutWithoutShearsFires(t *testing.T) {
+	w := openWorld(t)
+	var west, mid cube.Pos
+	w.run(func(r *world.Region) { west, _, mid = w.tripwire(t, r) })
+	w.run(func(r *world.Region) {
+		b, _ := r.Block(mid, 0)
+		w.circuits.DestroyBlock(r, mid, b, "minecraft:diamond_sword")
+		h, _ := r.Block(west, 0)
+		if v, _ := w.reg.Blocks.States(h)["powered_bit"].(uint8); v != 1 {
+			t.Error("cutting a wire by hand should set it off")
+		}
+	})
+}
+
+func TestPistonPushesItems(t *testing.T) {
+	w := openWorld(t)
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+		at := e.Position()
+		return mgl32.Vec3{at[0] - 0.125, at[1], at[2] - 0.125}, mgl32.Vec3{at[0] + 0.125, at[1] + 0.25, at[2] + 0.125}, false, true
+	})
+	item := w.d.AddEntity(world.EntityConfig{UniqueID: 902, RuntimeID: 902, Pos: mgl32.Vec3{5.5, surfaceY, 4.5}})
+	t.Cleanup(item.Remove)
+	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(4)})
+	w.run(func(r *world.Region) { place(r, cube.Pos{4, surfaceY, 4}, piston) })
+	w.run(func(r *world.Region) { place(r, cube.Pos{3, surfaceY, 4}, w.state(t, "minecraft:redstone_block", nil)) })
+	w.wait(t, func(r *world.Region) bool { return item.Position()[0] >= 6 })
+}
+
 func TestTrappedChestPowersWhileOpen(t *testing.T) {
 	w := openWorld(t)
 	at := cube.Pos{4, surfaceY, 4}

@@ -220,6 +220,56 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	}
 	if moving {
 		r.SendBlockEntity(pos)
+		e.pushEntities(r, pos, dir)
+	}
+}
+
+// pushEntities moves what a moving arm or block runs into out in front of it. Players
+// are left alone: the client moves them itself. Runs: owner of its chunk.
+func (e *pistonEntity) pushEntities(r *world.Region, pos cube.Pos, dir pistonFacing) {
+	expanding := e.state == pistonExpanding
+	if e.t.entityBox == nil || (!expanding && e.state != pistonRetracting) {
+		return
+	}
+	front := pos.Side(pistonFaces[dir])
+	step := mgl32.Vec3{float32(front[0] - pos[0]), float32(front[1] - pos[1]), float32(front[2] - pos[2])}
+	travel, gone := step, e.progress
+	if !expanding {
+		travel, gone = step.Mul(-1), 1-e.progress
+	}
+	c := e.t.circuitOf(r)
+	if expanding {
+		e.pushOutOf(c, pos, travel, gone)
+	}
+	for _, at := range e.attached {
+		e.pushOutOf(c, at, travel, gone)
+	}
+}
+
+// pushOutOf moves entities out of a block that started at base and has gone this far
+// along travel.
+func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.Vec3, gone float32) {
+	lo := mgl32.Vec3{float32(base[0]), float32(base[1]), float32(base[2])}.Add(travel.Mul(gone))
+	hi := lo.Add(mgl32.Vec3{1, 1, 1})
+	c.found = c.r.AppendEntitiesIn(c.found[:0], lo[0]-plateReach, lo[2]-plateReach, hi[0]+plateReach, hi[2]+plateReach)
+	for _, o := range c.found {
+		eLo, eHi, mob, ok := e.t.entityBox(o)
+		if !ok || mob {
+			continue
+		}
+		if eHi[0] <= lo[0] || eLo[0] >= hi[0] || eHi[1] <= lo[1] || eLo[1] >= hi[1] || eHi[2] <= lo[2] || eLo[2] >= hi[2] {
+			continue
+		}
+		var by mgl32.Vec3
+		for i := range 3 {
+			switch {
+			case travel[i] > 0:
+				by[i] = hi[i] - eLo[i]
+			case travel[i] < 0:
+				by[i] = lo[i] - eHi[i]
+			}
+		}
+		o.Apply(world.Movement{Pos: o.Position().Add(by), Rot: o.Rotation(), OnGround: o.OnGround(), Tick: o.Tick()})
 	}
 }
 
