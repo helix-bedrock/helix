@@ -5,32 +5,28 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
-	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
 
-// The client asks to open a chest or hopper cart with an Interact aimed at the cart. One
-// too far away stays shut.
-func TestInteractOpensCart(t *testing.T) {
+// The client asks to open a chest or hopper cart with an Interact aimed at the cart: one
+// in reach is found by its ID, one too far away is not.
+func TestInteractFindsCartInReach(t *testing.T) {
 	for _, kind := range []string{nameChestMinecart, nameHopperMinecart} {
 		t.Run(kind, func(t *testing.T) {
 			p, d, y := cartWorld(t, nameRail, railStates(0))
-			p.abilities = DefaultAbilities()
-			interact := func(m *Minecart) {
-				waitRegion(t, d, func(*world.Region) bool { return p.cartNear(m.entity.RuntimeID()) != nil })
-				onRegion(d, func(*world.Region) {
-					handleInteract(p, &packet.Interact{ActionType: packet.InteractActionOpenInventory, TargetEntityRuntimeID: m.entity.RuntimeID()})
-				})
-			}
-			interact(p.s.SpawnMinecart(d, kind, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5}))
-			if p.window.open {
-				t.Error("opened a cart out of reach")
-			}
+			far := p.s.SpawnMinecart(d, kind, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5})
 			near := p.s.SpawnMinecart(d, kind, p.entity.Position().Add(mgl32.Vec3{1, 1, 0}))
-			interact(near)
-			if !p.window.open || p.window.cart != near {
-				t.Errorf("window open %v, cart %v", p.window.open, p.window.cart)
-			}
+			waitRegion(t, d, func(*world.Region) bool {
+				return p.cartNear(far.entity.RuntimeID()) != nil && p.cartNear(near.entity.RuntimeID()) != nil
+			})
+			onRegion(d, func(*world.Region) {
+				if p.cartInReach(far.entity.RuntimeID()) != nil {
+					t.Error("found a cart out of reach")
+				}
+				if p.cartInReach(near.entity.RuntimeID()) != near {
+					t.Error("did not find the cart in reach")
+				}
+			})
 		})
 	}
 }

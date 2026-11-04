@@ -75,7 +75,7 @@ func handleInteract(p *Player, pk *packet.Interact) {
 		return
 	}
 	// The client asks this way to open a chest or hopper minecart.
-	if m := p.cartNear(pk.TargetEntityRuntimeID); m != nil && p.entity.Position().Sub(m.entity.Position()).Len() <= cartReach {
+	if m := p.cartInReach(pk.TargetEntityRuntimeID); m != nil {
 		p.openCart(m)
 	}
 }

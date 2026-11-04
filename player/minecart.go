@@ -1091,6 +1091,15 @@ func (p *Player) cartNear(id uint64) *Minecart {
 	return nil
 }
 
+// cartInReach finds a minecart close enough for the player to use, by its runtime ID.
+func (p *Player) cartInReach(id uint64) *Minecart {
+	m := p.cartNear(id)
+	if m == nil || p.entity.Position().Sub(m.entity.Position()).Len() > cartReach {
+		return nil
+	}
+	return m
+}
+
 // useOnCart is a use on actor transaction aimed at a minecart. False if it was not.
 func (p *Player) useOnCart(d *protocol.UseItemOnEntityTransactionData) bool {
 	m := p.cartNear(d.TargetEntityRuntimeID)
