@@ -5,6 +5,8 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/liquid"
+	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -28,8 +30,10 @@ const (
 	// A dispensed item starts ejectReach from the block's centre towards its front,
 	// ejectLow above the bottom of the block when it faces a side.
 	ejectReach = 0.7
-	ejectLow   = 0.3
-	ejectUp    = 0.2
+	// machineBucketPour is the click's data when a dispenser pours a bucket.
+	machineBucketPour = 1000
+	ejectLow          = 0.3
+	ejectUp           = 0.2
 	// The item leaves at ejectSpeed plus up to ejectSpeedExtra, and a gaussian
 	// ejectSpread on each axis.
 	ejectSpeed      = 0.2
@@ -435,14 +439,30 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	if c.machine.dropper && c.pushOne(r, front, slot) {
 		return
 	}
+	dir := faceVec(face)
+	at := center.Add(dir.Mul(ejectReach))
+	smoke := int32(dir[0]) + 3*int32(dir[2]) + 4
+	if !c.machine.dropper && c.useBucket(r, front, slot, at, pos, dir) {
+		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
+		return
+	}
 	one := it
 	one.Count = 1
 	it.Count--
 	c.SetItem(r, slot, it)
-	dir := faceVec(face)
-	spawn := center.Add(dir.Mul(ejectReach))
+	if one.Name == nameTNT && !c.machine.dropper && s.level.TNTExplodes {
+		s.dispenseTNT(r, front)
+	} else {
+		s.eject(r, one, pos, dir, at)
+	}
+	levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
+	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
+}
+
+// eject throws stack out of the machine at pos, as BDS's dispenser throws an item.
+func (s *Host) eject(r *world.Region, stack ItemStack, pos cube.Pos, dir, at mgl32.Vec3) {
 	if dir[1] == 0 {
-		spawn[1] = float32(pos[1]) + ejectLow
+		at[1] = float32(pos[1]) + ejectLow
 	}
 	speed := ejectSpeed + rand.Float32()*ejectSpeedExtra
 	vel := mgl32.Vec3{dir[0] * speed, ejectUp, dir[2] * speed}
@@ -452,13 +472,75 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	for n := range 3 {
 		vel[n] += float32(rand.NormFloat64()) * ejectSpread
 	}
-	if one.Name == nameTNT && !c.machine.dropper && s.level.TNTExplodes {
-		s.dispenseTNT(r, front)
-	} else {
-		s.spawnItem(r.Dimension(), one, spawn, vel, world.Rotation{}, chestPickupDelay, 0)
+	s.spawnItem(r.Dimension(), stack, at, vel, world.Rotation{}, chestPickupDelay, 0)
+}
+
+// useBucket is BDS's bucket in a dispenser: a filled one pours at front and an empty one
+// takes the source there. The other bucket then goes in the dispenser, or out as an item
+// if it is full. False if it did neither, and the bucket is thrown out like any item.
+func (c *Chest) useBucket(r *world.Region, front cube.Pos, slot int, at mgl32.Vec3, pos cube.Pos, dir mgl32.Vec3) bool {
+	s := c.s
+	it := c.items[slot]
+	var next string
+	extra := int32(machineBucketPour)
+	switch {
+	case it.Name == emptyBucket:
+		fill, ok := s.takeLiquid(r, front)
+		if !ok {
+			return false
+		}
+		next, extra = fill.item, -1
+	default:
+		liq, ok := bucketLiquids[it.Name]
+		if !ok || !s.machinePour(r, front, liq) {
+			return false
+		}
+		next = emptyBucket
 	}
-	levelEvent(r, pos, spawn, levelEventDispenseSmoke, int32(dir[0])+3*int32(dir[2])+4)
-	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
+	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: at, ExtraData: extra}, nil)
+	it.Count--
+	c.SetItem(r, slot, it)
+	if rest := c.AddItem(r, ItemStack{Name: next, Count: 1, netID: s.stackIDs.Add(1)}); !rest.Empty() {
+		s.eject(r, rest, pos, dir, at)
+	}
+	return true
+}
+
+// machinePour is BDS's pouring with nobody holding the bucket: the liquid goes in at pos,
+// which a solid block refuses unless it holds water and water is poured. Not read: the
+// nether's rule for water, and items a replaced block drops.
+func (s *Host) machinePour(r *world.Region, pos cube.Pos, liq bucketLiquid) bool {
+	blocks := s.reg.Blocks
+	block, ok := blocks.Block(liq.block)
+	if !ok {
+		return false
+	}
+	main, ok := r.Block(pos, 0)
+	if !ok {
+		return false
+	}
+	second, ok := r.Block(pos, 1)
+	if !ok {
+		return false
+	}
+	props := blocks.Properties(main)
+	water := liq.kind == liquid.Water
+	if second != blocks.Air() && blocks.Properties(second).Material != registry.MaterialWater {
+		return false
+	}
+	if props.SolidMaterial && (!water || !props.CanContainLiquid) {
+		return false
+	}
+	layer := uint8(0)
+	if water && main != blocks.Air() && props.CanContainLiquid {
+		layer = 1
+	}
+	if !r.SetBlock(pos, layer, block) {
+		return false
+	}
+	r.UpdateNeighbours(pos)
+	r.ScheduleTick(pos, block, liquid.TickDelay(liq.kind, false), 0)
+	return true
 }
 
 // pushOne moves one item of a slot into the container at at, false if there is none

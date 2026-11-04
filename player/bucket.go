@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -25,10 +26,44 @@ const emptyBucket = "minecraft:bucket"
 
 // bucketFills are what an empty bucket takes, by the material of the block, with the
 // bucket that makes and the sound.
-var bucketFills = map[uint8]struct{ item, sound string }{
+var bucketFills = map[uint8]bucketFill{
 	registry.MaterialWater:      {"minecraft:water_bucket", packet.SoundEventBucketFillWater},
 	registry.MaterialLava:       {"minecraft:lava_bucket", packet.SoundEventBucketFillLava},
 	registry.MaterialPowderSnow: {"minecraft:powder_snow_bucket", packet.SoundEventBucketFillPowderSnow},
+}
+
+// bucketFill is what an empty bucket becomes and the sound of it.
+type bucketFill struct{ item, sound string }
+
+// takeLiquid removes the source at pos, the second layer first, and tells what bucket
+// it fills. False if there is none: a liquid that is not a source stays (powder snow
+// always is one).
+func (s *Host) takeLiquid(r *world.Region, pos cube.Pos) (bucketFill, bool) {
+	blocks := s.reg.Blocks
+	layer := uint8(1)
+	b, ok := r.Block(pos, layer)
+	if !ok {
+		return bucketFill{}, false
+	}
+	if b == blocks.Air() {
+		layer = 0
+		b, _ = r.Block(pos, layer)
+	}
+	material := blocks.Properties(b).Material
+	fill, ok := bucketFills[material]
+	if !ok {
+		return bucketFill{}, false
+	}
+	if material != registry.MaterialPowderSnow {
+		if depth, _ := blocks.States(b)["liquid_depth"].(int32); depth != 0 {
+			return bucketFill{}, false
+		}
+	}
+	if !r.SetBlock(pos, layer, blocks.Air()) {
+		return bucketFill{}, false
+	}
+	r.UpdateNeighbours(pos)
+	return fill, true
 }
 
 // fillBucket is BDS's empty bucket: the liquid at the clicked block, the second layer
@@ -40,30 +75,10 @@ func (p *Player) fillBucket(clicked cube.Pos) bool {
 	if r == nil || !p.inReach(clicked) {
 		return false
 	}
-	blocks := p.s.reg.Blocks
-	layer := uint8(1)
-	b, ok := r.Block(clicked, layer)
+	fill, ok := p.s.takeLiquid(r, clicked)
 	if !ok {
 		return false
 	}
-	if b == blocks.Air() {
-		layer = 0
-		b, _ = r.Block(clicked, layer)
-	}
-	material := blocks.Properties(b).Material
-	fill, ok := bucketFills[material]
-	if !ok {
-		return false
-	}
-	if material != registry.MaterialPowderSnow {
-		if depth, _ := blocks.States(b)["liquid_depth"].(int32); depth != 0 {
-			return false
-		}
-	}
-	if !r.SetBlock(clicked, layer, blocks.Air()) {
-		return false
-	}
-	r.UpdateNeighbours(clicked)
 	r.Broadcast(clicked, &packet.LevelSoundEvent{SoundType: fill.sound, Position: blockVec(clicked).Add(mgl32.Vec3{0.5, 0.5, 0.5}), ExtraData: -1}, nil)
 	if p.creative() {
 		return true

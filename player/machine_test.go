@@ -145,6 +145,53 @@ func TestDispenserThrowsOneItem(t *testing.T) {
 	})
 }
 
+func TestDispenserPoursAndFillsBuckets(t *testing.T) {
+	p, d := machineWorld(t)
+	at, front := cube.Pos{1, 69, 1}, cube.Pos{2, 69, 1}
+	onRegion(d, func(r *world.Region) {
+		setNamed(t, p, r, at, "minecraft:dispenser", map[string]any{"facing_direction": int32(5)})
+		c := p.s.chestAt(r, at)
+		c.SetItem(r, 0, ItemStack{Name: "minecraft:water_bucket", Count: 1})
+		block, _ := r.Block(at, 0)
+		p.s.Dispense(r, at, block)
+		b, _ := r.Block(front, 0)
+		if got := p.s.reg.Blocks.Name(b); got != "minecraft:water" {
+			t.Errorf("front is %s", got)
+		}
+		if got := c.Item(r, 0); got.Name != emptyBucket || got.Count != 1 {
+			t.Errorf("after pouring the dispenser holds %+v", got)
+		}
+		p.s.Dispense(r, at, block)
+		b, _ = r.Block(front, 0)
+		if got := p.s.reg.Blocks.Name(b); got == "minecraft:water" {
+			t.Error("the empty bucket left the water")
+		}
+		if got := c.Item(r, 0); got.Name != "minecraft:water_bucket" || got.Count != 1 {
+			t.Errorf("after filling the dispenser holds %+v", got)
+		}
+	})
+}
+
+func TestDispenserThrowsBucketItCannotPour(t *testing.T) {
+	p, d := machineWorld(t)
+	at, front := cube.Pos{1, 69, 1}, cube.Pos{2, 69, 1}
+	onRegion(d, func(r *world.Region) {
+		setNamed(t, p, r, at, "minecraft:dispenser", map[string]any{"facing_direction": int32(5)})
+		setNamed(t, p, r, front, "minecraft:stone", nil)
+		c := p.s.chestAt(r, at)
+		c.SetItem(r, 0, ItemStack{Name: "minecraft:water_bucket", Count: 1})
+		block, _ := r.Block(at, 0)
+		p.s.Dispense(r, at, block)
+		if got := c.Item(r, 0); !got.Empty() {
+			t.Errorf("the dispenser still holds %+v", got)
+		}
+		b, _ := r.Block(front, 0)
+		if got := p.s.reg.Blocks.Name(b); got != "minecraft:stone" {
+			t.Errorf("front is %s", got)
+		}
+	})
+}
+
 func TestDropperFillsContainerInFront(t *testing.T) {
 	p, d := machineWorld(t)
 	at, front := cube.Pos{1, 69, 1}, cube.Pos{2, 69, 1}
