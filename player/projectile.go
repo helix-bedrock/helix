@@ -135,6 +135,8 @@ type ProjectileSpec struct {
 	Bounce bool
 	// HitSound is the sound it makes on hitting something, empty for none.
 	HitSound string
+	// Offset is how far from its shooter's eyes it starts, turned with the shooter.
+	Offset mgl32.Vec3
 }
 
 // projectileDefinition is the part of a definition this reads.
@@ -147,14 +149,15 @@ type projectileDefinition struct {
 
 // projectileComponent is the minecraft:projectile component.
 type projectileComponent struct {
-	Power           float32  `json:"power"`
-	Gravity         float32  `json:"gravity"`
-	Inertia         *float32 `json:"inertia"`
-	LiquidInertia   *float32 `json:"liquid_inertia"`
-	UncertaintyBase float32  `json:"uncertainty_base"`
-	UncertaintyMult float32  `json:"uncertainty_multiplier"`
-	HitSound        string   `json:"hit_sound"`
-	ShouldBounce    string   `json:"should_bounce"`
+	Power           float32   `json:"power"`
+	Gravity         float32   `json:"gravity"`
+	Inertia         *float32  `json:"inertia"`
+	LiquidInertia   *float32  `json:"liquid_inertia"`
+	UncertaintyBase float32   `json:"uncertainty_base"`
+	UncertaintyMult float32   `json:"uncertainty_multiplier"`
+	HitSound        string    `json:"hit_sound"`
+	ShouldBounce    string    `json:"should_bounce"`
+	Offset          []float32 `json:"offset"`
 	OnHit           struct {
 		Impact *struct {
 			Damage struct {
@@ -225,6 +228,9 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 		HitSound: c.HitSound, Bounce: c.ShouldBounce == projectileBounceNoDamage,
 		RemoveOnHit: c.OnHit.Remove != nil, TeleportOwner: c.OnHit.Teleport != nil,
 	}
+	if len(c.Offset) == 3 {
+		s.Offset = mgl32.Vec3{c.Offset[0], c.Offset[1], c.Offset[2]}
+	}
 	if c.Inertia != nil {
 		s.Inertia = *c.Inertia
 	}
@@ -272,6 +278,9 @@ type Projectile struct {
 	vel    mgl32.Vec3
 	rot    world.Rotation
 
+	// waiting holds a new one still for its first tick. The players who see it are told
+	// after entities tick, so it would first show a whole tick's flight from where it started.
+	waiting bool
 	// owner is who shot it, if anyone. separated is that it has left its owner's box: until
 	// then it passes through its owner.
 	owner     *Player
@@ -336,7 +345,7 @@ func flightRotation(vel mgl32.Vec3) world.Rotation {
 // shot it, or nil.
 func (s *Host) SpawnProjectile(d *world.Dimension, spec ProjectileSpec, pos, dir mgl32.Vec3, speed float32, owner *Player) *Projectile {
 	uncertainty := max(spec.UncertaintyBase-spec.UncertaintyPerDifficulty*float32(s.level.Difficulty), 0)
-	t := &Projectile{s: s, spec: spec, owner: owner, vel: aim(dir, speed, uncertainty), separated: owner == nil}
+	t := &Projectile{s: s, spec: spec, owner: owner, vel: aim(dir, speed, uncertainty), separated: owner == nil, waiting: true}
 	t.rot = flightRotation(t.vel)
 	t.entity = d.AddEntity(t.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, t.rot)) //nolint:gosec // an ID, not a secret
 	return t
@@ -373,14 +382,16 @@ func (t *Projectile) flags() int64 {
 	return f
 }
 
+// movePacket is the MoveActorDelta BDS sends (0x8ce8c80), every field each tick. Its ticks are
+// how many this move stands for: BDS counts them per player, for those it skipped sending to
+// when far off, and Helix sends to all every tick.
 func (t *Projectile) movePacket(e *world.Entity) packet.Packet {
-	rot := e.Rotation()
-	var flags byte
-	if e.OnGround() {
-		flags = packet.MoveFlagOnGround
-	}
-	return &packet.MoveActorAbsolute{
-		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw},
+	pos, rot := e.Position(), e.Rotation()
+	return &packet.MoveActorDelta{
+		EntityRuntimeID: e.RuntimeID(),
+		PositionX:       protocol.Option(pos[0]), PositionY: protocol.Option(pos[1]), PositionZ: protocol.Option(pos[2]),
+		RotationX: protocol.Option(rot.Pitch), RotationY: protocol.Option(rot.Yaw), RotationYHead: protocol.Option(rot.HeadYaw),
+		OnGround: e.OnGround(), Ticks: 1,
 	}
 }
 
@@ -389,6 +400,10 @@ func (t *Projectile) movePacket(e *world.Entity) packet.Packet {
 func (t *Projectile) tick(e *world.Entity) {
 	r := e.Region()
 	if r == nil || t.gone {
+		return
+	}
+	if t.waiting {
+		t.waiting = false
 		return
 	}
 	if t.shake > 0 {
@@ -423,6 +438,22 @@ func (t *Projectile) tick(e *world.Entity) {
 	}
 	t.vel = t.vel.Mul(inertia)
 	t.vel[1] -= t.spec.Gravity
+	t.sendHints(e, false)
+}
+
+// sendHints tells the client how fast it flies: its definition's
+// use_motion_prediction_hints, which every projectile here turns on.
+func (t *Projectile) sendHints(e *world.Entity, onGround bool) {
+	e.Send(&packet.MotionPredictionHints{EntityRuntimeID: e.RuntimeID(), Velocity: t.vel, OnGround: onGround})
+}
+
+// projectileEyes is where a shooter's projectile starts: its eyes and the definition's
+// offset, turned with the shooter.
+func projectileEyes(spec ProjectileSpec, eyes mgl32.Vec3, rot world.Rotation) mgl32.Vec3 {
+	yaw := float64(rot.Yaw) * -math.Pi / 180
+	c, s := float32(math.Cos(yaw)), float32(math.Sin(yaw))
+	o := spec.Offset
+	return eyes.Add(mgl32.Vec3{o[0]*c + o[2]*s, o[1], o[2]*c - o[0]*s})
 }
 
 // turn moves its rotation a part of the way to where it now flies.
@@ -630,7 +661,10 @@ func (t *Projectile) remove(e *world.Entity) {
 func (t *Projectile) stickIn(e *world.Entity, hit projectileHit) {
 	t.vel = mgl32.Vec3{}
 	t.stuck, t.stuckAt, t.stuckTicks, t.shake, t.critical = true, hit.block, 0, t.spec.ShakeTicks, false
-	e.Apply(world.Movement{Pos: hit.pos, Rot: t.rot, Tick: e.Tick()})
+	// On the ground is what tells the client it has stopped: without it the client goes on
+	// flying it into the block.
+	e.Apply(world.Movement{Pos: hit.pos, Rot: t.rot, OnGround: true, Tick: e.Tick()})
+	t.sendHints(e, true)
 	e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyFlags: t.flags()}})
 }
 
@@ -640,6 +674,7 @@ func (t *Projectile) tickStuck(r *world.Region, e *world.Entity) {
 	pos := e.Position()
 	if !t.heldBy(r, pos) {
 		t.stuck, t.stuckTicks = false, 0
+		e.Apply(world.Movement{Pos: pos, Rot: t.rot, Tick: e.Tick()})
 		return
 	}
 	t.stuckTicks++
@@ -892,8 +927,8 @@ func (p *Player) throwItem(held ItemStack) bool {
 		return false
 	}
 	p.thrownAt = now
-	eyes := p.entity.Position()
-	p.s.SpawnProjectile(r.Dimension(), spec, eyes, lookDirection(p.entity.Rotation()), spec.Power, p)
+	eyes, rot := p.entity.Position(), p.entity.Rotation()
+	p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power, p)
 	r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventThrow, Position: eyes, ExtraData: -1, EntityType: "minecraft:player"}, nil)
 	if !p.creative() {
 		p.useHeld()
@@ -963,8 +998,8 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	if !hasArrow && !creative && !infinity {
 		return
 	}
-	eyes := p.entity.Position()
-	t := p.s.SpawnProjectile(r.Dimension(), spec, eyes, lookDirection(p.entity.Rotation()), spec.Power*pull, p)
+	eyes, rot := p.entity.Position(), p.entity.Rotation()
+	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power*pull, p)
 	t.critical = pull == 1
 	t.power = heldEnchant(held, enchantPower)
 	t.punch = float32(heldEnchant(held, enchantPunch)) * punchPerLevel

@@ -125,3 +125,28 @@ func TestThrowableKinds(t *testing.T) {
 		t.Error("something not throwable is")
 	}
 }
+
+// A new one stays where it starts for its first tick, so players first see it there.
+func TestProjectileWaitsItsFirstTick(t *testing.T) {
+	p, d := machineWorld(t)
+	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
+	at := mgl32.Vec3{3.5, 200, 4.5}
+	arrow := &Projectile{s: p.s, spec: spec, vel: mgl32.Vec3{0, 0, 3}, waiting: true, separated: true}
+	arrow.entity = d.AddEntity(arrow.config(990001, 990001, at, world.Rotation{}))
+	onRegion(d, func(*world.Region) {
+		if arrow.waiting && arrow.entity.Position() != at {
+			t.Errorf("moved to %v while waiting", arrow.entity.Position())
+		}
+	})
+	waitRegion(t, d, func(*world.Region) bool { return arrow.entity.Position() != at })
+}
+
+// The definition's offset starts an arrow a little below the eyes.
+func TestProjectileStartsBelowEyes(t *testing.T) {
+	p := testPlayer(t)
+	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
+	got := projectileEyes(spec, mgl32.Vec3{0, 10, 0}, world.Rotation{Yaw: 90})
+	if got[1] != 9.9 || got[0] != 0 || got[2] != 0 {
+		t.Errorf("starts at %v", got)
+	}
+}
