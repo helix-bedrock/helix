@@ -57,7 +57,7 @@ func handleInventoryTransaction(p *Player, pk *packet.InventoryTransaction) {
 	case *protocol.UseItemOnEntityTransactionData:
 		p.handleUseOnEntity(d)
 	case *protocol.ReleaseItemTransactionData:
-		p.stopUsing()
+		p.letGo()
 	case *protocol.UseItemTransactionData:
 		if p.dead() {
 			return
@@ -78,8 +78,13 @@ func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 		return
 	}
-	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, d.TriggerType != protocol.TriggerTypeSimulationTick) {
+	first := d.TriggerType != protocol.TriggerTypeSimulationTick
+	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, first) {
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
+		// What is thrown or drawn does not need the air: aimed at a block it still goes.
+		if held := p.inventory.Held(); first && (throwable(held.Name) != "" || held.Name == nameBow) {
+			p.s.game.sys.UseItem(p, held)
+		}
 	}
 }
 

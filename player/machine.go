@@ -538,6 +538,12 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
 		return
 	}
+	if !c.machine.dropper && s.dispenseProjectile(r, pos, at, dir, it.Name) {
+		it.Count--
+		c.SetItem(r, slot, it)
+		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
+		return
+	}
 	one := it
 	one.Count = 1
 	it.Count--

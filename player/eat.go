@@ -44,6 +44,8 @@ type usingState struct {
 	item   ItemStack
 	food   FoodItem
 	left   int32
+	// bow is a bow being drawn, which ends when the player lets go.
+	bow bool
 }
 
 // ItemUseEvent fires before a player starts using the item it holds in the air.
@@ -164,9 +166,9 @@ func (p *Player) handleUseAir(d *protocol.UseItemTransactionData) {
 	}
 }
 
-// vanillaUseItem is BDS's useItem as far as built: armour goes on, and foods start
-// being eaten when the player may eat. Potions, bows, milk and other items used in the
-// air come later.
+// vanillaUseItem is BDS's useItem as far as built: armour goes on, snowballs, eggs and
+// pearls are thrown, a bow starts drawing, and foods start being eaten when the player may
+// eat. Potions, crossbows, tridents, milk and other items used in the air come later.
 func vanillaUseItem(p *Player, held ItemStack) bool {
 	g := p.s.game
 	if g.itemUseEv.Has() {
@@ -177,6 +179,16 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		}
 	}
 	if g.sys.EquipArmor(p, held) {
+		return true
+	}
+	if p.throwItem(held) {
+		return true
+	}
+	if held.Name == nameBow {
+		if !p.mayDrawBow(held) {
+			return false
+		}
+		p.startDrawing(held)
 		return true
 	}
 	food, ok := g.sys.FoodOf(p, held)
@@ -206,6 +218,28 @@ func (p *Player) startUsing(held ItemStack, food FoodItem) {
 	p.sendActorFlags()
 }
 
+// startDrawing starts drawing a bow.
+func (p *Player) startDrawing(held ItemStack) {
+	u := &p.using
+	slot := p.inventory.held
+	if u.active && u.slot == slot && u.item.Name == held.Name {
+		return
+	}
+	*u = usingState{active: true, slot: slot, item: held, left: bowUseTicks, bow: true}
+	p.sendActorFlags()
+}
+
+// letGo is the client saying it let go of what it was using: a drawn bow shoots.
+func (p *Player) letGo() {
+	u := p.using
+	if u.active && u.bow && p.inventory.held == u.slot {
+		if held := p.inventory.Held(); held.Name == u.item.Name {
+			p.releaseBow(held, bowUseTicks-u.left)
+		}
+	}
+	p.stopUsing()
+}
+
 // stopUsing is BDS's stopUsingItem.
 func (p *Player) stopUsing() {
 	if !p.using.active {
@@ -228,6 +262,12 @@ func (p *Player) tickUsing() {
 		return
 	}
 	u.left--
+	if u.bow {
+		if u.left <= 0 {
+			p.stopUsing()
+		}
+		return
+	}
 	if u.left > 0 {
 		if u.left < eatEffectStart && u.left%eatEffectEvery == 0 {
 			p.showEating(held)

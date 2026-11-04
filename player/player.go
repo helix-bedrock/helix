@@ -80,9 +80,13 @@ type Player struct {
 	riding  bool
 	window  windowState
 	using   usingState
-	food    foodState
-	hurt    hurtState
-	shield  shieldState
+	// pearlReady is the tick the player may throw an ender pearl again.
+	pearlReady int64
+	// thrownAt is the tick the player last threw something.
+	thrownAt int64
+	food     foodState
+	hurt     hurtState
+	shield   shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
 	// lastUse is what the first click of the held button did, a use constant.

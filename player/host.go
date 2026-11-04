@@ -76,6 +76,8 @@ type Host struct {
 	level        Level
 	viewDistance int32
 	maxPlayers   int
+	// projectileSpecs are what each kind of projectile does, read when first needed.
+	projectileSpecs sync.Map
 	// redstone is the numbers redstone runs by.
 	redstone *circuit.Settings
 
