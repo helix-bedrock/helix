@@ -46,6 +46,13 @@ type EntityBoxFunc func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool)
 // it plates stay up.
 func (t *Ticker) SetEntityBox(fn EntityBoxFunc) { t.entityBox = fn }
 
+// EntityPushFunc moves an entity a piston runs into. Runs: owner of the entity's region.
+type EntityPushFunc func(r *world.Region, e *world.Entity, by mgl32.Vec3)
+
+// SetEntityPush sets how pistons move entities. Call it before any player joins. Without
+// it pistons only change the entity's position.
+func (t *Ticker) SetEntityPush(fn EntityPushFunc) { t.entityPush = fn }
+
 // observerFace is the way an observer looks.
 func observerFace(states map[string]any) redstone.Face {
 	v, _ := states[stateFacingNamed].(string)

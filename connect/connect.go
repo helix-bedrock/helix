@@ -1,4 +1,4 @@
-// Package connect is how fences, glass panes and bars join their neighbours,
+// Package connect is how fences, glass panes, bars and trip wire join their neighbours,
 // as BDS 1.26.60 does it: since 1.26 the arms are in the block's own state, so
 // the server works them out when the block is placed and when a neighbour
 // changes. Walls have a rule of their own and are not here.
@@ -19,6 +19,7 @@ const (
 	groupWoodFence   = 0
 	groupNetherFence = 1
 	groupThin        = 3
+	groupTripWire    = 4
 )
 
 // noGroup marks a state that does not connect to anything.
@@ -114,12 +115,14 @@ func isByte(v any) bool {
 }
 
 // groupOf is the group of a block that works out its arms here, by BDS's class:
-// fire, chorus plants and trip wire have connection states with rules of their own.
+// fire and chorus plants have connection states with rules of their own.
 func groupOf(name string, states map[string]any) int8 {
 	if _, ok := states[arms[0].state]; !ok {
 		return noGroup
 	}
 	switch {
+	case name == "minecraft:trip_wire":
+		return groupTripWire
 	case name == "minecraft:nether_brick_fence":
 		return groupNetherFence
 	case strings.HasSuffix(name, "_fence"):
@@ -166,14 +169,14 @@ func (t *Table) Connected(r *world.Region, pos cube.Pos, block uint32) uint32 {
 }
 
 // accepts reports whether block lets group connect on its side touch. A block
-// with no rule lets everything connect.
+// with no rule lets everything connect but trip wire.
 func (t *Table) accepts(block uint32, group int8, touch cube.Face) bool {
 	if int(block) >= len(t.rules) {
 		return false
 	}
 	c := t.rules[block]
 	if !c.has {
-		return true
+		return group != groupTripWire
 	}
 	return c.groups&(1<<group) != 0 && c.faces&(1<<touch) != 0
 }

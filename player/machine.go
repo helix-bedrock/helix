@@ -334,6 +334,46 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	return lo, hi, false, false
 }
 
+// PistonPush moves an entity a piston runs into. A player's position is the client's, so
+// the server moves it, stopped by blocks as BDS's actor move is, and corrects the client.
+// Runs: owner of the entity's region.
+func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl32.Vec3) {
+	p, isPlayer := e.Owner().(*Player)
+	if !isPlayer {
+		e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()})
+		return
+	}
+	p.pistonPush(r, by)
+}
+
+// pistonPush moves the player and tells its client where it now is.
+func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
+	if p.entity == nil || p.dead() || p.gameMode == GameModeSpectator {
+		return
+	}
+	lo, hi, _, ok := p.s.EntityBox(p.entity)
+	if !ok {
+		return
+	}
+	var moved mgl32.Vec3
+	for axis := range 3 {
+		moved[axis] = p.s.clipSweep(r, lo, hi, axis, by[axis])
+		lo[axis] += moved[axis]
+		hi[axis] += moved[axis]
+	}
+	if moved == (mgl32.Vec3{}) {
+		return
+	}
+	rot, onGround, tick := p.entity.Rotation(), p.entity.OnGround(), p.entity.Tick()
+	pos := p.entity.Position().Add(moved)
+	p.s.handlers.movement(p, world.Movement{Pos: pos, Rot: rot, OnGround: onGround, Tick: tick})
+	p.send(&packet.CorrectPlayerMovePrediction{
+		PredictionType: packet.PredictionTypePlayer, Position: pos, Delta: p.move.velocity,
+		Rotation: mgl32.Vec2{rot.Pitch, rot.Yaw}, OnGround: onGround, Tick: tick,
+	})
+	p.flush()
+}
+
 // collectItems takes in whatever items lie in the box above the hopper. A stack that
 // fits goes in whole.
 func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {

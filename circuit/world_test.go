@@ -607,6 +607,27 @@ func TestPistonPushesItems(t *testing.T) {
 	w.wait(t, func(r *world.Region) bool { return item.Position()[0] >= 6 })
 }
 
+// A player is pushed like anything else, and through the engine's hook: only the engine
+// can tell the player's client.
+func TestPistonPushesPlayers(t *testing.T) {
+	w := openWorld(t)
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+		at := e.Position()
+		return mgl32.Vec3{at[0] - 0.3, at[1], at[2] - 0.3}, mgl32.Vec3{at[0] + 0.3, at[1] + 1.8, at[2] + 0.3}, true, true
+	})
+	var pushed atomic.Bool
+	w.circuits.SetEntityPush(func(_ *world.Region, e *world.Entity, by mgl32.Vec3) {
+		pushed.Store(true)
+		e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()})
+	})
+	player := w.d.AddEntity(world.EntityConfig{UniqueID: 903, RuntimeID: 903, Pos: mgl32.Vec3{5.5, surfaceY, 4.5}})
+	t.Cleanup(player.Remove)
+	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(4)})
+	w.run(func(r *world.Region) { place(r, cube.Pos{4, surfaceY, 4}, piston) })
+	w.run(func(r *world.Region) { place(r, cube.Pos{3, surfaceY, 4}, w.state(t, "minecraft:redstone_block", nil)) })
+	w.wait(t, func(r *world.Region) bool { return pushed.Load() && player.Position()[0] >= 6.3 })
+}
+
 func TestTrappedChestPowersWhileOpen(t *testing.T) {
 	w := openWorld(t)
 	at := cube.Pos{4, surfaceY, 4}

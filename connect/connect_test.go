@@ -90,6 +90,31 @@ func TestFences(t *testing.T) {
 		if arm(at, "west") != 0 {
 			t.Error("a fence kept its arm when the stone went")
 		}
+		// A wire joins the hook that faces it and wire, not stone or a hook facing away.
+		wire, _ := reg.Blocks.Block("minecraft:trip_wire")
+		hook := func(direction int32) uint32 {
+			id, ok := reg.Blocks.StateID("minecraft:tripwire_hook", map[string]any{"attached_bit": uint8(0), "direction": direction, "powered_bit": uint8(0)})
+			if !ok {
+				t.Error("no hook state")
+			}
+			return id
+		}
+		mid := cube.Pos{12, surfaceY, 8}
+		place(mid.Side(cube.FaceWest), hook(3))
+		place(mid.Side(cube.FaceEast), hook(3))
+		place(mid.Side(cube.FaceNorth), stone)
+		place(mid, wire)
+		if arm(mid, "west") != 1 || arm(mid, "east") != 0 || arm(mid, "north") != 0 {
+			t.Errorf("wire arms: west %d east %d north %d", arm(mid, "west"), arm(mid, "east"), arm(mid, "north"))
+		}
+		place(mid.Side(cube.FaceEast), hook(1))
+		if arm(mid, "east") != 1 {
+			t.Error("a wire did not join a hook placed after it")
+		}
+		place(mid.Side(cube.FaceSouth), wire)
+		if arm(mid, "south") != 1 || arm(mid.Side(cube.FaceSouth), "north") != 1 {
+			t.Error("two wires did not join")
+		}
 	})
 	<-done
 }

@@ -215,6 +215,8 @@ type Ticker struct {
 	noteAbove, noteBelow []uint8
 	// entityBox is how plates see entities. Set before any player joins.
 	entityBox EntityBoxFunc
+	// entityPush is how pistons move entities. Set before any player joins.
+	entityPush EntityPushFunc
 	// powerTNT is what power reaching a TNT block does.
 	powerTNT func(r *world.Region, pos cube.Pos)
 }

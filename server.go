@@ -246,6 +246,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	if s.circuits != nil {
 		s.circuits.SetDispense(host.Dispense)
 		s.circuits.SetEntityBox(host.EntityBox)
+		s.circuits.SetEntityPush(host.PistonPush)
 		s.circuits.SetPowerTNT(host.PowerTNT)
 		host.SetCircuitHooks(player.CircuitHooks{
 			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers,

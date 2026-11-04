@@ -421,6 +421,12 @@ func (s *Host) clipMove(r *world.Region, pos mgl32.Vec3, half float32, axis int,
 	}
 	lo := mgl32.Vec3{pos[0] - half, pos[1] - half, pos[2] - half}
 	hi := mgl32.Vec3{pos[0] + half, pos[1] + half, pos[2] + half}
+	return s.clipSweep(r, lo, hi, axis, d)
+}
+
+// clipSweep returns how far of d the box from lo to hi can move along axis before it hits
+// a block. A block not loaded stops it.
+func (s *Host) clipSweep(r *world.Region, lo, hi mgl32.Vec3, axis int, d float32) float32 {
 	sweepLo, sweepHi := lo, hi
 	if d < 0 {
 		sweepLo[axis] += d
