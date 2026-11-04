@@ -8,6 +8,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/circuit"
+	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -705,4 +706,56 @@ func TestJukeboxGivesPower(t *testing.T) {
 		w.circuits.SetJukeboxPower(r, at, 15)
 		return w.name(r, lamp) == "minecraft:lit_redstone_lamp"
 	})
+}
+
+func TestBellRingsFromTheRightSideAndOnPower(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	power := cube.Pos{5, surfaceY, 4}
+	south := int32(direction.South)
+	still := w.state(t, "minecraft:bell", map[string]any{"attachment": "standing", "direction": south, "toggle_bit": uint8(0)})
+	rung := w.state(t, "minecraft:bell", map[string]any{"attachment": "standing", "direction": south, "toggle_bit": uint8(1)})
+	w.run(func(r *world.Region) {
+		place(r, at, still)
+		if w.circuits.RingBell(r, at, still, 90) {
+			t.Error("rang from the side")
+		}
+		if !w.circuits.RingBell(r, at, still, 0) {
+			t.Fatal("did not ring from the front")
+		}
+		if b, _ := r.Block(at, 0); b != rung {
+			t.Error("the ring did not toggle the bell")
+		}
+	})
+	w.run(func(r *world.Region) { place(r, power, w.state(t, "minecraft:redstone_block", nil)) })
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return b == still
+	})
+}
+
+func TestBellBecomesMultipleAndFalls(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY + 1, 4}
+	west, east := cube.Pos{3, surfaceY + 1, 4}, cube.Pos{5, surfaceY + 1, 4}
+	stone, air := w.state(t, "minecraft:stone", nil), w.state(t, "minecraft:air", nil)
+	dir := int32(direction.East)
+	side := w.state(t, "minecraft:bell", map[string]any{"attachment": "side", "direction": dir})
+	both := w.state(t, "minecraft:bell", map[string]any{"attachment": "multiple", "direction": dir})
+	w.run(func(r *world.Region) {
+		place(r, west, stone)
+		place(r, at, side)
+		place(r, east, stone)
+	})
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return b == both
+	})
+	w.run(func(r *world.Region) { place(r, east, air) })
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return b == side
+	})
+	w.run(func(r *world.Region) { place(r, west, air) })
+	w.wait(t, func(r *world.Region) bool { return w.name(r, at) != "minecraft:bell" })
 }

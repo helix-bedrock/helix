@@ -164,6 +164,10 @@ type Chest struct {
 	// cooldown and lastTick are a hopper's, in ticks.
 	cooldown int32
 	lastTick int64
+	// disabled is a crafter's turned off slots, by bit, and crafting how long it still
+	// shows that it crafted.
+	disabled uint16
+	crafting int32
 	items    [chestSize]ItemStack
 	// saved keeps the other fields of the saved chest (CustomName, LootTable...),
 	// written back as they were.
@@ -268,6 +272,9 @@ func (c *Chest) NetworkData(pos cube.Pos) map[string]any {
 	}
 	if c.machine != nil {
 		m["id"] = c.machine.id
+		if c.machine.crafter {
+			m[disabledSlotsTag] = int16(c.disabled) //nolint:gosec // nine bits
+		}
 	}
 	m["x"], m["y"], m["z"] = int32(pos[0]), int32(pos[1]), int32(pos[2]) //nolint:gosec // block coordinates fit int32
 	switch {
@@ -474,6 +481,9 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	if c.machine != nil {
 		if c.machine.hopper {
 			c.tickHopper(r, pos, hopperDepth)
+		}
+		if c.machine.crafter {
+			c.tickCrafter(r, pos)
 		}
 		return
 	}

@@ -219,6 +219,10 @@ func (s *placeState) rule(rule string) {
 		}
 	case "end_rod":
 		s.endRod(face)
+	case "pending":
+		if s.name == crafterBlock {
+			s.crafter()
+		}
 	case "bell", "grindstone":
 		s.attached(face, look, rule == "bell")
 	}

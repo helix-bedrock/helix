@@ -203,6 +203,10 @@ func (t *Table) canHang(r *world.Region, pos cube.Pos) bool {
 	return t.hang[name] || name == hopper && stateInt(t.blocks.States(b), "facing_direction") == int(cube.FaceDown)
 }
 
+// CanHang reports whether something can hang from the block above pos, as a lantern or a
+// bell does.
+func (t *Table) CanHang(r *world.Region, pos cube.Pos) bool { return t.canHang(r, pos) }
+
 // onFloor reports whether the block below pos holds a lantern.
 func (t *Table) onFloor(r *world.Region, pos cube.Pos) bool {
 	b, ok := r.Block(pos.Side(cube.FaceDown), 0)

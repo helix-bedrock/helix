@@ -269,7 +269,7 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]
-	case containerLevelEntity:
+	case containerLevelEntity, protocol.ContainerCrafterLevelEntity:
 		if int(slot) >= len(inv.open) {
 			return r, false
 		}

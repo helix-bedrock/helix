@@ -109,11 +109,11 @@ func signalOf(name string) signal {
 		return signalAnchor
 	case nameDetectorRail:
 		return signalDetectorRail
-	case nameJukebox:
+	case nameJukebox, nameCrafter:
 		return signalEntity
 	case "minecraft:lectern", "minecraft:frame", "minecraft:glow_frame",
 		"minecraft:command_block", "minecraft:chain_command_block",
-		"minecraft:repeating_command_block", "minecraft:crafter", "minecraft:creaking_heart",
+		"minecraft:repeating_command_block", "minecraft:creaking_heart",
 		"minecraft:chiseled_bookshelf", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
 		return signalUnbuilt
 	}
@@ -402,6 +402,8 @@ func (e comparatorEntities) New(block uint32) world.BlockEntity {
 		return &pistonEntity{t: e.t, sticky: e.t.blocks.Name(block) == nameStickyPiston}
 	case kindNote:
 		return &noteEntity{}
+	case kindBell:
+		return &bellEntity{t: e.t}
 	}
 	if block == e.t.moving {
 		return &movingEntity{t: e.t, block: e.t.blocks.Air()}
@@ -421,6 +423,8 @@ func (e comparatorEntities) Load(pos cube.Pos, saved map[string]any) (world.Bloc
 		return e.t.loadMoving(saved), true
 	case noteEntityID:
 		return loadNote(saved), true
+	case bellEntityID:
+		return e.t.loadBell(saved), true
 	}
 	if id, _ := saved["id"].(string); id == comparatorEntityID {
 		v, _ := saved[outputSignalTag].(int32)

@@ -556,6 +556,9 @@ func (p *Player) refreshItems() {
 // ComparatorSignal is what a comparator reads from the chest: how full it and its
 // other half are. An ender chest's items belong to players, so it reads as empty.
 func (c *Chest) ComparatorSignal(r *world.Region, _ cube.Pos) int32 {
+	if c.machine != nil && c.machine.crafter {
+		return c.crafterSignal()
+	}
 	var sum circuit.ContainerSum
 	for _, it := range c.Items(r) {
 		maxStack := 0

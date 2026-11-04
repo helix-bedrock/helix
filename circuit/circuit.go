@@ -60,6 +60,7 @@ const (
 	nameMoving       = "minecraft:moving_block"
 	nameHopper       = "minecraft:hopper"
 	nameDispenser    = "minecraft:dispenser"
+	nameCrafter      = "minecraft:crafter"
 	nameDropper      = "minecraft:dropper"
 )
 
@@ -110,6 +111,7 @@ const (
 	kindPlainRail
 	kindDetectorRail
 	kindJukebox
+	kindBell
 )
 
 // kindOf returns the class of the block called name.
@@ -133,8 +135,10 @@ func kindOf(name string) kind {
 		return kindPiston
 	case nameHopper:
 		return kindHopper
-	case nameDispenser, nameDropper:
+	case nameDispenser, nameDropper, nameCrafter:
 		return kindDispenser
+	case nameBell:
+		return kindBell
 	case nameObserver:
 		return kindObserver
 	case nameNote:
@@ -448,6 +452,8 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			if !t.hookHeld(r, pos, block) {
 				r.ScheduleTick(pos, block, 1, 0)
 			}
+		case kindBell:
+			t.bellNeighbour(r, pos, from, block)
 		default:
 			if t.isArm(block) {
 				t.armNeighbour(r, pos, block)
@@ -630,6 +636,10 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		t.plateTick(t.circuitOf(r), pos, block)
 	case kindHook:
 		t.hookTick(t.circuitOf(r), pos, block)
+	case kindBell:
+		if !t.bellHeld(r, pos, block) {
+			t.fall(r, pos, block)
+		}
 	case kindTripWire:
 		if bitState(t.blocks.States(block), statePowered) {
 			t.wireUpdate(t.circuitOf(r), pos, block)
@@ -773,7 +783,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)
 		}
-	case kindNote, kindTNT:
+	case kindNote, kindTNT, kindBell:
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetAllowUp(true)
 		}

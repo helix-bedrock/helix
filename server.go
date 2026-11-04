@@ -250,7 +250,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		s.circuits.SetCartBox(host.CartBox)
 		s.circuits.SetPowerTNT(host.PowerTNT)
 		host.SetCircuitHooks(player.CircuitHooks{
-			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, JukeboxPower: s.circuits.SetJukeboxPower, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers, CartOnRail: s.circuits.CartOnRail,
+			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, JukeboxPower: s.circuits.SetJukeboxPower, RingBell: s.circuits.RingBell, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers, CartOnRail: s.circuits.CartOnRail,
 		})
 		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
 	}

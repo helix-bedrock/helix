@@ -6,6 +6,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
+// bellBlock rings when clicked from the right side.
+const bellBlock = "minecraft:bell"
+
 // What a player's click did first, as BDS keeps it for the repeats of a held
 // click.
 const (
@@ -78,6 +81,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)
+	}
+	if ring := p.s.circuits.RingBell; ring != nil && blocks.Name(u.Block) == bellBlock {
+		return ring(r, u.Pos, u.Block, p.entity.Rotation().Yaw)
 	}
 	if use := p.s.circuits.Use; use != nil && use(r, u.Pos, u.Block) {
 		return true

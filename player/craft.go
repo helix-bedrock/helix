@@ -231,12 +231,15 @@ func (p *Player) craftAuto(a *protocol.AutoCraftRecipeStackRequestAction) (uint8
 }
 
 // craftItem is what a recipe reads of a stack.
-func (p *Player) craftItem(s ItemStack) crafting.Item {
-	if s.Empty() {
+func (p *Player) craftItem(s ItemStack) crafting.Item { return p.s.craftItem(s) }
+
+// craftItem is what a recipe reads of a stack.
+func (s *Host) craftItem(i ItemStack) crafting.Item {
+	if i.Empty() {
 		return crafting.Item{}
 	}
-	t, _ := p.s.reg.Items.ByName(s.Name)
-	return crafting.Item{Name: s.Name, Meta: s.Meta, Tags: t.Tags}
+	t, _ := s.reg.Items.ByName(i.Name)
+	return crafting.Item{Name: i.Name, Meta: i.Meta, Tags: t.Tags}
 }
 
 // startResults makes the recipe's results, after listeners had their say.

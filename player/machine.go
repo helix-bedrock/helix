@@ -43,6 +43,9 @@ const (
 	ejectSpeed      = 0.2
 	ejectSpeedExtra = 0.1
 	ejectSpread     = 0.0075 * 6
+	// The item appears this far below where it is thrown from.
+	ejectDropSide     = -0.15625
+	ejectDropVertical = -0.125
 	// levelEventDispenseSmoke is BDS's smoke, with data 4 + x + 3z of the face.
 	levelEventDispenseSmoke = 2000
 	// transferCooldownTag is the saved hopper cooldown.
@@ -61,6 +64,8 @@ type machineSpec struct {
 	hopper bool
 	// dropper pushes into a container in front of it.
 	dropper bool
+	// crafter makes recipes instead of giving out what it holds.
+	crafter bool
 }
 
 // machineSpecs are the blocks that have only slots.
@@ -68,6 +73,7 @@ var machineSpecs = map[string]*machineSpec{
 	"minecraft:hopper":    {id: "Hopper", size: 5, window: byte(protocol.ContainerTypeHopper), hopper: true},
 	"minecraft:dispenser": {id: "Dispenser", size: 9, window: byte(protocol.ContainerTypeDispenser)},
 	"minecraft:dropper":   {id: "Dropper", size: 9, window: byte(protocol.ContainerTypeDropper), dropper: true},
+	crafterBlock:          {id: crafterEntityID, size: crafterSize, window: byte(protocol.ContainerTypeCrafter), crafter: true},
 }
 
 // machineByID is the spec of a saved id, nil if it is no such block.
@@ -90,6 +96,10 @@ func (s *Host) loadMachine(pos cube.Pos, saved map[string]any, spec *machineSpec
 		}
 	}
 	c.cooldown, _ = saved[transferCooldownTag].(int32)
+	if v, ok := saved[disabledSlotsTag].(int16); ok {
+		c.disabled = uint16(v) & allCrafterSlots //nolint:gosec // masked
+	}
+	delete(c.saved, disabledSlotsTag)
 	delete(c.saved, "Items")
 	delete(c.saved, transferCooldownTag)
 	return c
@@ -280,6 +290,9 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 func (c *Chest) takeOne(r *world.Region, s ItemStack) bool {
 	limit := s.maxStack(c.s.reg)
 	for i, size := 0, c.Size(r); i < size; i++ {
+		if c.machine != nil && c.machine.crafter && !c.crafterTakes(i, s) {
+			continue
+		}
 		cur := c.Item(r, i)
 		switch {
 		case cur.Empty():
@@ -329,6 +342,9 @@ type CircuitHooks struct {
 	Destroy func(r *world.Region, pos cube.Pos, block uint32, item string)
 	// ChestViewers says how many have the trapped chest at pos open.
 	ChestViewers func(r *world.Region, pos cube.Pos, n int32)
+	// RingBell is a player with this yaw clicking the bell at pos, false if that does not
+	// ring it.
+	RingBell func(r *world.Region, pos cube.Pos, block uint32, yaw float32) bool
 	// JukeboxPower gives the jukebox at pos this power.
 	JukeboxPower func(r *world.Region, pos cube.Pos, power int32)
 	// CartOnRail is a minecart in the block at pos.
@@ -460,6 +476,10 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	if c == nil || c.machine == nil {
 		return
 	}
+	if c.machine.crafter {
+		c.craft(r, pos, block)
+		return
+	}
 	slot := -1
 	seen := 0
 	for i := range c.machine.size {
@@ -520,6 +540,11 @@ func (s *Host) eject(r *world.Region, stack ItemStack, pos cube.Pos, dir, at mgl
 	}
 	for n := range 3 {
 		vel[n] += float32(rand.NormFloat64()) * ejectSpread
+	}
+	if dir[1] == 0 {
+		at[1] += ejectDropSide
+	} else {
+		at[1] += ejectDropVertical
 	}
 	s.spawnItem(r.Dimension(), stack, at, vel, world.Rotation{}, chestPickupDelay, 0)
 }

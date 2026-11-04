@@ -91,6 +91,9 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleContainerClose); err != nil {
 		return err
 	}
+	if err := Handle(s, handleToggleCrafterSlot); err != nil {
+		return err
+	}
 	if err := Handle(s, handleRespawn); err != nil {
 		return err
 	}

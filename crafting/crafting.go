@@ -225,6 +225,18 @@ func (t *Table) Recipe(id uint32) (*Recipe, bool) {
 	return r, ok
 }
 
+// Find returns the recipe for block that fits the grid, the lowest network ID if several do,
+// or nil. It walks every recipe: for what crafts now and then, not every tick.
+func (t *Table) Find(block string, g Grid) *Recipe {
+	var found *Recipe
+	for _, r := range t.recipes {
+		if r.Block == block && (found == nil || r.NetworkID < found.NetworkID) && r.Fits(g) {
+			found = r
+		}
+	}
+	return found
+}
+
 // ingredients reads a packet's cells. Kinds a vanilla packet does not use take
 // nothing, so a recipe with one never fits a grid holding an item there.
 func ingredients(list []protocol.ItemDescriptorCount) []Ingredient {
