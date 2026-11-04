@@ -28,6 +28,9 @@ const (
 	// the bottom.
 	hopperReachLow  = 0.625
 	hopperReachHigh = 2
+	// hopperBoxInset is how far BDS shrinks that box on every side, which leaves out an
+	// item resting exactly on top of a full block.
+	hopperBoxInset = 0.0001
 	// A dispensed item starts ejectReach from the block's centre towards its front,
 	// ejectLow above the bottom of the block when it faces a side.
 	ejectReach = 0.7
@@ -179,9 +182,9 @@ func (c *Chest) hopperAt(r *world.Region, pos cube.Pos) *Chest {
 }
 
 // moveItems is BDS's hopper move: push one item on, then if there is room pull one
-// from the container above, or take items lying above unless a container is there. Any
-// other block does not stop that, so items on top of a full block go in. True if
-// something moved.
+// from the container above, or take items in the box above unless a container is there.
+// Any other block only matters by where items can lie: on a slab or stair they are in
+// the box, on a full block just out of it. True if something moved.
 func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos) bool {
 	size := c.halfSize()
 	pushed := false
@@ -393,7 +396,7 @@ func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
 	p.flush()
 }
 
-// collectItems takes in whatever items touch the box above the hopper. A stack that
+// collectItems takes in whatever items overlap the box above the hopper. A stack that
 // fits goes in whole. An item only some players may see stays out, as those players' own;
 // a name tag or lifetime changes nothing about what the item is.
 func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {
@@ -405,8 +408,9 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {
 			continue
 		}
 		at := o.Position()
-		if at[0]+itemHalfSize <= x || at[0]-itemHalfSize >= x+1 || at[2]+itemHalfSize <= z || at[2]-itemHalfSize >= z+1 ||
-			at[1]+itemHalfSize <= y+hopperReachLow || at[1]-itemHalfSize > y+hopperReachHigh {
+		if at[0]+itemHalfSize < x+hopperBoxInset || at[0]-itemHalfSize > x+1-hopperBoxInset ||
+			at[2]+itemHalfSize < z+hopperBoxInset || at[2]-itemHalfSize > z+1-hopperBoxInset ||
+			at[1]+itemHalfSize < y+hopperReachLow+hopperBoxInset || at[1]-itemHalfSize > y+hopperReachHigh-hopperBoxInset {
 			continue
 		}
 		left := c.AddItem(r, i.stack)

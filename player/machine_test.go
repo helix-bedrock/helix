@@ -104,7 +104,27 @@ func TestHopperCollectsItemsAbove(t *testing.T) {
 	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 3 })
 }
 
-func TestHopperCollectsOnTopOfBlockAbove(t *testing.T) {
+// An item on a slab or stair above a hopper is in reach of it.
+func TestHopperCollectsOnPartBlockAbove(t *testing.T) {
+	for _, name := range []string{"minecraft:smooth_stone_slab", "minecraft:oak_stairs"} {
+		t.Run(name, func(t *testing.T) {
+			p, d := machineWorld(t)
+			at := cube.Pos{1, 69, 1}
+			var c *Chest
+			onRegion(d, func(r *world.Region) {
+				setNamed(t, p, r, at, "minecraft:hopper", nil)
+				setNamed(t, p, r, at.Side(cube.FaceUp), name, nil)
+				c = p.s.chestAt(r, at)
+			})
+			// From above the box, over the low half of the stair: its default rises to the east.
+			p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.25, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+			waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 2 })
+		})
+	}
+}
+
+// An item resting on a full block above a hopper is just out of reach of it.
+func TestHopperLeavesItemOnFullBlockAbove(t *testing.T) {
 	p, d := machineWorld(t)
 	at := cube.Pos{1, 69, 1}
 	var c *Chest
@@ -113,8 +133,14 @@ func TestHopperCollectsOnTopOfBlockAbove(t *testing.T) {
 		setNamed(t, p, r, at.Side(cube.FaceUp), "minecraft:stone", nil)
 		c = p.s.chestAt(r, at)
 	})
-	p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.5, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
-	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 2 })
+	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.5, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+	waitRegion(t, d, func(*world.Region) bool { return i.onGround })
+	time.Sleep(300 * time.Millisecond)
+	onRegion(d, func(r *world.Region) {
+		if !c.Item(r, 0).Empty() {
+			t.Error("the hopper took an item through a full block")
+		}
+	})
 }
 
 func TestHopperDoesNotCollectThroughContainer(t *testing.T) {
