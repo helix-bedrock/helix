@@ -78,11 +78,11 @@ type Player struct {
 	// vehicle is the minecart the player sits in, riding whether others see it so.
 	vehicle *Minecart
 	riding  bool
-	window     windowState
-	using      usingState
-	food       foodState
-	hurt       hurtState
-	shield     shieldState
+	window  windowState
+	using   usingState
+	food    foodState
+	hurt    hurtState
+	shield  shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
 	// lastUse is what the first click of the held button did, a use constant.

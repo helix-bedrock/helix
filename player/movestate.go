@@ -78,8 +78,8 @@ func (p *Player) SetFallDistance(d float32) { p.move.fall = d }
 type moveState struct {
 	// forward is how far the client's stick or keys push forward.
 	forward float32
-	flags uint8
-	fall  float32
+	flags   uint8
+	fall    float32
 	// velocity is the player's last movement, as knockback starts from it.
 	velocity mgl32.Vec3
 	// climbing and inWater are what the last movement found.
