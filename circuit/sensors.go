@@ -440,6 +440,12 @@ func (t *Ticker) playNote(r *world.Region, pos cube.Pos, note uint8) {
 	}
 }
 
+// nameTNT is the block redstone lights.
+const nameTNT = "minecraft:tnt"
+
+// SetPowerTNT sets what power reaching a TNT block does. Call it before the world ticks.
+func (t *Ticker) SetPowerTNT(fn func(r *world.Region, pos cube.Pos)) { t.powerTNT = fn }
+
 // notePower plays a note block as power comes to it.
 func (t *Ticker) notePower(r *world.Region, pos cube.Pos, on bool) {
 	e := t.ensureNote(r, pos)

@@ -105,6 +105,7 @@ const (
 	kindDaylight
 	kindHook
 	kindTripWire
+	kindTNT
 )
 
 // kindOf returns the class of the block called name.
@@ -144,6 +145,8 @@ func kindOf(name string) kind {
 		return kindHook
 	case nameTripWire:
 		return kindTripWire
+	case nameTNT:
+		return kindTNT
 	}
 	switch {
 	case strings.HasSuffix(name, "_pressure_plate"):
@@ -212,6 +215,8 @@ type Ticker struct {
 	noteAbove, noteBelow []uint8
 	// entityBox is how plates see entities. Set before any player joins.
 	entityBox EntityBoxFunc
+	// powerTNT is what power reaching a TNT block does.
+	powerTNT func(r *world.Region, pos cube.Pos)
 }
 
 // localKey finds a region's circuit state on it.
@@ -736,7 +741,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)
 		}
-	case kindNote:
+	case kindNote, kindTNT:
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetAllowUp(true)
 		}
@@ -811,6 +816,10 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 	case kindNote:
 		if !first {
 			t.notePower(c.r, pos, on)
+		}
+	case kindTNT:
+		if on && t.powerTNT != nil {
+			t.powerTNT(c.r, pos)
 		}
 	case kindDispenser:
 		triggered := bitState(t.blocks.States(block), stateTriggered)

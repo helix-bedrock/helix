@@ -316,7 +316,7 @@ func (c *Chest) viewersChanged(r *world.Region) {
 	}
 }
 
-// EntityBox is what pressure plates see of an entity: players and dropped items, not
+// EntityBox is what pressure plates see of an entity: players, dropped items and lit TNT, not
 // experience orbs. Runs: owner of the entity's region.
 func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	at := e.Position()
@@ -327,6 +327,9 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	case *ItemActor:
 		lo = mgl32.Vec3{at[0] - itemHalfSize, at[1], at[2] - itemHalfSize}
 		return lo, mgl32.Vec3{at[0] + itemHalfSize, at[1] + 2*itemHalfSize, at[2] + itemHalfSize}, false, true
+	case *PrimedTNT:
+		half := mgl32.Vec3{tntHalfSize, tntHalfSize, tntHalfSize}
+		return at.Sub(half), at.Add(half), false, true
 	}
 	return lo, hi, false, false
 }
@@ -409,7 +412,11 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	for n := range 3 {
 		vel[n] += float32(rand.NormFloat64()) * ejectSpread
 	}
-	s.spawnItem(r.Dimension(), one, spawn, vel, world.Rotation{}, chestPickupDelay, 0)
+	if one.Name == nameTNT && !c.machine.dropper && s.level.TNTExplodes {
+		s.dispenseTNT(r, front)
+	} else {
+		s.spawnItem(r.Dimension(), one, spawn, vel, world.Rotation{}, chestPickupDelay, 0)
+	}
 	levelEvent(r, pos, spawn, levelEventDispenseSmoke, int32(dir[0])+3*int32(dir[2])+4)
 	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
 }

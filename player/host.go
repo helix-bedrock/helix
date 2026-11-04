@@ -40,7 +40,9 @@ type Level struct {
 	ShowDeathMessages   bool
 	PVP                 bool
 	NaturalRegeneration bool
-	GameRules           []protocol.GameRule
+	// TNTExplodes, TNTExplosionDropDecay and DoTileDrops are the game rules explosions read.
+	TNTExplodes, TNTExplosionDropDecay, DoTileDrops bool
+	GameRules                                       []protocol.GameRule
 }
 
 // HostConfig is what the server gives the players.

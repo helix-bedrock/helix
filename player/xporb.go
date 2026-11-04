@@ -92,6 +92,8 @@ type XPOrb struct {
 	lastSeek   int32
 	taken      bool
 	saved      map[string]any
+	// health is what explosions take from.
+	health int32
 }
 
 // Value returns the experience the orb gives.
@@ -145,7 +147,7 @@ func (s *Host) spawnOrbOrMerge(r *world.Region, pos mgl32.Vec3, value int32) {
 		}
 		return
 	}
-	o := &XPOrb{s: s, value: value}
+	o := &XPOrb{s: s, value: value, health: itemHealth}
 	o.body.s = s
 	o.entity = r.Dimension().AddEntity(o.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{})) //nolint:gosec // an entity ID, not a secret
 }
@@ -207,7 +209,10 @@ func (s *Host) loadOrb(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bo
 	if !ok || len(pos) != 3 {
 		return false
 	}
-	o := &XPOrb{s: s, saved: saved.Data}
+	o := &XPOrb{s: s, saved: saved.Data, health: itemHealth}
+	if h, isShort := saved.Data["Health"].(int16); isShort {
+		o.health = int32(h)
+	}
 	o.body.s = s
 	o.value, _ = saved.Data[xpOrbValueKey].(int32)
 	age, _ := saved.Data["Age"].(int16)

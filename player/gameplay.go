@@ -61,10 +61,12 @@ type Systems struct {
 	Exhaust      ExhaustFunc
 	FoodTick     FoodTickFunc
 	Die          DieFunc
-	Respawn      RespawnFunc
-	ShieldUp     ShieldUpFunc
-	ShieldBlock  ShieldBlockFunc
-	Totem        TotemFunc
+	// Explode runs explosions.
+	Explode     ExplodeFunc
+	Respawn     RespawnFunc
+	ShieldUp    ShieldUpFunc
+	ShieldBlock ShieldBlockFunc
+	Totem       TotemFunc
 	// Hitting.
 	Attack       AttackFunc
 	AttackDamage AttackDamageFunc
@@ -158,6 +160,8 @@ type gameplay struct {
 	itemEatEv listeners[ItemEatEvent]
 	attackEv  listeners[PlayerAttackEvent]
 	hurtEv    listeners[PlayerHurtEvent]
+	// explosionEv is explosions.
+	explosionEv listeners[ExplosionEvent]
 	// The events of shields, totems and armour.
 	blockEv      listeners[PlayerBlockEvent]
 	totemEv      listeners[PlayerTotemEvent]
@@ -201,10 +205,11 @@ type gameState struct {
 	placeEv          listeners[BlockPlaceEvent]
 	useEv            listeners[BlockUseEvent]
 	// The events of using items, hitting and being hurt.
-	itemUseEv listeners[ItemUseEvent]
-	itemEatEv listeners[ItemEatEvent]
-	attackEv  listeners[PlayerAttackEvent]
-	hurtEv    listeners[PlayerHurtEvent]
+	itemUseEv   listeners[ItemUseEvent]
+	itemEatEv   listeners[ItemEatEvent]
+	attackEv    listeners[PlayerAttackEvent]
+	explosionEv listeners[ExplosionEvent]
+	hurtEv      listeners[PlayerHurtEvent]
 	// The events of shields, totems and armour.
 	blockEv      listeners[PlayerBlockEvent]
 	totemEv      listeners[PlayerTotemEvent]
@@ -232,7 +237,7 @@ type gameState struct {
 }
 
 func newGameState() *gameState {
-	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), out: &gameplay{}}
+	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{nameTNT: tntBlock{}}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), out: &gameplay{}}
 }
 
 // Systems returns the breaking and placing steps to replace or wrap. Not
@@ -393,6 +398,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.FoodOf = vanillaFoodOf
 	sys.Eat = vanillaEat
 	sys.Die = vanillaDie
+	sys.Explode = vanillaExplode
 	sys.Respawn = vanillaRespawn
 	sys.ShieldUp = vanillaShieldUp
 	sys.ShieldBlock = vanillaShieldBlock
@@ -427,7 +433,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	gs := s.h.game
 	g := gs.out
 	*g = gameplay{
-		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv,
+		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv, explosionEv: gs.explosionEv,
 		sys: gs.sys, effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
@@ -450,6 +456,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.itemEatEv.freeze()
 	g.attackEv.freeze()
 	g.hurtEv.freeze()
+	g.explosionEv.freeze()
 	g.blockEv.freeze()
 	g.totemEv.freeze()
 	g.armorEquipEv.freeze()

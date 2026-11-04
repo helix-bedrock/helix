@@ -624,3 +624,25 @@ func TestTrappedChestPowersWhileOpen(t *testing.T) {
 	w.run(func(r *world.Region) { w.circuits.SetChestViewers(r, at, 0) })
 	w.wait(t, func(r *world.Region) bool { return w.name(r, lamp) == "minecraft:redstone_lamp" })
 }
+
+func TestPowerLightsTNT(t *testing.T) {
+	w := openWorld(t)
+	got := make(chan cube.Pos, 1)
+	w.circuits.SetPowerTNT(func(r *world.Region, pos cube.Pos) {
+		select {
+		case got <- pos:
+		default:
+		}
+	})
+	at := cube.Pos{4, surfaceY, 4}
+	w.run(func(r *world.Region) { place(r, at, w.state(t, "minecraft:tnt", nil)) })
+	w.run(func(r *world.Region) { place(r, cube.Pos{5, surfaceY, 4}, w.state(t, "minecraft:redstone_block", nil)) })
+	select {
+	case pos := <-got:
+		if pos != at {
+			t.Errorf("lit %v", pos)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("power did not reach the TNT")
+	}
+}

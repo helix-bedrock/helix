@@ -75,6 +75,8 @@ type ItemActor struct {
 	// saved keeps what BDS saved for the item that Helix does not use (its
 	// health, owner and the actor fields), written back as it was.
 	saved map[string]any
+	// health is what explosions take from.
+	health int32
 	// rule and view are a plugin's: who sees the item and what they are shown.
 	rule func(p *Player) bool
 	view func(p *Player, v *ItemView)
@@ -102,7 +104,7 @@ func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec
 func (s *Host) newItem(stack ItemStack, vel mgl32.Vec3, pickupDelay, throwTime int32) *ItemActor {
 	// A stack in the world has no slot, so no network ID the client names.
 	stack.netID = 0
-	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime}
+	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime, health: itemHealth}
 }
 
 // addTo puts the item in the dimension.
@@ -135,6 +137,7 @@ func (i *ItemActor) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	if i.onGround {
 		onGround = 1
 	}
+	data["Health"] = int16(i.health) //nolint:gosec // at most what it was saved with
 	data["identifier"] = itemIdentifier
 	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
 	data["Motion"] = []float32{i.vel[0], i.vel[1], i.vel[2]}
@@ -153,6 +156,9 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	if id == xpOrbIdentifier {
 		return s.loadOrb(r, at, saved)
 	}
+	if id == nameTNT {
+		return s.loadTNT(r, at, saved)
+	}
 	if id != itemIdentifier {
 		return false
 	}
@@ -165,7 +171,10 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	if stack.Empty() {
 		return false
 	}
-	i := &ItemActor{s: s, stack: stack, saved: saved.Data}
+	i := &ItemActor{s: s, stack: stack, saved: saved.Data, health: itemHealth}
+	if h, isShort := saved.Data["Health"].(int16); isShort {
+		i.health = int32(h)
+	}
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
 		i.vel = mgl32.Vec3{v[0], v[1], v[2]}
 	}
@@ -401,18 +410,24 @@ func (i *ItemActor) collide(r *world.Region, pos mgl32.Vec3) (out mgl32.Vec3, hi
 // clip returns how far of d the item's box can move along axis before it
 // hits a block. A block not loaded stops it.
 func (i *ItemActor) clip(r *world.Region, pos mgl32.Vec3, axis int, d float32) float32 {
+	return i.s.clipMove(r, pos, itemHalfSize, axis, d)
+}
+
+// clipMove returns how far of d a box half across around pos can move along axis before
+// it hits a block. A block not loaded stops it.
+func (s *Host) clipMove(r *world.Region, pos mgl32.Vec3, half float32, axis int, d float32) float32 {
 	if d == 0 {
 		return 0
 	}
-	lo := mgl32.Vec3{pos[0] - itemHalfSize, pos[1] - itemHalfSize, pos[2] - itemHalfSize}
-	hi := mgl32.Vec3{pos[0] + itemHalfSize, pos[1] + itemHalfSize, pos[2] + itemHalfSize}
+	lo := mgl32.Vec3{pos[0] - half, pos[1] - half, pos[2] - half}
+	hi := mgl32.Vec3{pos[0] + half, pos[1] + half, pos[2] + half}
 	sweepLo, sweepHi := lo, hi
 	if d < 0 {
 		sweepLo[axis] += d
 	} else {
 		sweepHi[axis] += d
 	}
-	blocks := i.s.reg.Blocks
+	blocks := s.reg.Blocks
 	for x := itemFloor(sweepLo[0]); x <= itemFloor(sweepHi[0]); x++ {
 		for y := itemFloor(sweepLo[1]); y <= itemFloor(sweepHi[1]); y++ {
 			for z := itemFloor(sweepLo[2]); z <= itemFloor(sweepHi[2]); z++ {

@@ -382,6 +382,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		}
 		becomes, wear = e.Becomes, e.Wear
 	}
+	p.s.brokenTNT(r, pos, b.Block, p)
 	if destroy := p.s.circuits.Destroy; destroy != nil {
 		destroy(r, pos, b.Block, p.inventory.main[p.inventory.held].Name)
 	}
