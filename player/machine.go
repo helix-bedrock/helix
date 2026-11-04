@@ -357,6 +357,9 @@ type CircuitHooks struct {
 	RingBell func(r *world.Region, pos cube.Pos, block uint32, yaw float32) bool
 	// JukeboxPower gives the jukebox at pos this power.
 	JukeboxPower func(r *world.Region, pos cube.Pos, power int32)
+	// HitTarget is a projectile landing at hit on the target block at pos, false if the
+	// block is not a target. arrow says it was an arrow or trident.
+	HitTarget func(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool
 	// CartOnRail is a minecart in the block at pos.
 	CartOnRail func(r *world.Region, pos cube.Pos)
 }
@@ -473,6 +476,15 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos, conf *circuit.Hopper
 			i.sendStackSize()
 		}
 		return true
+	}
+	return false
+}
+
+// HitTarget is a projectile landing at hit on the target block at pos, for whatever makes
+// projectiles. False if the block is not a target. Runs: owner of the region.
+func (s *Host) HitTarget(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool {
+	if fn := s.circuits.HitTarget; fn != nil {
+		return fn(r, pos, hit, arrow)
 	}
 	return false
 }

@@ -639,6 +639,8 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		}
 	case kindObserver:
 		t.observerTick(t.circuitOf(r), pos, block)
+	case kindTarget:
+		t.targetTick(r, pos)
 	case kindPlate:
 		t.plateTick(t.circuitOf(r), pos, block)
 	case kindHook:
@@ -778,7 +780,10 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetStrength(intState(states, stateSignal))
 			comp.SetAllowUp(true)
 		}
-	case kindTarget, kindTrapped, kindJukebox:
+	case kindTarget:
+		// BDS's has no direction and nothing else set until it is hit.
+		c.sys.Create(p, redstone.KindProducer, redstone.NoFace)
+	case kindTrapped, kindJukebox:
 		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)

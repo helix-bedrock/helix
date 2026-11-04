@@ -759,3 +759,24 @@ func TestBellBecomesMultipleAndFalls(t *testing.T) {
 	w.run(func(r *world.Region) { place(r, west, air) })
 	w.wait(t, func(r *world.Region) bool { return w.name(r, at) != "minecraft:bell" })
 }
+
+// A hit powers what touches the target, then stops after its wait. Other blocks are not
+// targets.
+func TestHitTargetPowersThenStops(t *testing.T) {
+	w := openWorld(t)
+	at, lamp := cube.Pos{4, surfaceY, 4}, cube.Pos{4, surfaceY, 5}
+	w.run(func(r *world.Region) {
+		place(r, at, w.state(t, "minecraft:target", nil))
+		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
+		if w.circuits.HitTarget(r, lamp, mgl32.Vec3{4.5, surfaceY + 1, 5.5}, false) {
+			t.Error("a lamp took a hit as a target")
+		}
+	})
+	w.run(func(r *world.Region) {
+		if !w.circuits.HitTarget(r, at, mgl32.Vec3{4.5, surfaceY + 1, 4.5}, false) {
+			t.Error("the target took no hit")
+		}
+	})
+	w.wait(t, func(r *world.Region) bool { return w.name(r, lamp) == "minecraft:lit_redstone_lamp" })
+	w.wait(t, func(r *world.Region) bool { return w.name(r, lamp) == "minecraft:redstone_lamp" })
+}

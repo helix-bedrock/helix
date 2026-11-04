@@ -9,12 +9,14 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/cube"
 )
 
 // testModeNames are the names /gamemode takes, as BDS's command accepts
@@ -112,13 +114,21 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "level", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
 		}}},
 	}
+	target := protocol.Command{
+		Name: targetTestCommand, Description: "Hits nearby target blocks: [edge] [arrow].",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "first", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
+			{Name: "second", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
+		}}},
+	}
 	return &packet.AvailableCommands{
 		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions),
 		Enums: []protocol.CommandEnum{
 			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
 			{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
 		},
-		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant},
+		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant, target},
 	}
 }
 
@@ -146,6 +156,45 @@ func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestD
 
 // tuneTestCommand is the command that tries the number API.
 const tuneTestCommand = "tune"
+
+// targetTestCommand stands in for a projectile until Helix has them: it hits the target
+// blocks near the player, in the middle of the top, or near a corner with "edge".
+const targetTestCommand = "targettest"
+
+// targetTestReach is how far from the player /targettest looks, each way.
+const targetTestReach = 6
+
+// targetTestOff is how far from the middle of the top an "edge" hit lands on each axis.
+const targetTestOff = 0.4
+
+// targetTest runs /targettest: [edge] [arrow].
+func targetTest(p *player.Player, args []string) string {
+	e := p.Entity()
+	if e == nil || e.Region() == nil {
+		return "Not in the world."
+	}
+	r := e.Region()
+	edge, arrow := slices.Contains(args, "edge"), slices.Contains(args, "arrow")
+	at := e.Position()
+	centre := cube.Pos{int(math.Floor(float64(at[0]))), int(math.Floor(float64(at[1]))), int(math.Floor(float64(at[2])))}
+	hits := 0
+	for x := -targetTestReach; x <= targetTestReach; x++ {
+		for y := -targetTestReach; y <= targetTestReach; y++ {
+			for z := -targetTestReach; z <= targetTestReach; z++ {
+				pos := cube.Pos{centre[0] + x, centre[1] + y, centre[2] + z}
+				hit := mgl32.Vec3{float32(pos[0]) + 0.5, float32(pos[1]) + 1, float32(pos[2]) + 0.5}
+				if edge {
+					hit[0] += targetTestOff
+					hit[2] += targetTestOff
+				}
+				if p.Host().HitTarget(r, pos, hit, arrow) {
+					hits++
+				}
+			}
+		}
+	}
+	return fmt.Sprintf("Hit %d target blocks.", hits)
+}
 
 // enchantTestCommand is the command that gives levels and tries changing an
 // enchantment's default while running.
@@ -546,6 +595,11 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) > 0 && args[0] == targetTestCommand {
+			// A failed write means the connection is closing, as above.
+			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: targetTest(p, args[1:])})
+			return
+		}
 		if len(args) > 1 && args[0] == enchantTestCommand {
 			// A failed write means the connection is closing, as above.
 			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: enchantTest(p, args[1:])})

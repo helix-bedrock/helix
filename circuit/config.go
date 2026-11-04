@@ -30,6 +30,7 @@ type Config struct {
 	Lamp       LampConfig
 	Observer   ObserverConfig
 	Plate      PlateConfig
+	Target     TargetConfig
 	Piston     PistonConfig
 	Tripwire   TripwireConfig
 	Rail       RailConfig
@@ -100,6 +101,13 @@ type PlateConfig struct {
 	LightWeight, HeavyWeight int32
 }
 
+// TargetConfig is how target blocks behave.
+type TargetConfig struct {
+	// Ticks is how long one stays on after a hit, and ArrowTicks the same after an arrow
+	// or trident.
+	Ticks, ArrowTicks int32
+}
+
 // PistonConfig is how pistons behave.
 type PistonConfig struct {
 	// PushLimit is the most blocks one piston moves.
@@ -158,6 +166,7 @@ func DefaultConfig() Config {
 		Lamp:       LampConfig{OffDelay: 4},
 		Observer:   ObserverConfig{Delay: 2, Retry: 1},
 		Plate:      PlateConfig{Delay: 20, WeightedDelay: 10, LightWeight: 15, HeavyWeight: 150},
+		Target:     TargetConfig{Ticks: 8, ArrowTicks: 20},
 		Piston:     PistonConfig{PushLimit: 12, Step: 0.5},
 		Tripwire:   TripwireConfig{Delay: 10, HookReach: 42},
 		Rail:       RailConfig{DetectorDelay: 20},
@@ -186,6 +195,8 @@ func (c Config) sane() Config {
 	c.Plate.WeightedDelay = max(c.Plate.WeightedDelay, minTicks)
 	c.Plate.LightWeight = max(c.Plate.LightWeight, 1)
 	c.Plate.HeavyWeight = max(c.Plate.HeavyWeight, 1)
+	c.Target.Ticks = max(c.Target.Ticks, minTicks)
+	c.Target.ArrowTicks = max(c.Target.ArrowTicks, minTicks)
 	c.Piston.PushLimit = max(c.Piston.PushLimit, 0)
 	if c.Piston.Step <= 0 || c.Piston.Step > 1 {
 		c.Piston.Step = DefaultConfig().Piston.Step
