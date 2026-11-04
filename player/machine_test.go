@@ -104,6 +104,28 @@ func TestHopperCollectsItemsAbove(t *testing.T) {
 	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 3 })
 }
 
+func TestHopperCollectsOnTopOfBlockAbove(t *testing.T) {
+	p, d := machineWorld(t)
+	at := cube.Pos{1, 69, 1}
+	var c *Chest
+	onRegion(d, func(r *world.Region) {
+		setNamed(t, p, r, at, "minecraft:hopper", nil)
+		setNamed(t, p, r, at.Side(cube.FaceUp), "minecraft:stone", nil)
+		c = p.s.chestAt(r, at)
+	})
+	p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.5, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 2 })
+}
+
+func TestHopperDoesNotCollectThroughContainer(t *testing.T) {
+	if !containerBlock("minecraft:trapped_chest") || !containerBlock("minecraft:red_shulker_box") || !containerBlock("minecraft:oxidized_copper_chest") {
+		t.Error("a container was not seen as one")
+	}
+	if containerBlock("minecraft:stone") || containerBlock("minecraft:crafting_table") {
+		t.Error("a plain block was seen as a container")
+	}
+}
+
 func TestHopperTurnedOffHolds(t *testing.T) {
 	p, d := machineWorld(t)
 	mid, low := cube.Pos{1, 69, 1}, cube.Pos{1, 68, 1}

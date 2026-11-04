@@ -3,6 +3,7 @@ package player
 import (
 	"maps"
 	"math/rand/v2"
+	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/liquid"
@@ -178,7 +179,9 @@ func (c *Chest) hopperAt(r *world.Region, pos cube.Pos) *Chest {
 }
 
 // moveItems is BDS's hopper move: push one item on, then if there is room pull one
-// from the container above, or items from the block above. True if something moved.
+// from the container above, or take items lying above unless a container is there. Any
+// other block does not stop that, so items on top of a full block go in. True if
+// something moved.
 func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos) bool {
 	size := c.halfSize()
 	pushed := false
@@ -192,10 +195,22 @@ func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos) bool {
 	if c.pullFrom(r, above) {
 		return true
 	}
-	if b, ok := r.Block(above, 0); ok && c.s.attach.Solid(b) {
+	if b, ok := r.Block(above, 0); ok && containerBlock(c.s.reg.Blocks.Name(b)) {
 		return pushed
 	}
 	return c.collectItems(r, pos) || pushed
+}
+
+// containerBlock reports whether the block is one BDS's block class calls a container:
+// the classes that override that check, by the names of their blocks.
+func containerBlock(name string) bool {
+	switch name {
+	case "minecraft:chest", "minecraft:hopper", "minecraft:dispenser", "minecraft:dropper", "minecraft:barrel",
+		"minecraft:brewing_stand", "minecraft:crafter", "minecraft:furnace", "minecraft:lit_furnace",
+		"minecraft:blast_furnace", "minecraft:lit_blast_furnace", "minecraft:smoker", "minecraft:lit_smoker":
+		return true
+	}
+	return strings.HasSuffix(name, "_chest") || strings.HasSuffix(name, "_shulker_box")
 }
 
 // emptySlots reports whether it holds nothing.
@@ -391,7 +406,7 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {
 		}
 		at := o.Position()
 		if at[0]+itemHalfSize <= x || at[0]-itemHalfSize >= x+1 || at[2]+itemHalfSize <= z || at[2]-itemHalfSize >= z+1 ||
-			at[1]+2*itemHalfSize <= y+hopperReachLow || at[1] >= y+hopperReachHigh {
+			at[1]+itemHalfSize <= y+hopperReachLow || at[1]-itemHalfSize > y+hopperReachHigh {
 			continue
 		}
 		left := c.AddItem(r, i.stack)
