@@ -174,6 +174,10 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 	p.move.climbing, p.move.inWater = m.Climbing, m.InWater
 	sys := p.s.game.sys
 	sys.Fall(p, &m)
+	// BDS's FoodExhaustionSystem leaves out anyone riding.
+	if p.vehicle != nil {
+		return
+	}
 	if cost := sys.MoveCost(p, &m); cost > 0 {
 		sys.Exhaust(p, cost)
 	}

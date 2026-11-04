@@ -61,7 +61,7 @@ func (w *windowState) nextID() {
 // container is open.
 func handleInteract(p *Player, pk *packet.Interact) {
 	if pk.ActionType == packet.InteractActionLeaveVehicle && p.vehicle != nil {
-		p.vehicle.dismount()
+		letOff(p.vehicle, p)
 		return
 	}
 	if pk.ActionType != packet.InteractActionOpenInventory || p.entity == nil {

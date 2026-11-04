@@ -1,7 +1,10 @@
 package player
 
 import (
+	"maps"
+
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -28,8 +31,14 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		protocol.EntityDataKeyHeight:   float32(1.8),
 		protocol.EntityDataKeyScale:    float32(1),
 	}
+	var links []protocol.EntityLink
+	if p.vehicle != nil {
+		maps.Copy(meta, p.vehicle.riders().Metadata(p))
+		links = []protocol.EntityLink{ride.Link(p.vehicle.rideEntity().UniqueID(), p.uniqueID, protocol.EntityLinkRider)}
+	}
 	return []packet.Packet{&packet.AddPlayer{
-		UUID: p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
+		EntityLinks: links,
+		UUID:        p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
 		Position: pos.Sub(mgl32.Vec3{0, eyeHeight, 0}), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		GameType: p.gameMode, EntityMetadata: meta,
 		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().network(p.s.reg),

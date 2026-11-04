@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -108,7 +109,7 @@ const (
 	// items lying within cartHopperReach of its box.
 	cartHopperEvery = 4
 	cartHopperReach = 0.25
-	// cartSeatY is rideable's seat.
+	// cartSeatY is rideable's seat, from entities/minecart.json.
 	cartSeatY = -0.2
 	// cartReach is how far a player may be from a cart to use it.
 	cartReach = 12
@@ -169,7 +170,8 @@ type Minecart struct {
 	gone     bool
 	flipped  bool
 
-	rider              *Player
+	seats              *ride.Vehicle
+	moved              mgl32.Vec3
 	hurtTime, hurtSide int32
 	integrity          int32
 
@@ -200,7 +202,16 @@ func (m *Minecart) SetVelocity(v mgl32.Vec3) { m.vel = v }
 func (m *Minecart) SetMaxSpeed(blocksPerTick float32) { m.maxSpeed = blocksPerTick }
 
 // Rider returns who rides it, if anyone.
-func (m *Minecart) Rider() *Player { return m.rider }
+func (m *Minecart) Rider() *Player { return m.rider() }
+
+// rider is who sits in it, if anyone.
+func (m *Minecart) rider() *Player {
+	if m.seats == nil {
+		return nil
+	}
+	p, _ := m.seats.First().(*Player)
+	return p
+}
 
 // Chest returns its slots, nil for a plain or TNT cart.
 func (m *Minecart) Chest() *Chest { return m.chest }
@@ -225,6 +236,9 @@ func (s *Host) newCart(id string) *Minecart {
 		return nil
 	}
 	m := &Minecart{s: s, spec: spec, maxSpeed: cartMaxSpeed, integrity: cartIntegrity}
+	if spec.rides {
+		m.seats = ride.New(cartRideRules())
+	}
 	if spec.machine != nil {
 		m.chest = &Chest{s: s, lead: true, machine: spec.machine, cart: m}
 	}
@@ -256,8 +270,8 @@ func (m *Minecart) spawnPackets(e *world.Entity) []packet.Packet {
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: m.spec.id,
 		Position: e.Position(), Velocity: m.vel, EntityMetadata: meta,
 	}
-	if m.rider != nil && m.rider.entity != nil {
-		add.EntityLinks = []protocol.EntityLink{m.link(protocol.EntityLinkRider)}
+	if m.seats != nil {
+		add.EntityLinks = m.seats.Links(e.UniqueID())
 	}
 	return []packet.Packet{add}
 }
@@ -268,10 +282,6 @@ func (m *Minecart) flags() uint64 {
 		f |= 1 << protocol.EntityDataFlagIgnited
 	}
 	return f
-}
-
-func (m *Minecart) link(kind byte) protocol.EntityLink {
-	return protocol.EntityLink{RiddenEntityUniqueID: m.entity.UniqueID(), RiderEntityUniqueID: m.rider.entity.UniqueID(), Type: kind, RiderInitiated: true}
 }
 
 func (m *Minecart) movePacket(e *world.Entity) packet.Packet {
@@ -292,10 +302,11 @@ func (m *Minecart) tick(e *world.Entity) {
 	if r == nil || m.gone {
 		return
 	}
-	m.settleRider()
+	m.settleRiders()
 	start := e.Position()
 	m.preTick(r, e, start)
 	pos := m.move(r, start)
+	m.moved = pos.Sub(start)
 	rot := m.turn(start, pos, e.Rotation())
 	if !e.Apply(world.Movement{Pos: pos, Rot: rot, OnGround: m.onGround, Tick: e.Tick()}) {
 		m.vel = mgl32.Vec3{}
@@ -345,7 +356,7 @@ func (m *Minecart) slowDown(r *world.Region) {
 	switch {
 	case m.chest != nil:
 		scale = cartSlowFull + float32(fullPower-m.chest.ComparatorSignal(r, cube.Pos{}))*cartSlowPerSignal
-	case m.rider != nil:
+	case m.rider() != nil:
 		scale = cartSlowRidden
 	}
 	m.vel = mgl32.Vec3{m.vel[0] * scale, 0, m.vel[2] * scale}
@@ -497,7 +508,7 @@ func (m *Minecart) railSpeed(dir int, brake *bool) mgl32.Vec3 {
 		}
 	}
 	x, z := m.vel[0], m.vel[2]
-	if m.rider != nil {
+	if m.rider() != nil {
 		x *= cartRiddenScale
 		z *= cartRiddenScale
 	}
@@ -507,7 +518,7 @@ func (m *Minecart) railSpeed(dir int, brake *bool) mgl32.Vec3 {
 // riderPush is a rider walking forward starting a cart that is almost still, the way it
 // looks. True if it pushed.
 func (m *Minecart) riderPush() bool {
-	p := m.rider
+	p := m.rider()
 	if p == nil || p.entity == nil || p.move.forward <= 0 {
 		return false
 	}
@@ -694,7 +705,7 @@ func (m *Minecart) pushes(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
 		}
 		switch owner := o.Owner().(type) {
 		case *Player:
-			if owner == m.rider || owner.dead() || owner.gameMode == GameModeSpectator {
+			if owner == m.rider() || owner.dead() || owner.gameMode == GameModeSpectator {
 				continue
 			}
 			pLo, pHi, _, ok := m.s.EntityBox(o)
@@ -796,7 +807,7 @@ func (m *Minecart) railSensor(r *world.Region, pos mgl32.Vec3) {
 	switch {
 	case m.spec.rides:
 		if on {
-			m.dismount()
+			letOffAll(m)
 		}
 	case m.spec.hopper:
 		m.hopperOff = on
@@ -894,7 +905,7 @@ func (m *Minecart) tickFuse(r *world.Region, e *world.Entity) {
 // remove takes the cart out of the world with its rider and viewers let go.
 func (m *Minecart) remove(r *world.Region) {
 	m.gone = true
-	m.dismount()
+	letOffAll(m)
 	if m.chest != nil {
 		m.chest.closeViewers(r)
 	}
@@ -999,9 +1010,7 @@ func (m *Minecart) BlastPush(push mgl32.Vec3) {
 func (m *Minecart) use(p *Player) {
 	switch {
 	case m.spec.rides:
-		if m.rider == nil && p.vehicle == nil {
-			m.mount(p)
-		}
+		mount(m, p)
 	case m.chest != nil:
 		p.openCart(m)
 	case m.spec.tnt:
@@ -1012,62 +1021,28 @@ func (m *Minecart) use(p *Player) {
 	}
 }
 
-// mount puts a player in the cart. Not yet compared with what BDS sends.
-func (m *Minecart) mount(p *Player) {
-	if p.entity == nil {
-		return
-	}
-	m.rider, p.vehicle = p, m
-	m.entity.Send(&packet.SetActorLink{EntityLink: m.link(protocol.EntityLinkRider)})
-	m.sendSeat(p, true)
-}
-
-// dismount lets the rider go, if there is one.
-func (m *Minecart) dismount() {
-	p := m.rider
-	if p == nil {
-		return
-	}
-	if p.entity != nil {
-		m.entity.Send(&packet.SetActorLink{EntityLink: m.link(protocol.EntityLinkRemove)})
-		m.sendSeat(p, false)
-	}
-	m.rider, p.vehicle = nil, nil
-	p.move.forward = 0
-}
-
-// sendSeat shows the player as sitting in the cart or not.
-func (m *Minecart) sendSeat(p *Player, on bool) {
-	p.riding = on
-	meta := protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags()}
-	if on {
-		meta[protocol.EntityDataKeySeatOffset] = mgl32.Vec3{0, cartSeatY, 0}
-	}
-	pk := &packet.SetActorData{EntityRuntimeID: p.entity.RuntimeID(), EntityMetadata: meta}
-	p.entity.Send(pk)
-	p.send(pk)
-	p.flush()
-}
-
-// settleRider lets go of a rider who has left, died or gone away.
-func (m *Minecart) settleRider() {
-	p := m.rider
-	if p == nil {
-		return
-	}
-	if p.entity == nil || p.dead() || p.entity.Region() != m.entity.Region() {
-		m.rider, p.vehicle, p.riding = nil, nil, false
-		if p.entity != nil {
-			m.dismountShown(p)
-		}
+// cartRideRules is the rideable component of entities/minecart.json.
+func cartRideRules() *ride.Rules {
+	return &ride.Rules{
+		SeatCount: 1, CrouchingSkipInteract: true, PullIn: true,
+		Seats: []ride.Seat{{Position: mgl32.Vec3{0, cartSeatY, 0}}},
 	}
 }
 
-// dismountShown tells those who see it that a rider is gone.
-func (m *Minecart) dismountShown(p *Player) {
-	m.entity.Send(&packet.SetActorLink{EntityLink: protocol.EntityLink{
-		RiddenEntityUniqueID: m.entity.UniqueID(), RiderEntityUniqueID: p.entity.UniqueID(), Type: protocol.EntityLinkRemove,
-	}})
+// riders, rideEntity, rideFrame and rideMoved make the cart a vehicle.
+func (m *Minecart) riders() *ride.Vehicle { return m.seats }
+
+func (m *Minecart) rideEntity() *world.Entity { return m.entity }
+
+func (m *Minecart) rideMoved() mgl32.Vec3 { return m.moved }
+
+func (m *Minecart) rideTop() float32 { return m.entity.Position()[1] - cartOffset + cartHeight }
+
+// settleRiders lets go of riders who have left, died or gone away.
+func (m *Minecart) settleRiders() {
+	if m.seats != nil {
+		settleRiders(m)
+	}
 }
 
 // openCart opens the cart's slots for the player, as a chest but held by an entity.
