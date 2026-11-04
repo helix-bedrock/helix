@@ -124,6 +124,10 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		}
 	}
 	p.move.velocity = pk.Delta
+	p.move.forward = pk.MoveVector[1]
+	if p.vehicle != nil && pk.InputData.Load(packet.InputFlagStartSneaking) {
+		p.vehicle.dismount()
+	}
 	collided := pk.InputData.Load(packet.InputFlagVerticalCollision)
 	var from mgl32.Vec3
 	if p.entity != nil {

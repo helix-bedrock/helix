@@ -144,6 +144,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == emptyBucket {
 		return p.fillBucket(clicked)
 	}
+	if IsCartItem(held.Name) {
+		return p.placeCart(r, clicked, held.Name)
+	}
 	block, ok := p.itemBlock(held)
 	if !ok {
 		return false

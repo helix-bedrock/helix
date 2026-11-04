@@ -256,7 +256,9 @@ func (c *Chest) SetItem(r *world.Region, slot int, s ItemStack) bool {
 	}
 	s = c.s.freshStack(s)
 	half.items[at] = s
-	r.SaveBlockEntity(half.pos)
+	if half.cart == nil {
+		r.SaveBlockEntity(half.pos)
+	}
 	lead, _ := c.halves(r)
 	for _, v := range lead.viewers {
 		v.sendNow(&packet.InventorySlot{WindowID: uint32(v.window.id), Slot: uint32(slot), NewItem: s.network(c.s.reg)}) //nolint:gosec // slots are small
@@ -546,7 +548,7 @@ func (p *Player) refreshItems() {
 	if r == nil {
 		return
 	}
-	if c := p.s.chestAt(r, p.window.chestPos); c != nil {
+	if c := p.windowChest(r); c != nil {
 		p.send(&packet.InventoryContent{WindowID: uint32(p.window.id), Content: p.chestContent(r, c)})
 	}
 }

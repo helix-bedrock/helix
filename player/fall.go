@@ -51,6 +51,10 @@ const (
 // runs with the distance fallen, then it is cleared; it grows while the
 // player moves down and is cleared when it does not.
 func vanillaFall(p *Player, m *MoveInfo) {
+	if p.vehicle != nil {
+		p.move.fall = 0
+		return
+	}
 	dy := m.To[1] - m.From[1]
 	_, slow := p.Effect(EffectSlowFalling)
 	if m.Climbing || p.Moving(MoveGliding) || slow && dy < 0 {

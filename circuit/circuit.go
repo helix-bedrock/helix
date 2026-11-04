@@ -106,6 +106,9 @@ const (
 	kindHook
 	kindTripWire
 	kindTNT
+	kindPoweredRail
+	kindPlainRail
+	kindDetectorRail
 )
 
 // kindOf returns the class of the block called name.
@@ -148,6 +151,9 @@ func kindOf(name string) kind {
 	case nameTNT:
 		return kindTNT
 	}
+	if k, ok := railKind(name); ok {
+		return k
+	}
 	switch {
 	case strings.HasSuffix(name, "_pressure_plate"):
 		return kindPlate
@@ -178,6 +184,10 @@ func componentKind(k kind) redstone.Kind {
 		return redstone.KindProducer
 	case kindObserver:
 		return redstone.KindPulse
+	case kindPoweredRail:
+		return redstone.KindRail
+	case kindDetectorRail:
+		return redstone.KindProducer
 	}
 	return redstone.KindConsumer
 }
@@ -215,6 +225,7 @@ type Ticker struct {
 	noteAbove, noteBelow []uint8
 	// entityBox is how plates see entities. Set before any player joins.
 	entityBox EntityBoxFunc
+	cartBox   CartBoxFunc
 	// entityPush is how pistons move entities. Set before any player joins.
 	entityPush EntityPushFunc
 	// powerTNT is what power reaching a TNT block does.
@@ -384,6 +395,8 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 	}
 	c.sys.Invalidate(p)
 	switch {
+	case isRailKind(k):
+		t.railPlaced(c, pos)
 	case k == kindHook:
 		t.hookLook(c, pos, block, hookNoSource)
 		if !t.hookHeld(r, pos, block) {
@@ -418,6 +431,10 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			}
 		case kindPiston:
 			t.armNeighbour(r, pos, block)
+		case kindPoweredRail, kindPlainRail, kindDetectorRail:
+			if !t.railSurvives(r, pos, block) {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
 		case kindObserver:
 			t.observerHeard(r, pos, from, block)
 		case kindPlate:
@@ -596,6 +613,14 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		if t.dispense != nil {
 			t.dispense(r, pos, block)
 		}
+	case kindPoweredRail, kindPlainRail, kindDetectorRail:
+		if !t.railSurvives(r, pos, block) {
+			t.fall(r, pos, block)
+			return
+		}
+		if t.kind(block) == kindDetectorRail && bitState(t.blocks.States(block), stateRailData) {
+			t.detectorCheck(t.circuitOf(r), pos, block)
+		}
 	case kindObserver:
 		t.observerTick(t.circuitOf(r), pos, block)
 	case kindPlate:
@@ -619,6 +644,8 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 	name := t.blocks.Name(block)
 	states := t.blocks.States(block)
 	switch t.kind(block) {
+	case kindPoweredRail, kindPlainRail, kindDetectorRail:
+		t.railComponent(c, pos, block, load)
 	case kindWire:
 		// A new component starts at no power, and the block follows it.
 		if comp := c.sys.Create(p, redstone.KindWire, redstone.Down); comp != nil {
@@ -815,6 +842,8 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 		}
 	case kindHopper:
 		t.setByCircuit(c, pos, t.with(block, stateToggle, flag(on)))
+	case kindPoweredRail, kindPlainRail:
+		t.railPower(c, pos, block, strength, first)
 	case kindNote:
 		if !first {
 			t.notePower(c.r, pos, on)

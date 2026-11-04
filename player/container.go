@@ -25,6 +25,8 @@ type windowState struct {
 	// chest means the open window is the chest at chestPos.
 	chest    bool
 	chestPos cube.Pos
+	// cart is the minecart whose slots are open, if a cart's are.
+	cart *Minecart
 	// chestDim is the dimension of that chest.
 	chestDim *world.Dimension
 	// workbench means the open window is the crafting table at workbenchPos.
@@ -58,6 +60,10 @@ func (w *windowState) nextID() {
 // is built: BDS opens it when the target is within 12 blocks and no
 // container is open.
 func handleInteract(p *Player, pk *packet.Interact) {
+	if pk.ActionType == packet.InteractActionLeaveVehicle && p.vehicle != nil {
+		p.vehicle.dismount()
+		return
+	}
 	if pk.ActionType != packet.InteractActionOpenInventory || p.entity == nil {
 		return
 	}

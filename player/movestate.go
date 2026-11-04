@@ -76,6 +76,8 @@ func (p *Player) SetFallDistance(d float32) { p.move.fall = d }
 
 // moveState is the player's movement state on its region.
 type moveState struct {
+	// forward is how far the client's stick or keys push forward.
+	forward float32
 	flags uint8
 	fall  float32
 	// velocity is the player's last movement, as knockback starts from it.
@@ -95,6 +97,9 @@ func (p *Player) actorFlags() int64 {
 	}
 	if p.using.active {
 		f |= 1 << protocol.EntityDataFlagUsingItem
+	}
+	if p.riding {
+		f |= 1 << protocol.EntityDataFlagRiding
 	}
 	return f
 }

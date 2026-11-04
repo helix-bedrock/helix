@@ -67,10 +67,12 @@ What works today and what is left is in [STATUS.md](STATUS.md).
 | Regions (parallel ticking, merge and split) | ✅ done |
 | Block ticks (random and scheduled) | 🟡 ticks run; water and lava flow, other blocks have no behaviour yet |
 | Players (spawn, movement, seeing each other, abilities, attributes) | 🟡 in progress |
-| Inventory | 🟡 changes checked as BDS does; dropping and crafting not done |
+| Inventory, chests, crafting, smithing, enchanting | 🟡 written from BDS's code; items are held by the server |
 | Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | ⬜ not hooked up |
-| Redstone ([redstone](https://github.com/helix-bedrock/redstone)) | 🟡 written from BDS's code, not fully tested |
-| Mobs ([entity](https://github.com/helix-bedrock/entity)), combat, commands, UI | ⬜ not started |
+| Redstone ([redstone](https://github.com/helix-bedrock/redstone)), pistons, hoppers, TNT | 🟡 written from BDS's code, not fully tested |
+| Rails and minecarts (plain, chest, hopper, TNT) | 🟡 written from BDS's code, not tested in game |
+| Player combat, health, hunger, death | 🟡 written from BDS's code, not fully tested |
+| Mobs ([entity](https://github.com/helix-bedrock/entity)), commands, UI | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
 updates, Helix will be updated to the new version and gain everything the update adds. The project

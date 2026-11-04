@@ -225,6 +225,9 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	if strings.HasSuffix(name, "_pressure_plate") {
 		return t.DiodeSurvives(r, pos)
 	}
+	if name == "minecraft:rail" || name == "minecraft:golden_rail" || name == "minecraft:detector_rail" || name == "minecraft:activator_rail" {
+		return t.onFloor(r, pos)
+	}
 	if name == tripwireHook {
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
 		return ok && !direction.Vertical(clicked) && t.Supports(b, clicked)

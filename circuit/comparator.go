@@ -74,6 +74,7 @@ const (
 	// signalUnbuilt has a signal in BDS from a block entity not run yet. It reads as
 	// 0, but still stops a comparator looking past it.
 	signalUnbuilt
+	signalDetectorRail
 )
 
 // Sizes of the containers a comparator reads.
@@ -104,8 +105,10 @@ func signalOf(name string) signal {
 		return signalHive
 	case "minecraft:respawn_anchor":
 		return signalAnchor
+	case nameDetectorRail:
+		return signalDetectorRail
 	case "minecraft:jukebox", "minecraft:lectern", "minecraft:frame", "minecraft:glow_frame",
-		"minecraft:detector_rail", "minecraft:command_block", "minecraft:chain_command_block",
+		"minecraft:command_block", "minecraft:chain_command_block",
 		"minecraft:repeating_command_block", "minecraft:crafter", "minecraft:creaking_heart",
 		"minecraft:chiseled_bookshelf", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
 		return signalUnbuilt
@@ -228,6 +231,8 @@ func (t *Ticker) blockSignal(r *world.Region, pos cube.Pos, block uint32) int32 
 	switch t.signals[block] {
 	case signalContainer:
 		return t.containerSignal(r, pos, block)
+	case signalDetectorRail:
+		return t.detectorSignal(t.circuitOf(r), pos)
 	case signalComposter:
 		return intState(states, "composter_fill_level")
 	case signalCauldron:

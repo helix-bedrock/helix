@@ -75,6 +75,9 @@ type Player struct {
 	effects    []ActiveEffect
 	brk        breakState
 	move       moveState
+	// vehicle is the minecart the player sits in, riding whether others see it so.
+	vehicle *Minecart
+	riding  bool
 	window     windowState
 	using      usingState
 	food       foodState

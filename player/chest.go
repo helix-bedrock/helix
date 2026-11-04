@@ -156,6 +156,8 @@ type Chest struct {
 	s     *Host
 	pos   cube.Pos
 	ender bool
+	// cart is the minecart holding these slots, if no block does.
+	cart *Minecart
 	// machine says this is a hopper, dispenser or dropper rather than a chest: the
 	// same slots and window, without a lid or a partner.
 	machine *machineSpec
@@ -564,6 +566,9 @@ func (c *Chest) lidSound(r *world.Region, sound string) {
 
 // blockEvent tells the players near how the lid stands.
 func (c *Chest) blockEvent(r *world.Region) {
+	if c.cart != nil {
+		return
+	}
 	if c.machine != nil {
 		return
 	}
@@ -701,6 +706,7 @@ func (p *Player) closeWindow(serverSide bool) {
 	w := &p.window
 	w.clearStations()
 	w.chest = false
+	w.cart = nil
 	p.inventory.open = nil
 	if serverSide {
 		p.sendNow(&packet.ContainerClose{WindowID: w.id, ContainerType: containerTypeNone, ServerSide: true})
@@ -715,7 +721,16 @@ func (p *Player) leaveChest(r *world.Region, serverSide bool) {
 		return
 	}
 	pos := w.chestPos
+	cart := w.cart
 	p.closeWindow(serverSide)
+	if cart != nil {
+		if cart.chest != nil {
+			if cr := cart.entity.Region(); cr != nil && (r == nil || cr == r) {
+				cart.chest.removeViewer(cr, p)
+			}
+		}
+		return
+	}
 	if r != nil {
 		if c := p.s.chestAt(r, pos); c != nil {
 			lead, _ := c.halves(r)
@@ -750,9 +765,12 @@ func (p *Player) tickChest() {
 	if r == nil {
 		return
 	}
-	pos := p.window.chestPos
-	d := p.entity.Position().Sub(blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
-	if p.s.chestAt(r, pos) == nil || d.Dot(d) > chestViewRange*chestViewRange {
+	at := blockVec(p.window.chestPos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
+	if m := p.window.cart; m != nil {
+		at = m.entity.Position()
+	}
+	d := p.entity.Position().Sub(at)
+	if p.windowChest(r) == nil || d.Dot(d) > chestViewRange*chestViewRange {
 		p.leaveChest(r, true)
 		p.flush()
 	}
@@ -770,7 +788,7 @@ func (p *Player) loadChestWork() []ItemStack {
 	if r == nil {
 		return nil
 	}
-	c := p.s.chestAt(r, p.window.chestPos)
+	c := p.windowChest(r)
 	if c == nil {
 		return nil
 	}
@@ -797,7 +815,7 @@ func (p *Player) commitChestWork() {
 	if r == nil {
 		return
 	}
-	c := p.s.chestAt(r, p.window.chestPos)
+	c := p.windowChest(r)
 	if c == nil {
 		return
 	}
@@ -820,7 +838,9 @@ func (p *Player) commitChestWork() {
 			continue
 		}
 		*cur = s
-		r.SaveBlockEntity(half.pos)
+		if half.cart == nil {
+			r.SaveBlockEntity(half.pos)
+		}
 		for _, v := range lead.viewers {
 			if v != p {
 				v.sendNow(&packet.InventorySlot{WindowID: uint32(v.window.id), Slot: uint32(i), NewItem: s.network(p.s.reg)}) //nolint:gosec // slots are small

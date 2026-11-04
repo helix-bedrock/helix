@@ -194,14 +194,20 @@ func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos) bool {
 	if c.fullSlots(size) {
 		return pushed
 	}
+	return c.pullOrCollect(r, pos) || pushed
+}
+
+// pullOrCollect is the second half of a hopper's move: one item from the container or
+// cart above, or items in the box above unless the block above is a container.
+func (c *Chest) pullOrCollect(r *world.Region, pos cube.Pos) bool {
 	above := pos.Side(cube.FaceUp)
 	if c.pullFrom(r, above) {
 		return true
 	}
 	if b, ok := r.Block(above, 0); ok && containerBlock(c.s.reg.Blocks.Name(b)) {
-		return pushed
+		return false
 	}
-	return c.collectItems(r, pos) || pushed
+	return c.collectItems(r, pos)
 }
 
 // containerBlock reports whether the block is one BDS's block class calls a container:
@@ -240,10 +246,14 @@ func (c *Chest) fullSlots(size int) bool {
 // pushTo moves one item into the container at at. A hopper given its first item
 // waits, so a chain does not outrun itself.
 func (c *Chest) pushTo(r *world.Region, at cube.Pos) bool {
-	to := c.s.chestAt(r, at)
-	if to == nil || to == c || to.ender {
-		return false
+	if to := c.s.chestAt(r, at); to != nil && to != c && !to.ender && c.pushInto(r, to) {
+		return true
 	}
+	return c.s.cartsAt(r, at, c, func(to *Chest) bool { return c.pushInto(r, to) })
+}
+
+// pushInto moves one item into a container.
+func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 	wasEmpty := to.machine != nil && to.machine.hopper && to.emptySlots(to.machine.size)
 	for i := range c.halfSize() {
 		s := c.items[i]
@@ -289,10 +299,14 @@ func (c *Chest) takeOne(r *world.Region, s ItemStack) bool {
 // pullFrom takes one item from the container at at, from its first slot that this
 // one has room for.
 func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
-	from := c.s.chestAt(r, at)
-	if from == nil || from == c || from.ender {
-		return false
+	if from := c.s.chestAt(r, at); from != nil && from != c && !from.ender && c.pullOne(r, from) {
+		return true
 	}
+	return c.s.cartsAt(r, at, c, func(from *Chest) bool { return c.pullOne(r, from) })
+}
+
+// pullOne takes one item from a container, from its first slot this one has room for.
+func (c *Chest) pullOne(r *world.Region, from *Chest) bool {
 	for i, size := 0, from.Size(r); i < size; i++ {
 		s := from.Item(r, i)
 		if s.Empty() || !c.takeOne(r, s) {
@@ -315,6 +329,8 @@ type CircuitHooks struct {
 	Destroy func(r *world.Region, pos cube.Pos, block uint32, item string)
 	// ChestViewers says how many have the trapped chest at pos open.
 	ChestViewers func(r *world.Region, pos cube.Pos, n int32)
+	// CartOnRail is a minecart in the block at pos.
+	CartOnRail func(r *world.Region, pos cube.Pos)
 }
 
 // SetCircuitHooks sets what redstone answers for. Call it before any player joins.
@@ -323,7 +339,7 @@ func (s *Host) SetCircuitHooks(h CircuitHooks) { s.circuits = h }
 // viewersChanged tells a trapped chest, both halves of a double one, who has it open.
 func (c *Chest) viewersChanged(r *world.Region) {
 	report := c.s.circuits.ChestViewers
-	if report == nil {
+	if report == nil || c.cart != nil {
 		return
 	}
 	b, ok := r.Block(c.pos, 0)
@@ -352,6 +368,9 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	case *PrimedTNT:
 		half := mgl32.Vec3{tntHalfSize, tntHalfSize, tntHalfSize}
 		return at.Sub(half), at.Add(half), false, true
+	case *Minecart:
+		lo, hi = cartBox(at)
+		return lo, hi, false, true
 	}
 	return lo, hi, false, false
 }
@@ -465,6 +484,13 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	smoke := int32(dir[0]) + 3*int32(dir[2]) + 4
 	if !c.machine.dropper && c.useBucket(r, front, slot, at, pos, dir) {
 		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
+		return
+	}
+	if !c.machine.dropper && IsCartItem(it.Name) && s.dispenseCart(r, front, dir, it.Name) {
+		it.Count--
+		c.SetItem(r, slot, it)
+		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
+		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
 		return
 	}
 	one := it
