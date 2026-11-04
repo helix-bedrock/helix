@@ -114,9 +114,9 @@ type RakNetConfig struct {
 // setting: the name, the world worlds/Bedrock level, 10 players, a view
 // distance of 32 chunks, a tick distance of 4, entities seen within BDS's
 // 57-chunk disc, online mode, NetherNet on port 19132 with the identity key in
-// keys/server_identity_key.pem. RakNet is on as well, on
-// UDP port 19132 next to NetherNet's TCP port, for clients that cannot use
-// NetherNet.
+// keys/server_identity_key.pem. Helix differs in two ways: NetherNet's UDP
+// traffic stays on port 19132, so one forwarded port is enough, and RakNet is
+// off, as Minecraft is removing it. Turn it on with RakNet.Enabled.
 func DefaultConfig() Config {
 	return Config{
 		Name:              "Dedicated Server",
@@ -131,8 +131,9 @@ func DefaultConfig() Config {
 			Enabled:         true,
 			Address:         ":19132",
 			IdentityKeyPath: nethernet.DefaultIdentityKeyPath,
+			UDPPort:         19132,
 		},
-		RakNet:  RakNetConfig{Enabled: true, Address: ":19132"},
+		RakNet:  RakNetConfig{Address: ":19132"},
 		Network: network.DefaultConfig(),
 	}
 }
@@ -465,7 +466,7 @@ func (s *Server) PlayerCount() int { return len(s.Players()) }
 func (s *Server) updateStatus() {
 	st := network.Status{
 		Name: s.conf.Name, LevelName: s.conf.LevelName, Players: s.PlayerCount(), MaxPlayers: s.conf.MaxPlayers,
-		GameMode: "Survival", ServerID: s.serverID, Port: port(s.conf.RakNet.Address), PortV6: port(s.conf.RakNet.Address),
+		GameMode: "Survival", ServerID: s.serverID, Port: port(s.conf.NetherNet.Address), PortV6: port(s.conf.NetherNet.Address),
 	}
 	s.listener.SetStatus(st)
 }
