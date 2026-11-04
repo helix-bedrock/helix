@@ -26,7 +26,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   their chunk; where they were is saved when they leave.
 - **Abilities:** permission levels, game mode and attributes follow BDS 1.26.60 (layered abilities,
   its per-game-mode rules, its saved format) and are sent at join in BDS's order.
-- **Inventory:** items are loaded from and saved in BDS's format. Every inventory change the client
+- **Inventory:** items are loaded from and saved in BDS's format. Pick block works as BDS does (not yet tested in game; a block's data on the item is not built). Every inventory change the client
   asks for is checked as BDS checks it (stack network IDs, counts, stack sizes, armour slots and
   offhand items as BDS lists them, creative-only destroy and creative items) before it happens.
   Stricter than BDS on purpose: what a client says it holds is only compared, never kept, so a

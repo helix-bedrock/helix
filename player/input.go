@@ -82,6 +82,9 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleMobEquipment); err != nil {
 		return err
 	}
+	if err := Handle(s, handleBlockPick); err != nil {
+		return err
+	}
 	if err := Handle(s, handleInventoryTransaction); err != nil {
 		return err
 	}
