@@ -16,6 +16,9 @@ import (
 // playerFamily is the player's type_family that family_types test.
 const playerFamily = "player"
 
+// playerRidingOffset is what BDS's player constructor gives its riding offset component.
+const playerRidingOffset = -0.4
+
 // vehicle is what a player can sit on: anything that keeps riders in the ride package and
 // is an entity. Minecarts are the first; mobs will be the same.
 type vehicle interface {
@@ -35,7 +38,7 @@ func (p *Player) RideID() int64 { return p.uniqueID }
 // RideBody is the player's size for riding.
 func (p *Player) RideBody() ride.Body {
 	return ride.Body{
-		HeightOffset: eyeHeight, Width: playerHalfWidth * 2, Height: playerHeight,
+		HeightOffset: eyeHeight, RidingOffset: playerRidingOffset, Width: playerHalfWidth * 2, Height: playerHeight,
 		Families: []string{playerFamily},
 	}
 }

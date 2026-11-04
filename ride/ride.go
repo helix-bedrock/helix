@@ -69,6 +69,9 @@ type Rules struct {
 type Body struct {
 	// HeightOffset is how far its position is above its feet: 1.62 for a player.
 	HeightOffset float32
+	// RidingOffset is BDS's offset added to HeightOffset in a seat, -0.4 for a player. A baby
+	// does not take it.
+	RidingOffset float32
 	// RidingHeight replaces HeightOffset in a seat when HasRidingHeight is set, as BDS's
 	// RidingHeightComponent does for a few mobs.
 	RidingHeight    float32
@@ -184,13 +187,13 @@ func seatFor(seats []Seat, riders, index int) Seat {
 }
 
 // SeatOffset is what BDS keeps as a rider's seat offset: the seat, scaled, with the rider's
-// own height added: a rider's position is above its feet, and its feet go in the seat.
+// own height and riding offset added. A rider's position is above its feet.
 func (v *Vehicle) SeatOffset(r Rider) mgl32.Vec3 {
 	return offset(v.Seat(r), v.scale, r.RideBody())
 }
 
 func offset(s Seat, scale float32, body Body) mgl32.Vec3 {
-	height := body.HeightOffset
+	height := body.HeightOffset + body.RidingOffset
 	if body.HasRidingHeight {
 		height = body.RidingHeight
 	}

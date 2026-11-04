@@ -18,7 +18,7 @@ func (r *testRider) RideID() int64  { return r.id }
 func (r *testRider) RideBody() Body { return r.body }
 
 func player(id int64) *testRider {
-	return &testRider{id: id, body: Body{HeightOffset: 1.62, Width: 0.6, Height: 1.8, Families: []string{"player"}}}
+	return &testRider{id: id, body: Body{HeightOffset: 1.62, RidingOffset: -0.4, Width: 0.6, Height: 1.8, Families: []string{"player"}}}
 }
 
 // testBlocks is flat ground below y=0 and whatever else a test puts down.
@@ -45,7 +45,7 @@ func TestSeatPutsAPlayerInTheCart(t *testing.T) {
 		t.Fatal("no seat")
 	}
 	got := v.SeatOffset(p)
-	want := mgl32.Vec3{0, 1.42, 0}
+	want := mgl32.Vec3{0, 1.02, 0}
 	if !got.ApproxEqual(want) {
 		t.Fatalf("seat offset %v, want %v", got, want)
 	}

@@ -302,7 +302,7 @@ func TestRiderSitsInTheCartAndLandsBeside(t *testing.T) {
 	onRegion(d, func(*world.Region) {
 		mount(m, p)
 		at := m.entity.Position()
-		want := at.Add(mgl32.Vec3{0, eyeHeight + cartSeatY, 0})
+		want := at.Add(mgl32.Vec3{0, eyeHeight + playerRidingOffset + cartSeatY, 0})
 		if got := p.seatPosition(); !got.ApproxEqualThreshold(want, 1e-4) {
 			t.Errorf("seat at %v, want %v", got, want)
 		}
