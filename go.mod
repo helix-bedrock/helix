@@ -9,7 +9,7 @@ require (
 	github.com/helix-bedrock/nethernet v0.0.0-20261030021933-e2ad03a8eaca
 	github.com/helix-bedrock/protocol v0.0.0-20261103164222-3ff45038b903
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
-	github.com/helix-bedrock/redstone v0.0.0-20261104160113-377c4410377a
+	github.com/helix-bedrock/redstone v0.0.0-20261104204546-249acba557e1
 	github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551
 	github.com/pion/ice/v4 v4.4.8
 	github.com/pion/webrtc/v4 v4.2.26

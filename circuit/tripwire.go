@@ -23,12 +23,8 @@ const (
 
 // BDS's numbers for a tripwire.
 const (
-	// hookReach is the first distance a hook no longer looks at.
-	hookReach = 42
 	// hookNoSource says no wire asked a hook to look.
 	hookNoSource = -1
-	// tripDelay is how many ticks before a hook or a pressed wire looks again.
-	tripDelay = 10
 	// tripHeight is the height of the part of a wire's block that senses.
 	tripHeight = 0.15625
 	// nameShears is the item that cuts a wire without setting it off.
@@ -76,7 +72,8 @@ func (t *Ticker) hookLook(c *regionCircuit, pos cube.Pos, block uint32, source i
 	step := hookSteps[d]
 	wasAttached, wasPowered := bitState(states, stateAttached), bitState(states, statePowered)
 	attached, pressed, other := true, false, 0
-	var seen [hookReach]wireSeen
+	var seen [hookReachLimit]wireSeen
+	hookReach := t.settings.Get().Tripwire.HookReach
 	for i := 1; i < hookReach; i++ {
 		b, ok := c.r.Block(cube.Pos{pos[0] + step[0]*i, pos[1], pos[2] + step[2]*i}, 0)
 		if !ok {
@@ -98,7 +95,7 @@ func (t *Ticker) hookLook(c *regionCircuit, pos cube.Pos, block uint32, source i
 		seen[i] = wireSeen{wire: true, disarmed: bitState(s, stateDisarmed)}
 		pressed = pressed || (!seen[i].disarmed && bitState(s, statePowered))
 		if i == source {
-			c.r.ScheduleTick(pos, block, tripDelay, 0)
+			c.r.ScheduleTick(pos, block, t.settings.Get().Tripwire.Delay, 0)
 			attached = attached && !seen[i].disarmed
 		}
 	}
@@ -180,6 +177,7 @@ func (t *Ticker) tellHooks(c *regionCircuit, pos cube.Pos) {
 
 // tellHook follows the wire from pos in one direction to a hook facing back along it.
 func (t *Ticker) tellHook(c *regionCircuit, pos, step cube.Pos, facing int32) {
+	hookReach := t.settings.Get().Tripwire.HookReach
 	for i := 1; i < hookReach; i++ {
 		at := cube.Pos{pos[0] + step[0]*i, pos[1], pos[2] + step[2]*i}
 		b, ok := c.r.Block(at, 0)
@@ -208,7 +206,7 @@ func (t *Ticker) wireUpdate(c *regionCircuit, pos cube.Pos, block uint32) {
 	}
 	if pressed {
 		now, _ := c.r.Block(pos, 0)
-		c.r.ScheduleTick(pos, now, tripDelay, 0)
+		c.r.ScheduleTick(pos, now, t.settings.Get().Tripwire.Delay, 0)
 	}
 }
 

@@ -22,12 +22,6 @@ const (
 	enchantFireAspect = int16(13)
 	stateExplodeBit   = "explode_bit"
 
-	// tntPower is its radius, tntFuse its fuse in ticks. One an explosion lit gets a fuse
-	// from tntBlastFuseMin to tntBlastFuseMax.
-	tntPower        = 4
-	tntFuse         = 80
-	tntBlastFuseMin = 10
-	tntBlastFuseMax = 40
 	// tntHalfSize is half of its 0.98 box, tntBlastOffset how far above its feet it
 	// explodes.
 	tntHalfSize    = 0.49
@@ -90,7 +84,7 @@ func (t *PrimedTNT) SetFire(fire bool) { t.fire = fire }
 func (s *Host) SpawnTNT(d *world.Dimension, feet mgl32.Vec3, fuse int32, owner *Player) *PrimedTNT {
 	angle := rand.Float64() * 2 * math.Pi //nolint:gosec // a hop, not a secret
 	t := &PrimedTNT{
-		s: s, fuse: fuse, lit: true, power: tntPower, owner: owner,
+		s: s, fuse: fuse, lit: true, power: s.redstone.Get().TNT.Power, owner: owner,
 		vel: mgl32.Vec3{float32(-math.Sin(angle)) * tntSpread, tntHop, float32(-math.Cos(angle)) * tntSpread},
 	}
 	pos := mgl32.Vec3{feet[0], feet[1] + tntHalfSize, feet[2]}
@@ -242,7 +236,7 @@ func (s *Host) loadTNT(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bo
 	if !ok || len(pos) != 3 {
 		return false
 	}
-	t := &PrimedTNT{s: s, power: tntPower, saved: saved.Data}
+	t := &PrimedTNT{s: s, power: s.redstone.Get().TNT.Power, saved: saved.Data}
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
 		t.vel = mgl32.Vec3{v[0], v[1], v[2]}
 	}
@@ -293,7 +287,8 @@ func (tntBlock) Exploded(s *Host, r *world.Region, pos cube.Pos, _ uint32, e *Ex
 	if !s.level.TNTExplodes {
 		return
 	}
-	fuse := int32(tntBlastFuseMin + rand.IntN(tntBlastFuseMax-tntBlastFuseMin+1)) //nolint:gosec // a fuse, not a secret
+	conf := &s.redstone.Get().TNT
+	fuse := conf.BlastFuseMin + rand.Int32N(conf.BlastFuseMax-conf.BlastFuseMin+1)
 	s.SpawnTNT(r.Dimension(), tntFeet(pos), fuse, e.Attacker)
 }
 
@@ -316,7 +311,7 @@ func (s *Host) PrimeBlock(r *world.Region, pos cube.Pos, owner *Player) bool {
 
 // lightTNT is BDS's TNT block lighting: the entity, and the fuse sound where it is.
 func (s *Host) lightTNT(r *world.Region, pos cube.Pos, owner *Player) {
-	t := s.SpawnTNT(r.Dimension(), tntFeet(pos), tntFuse, owner)
+	t := s.SpawnTNT(r.Dimension(), tntFeet(pos), s.redstone.Get().TNT.Fuse, owner)
 	levelEvent(r, pos, t.entity.Position(), packet.LevelEventSoundFuse, 0)
 }
 
@@ -327,7 +322,7 @@ func (s *Host) PowerTNT(r *world.Region, pos cube.Pos) { s.PrimeBlock(r, pos, ni
 func (s *Host) dispenseTNT(r *world.Region, front cube.Pos) {
 	feet := tntFeet(front)
 	feet[1] += tntDispenseUp
-	t := s.SpawnTNT(r.Dimension(), feet, tntFuse, nil)
+	t := s.SpawnTNT(r.Dimension(), feet, s.redstone.Get().TNT.Fuse, nil)
 	levelEvent(r, front, t.entity.Position(), packet.LevelEventSoundFuse, 0)
 }
 

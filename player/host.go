@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/attach"
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/loot"
@@ -57,6 +58,8 @@ type HostConfig struct {
 	ViewDistance int32
 	// MaxPlayers is how many players may be online at once.
 	MaxPlayers int
+	// Redstone is the numbers redstone runs by. Nil means BDS's.
+	Redstone *circuit.Settings
 }
 
 // Host runs the players of one server: it admits them, owns the player
@@ -73,6 +76,8 @@ type Host struct {
 	level        Level
 	viewDistance int32
 	maxPlayers   int
+	// redstone is the numbers redstone runs by.
+	redstone *circuit.Settings
 
 	handlers handlers
 	game     *gameplay
@@ -132,8 +137,12 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	for name, rule := range g.dropRules {
 		drops.Set(name, rule)
 	}
+	if conf.Redstone == nil {
+		conf.Redstone = circuit.NewSettings(circuit.DefaultConfig())
+	}
 	h := &Host{
-		drops: drops, foods: foodTable(conf.Registry.Items),
+		redstone: conf.Redstone,
+		drops:    drops, foods: foodTable(conf.Registry.Items),
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests, discs: discs,

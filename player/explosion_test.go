@@ -50,7 +50,7 @@ func TestTNTBreaksBlocksAndLightsTNT(t *testing.T) {
 		}
 		r.SetBlock(cube.Pos{8, y + 1, 10}, 0, block("minecraft:tnt"))
 		r.SetBlock(cube.Pos{8, y + 1, 6}, 0, block("minecraft:obsidian"))
-		x := NewExplosion(mgl32.Vec3{8.5, float32(y) + 1, 8.5}, tntPower)
+		x := NewExplosion(mgl32.Vec3{8.5, float32(y) + 1, 8.5}, p.s.redstone.Get().TNT.Power)
 		if !p.s.Explode(r, x) {
 			t.Error("explosion did nothing")
 		}
@@ -113,7 +113,7 @@ func TestBlastDestroysItemsButNotNetherStars(t *testing.T) {
 		dirt = p.s.spawnItem(d, ItemStack{Name: "minecraft:dirt", Count: 1}, mgl32.Vec3{8, y + 0.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
 	})
 	onRegion(d, func(r *world.Region) {
-		x := NewExplosion(star.entity.Position().Sub(mgl32.Vec3{0.5, 0, 0}), tntPower)
+		x := NewExplosion(star.entity.Position().Sub(mgl32.Vec3{0.5, 0, 0}), p.s.redstone.Get().TNT.Power)
 		x.BreaksBlocks = false
 		p.s.Explode(r, x)
 	})

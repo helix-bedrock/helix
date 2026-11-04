@@ -32,13 +32,6 @@ const (
 // statePowered is an observer's state.
 const statePowered = "powered_bit"
 
-// Ticks of an observer: how long before it changes, and how long to try again on a tick
-// the circuits do not evaluate next.
-const (
-	observerDelay = 2
-	observerRetry = 1
-)
-
 // EntityBoxFunc returns what plates see of an entity: its box, whether it is a mob, and
 // false if plates do not see it at all. Runs: owner of the entity's region.
 type EntityBoxFunc func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool)
@@ -81,14 +74,14 @@ func (t *Ticker) observerHeard(r *world.Region, pos, from cube.Pos, block uint32
 	if t.circuitOf(r).sys.Component(toPos(pos), redstone.KindPulse) == nil || r.HasScheduledTick(pos, block) {
 		return
 	}
-	r.ScheduleTick(pos, block, observerDelay, 0)
+	r.ScheduleTick(pos, block, t.settings.Get().Observer.Delay, 0)
 }
 
 // observerTick turns an observer on or off, on a tick the circuits evaluate next: on
 // any other it tries again a tick later.
 func (t *Ticker) observerTick(c *regionCircuit, pos cube.Pos, block uint32) {
 	if c.sys.SignalTick() {
-		c.r.ScheduleTick(pos, block, observerRetry, 0)
+		c.r.ScheduleTick(pos, block, t.settings.Get().Observer.Retry, 0)
 		return
 	}
 	t.turnObserver(c, pos, block, !bitState(t.blocks.States(block), statePowered))
@@ -108,7 +101,7 @@ func (t *Ticker) turnObserver(c *regionCircuit, pos cube.Pos, block uint32, on b
 	}
 	comp.SetStrength(fullPower)
 	if !c.r.HasScheduledTick(pos, next) {
-		delay := int32(observerDelay)
+		delay := t.settings.Get().Observer.Delay
 		if c.sys.SignalTick() {
 			delay++
 		}
@@ -122,18 +115,6 @@ const (
 	plateHeight = 0.25
 )
 
-// Ticks a plate waits before looking again.
-const (
-	plateDelay         = 20
-	plateDelayWeighted = 10
-)
-
-// Entities that hold a weighted plate at full power.
-const (
-	lightPlateWeight = 15
-	heavyPlateWeight = 150
-)
-
 // plateSoundHeight is how far up the block a plate clicks.
 const plateSoundHeight = 0.1
 
@@ -142,6 +123,8 @@ const plateReach = 1
 
 // plateRule is how a plate reads what stands on it.
 type plateRule struct {
+	// wait is how long it waits before looking again.
+	wait int32
 	// weight is the entities at full power of a weighted plate, 0 for one that is
 	// simply on.
 	weight int32
@@ -150,16 +133,17 @@ type plateRule struct {
 }
 
 // plateRuleOf is the rule of the plate called name.
-func plateRuleOf(name string) plateRule {
+func (t *Ticker) plateRuleOf(name string) plateRule {
+	conf := t.settings.Get()
 	switch name {
 	case nameLightPlate:
-		return plateRule{weight: lightPlateWeight}
+		return plateRule{weight: conf.Plate.LightWeight, wait: conf.Plate.WeightedDelay}
 	case nameHeavyPlate:
-		return plateRule{weight: heavyPlateWeight}
+		return plateRule{weight: conf.Plate.HeavyWeight, wait: conf.Plate.WeightedDelay}
 	case nameStonePlate, nameBlackstonePlate:
-		return plateRule{mobs: true}
+		return plateRule{mobs: true, wait: conf.Plate.Delay}
 	}
-	return plateRule{}
+	return plateRule{wait: conf.Plate.Delay}
 }
 
 // signalOf is the power a plate gives with this value in its state.
@@ -178,17 +162,9 @@ func (p plateRule) valueOf(power int32) int32 {
 	return power
 }
 
-// delay is how long a plate waits before looking again.
-func (p plateRule) delay() int32 {
-	if p.weight == 0 {
-		return plateDelay
-	}
-	return plateDelayWeighted
-}
-
 // plateState is the power the plate in this state gives.
 func (t *Ticker) plateState(block uint32) int32 {
-	return plateRuleOf(t.blocks.Name(block)).signalOf(intState(t.blocks.States(block), stateSignal))
+	return t.plateRuleOf(t.blocks.Name(block)).signalOf(intState(t.blocks.States(block), stateSignal))
 }
 
 // plateSignal is the power a plate should give for what stands on it now.
@@ -235,7 +211,7 @@ func (t *Ticker) updatePlate(c *regionCircuit, pos cube.Pos, block uint32, rule 
 		}, nil)
 	}
 	if now > 0 {
-		c.r.ScheduleTick(pos, next, rule.delay(), 0)
+		c.r.ScheduleTick(pos, next, rule.wait, 0)
 	}
 }
 
@@ -246,7 +222,7 @@ func (t *Ticker) plateTick(c *regionCircuit, pos cube.Pos, block uint32) {
 		t.fall(c.r, pos, block)
 		return
 	}
-	rule := plateRuleOf(t.blocks.Name(block))
+	rule := t.plateRuleOf(t.blocks.Name(block))
 	t.updatePlate(c, pos, block, rule, t.plateState(block), t.plateSignal(c, pos, rule))
 }
 
@@ -254,7 +230,7 @@ func (t *Ticker) plateTick(c *regionCircuit, pos cube.Pos, block uint32) {
 // once; a weighted one that is down changes its strength, and comes up only on its
 // tick.
 func (t *Ticker) stepOn(c *regionCircuit, pos cube.Pos, block uint32) {
-	rule := plateRuleOf(t.blocks.Name(block))
+	rule := t.plateRuleOf(t.blocks.Name(block))
 	old := t.plateState(block)
 	now := t.plateSignal(c, pos, rule)
 	switch {

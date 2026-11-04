@@ -480,7 +480,7 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	}
 	if c.machine != nil {
 		if c.machine.hopper {
-			c.tickHopper(r, pos, hopperDepth)
+			c.tickHopper(r, pos, int(c.s.redstone.Get().Hopper.ChainDepth))
 		}
 		if c.machine.crafter {
 			c.tickCrafter(r, pos)

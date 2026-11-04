@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -16,21 +17,6 @@ import (
 
 // Hopper, dispenser and dropper rules from BDS 1.26.60.
 const (
-	// hopperDepth is how far a hopper first ticks the hoppers it feeds.
-	hopperDepth = 50
-	// hopperCooldown is how long a hopper waits after moving something, and a
-	// hopper that was just given its first item waits hopperFirstItem, one tick more
-	// if it has not ticked yet this tick.
-	hopperCooldown  = 8
-	hopperFirstItem = 4
-	// hopperReachLow is how far into the block above the hopper's item box starts,
-	// from the top of the hopper's own block; hopperReachHigh where it ends, from
-	// the bottom.
-	hopperReachLow  = 0.625
-	hopperReachHigh = 2
-	// hopperBoxInset is how far BDS shrinks that box on every side, which leaves out an
-	// item resting exactly on top of a full block.
-	hopperBoxInset = 0.0001
 	// A dispensed item starts ejectReach from the block's centre towards its front,
 	// ejectLow above the bottom of the block when it faces a side.
 	ejectReach = 0.7
@@ -38,11 +24,6 @@ const (
 	machineBucketPour = 1000
 	ejectLow          = 0.3
 	ejectUp           = 0.2
-	// The item leaves at ejectSpeed plus up to ejectSpeedExtra, and a gaussian
-	// ejectSpread on each axis.
-	ejectSpeed      = 0.2
-	ejectSpeedExtra = 0.1
-	ejectSpread     = 0.0075 * 6
 	// The item appears this far below where it is thrown from.
 	ejectDropSide     = -0.15625
 	ejectDropVertical = -0.125
@@ -156,8 +137,12 @@ func (c *Chest) tickHopper(r *world.Region, pos cube.Pos, depth int) {
 	if v, _ := c.s.reg.Blocks.States(block)[stateHopperOff].(uint8); v != 0 {
 		return
 	}
-	if c.moveItems(r, pos, front) {
-		c.cooldown = hopperCooldown
+	conf := &c.s.redstone.Get().Hopper
+	switch c.moveItems(r, pos, front, conf) {
+	case hopperMoved:
+		c.cooldown = conf.MoveCooldown
+	case hopperPickedUp:
+		c.cooldown = conf.PickupCooldown
 	}
 }
 
@@ -194,30 +179,55 @@ func (c *Chest) hopperAt(r *world.Region, pos cube.Pos) *Chest {
 // moveItems is BDS's hopper move: push one item on, then if there is room pull one
 // from the container above, or take items in the box above unless a container is there.
 // Any other block only matters by where items can lie: on a slab or stair they are in
-// the box, on a full block just out of it. True if something moved.
-func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos) bool {
+// the box, on a full block just out of it. It says what the move did. BDS has one
+// cooldown for all of it, and both of Config's are that number by default.
+func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos, conf *circuit.HopperConfig) hopperResult {
 	size := c.halfSize()
-	pushed := false
-	if !c.emptySlots(size) {
-		pushed = c.pushTo(r, front)
+	result := hopperIdle
+	for range conf.ItemsPerMove {
+		if c.emptySlots(size) || !c.pushTo(r, front) {
+			break
+		}
+		result = hopperMoved
 	}
-	if c.fullSlots(size) {
-		return pushed
+	for range conf.ItemsPerMove {
+		if c.fullSlots(size) {
+			break
+		}
+		switch c.pullOrCollect(r, pos, conf) {
+		case hopperIdle:
+			return result
+		case hopperPickedUp:
+			return hopperPickedUp
+		}
+		result = hopperMoved
 	}
-	return c.pullOrCollect(r, pos) || pushed
+	return result
 }
+
+// hopperResult is what one hopper move did.
+type hopperResult uint8
+
+const (
+	hopperIdle hopperResult = iota
+	hopperMoved
+	hopperPickedUp
+)
 
 // pullOrCollect is the second half of a hopper's move: one item from the container or
 // cart above, or items in the box above unless the block above is a container.
-func (c *Chest) pullOrCollect(r *world.Region, pos cube.Pos) bool {
+func (c *Chest) pullOrCollect(r *world.Region, pos cube.Pos, conf *circuit.HopperConfig) hopperResult {
 	above := pos.Side(cube.FaceUp)
 	if c.pullFrom(r, above) {
-		return true
+		return hopperMoved
 	}
 	if b, ok := r.Block(above, 0); ok && containerBlock(c.s.reg.Blocks.Name(b)) {
-		return false
+		return hopperIdle
 	}
-	return c.collectItems(r, pos)
+	if c.collectItems(r, pos, conf) {
+		return hopperPickedUp
+	}
+	return hopperIdle
 }
 
 // containerBlock reports whether the block is one BDS's block class calls a container:
@@ -276,7 +286,7 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 		s.Count--
 		c.SetItem(r, i, s)
 		if wasEmpty {
-			to.cooldown = hopperFirstItem
+			to.cooldown = c.s.redstone.Get().Hopper.FirstItemCooldown
 			if to.lastTick < r.CurrentTick() {
 				to.cooldown++
 			}
@@ -436,7 +446,7 @@ func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
 // collectItems takes in whatever items overlap the box above the hopper. A stack that
 // fits goes in whole. An item only some players may see stays out, as those players' own;
 // a name tag or lifetime changes nothing about what the item is.
-func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {
+func (c *Chest) collectItems(r *world.Region, pos cube.Pos, conf *circuit.HopperConfig) bool {
 	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
 	var buf [16]*world.Entity
 	for _, o := range r.AppendEntitiesIn(buf[:0], x, z, x+1, z+1) {
@@ -445,9 +455,10 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos) bool {
 			continue
 		}
 		at := o.Position()
-		if at[0]+itemHalfSize < x+hopperBoxInset || at[0]-itemHalfSize > x+1-hopperBoxInset ||
-			at[2]+itemHalfSize < z+hopperBoxInset || at[2]-itemHalfSize > z+1-hopperBoxInset ||
-			at[1]+itemHalfSize < y+hopperReachLow+hopperBoxInset || at[1]-itemHalfSize > y+hopperReachHigh-hopperBoxInset {
+		inset := conf.PickupInset
+		if at[0]+itemHalfSize < x+inset || at[0]-itemHalfSize > x+1-inset ||
+			at[2]+itemHalfSize < z+inset || at[2]-itemHalfSize > z+1-inset ||
+			at[1]+itemHalfSize < y+conf.PickupLow+inset || at[1]-itemHalfSize > y+conf.PickupHigh-inset {
 			continue
 		}
 		left := c.AddItem(r, i.stack)
@@ -533,13 +544,14 @@ func (s *Host) eject(r *world.Region, stack ItemStack, pos cube.Pos, dir, at mgl
 	if dir[1] == 0 {
 		at[1] = float32(pos[1]) + ejectLow
 	}
-	speed := ejectSpeed + rand.Float32()*ejectSpeedExtra
+	eject := &s.redstone.Get().Dispenser
+	speed := eject.Speed + rand.Float32()*eject.SpeedExtra
 	vel := mgl32.Vec3{dir[0] * speed, ejectUp, dir[2] * speed}
 	if dir[1] != 0 {
 		vel[1] = dir[1] * speed
 	}
 	for n := range 3 {
-		vel[n] += float32(rand.NormFloat64()) * ejectSpread
+		vel[n] += float32(rand.NormFloat64()) * eject.Spread
 	}
 	if dir[1] == 0 {
 		at[1] += ejectDropSide

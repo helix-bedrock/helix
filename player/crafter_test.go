@@ -45,7 +45,7 @@ func TestCrafterMakesRecipeIntoChest(t *testing.T) {
 			t.Errorf("chest holds %+v", got)
 		}
 		block, _ = r.Block(at, 0)
-		if v, _ := p.s.reg.Blocks.States(block)[stateCrafting].(uint8); v != 1 || c.crafting != crafterShowTicks {
+		if v, _ := p.s.reg.Blocks.States(block)[stateCrafting].(uint8); v != 1 || c.crafting != p.s.redstone.Get().Crafter.ShowTicks {
 			t.Errorf("crafting state %d, timer %d", v, c.crafting)
 		}
 	})

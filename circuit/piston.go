@@ -17,10 +17,6 @@ import (
 const (
 	pistonEntityID = "PistonArm"
 	movingEntityID = "MovingBlock"
-	// pistonPushLimit is the most blocks one piston moves.
-	pistonPushLimit = 12
-	// pistonStep is how far the arm goes per tick, 0 to 1.
-	pistonStep = 0.5
 	// pistonCarryHeight is how far above a moving block an entity still rides on it.
 	pistonCarryHeight = 0.05
 )
@@ -210,12 +206,12 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	}
 	switch e.state {
 	case pistonExpanding:
-		e.progress = min(e.progress+pistonStep, 1)
+		e.progress = min(e.progress+e.t.settings.Get().Piston.Step, 1)
 		if e.progress >= 1 {
 			e.newState = pistonExpanded
 		}
 	case pistonRetracting:
-		e.progress = max(e.progress-pistonStep, 0)
+		e.progress = max(e.progress-e.t.settings.Get().Piston.Step, 0)
 		if e.progress <= 0 {
 			e.newState = pistonRetracted
 		}
@@ -262,7 +258,7 @@ func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.V
 		if carries && travel[1] == 0 && eLo[1] >= hi[1] && eLo[1] < hi[1]+pistonCarryHeight {
 			x, z := (eLo[0]+eHi[0])/2, (eLo[2]+eHi[2])/2
 			if x >= lo[0] && x <= hi[0] && z >= lo[2] && z <= hi[2] {
-				e.moveEntity(c.r, o, travel.Mul(pistonStep))
+				e.moveEntity(c.r, o, travel.Mul(e.t.settings.Get().Piston.Step))
 			}
 			continue
 		}
@@ -339,7 +335,7 @@ func (e *pistonEntity) collect(r *world.Region, pos, at cube.Pos, move pistonFac
 	if !e.walk(r, pos, at, move, move) {
 		return false
 	}
-	return len(e.attached) <= pistonPushLimit
+	return len(e.attached) <= e.t.settings.Get().Piston.PushLimit
 }
 
 // walk adds the block at at and what it takes along. reached is the way it was

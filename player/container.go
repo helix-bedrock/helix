@@ -67,12 +67,17 @@ func handleInteract(p *Player, pk *packet.Interact) {
 	if pk.ActionType != packet.InteractActionOpenInventory || p.entity == nil {
 		return
 	}
-	// The player is the only entity a target can be so far, so BDS's
-	// 12-block distance to the target always holds.
-	if pk.TargetEntityRuntimeID != p.runtimeID || p.window.open {
+	if p.window.open {
 		return
 	}
-	p.openInventory()
+	if pk.TargetEntityRuntimeID == p.runtimeID {
+		p.openInventory()
+		return
+	}
+	// The client asks this way to open a chest or hopper minecart.
+	if m := p.cartNear(pk.TargetEntityRuntimeID); m != nil && p.entity.Position().Sub(m.entity.Position()).Len() <= cartReach {
+		p.openCart(m)
+	}
 }
 
 // openInventory opens the player's own inventory as BDS does: the next

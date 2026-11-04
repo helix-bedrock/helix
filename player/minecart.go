@@ -105,10 +105,6 @@ const (
 	cartTNTBurnExtra = 20
 	cartTNTFall      = 3.5
 
-	// cartHopperEvery is how often its hopper runs, in ticks: HopperSystem's timer. It takes
-	// items lying within cartHopperReach of its box.
-	cartHopperEvery = 4
-	cartHopperReach = 0.25
 	// cartSeatY is rideable's seat, from entities/minecart.json.
 	cartSeatY = -0.2
 	// cartReach is how far a player may be from a cart to use it.
@@ -828,10 +824,10 @@ func (m *Minecart) tickHopper(r *world.Region, pos mgl32.Vec3) {
 		m.hopperWait--
 		return
 	}
-	m.hopperWait = cartHopperEvery - 1
+	m.hopperWait = m.s.redstone.Get().CartHopper.Every - 1
 	lo, hi := cartBox(pos)
 	centre := floorPos(mgl32.Vec3{pos[0], (lo[1] + hi[1]) / 2, pos[2]})
-	if !m.chest.fullSlots(m.chest.halfSize()) && m.chest.pullOrCollect(r, centre) {
+	if !m.chest.fullSlots(m.chest.halfSize()) && m.chest.pullOrCollect(r, centre, &m.s.redstone.Get().Hopper) != hopperIdle {
 		return
 	}
 	m.pickUpAround(r, lo, hi)
@@ -839,7 +835,8 @@ func (m *Minecart) tickHopper(r *world.Region, pos mgl32.Vec3) {
 
 // pickUpAround takes the first item lying within reach of the cart's box.
 func (m *Minecart) pickUpAround(r *world.Region, lo, hi mgl32.Vec3) {
-	grow := mgl32.Vec3{cartHopperReach, 0, cartHopperReach}
+	reach := m.s.redstone.Get().CartHopper.Reach
+	grow := mgl32.Vec3{reach, 0, reach}
 	lo, hi = lo.Sub(grow), hi.Add(grow)
 	m.near = r.AppendEntitiesIn(m.near[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range m.near {
@@ -1049,7 +1046,7 @@ func (m *Minecart) settleRiders() {
 func (p *Player) openCart(m *Minecart) {
 	r := p.entity.Region()
 	w := &p.window
-	if r == nil || w.open || m.chest == nil {
+	if r == nil || w.open || m.chest == nil || !p.abilities.Flag(AbilityOpenContainers) {
 		return
 	}
 	w.nextID()

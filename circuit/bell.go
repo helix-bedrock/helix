@@ -24,10 +24,6 @@ const (
 	attachMultiple  = "multiple"
 )
 
-// bellRingTicks is where a bell's count stops it. A ringing bell counts two a tick, so
-// a ring lasts 25 ticks.
-const bellRingTicks = 50
-
 // bellEntity is a bell's block entity. BDS has it look at its power each tick and ring
 // as power comes; powered is not saved, so a powered bell rings again when loaded.
 type bellEntity struct {
@@ -76,7 +72,7 @@ func (e *bellEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	if e.ringing {
 		e.ticks++
 	}
-	if e.ticks >= bellRingTicks {
+	if e.ticks >= e.t.settings.Get().Bell.RingTicks {
 		e.ringing, e.ticks = false, 0
 	}
 	if e.t.circuitOf(r).sys.Strength(toPos(pos)) <= 0 {

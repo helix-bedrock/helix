@@ -22,8 +22,6 @@ const (
 	railNone int32 = -1
 	// railFirstCurve is the first direction that is a curve: only plain rails have them.
 	railFirstCurve = 6
-	// railDetectorDelay is how many ticks a pressed detector rail waits to look again.
-	railDetectorDelay = 20
 	// railDetectorInset is how far in from the sides of the block it looks, and from the top.
 	railDetectorInset = 0.2
 	// railGroupGolden and railGroupActivator keep the two kinds of powered rail apart.
@@ -481,7 +479,7 @@ func (t *Ticker) detectorCheck(c *regionCircuit, pos cube.Pos, block uint32) {
 			now = t.with(block, stateRailData, flag(true))
 			t.setByCircuit(c, pos, now)
 		}
-		c.r.ScheduleTick(pos, now, railDetectorDelay, 0)
+		c.r.ScheduleTick(pos, now, t.settings.Get().Rail.DetectorDelay, 0)
 		if was {
 			return
 		}

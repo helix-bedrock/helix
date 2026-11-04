@@ -23,7 +23,6 @@ const (
 	stateOrientation   = "orientation"
 	stateCrafting      = "crafting"
 	allCrafterSlots    = 1<<crafterSize - 1
-	crafterShowTicks   = 6
 	crafterEjectHeight = 0.3
 	// levelEventCrafterCraft is the crafter's smoke, with data 4 + x + 3z of the face.
 	levelEventCrafterCraft = 3609
@@ -203,7 +202,7 @@ func (c *Chest) craft(r *world.Region, pos cube.Pos, block uint32) {
 			c.SetItem(r, i, it)
 		}
 	}
-	c.crafting = crafterShowTicks
+	c.crafting = c.s.redstone.Get().Crafter.ShowTicks
 	c.setBlockState(r, pos, stateCrafting, uint8(1))
 }
 

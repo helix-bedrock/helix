@@ -65,6 +65,10 @@ type Config struct {
 	// and entity types, and replace or wrap packet handlers here. Nil means
 	// vanilla only.
 	Setup func(s *Setup) error
+	// Redstone is every number redstone runs by: hopper timing, delays, signal reach and
+	// the rest. Its zero value means [circuit.DefaultConfig], BDS's numbers. Change it
+	// while running with [Server.SetRedstone].
+	Redstone circuit.Config
 	// MaxPlayers is how many players may be online at once.
 	MaxPlayers int
 	// OnlineMode requires every player to be signed in to Xbox Live.
@@ -137,8 +141,9 @@ func DefaultConfig() Config {
 			IdentityKeyPath: nethernet.DefaultIdentityKeyPath,
 			UDPPort:         19132,
 		},
-		RakNet:  RakNetConfig{Address: ":19132"},
-		Network: network.DefaultConfig(),
+		RakNet:   RakNetConfig{Address: ":19132"},
+		Network:  network.DefaultConfig(),
+		Redstone: circuit.DefaultConfig(),
 	}
 }
 
@@ -152,6 +157,7 @@ type Server struct {
 	serverID int64
 	reg      *registry.Registry
 	circuits *circuit.Ticker
+	redstone *circuit.Settings
 
 	db          *mcdb.DB
 	worldStore  mcdb.WorldStore
@@ -187,7 +193,10 @@ func New(conf Config) (*Server, error) {
 	if _, err := rand.Read(id[:]); err != nil {
 		return nil, fmt.Errorf("helix: server ID: %w", err)
 	}
-	s := &Server{conf: conf, log: conf.Log, serverID: int64(binary.LittleEndian.Uint64(id[:]))}
+	if conf.Redstone == (circuit.Config{}) {
+		conf.Redstone = circuit.DefaultConfig()
+	}
+	s := &Server{conf: conf, log: conf.Log, serverID: int64(binary.LittleEndian.Uint64(id[:])), redstone: circuit.NewSettings(conf.Redstone)}
 	if err := s.buildRegistry(); err != nil {
 		return nil, err
 	}
@@ -216,6 +225,15 @@ func New(conf Config) (*Server, error) {
 	return s, nil
 }
 
+// Redstone returns the numbers redstone runs by now. Change a copy and give it to
+// [Server.SetRedstone].
+func (s *Server) Redstone() circuit.Config { return *s.redstone.Get() }
+
+// SetRedstone changes the numbers redstone runs by while the server runs. Each part reads
+// them the next time it needs one: a wait already counting down finishes first. Numbers
+// that would stop something working are brought back in range.
+func (s *Server) SetRedstone(c circuit.Config) { s.redstone.Set(c) }
+
 // Run opens the world, starts the server and runs it until ctx is
 // cancelled or a transport fails to open. It closes every connection, then
 // saves and closes the world, before it returns.
@@ -241,7 +259,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 	host, err := player.NewHost(player.HostConfig{
 		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Store: s.playerStore,
-		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers,
+		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone,
 	}, s.setup)
 	if err != nil {
 		_ = s.listener.Close()

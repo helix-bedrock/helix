@@ -105,6 +105,7 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		if err != nil {
 			return err
 		}
+		circuits.SetSettings(s.redstone)
 		conf.Ticker = circuits
 		s.circuits = circuits
 	}

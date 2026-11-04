@@ -70,12 +70,6 @@ const (
 	stateTriggered = "triggered_bit"
 )
 
-// dispenseDelay is how many ticks a dispenser waits after being powered.
-const dispenseDelay = 4
-
-// lampOffDelay is how many ticks a lamp stays lit after losing power.
-const lampOffDelay = 4
-
 // fullPower is the strength of something simply on.
 const fullPower = 15
 
@@ -209,9 +203,11 @@ type DispenseFunc func(r *world.Region, pos cube.Pos, block uint32)
 // BlockTicker it embeds.
 type Ticker struct {
 	world.BlockTicker
-	blocks *registry.Blocks
-	items  *registry.Items
-	attach *attach.Table
+	// settings are the numbers in use.
+	settings *Settings
+	blocks   *registry.Blocks
+	items    *registry.Items
+	attach   *attach.Table
 	// pistons is what pistons do with each block, moving the moving block's state.
 	pistons pistonRules
 	moving  uint32
@@ -248,6 +244,8 @@ type regionCircuit struct {
 	r      *world.Region
 	sys    *redstone.System
 	seeded bool
+	// conf is the Config sys was last given.
+	conf *Config
 	// recheck asks for paths stopped at chunks a merge brought in to be tried again.
 	recheck bool
 	// moving and found are kept to look for entities without allocating.
@@ -261,7 +259,7 @@ func NewTicker(reg *registry.Registry, attached *attach.Table, fall FallFunc, ne
 	if err != nil {
 		return nil, fmt.Errorf("circuit: %w", err)
 	}
-	t := &Ticker{BlockTicker: next, blocks: blocks, items: reg.Items, attach: attached, fall: fall}
+	t := &Ticker{settings: NewSettings(DefaultConfig()), BlockTicker: next, blocks: blocks, items: reg.Items, attach: attached, fall: fall}
 	if t.pistons, err = loadPistonRules(); err != nil {
 		return nil, fmt.Errorf("circuit: %w", err)
 	}
@@ -292,6 +290,10 @@ func NewTicker(reg *registry.Registry, attached *attach.Table, fall FallFunc, ne
 	}
 	return t, nil
 }
+
+// SetSettings shares the numbers in use with whoever holds s. Call it before any player
+// joins.
+func (t *Ticker) SetSettings(s *Settings) { t.settings = s }
 
 // SetDispense sets what fires dispensers and droppers. Call it before any player
 // joins.
@@ -325,6 +327,11 @@ func (t *Ticker) BeforeBlockTicks(r *world.Region) {
 	if c.recheck {
 		c.recheck = false
 		c.sys.RecheckWaiting(c)
+	}
+	if conf := t.settings.Get(); conf != c.conf {
+		c.conf = conf
+		c.sys.Interval = conf.Interval
+		c.sys.SetRules(conf.Rules)
 	}
 	t.entitiesOnPlates(c)
 	c.sys.UpdateDependencies(c)
@@ -841,7 +848,7 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 				t.setByCircuit(c, pos, t.named(nameLampOn, block))
 			}
 		} else {
-			c.r.ScheduleTick(pos, block, lampOffDelay, 0)
+			c.r.ScheduleTick(pos, block, t.settings.Get().Lamp.OffDelay, 0)
 		}
 	case kindRepeater:
 		if want := choose(on, nameRepeater, nameRepeaterOff); want != name {
@@ -870,7 +877,7 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 		switch {
 		case on && !triggered:
 			t.setByCircuit(c, pos, t.with(block, stateTriggered, flag(true)))
-			c.r.ScheduleTick(pos, t.with(block, stateTriggered, flag(true)), dispenseDelay, 0)
+			c.r.ScheduleTick(pos, t.with(block, stateTriggered, flag(true)), t.settings.Get().Dispenser.Delay, 0)
 		case !on && triggered:
 			t.setByCircuit(c, pos, t.with(block, stateTriggered, flag(false)))
 		}

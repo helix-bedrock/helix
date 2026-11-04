@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 )
@@ -20,7 +21,7 @@ func testPlayer(t *testing.T) *Player {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Host{reg: reg, log: slog.New(slog.DiscardHandler), level: Level{GameMode: GameModeCreative}}
+	s := &Host{redstone: circuit.NewSettings(circuit.DefaultConfig()), reg: reg, log: slog.New(slog.DiscardHandler), level: Level{GameMode: GameModeCreative}}
 	p := &Player{s: s, gameMode: GameModeSurvival}
 	p.inventory.load(map[string]any{"Inventory": []any{
 		map[string]any{"Name": "minecraft:netherite_sword", "Count": uint8(1), "Damage": int16(0), "Slot": uint8(0), "WasPickedUp": uint8(0)},
