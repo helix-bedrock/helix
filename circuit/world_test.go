@@ -667,3 +667,42 @@ func TestPowerLightsTNT(t *testing.T) {
 		t.Fatal("power did not reach the TNT")
 	}
 }
+
+// TestObserverSeesWaterFlow is BDS: water spreading into the block an observer looks at
+// changes that block's state, so it fires like any other change.
+func TestObserverSeesWaterFlow(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	observer := w.state(t, "minecraft:observer", map[string]any{"minecraft:facing_direction": "east"})
+	w.run(func(r *world.Region) { place(r, at, observer) })
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		return b == observer
+	})
+	water := w.state(t, "minecraft:water", nil)
+	w.run(func(r *world.Region) {
+		source := cube.Pos{6, surfaceY, 4}
+		place(r, source, water)
+		r.ScheduleTick(source, water, 1, 0)
+	})
+	w.wait(t, func(r *world.Region) bool {
+		b, _ := r.Block(at, 0)
+		powered, _ := w.reg.Blocks.States(b)["powered_bit"].(uint8)
+		return powered == 1
+	})
+}
+
+// TestJukeboxGivesPower is a jukebox's producer turned on by what it plays.
+func TestJukeboxGivesPower(t *testing.T) {
+	w := openWorld(t)
+	at := cube.Pos{4, surfaceY, 4}
+	lamp := cube.Pos{5, surfaceY, 4}
+	w.run(func(r *world.Region) {
+		place(r, at, w.state(t, "minecraft:jukebox", nil))
+		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
+	})
+	w.wait(t, func(r *world.Region) bool {
+		w.circuits.SetJukeboxPower(r, at, 15)
+		return w.name(r, lamp) == "minecraft:lit_redstone_lamp"
+	})
+}

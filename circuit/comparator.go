@@ -75,6 +75,8 @@ const (
 	// 0, but still stops a comparator looking past it.
 	signalUnbuilt
 	signalDetectorRail
+	// signalEntity is what its block entity says.
+	signalEntity
 )
 
 // Sizes of the containers a comparator reads.
@@ -107,7 +109,9 @@ func signalOf(name string) signal {
 		return signalAnchor
 	case nameDetectorRail:
 		return signalDetectorRail
-	case "minecraft:jukebox", "minecraft:lectern", "minecraft:frame", "minecraft:glow_frame",
+	case nameJukebox:
+		return signalEntity
+	case "minecraft:lectern", "minecraft:frame", "minecraft:glow_frame",
 		"minecraft:command_block", "minecraft:chain_command_block",
 		"minecraft:repeating_command_block", "minecraft:crafter", "minecraft:creaking_heart",
 		"minecraft:chiseled_bookshelf", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
@@ -233,6 +237,13 @@ func (t *Ticker) blockSignal(r *world.Region, pos cube.Pos, block uint32) int32 
 		return t.containerSignal(r, pos, block)
 	case signalDetectorRail:
 		return t.detectorSignal(t.circuitOf(r), pos)
+	case signalEntity:
+		if be, ok := r.BlockEntity(pos); ok {
+			if e, ok := be.(SignalEntity); ok {
+				return e.ComparatorSignal(r, pos)
+			}
+		}
+		return 0
 	case signalComposter:
 		return intState(states, "composter_fill_level")
 	case signalCauldron:

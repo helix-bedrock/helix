@@ -317,7 +317,7 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 
 // setAndUpdate sets a block and tells its neighbours.
 func setAndUpdate(r *world.Region, pos cube.Pos, block uint32) {
-	if r.SetBlock(pos, 0, block) {
+	if old, ok := r.Block(pos, 0); ok && old != block && r.SetBlock(pos, 0, block) {
 		r.UpdateNeighbours(pos)
 	}
 }

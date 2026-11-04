@@ -329,6 +329,8 @@ type CircuitHooks struct {
 	Destroy func(r *world.Region, pos cube.Pos, block uint32, item string)
 	// ChestViewers says how many have the trapped chest at pos open.
 	ChestViewers func(r *world.Region, pos cube.Pos, n int32)
+	// JukeboxPower gives the jukebox at pos this power.
+	JukeboxPower func(r *world.Region, pos cube.Pos, power int32)
 	// CartOnRail is a minecart in the block at pos.
 	CartOnRail func(r *world.Region, pos cube.Pos)
 }

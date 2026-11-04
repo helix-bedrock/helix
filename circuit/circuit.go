@@ -109,6 +109,7 @@ const (
 	kindPoweredRail
 	kindPlainRail
 	kindDetectorRail
+	kindJukebox
 )
 
 // kindOf returns the class of the block called name.
@@ -150,6 +151,8 @@ func kindOf(name string) kind {
 		return kindTripWire
 	case nameTNT:
 		return kindTNT
+	case nameJukebox:
+		return kindJukebox
 	}
 	if k, ok := railKind(name); ok {
 		return k
@@ -180,7 +183,7 @@ func componentKind(k kind) redstone.Kind {
 		return redstone.KindRepeater
 	case kindComparator:
 		return redstone.KindComparator
-	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook:
+	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook, kindJukebox:
 		return redstone.KindProducer
 	case kindObserver:
 		return redstone.KindPulse
@@ -758,7 +761,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetStrength(intState(states, stateSignal))
 			comp.SetAllowUp(true)
 		}
-	case kindTarget, kindTrapped:
+	case kindTarget, kindTrapped, kindJukebox:
 		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)
@@ -904,7 +907,8 @@ func (t *Ticker) updateDoor(c *regionCircuit, pos cube.Pos, block uint32, p reds
 // setByCircuit sets a block because of the circuit, so it does not rebuild it.
 func (t *Ticker) setByCircuit(c *regionCircuit, pos cube.Pos, block uint32) {
 	c.sys.Lock(true)
-	if c.r.SetBlock(pos, 0, block) {
+	// BDS tells the neighbours only of a real change: anything else would wake observers.
+	if old, ok := c.r.Block(pos, 0); ok && old != block && c.r.SetBlock(pos, 0, block) {
 		c.r.UpdateNeighbours(pos)
 	}
 	c.sys.Lock(false)

@@ -193,6 +193,9 @@ type chestEntities struct {
 
 // New returns a new chest for a chest block.
 func (e chestEntities) New(block uint32) world.BlockEntity {
+	if e.s.reg.Blocks.Name(block) == jukeboxBlock {
+		return &jukeboxEntity{s: e.s}
+	}
 	if e.s.reg.Blocks.Name(block) == enchantingTable {
 		return &enchantTableEntity{}
 	}
@@ -210,6 +213,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 // to link them; only the lead reads the partner's position.
 func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEntity, bool) {
 	id, _ := saved["id"].(string)
+	if id == jukeboxEntityID {
+		return e.s.loadJukebox(saved), true
+	}
 	if id == enchantTableEntityID {
 		return &enchantTableEntity{saved: maps.Clone(saved)}, true
 	}

@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/crafting"
@@ -84,6 +85,8 @@ type Host struct {
 	circuits CircuitHooks
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
+	// discs is the music discs by item name.
+	discs map[string]data.MusicDisc
 	// drops holds what each block drops.
 	drops *loot.Table
 	// foods holds what each item does when eaten, from the items' own data.
@@ -114,6 +117,10 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: attached blocks: %w", err)
 	}
+	discs, err := loadDiscs()
+	if err != nil {
+		return nil, err
+	}
 	chests, err := newChestTable(conf.Registry.Blocks)
 	if err != nil {
 		return nil, fmt.Errorf("player: chests: %w", err)
@@ -129,7 +136,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		drops: drops, foods: foodTable(conf.Registry.Items),
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests,
+		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests, discs: discs,
 	}
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()

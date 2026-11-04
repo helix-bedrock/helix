@@ -17,6 +17,7 @@ import (
 // Blocks that sense something rather than take power.
 const (
 	nameObserver         = "minecraft:observer"
+	nameJukebox          = "minecraft:jukebox"
 	nameNote             = "minecraft:noteblock"
 	nameTarget           = "minecraft:target"
 	nameTrapped          = "minecraft:trapped_chest"
@@ -303,6 +304,13 @@ func (t *Ticker) entitiesOnPlates(c *regionCircuit) {
 
 // floor is the block coordinate of v.
 func floor(v float32) int { return int(math.Floor(float64(v))) }
+
+// SetJukeboxPower gives a jukebox the power of what it is doing. Runs: owner of the region.
+func (t *Ticker) SetJukeboxPower(r *world.Region, pos cube.Pos, power int32) {
+	if comp := t.circuitOf(r).sys.Component(toPos(pos), redstone.KindProducer); comp != nil {
+		comp.SetStrength(power)
+	}
+}
 
 // SetChestViewers gives a trapped chest the power of its n viewers. Runs: owner of the
 // region.

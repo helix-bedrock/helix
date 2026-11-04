@@ -319,7 +319,7 @@ func (a *railAt) set(block uint32) {
 	c := a.c
 	locked := c.sys.Locked()
 	c.sys.Lock(true)
-	changed := c.r.SetBlock(a.pos, 0, block)
+	changed := a.block != block && c.r.SetBlock(a.pos, 0, block)
 	c.sys.Lock(locked)
 	a.block = block
 	if changed {
