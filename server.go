@@ -105,6 +105,13 @@ type NetherNetConfig struct {
 	UDPPort uint16
 	// PortMappings is BDS's server-port-mappings: public:local single ports.
 	PortMappings string
+	// SignInID is BDS's nethernet-id, a UUID. When set, the server signs in to
+	// Microsoft's signaling service as BDS does.
+	SignInID string
+	// ApplicationID and ApplicationTenantID are BDS's application-id and
+	// application-tenant-id, the owner's Azure application that signs in with
+	// the certificate in AppCertificate.pfx.
+	ApplicationID, ApplicationTenantID string
 	// UDPPorts is BDS's server-udp-ports: ports or ranges, each maybe
 	// public:local, with maybe an address first. With UDPPort 0, connections
 	// take their local port from them.
@@ -316,6 +323,7 @@ func (s *Server) openTransports() error {
 		}
 		t, err := network.NetherNet(network.NetherNetConfig{
 			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort, UDPPorts: s.conf.NetherNet.UDPPorts, PortMappings: s.conf.NetherNet.PortMappings, LAN: s.conf.NetherNet.LAN, PublicIP: s.conf.NetherNet.PublicIP,
+			SignInID: s.conf.NetherNet.SignInID, ApplicationID: s.conf.NetherNet.ApplicationID, ApplicationTenantID: s.conf.NetherNet.ApplicationTenantID,
 			AllowAnonymous: s.conf.NetherNet.AllowAnonymous, Log: s.log.With("part", "nethernet"),
 		})
 		if err != nil {

@@ -6,13 +6,14 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/helix-bedrock/helix-data v0.0.0-20261104165703-94dd035f2983
-	github.com/helix-bedrock/nethernet v0.0.0-20261105034331-7fdb66309672
+	github.com/helix-bedrock/nethernet v0.0.0-20261105040442-b0c37f2084ad
 	github.com/helix-bedrock/protocol v0.0.0-20261103164222-3ff45038b903
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
 	github.com/helix-bedrock/redstone v0.0.0-20261104204546-249acba557e1
 	github.com/helix-bedrock/world v0.0.0-20261030181119-62ca87473551
 	github.com/pion/ice/v4 v4.4.8
 	github.com/pion/webrtc/v4 v4.2.26
+	golang.org/x/net v0.62.0
 )
 
 require (
@@ -35,10 +36,9 @@ require (
 	github.com/pion/transport/v5 v5.1.4 // indirect
 	github.com/pion/turn/v5 v5.1.3 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )

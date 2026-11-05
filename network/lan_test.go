@@ -59,7 +59,7 @@ func TestLANFindAndJoin(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if data.ServerName != "a" || data.LevelName != "b" || data.PlayerCount != 1 || data.MaxPlayerCount != 10 ||
-		data.Protocol != protocol.CurrentProtocol || !data.AcceptsOnlineAuth || data.ConnectionType != lanConnectionType ||
+		data.Protocol != protocol.CurrentProtocol || !data.AcceptsOnlineAuth || data.ConnectionType != connectionNetherNet ||
 		data.Nonce == "" || data.Nonce != server.handler.Nonce() {
 		t.Errorf("found %+v", data)
 	}
