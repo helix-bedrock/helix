@@ -39,6 +39,7 @@ func (p *Player) dead() bool { return p.Health() <= 0 }
 // the death event, the death info and the death message follow, and the
 // respawn sequence starts. Experience is not dropped yet.
 func vanillaDie(p *Player, src DamageSource) {
+	p.StopSleeping()
 	p.stopUsing()
 	p.lowerShield()
 	p.hurt = hurtState{}
@@ -131,7 +132,7 @@ func (p *Player) tickRespawn() {
 		p.send(&packet.Respawn{Position: p.entity.Position(), State: packet.RespawnStateSearchingForSpawn})
 		p.respawn = respawnWaitClient
 	case respawnFind:
-		spawn, _ := p.worldSpawn()
+		spawn := p.respawnPoint()
 		p.moveZones(spawn)
 		p.send(&packet.Respawn{Position: spawn, State: packet.RespawnStateSearchingForSpawn},
 			&packet.Respawn{Position: spawn, State: packet.RespawnStateReadyToSpawn})
@@ -153,11 +154,23 @@ func handleRespawn(p *Player, pk *packet.Respawn) {
 // handlePlayerAction is vanilla's PlayerAction handler. Only the respawn is
 // built: BDS takes it from a dead player whose spawn was found.
 func handlePlayerAction(p *Player, pk *packet.PlayerAction) {
+	if pk.ActionType == protocol.PlayerActionStopSleeping && pk.EntityRuntimeID == p.runtimeID {
+		p.StopSleeping()
+		return
+	}
 	if pk.ActionType != protocol.PlayerActionRespawn || pk.EntityRuntimeID != p.runtimeID || p.respawn != respawnWaitAction || !p.dead() {
 		return
 	}
+	p.s.game.sys.Respawn(p, p.respawnPoint())
+}
+
+// respawnPoint is where a dead player comes back: beside its bed, else the world spawn.
+func (p *Player) respawnPoint() mgl32.Vec3 {
+	if at, ok := p.bedRespawn(p.entity.Region()); ok {
+		return at
+	}
 	spawn, _ := p.worldSpawn()
-	p.s.game.sys.Respawn(p, spawn)
+	return spawn
 }
 
 // vanillaRespawn is BDS's respawn as far as built: the body resets, the

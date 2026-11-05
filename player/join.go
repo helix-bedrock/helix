@@ -164,6 +164,7 @@ func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) (leave func())
 		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: spawn, Rot: rot, Viewer: p.viewer, Owner: p,
 		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,
 		Removed: func(e *world.Entity) {
+			p.StopSleeping()
 			p.leaveChest(nil, false)
 			removed <- last{e.Position(), e.Rotation()}
 		},

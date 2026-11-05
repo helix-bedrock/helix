@@ -65,6 +65,16 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   block. Chests also have pairing and spilling events and their name and pair (`Host.ChestAt`,
   `Host.WithChest`, `Chest`). None of this is tested in game yet; what other players see a player hold
   or wear has no per-player view yet.
+  Beds, straw beds and cushions are written from BDS 1.26.60's code (not tested in game yet). Beds have
+  their block entity (the colour the client draws them with), BDS's placing rule (facing, both halves
+  free and held, no end portal near) and break as one; sleeping checks distance, the night and room to
+  get up, sets the bed as the respawn point, and once enough players (`playerssleepingpercentage`) have
+  slept 100 ticks the night is skipped. Outside the overworld a bed explodes and a straw bed falls apart
+  (`respawnblocksexplode`). A straw bed never sets the spawn and is used up when its sleeper gets up.
+  Cushions go on any top face at the exact height clicked, turned to the nearest quarter, never on or
+  into another cushion; one hit breaks them; a seated player stays seated through leaving and a restart
+  (`Host.SpawnCushion`, `Cushion`, `Player.Sleeping`, `Player.StopSleeping`). Not built: monsters
+  keeping a player awake (there are none yet), weather clearing on the night skip, beds bouncing.
   Experience has `OnExperience`, `Player.AddExperience`, `SetLevel` and `Host.SpawnExperience`. Block breaks say what is left behind and
   how much the tool wears, and `OnBlockDrops` and `Setup.SetBlockDrops` decide what comes out, where
   and how fast (not yet tested in game).

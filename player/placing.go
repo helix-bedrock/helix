@@ -149,6 +149,12 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == emptyBucket {
 		return p.fillBucket(clicked)
 	}
+	if isCushionItem(held.Name) {
+		return p.placeCushion(r, clicked, face, click, held)
+	}
+	if isBedItem(held.Name) {
+		return p.placeBed(r, clicked, face, held)
+	}
 	if IsCartItem(held.Name) {
 		return p.placeCart(r, clicked, held.Name)
 	}

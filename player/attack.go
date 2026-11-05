@@ -117,7 +117,7 @@ func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
 	if p.dead() || p.entity == nil {
 		return
 	}
-	if p.useOnCart(d) {
+	if p.useOnCart(d) || p.useOnCushion(d) {
 		return
 	}
 	if d.ActionType != protocol.UseItemOnEntityActionAttack {

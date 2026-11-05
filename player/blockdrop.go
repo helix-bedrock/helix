@@ -109,7 +109,7 @@ func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) ([]Bloc
 			harvest = true
 			var items []ItemStack
 			items, xp = g.sys.Drops(p.s, block, p.breakContext(r, pos))
-			items = p.s.shulkerDrops(r, pos, items)
+			items = p.s.blockEntityDrops(r, pos, items)
 			drops = make([]BlockDrop, 0, len(items))
 			for _, it := range items {
 				drops = append(drops, NewBlockDrop(pos, it))
@@ -237,7 +237,7 @@ func customNameAt(r *world.Region, pos cube.Pos) string {
 // Runs: on the region tick.
 func (s *Host) FallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	items, _ := s.game.sys.Drops(s, block, &loot.Context{})
-	items = s.shulkerDrops(r, pos, items)
+	items = s.blockEntityDrops(r, pos, items)
 	if r.SetBlock(pos, 0, s.reg.Blocks.Air()) {
 		r.UpdateNeighbours(pos)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
@@ -291,6 +292,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == enchantingTable {
 		return &enchantTableEntity{}
 	}
+	if e.s.reg.Blocks.Name(block) == blockuse.Bed {
+		return &bedEntity{}
+	}
 	t := e.s.chests
 	if int(block) >= len(t.kind) || t.kind[block] == chestNone {
 		return nil
@@ -307,6 +311,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	id, _ := saved["id"].(string)
 	if id == jukeboxEntityID {
 		return e.s.loadJukebox(saved), true
+	}
+	if id == bedEntityID {
+		return loadBed(saved), true
 	}
 	if id == enchantTableEntityID {
 		return &enchantTableEntity{saved: maps.Clone(saved)}, true

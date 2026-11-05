@@ -315,6 +315,14 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 
 // NeighbourChanged breaks a door that lost its other half or its support.
 func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uint32, layer uint8) {
+	if layer == 0 && IsBed(t.blocks, block) {
+		if from == BedOther(t.blocks, pos, block) && !bedWhole(t.blocks, r, pos, block) {
+			setAndUpdate(r, pos, t.blocks.Air())
+			return
+		}
+		t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
+		return
+	}
 	if layer != 0 || !IsDoor(t.blocks, block) || doorStands(t.blocks, r, pos, block) {
 		t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 		return

@@ -31,6 +31,7 @@ func gameRules(d *leveldat.Data) []protocol.GameRule {
 		{Name: "maxcommandchainlength", CanBeModifiedByPlayer: true, Value: uint32(d.MaxCommandChainLength)}, //nolint:gosec // game rule values are small
 		{Name: "mobgriefing", CanBeModifiedByPlayer: true, Value: d.MobGriefing},
 		{Name: "naturalregeneration", CanBeModifiedByPlayer: true, Value: d.NaturalRegeneration},
+		{Name: "playerssleepingpercentage", CanBeModifiedByPlayer: true, Value: uint32(d.PlayersSleepingPercentage)}, //nolint:gosec // game rule values are small
 		{Name: "projectilescanbreakblocks", CanBeModifiedByPlayer: true, Value: d.ProjectilesCanBreakBlocks},
 		{Name: "pvp", CanBeModifiedByPlayer: true, Value: d.PVP},
 		{Name: "randomtickspeed", CanBeModifiedByPlayer: true, Value: uint32(d.RandomTickSpeed)}, //nolint:gosec // game rule values are small

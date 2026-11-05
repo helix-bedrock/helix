@@ -53,6 +53,8 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickEffects()
 	p.tickHurt()
 	p.tickShield()
+	p.tickSleep()
+	p.reseat()
 	run := p.input.take()
 	for i, pk := range run {
 		if h := p.s.handlers.handler(pk.ID()); h != nil {

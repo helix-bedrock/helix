@@ -45,7 +45,13 @@ type Level struct {
 	NaturalRegeneration bool
 	// TNTExplodes, TNTExplosionDropDecay and DoTileDrops are the game rules explosions read.
 	TNTExplodes, TNTExplosionDropDecay, DoTileDrops bool
-	GameRules                                       []protocol.GameRule
+	// RespawnBlocksExplode, DoDayLightCycle and PlayersSleepingPercentage are the game rules
+	// beds read.
+	RespawnBlocksExplode, DoDayLightCycle bool
+	// DoEntityDrops is whether broken entities such as cushions leave their item.
+	DoEntityDrops             bool
+	PlayersSleepingPercentage int32
+	GameRules                 []protocol.GameRule
 }
 
 // HostConfig is what the server gives the players.
@@ -158,6 +164,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	h.ClearAllTuning()
 	conf.Overworld.SetEntityLoader(h.loadEntity)
 	conf.Overworld.SetBlockEntities(chestEntities{s: h})
+	h.global.run(func() { h.global.tick = h.sleepTick })
 	return h, nil
 }
 

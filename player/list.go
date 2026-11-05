@@ -25,6 +25,10 @@ type global struct {
 	order   []*Player // in the order they joined
 
 	list atomic.Pointer[[]*Player]
+
+	// tick runs on the global goroutine every tick after the queued work, if set before the
+	// first player joins.
+	tick func()
 }
 
 func newGlobal() *global {
@@ -76,6 +80,9 @@ func (g *global) loop() {
 		for i, fn := range in {
 			fn()
 			in[i] = nil
+		}
+		if g.tick != nil && !stopping {
+			g.tick()
 		}
 		if stopping {
 			return

@@ -19,6 +19,9 @@ const playerFamily = "player"
 // playerRidingOffset is what BDS's player constructor gives its riding offset component.
 const playerRidingOffset = -0.4
 
+// rideExitUp lifts a landing a little, as ride.Exit does.
+const rideExitUp = 0.001
+
 // vehicle is what a player can sit on: anything that keeps riders in the ride package and
 // is an entity. Minecarts are the first; mobs will be the same.
 type vehicle interface {
@@ -94,6 +97,10 @@ func letOff(v vehicle, p *Player) {
 		return
 	}
 	at := ride.Exit(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), e.Position(), v.rideMoved(), seat, v.rideTop())
+	if seats.Rules().Dismount == ride.DismountOnTopCenter {
+		pos := e.Position()
+		at = mgl32.Vec3{pos[0], v.rideTop() + p.RideBody().HeightOffset + rideExitUp, pos[2]}
+	}
 	applyMovement(p, moveTo(at, p.entity.Rotation(), p.entity.Tick()))
 }
 

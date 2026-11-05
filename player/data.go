@@ -18,6 +18,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 		return pos, rot, false
 	}
 	p.saved = data
+	p.reseatTicks = cushionReseatTicks
 	if mode, isInt := data["PlayerGameMode"].(int32); isInt {
 		p.gameMode = mode
 	}
@@ -29,6 +30,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 	}
 	p.inventory.load(data, func() int32 { return p.s.stackIDs.Add(1) })
 	p.uiLeftovers = p.inventory.takeUIItems(p.s.reg, func() int32 { return p.s.stackIDs.Add(1) }, !p.dead())
+	p.loadSpawn(data)
 	if seed, isInt := data[enchantSeedTag].(int32); isInt {
 		p.enchant.seed, p.enchant.seeded = seed, true
 	}
@@ -79,6 +81,7 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	p.abilities.save(data)
 	p.attributes.save(data)
 	p.inventory.save(data)
+	p.saveSpawn(data)
 	if p.enchant.seeded {
 		data[enchantSeedTag] = p.enchant.seed
 	}

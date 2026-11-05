@@ -66,6 +66,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useChest(r, u)
 	}
 	switch blocks.Name(u.Block) {
+	case blockuse.Bed, blockuse.StrawBed:
+		return p.useBed(r, u)
 	case jukeboxBlock:
 		return p.useJukebox(r, u)
 	case craftingTable:

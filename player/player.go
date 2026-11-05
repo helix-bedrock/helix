@@ -79,8 +79,13 @@ type Player struct {
 	// vehicle is what the player sits on, riding whether others see it so.
 	vehicle vehicle
 	riding  bool
-	window  windowState
-	using   usingState
+	// sleep is where the player is with sleeping, spawn its own respawn point (a bed).
+	sleep sleepState
+	spawn spawnPointState
+	// reseatTicks counts down the ticks a joining player looks for the cushion it left on.
+	reseatTicks int32
+	window      windowState
+	using       usingState
 	// pearlReady is the tick the player may throw an ender pearl again.
 	pearlReady int64
 	// thrownAt is the tick the player last threw something.

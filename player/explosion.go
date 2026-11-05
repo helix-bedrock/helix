@@ -613,7 +613,7 @@ type blastDrop struct {
 // high as more kinds of drops allow.
 func (s *Host) blastDrops(r *world.Region, block uint32, radius float32, pos cube.Pos, drops []blastDrop) []blastDrop {
 	items, _ := s.game.sys.Drops(s, block, &loot.Context{Explosion: true, Radius: radius})
-	items = s.shulkerDrops(r, pos, items)
+	items = s.blockEntityDrops(r, pos, items)
 	for _, it := range items {
 		limit := min(int(it.maxStack(s.reg)), dropStackStep*(len(drops)/dropStackEvery)+dropStackStep)
 		for i := range drops {
