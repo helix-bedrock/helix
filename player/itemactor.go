@@ -446,7 +446,6 @@ func (s *Host) clipSweep(r *world.Region, lo, hi mgl32.Vec3, axis int, d float32
 	} else {
 		sweepHi[axis] += d
 	}
-	blocks := s.reg.Blocks
 	for x := itemFloor(sweepLo[0]); x <= itemFloor(sweepHi[0]); x++ {
 		for y := itemFloor(sweepLo[1]); y <= itemFloor(sweepHi[1]); y++ {
 			for z := itemFloor(sweepLo[2]); z <= itemFloor(sweepHi[2]); z++ {
@@ -455,7 +454,7 @@ func (s *Host) clipSweep(r *world.Region, lo, hi mgl32.Vec3, axis int, d float32
 					return 0
 				}
 				origin := mgl32.Vec3{float32(x), float32(y), float32(z)}
-				for _, box := range blocks.Properties(b).Collision {
+				for _, box := range s.boxesFor(r, cube.Pos{x, y, z}, b, lo, hi) {
 					d = clipBox(lo, hi, origin, box, axis, d)
 				}
 			}

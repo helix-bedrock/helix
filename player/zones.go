@@ -51,6 +51,14 @@ func (p *Player) setRadius(radius int32) {
 	p.moveZones(pos)
 }
 
+// viewRadius is the player's view radius in chunks, 0 until it asks for one. Runs: anywhere.
+func (p *Player) viewRadius() int32 {
+	z := &p.zone
+	z.mu.Lock()
+	defer z.mu.Unlock()
+	return z.radius
+}
+
 // blockPosOf is the block a position is in.
 func blockPosOf(pos mgl32.Vec3) protocol.BlockPos {
 	return protocol.BlockPos{floorInt(pos[0]), floorInt(pos[1]), floorInt(pos[2])}

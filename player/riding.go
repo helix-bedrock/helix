@@ -93,7 +93,7 @@ func letOff(v vehicle, p *Player) {
 	if r == nil {
 		return
 	}
-	at := ride.Exit(rideBlocks{p.s.reg.Blocks, r}, p.RideBody(), e.Position(), v.rideMoved(), seat, v.rideTop())
+	at := ride.Exit(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), e.Position(), v.rideMoved(), seat, v.rideTop())
 	applyMovement(p, moveTo(at, p.entity.Rotation(), p.entity.Tick()))
 }
 
@@ -146,6 +146,7 @@ func (p *Player) showSeat(on bool) {
 
 // rideBlocks is the world for the search for a place to land.
 type rideBlocks struct {
+	s      *Host
 	blocks *registry.Blocks
 	r      *world.Region
 }
@@ -156,7 +157,7 @@ func (b rideBlocks) Boxes(pos cube.Pos) []registry.Box {
 	if !ok {
 		return []registry.Box{{0, 0, 0, 1, 1, 1}}
 	}
-	return b.blocks.Properties(s).Collision
+	return b.s.boxesAt(b.r, pos, s)
 }
 
 // PassThrough is ignoredExitCollisionBlock: open doors, trapdoors and gates, scaffolding

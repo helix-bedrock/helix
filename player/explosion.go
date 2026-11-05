@@ -393,7 +393,6 @@ func exposureOffset(step float32) float32 {
 // rayBlocked walks the blocks from one point to another and reports whether a collision
 // box is in the way. Blocks not loaded do not block.
 func (s *Host) rayBlocked(r *world.Region, from, to mgl32.Vec3) bool {
-	blocks := s.reg.Blocks
 	var pos, end, step [3]int
 	var next, delta, a, d [3]float64
 	for n := range 3 {
@@ -413,7 +412,7 @@ func (s *Host) rayBlocked(r *world.Region, from, to mgl32.Vec3) bool {
 		if !ok {
 			return false
 		}
-		for _, box := range blocks.Properties(b).Collision {
+		for _, box := range s.boxesAt(r, cube.Pos{pos[0], pos[1], pos[2]}, b) {
 			if segmentHits(a, d, pos, box) {
 				return true
 			}

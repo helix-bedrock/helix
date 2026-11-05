@@ -814,7 +814,6 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 			next[n] = math.Inf(1)
 		}
 	}
-	blocks := s.reg.Blocks
 	for range projectileClipLimit {
 		at := cube.Pos{pos[0], pos[1], pos[2]}
 		b, ok := r.Block(at, 0)
@@ -823,7 +822,7 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 		}
 		best, found := 2.0, false
 		var bestLo, bestHi mgl32.Vec3
-		for _, box := range blocks.Properties(b).Collision {
+		for _, box := range s.boxesAt(r, at, b) {
 			lo := mgl32.Vec3{float32(at[0]) + box[0], float32(at[1]) + box[1], float32(at[2]) + box[2]}
 			hi := mgl32.Vec3{float32(at[0]) + box[3], float32(at[1]) + box[4], float32(at[2]) + box[5]}
 			if v, hits := segmentEntersBox(from, to, lo, hi); hits && v < best {
@@ -939,7 +938,7 @@ func (t *Projectile) heldBy(r *world.Region, pos mgl32.Vec3) bool {
 	if !ok {
 		return true
 	}
-	for _, box := range t.s.reg.Blocks.Properties(b).Collision {
+	for _, box := range t.s.boxesAt(r, t.stuckAt, b) {
 		at := t.stuckAt
 		lo := mgl32.Vec3{float32(at[0]) + box[0], float32(at[1]) + box[1], float32(at[2]) + box[2]}
 		hi := mgl32.Vec3{float32(at[0]) + box[3], float32(at[1]) + box[4], float32(at[2]) + box[5]}

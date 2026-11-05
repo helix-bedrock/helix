@@ -9,7 +9,7 @@ import (
 // The shape rules of the blocks whose collision BDS 1.26.60 computes in code
 // (helix-data's bds/collision.json names each block's rule). Rules that
 // read only the block's own state are applied once when the registry is
-// built; the others (doors) need the world and leave the state marked
+// built; the others (doors, scaffolding) need the world and leave the state marked
 // CollisionComputed. Research notes are private.
 
 // The heights BDS gives fences, fence gates and walls: higher than a block,
@@ -52,6 +52,8 @@ func stateRule(rule string) func(name string, s map[string]any) []Box {
 		return fenceGateShape
 	case "carpet":
 		return carpetShape
+	case "shulker_box":
+		return shulkerShape
 	}
 	return moreRule(rule)
 }
@@ -260,24 +262,42 @@ func carpetShape(string, map[string]any) []Box {
 	return []Box{{0, 0, 0, 1, 0.0625, 1}}
 }
 
+// shulkerShape is a whole block. BDS grows it to the box its open lid fills (0xD525530), which
+// Helix does not keep yet, so an open one is the same.
+func shulkerShape(string, map[string]any) []Box {
+	return []Box{{0, 0, 0, 1, 1, 1}}
+}
+
+// doorPanels are the four places BDS puts a door's panel, in the order of its table.
+var doorPanels = [4]Box{
+	{0, 0, 0, 1, 1, trapdoorThin},
+	{1 - trapdoorThin, 0, 0, 1, 1, 1},
+	{0, 0, 1 - trapdoorThin, 1, 1, 1},
+	{0, 0, 0, trapdoorThin, 1, 1},
+}
+
 // Door returns a door's box from its lower and upper half: a thin panel at
 // the side its direction, open state and hinge put it. The lower half
 // holds the direction and open state, the upper the hinge.
 func Door(lower, upper map[string]any) Box {
-	const thin, far = 0.1825, 0.8175
-	panels := [4]Box{
-		{0, 0, 0, 1, 1, thin},
-		{far, 0, 0, 1, 1, 1},
-		{0, 0, far, 1, 1, 1},
-		{0, 0, 0, thin, 1, 1},
-	}
+	return doorPanels[doorPanel(lower, upper)]
+}
+
+// DoorBoxes is Door as a list of boxes, for what reads every shape alike. The list is
+// shared and allocates nothing: do not change it.
+func DoorBoxes(lower, upper map[string]any) []Box {
+	n := doorPanel(lower, upper)
+	return doorPanels[n : n+1 : n+1]
+}
+
+func doorPanel(lower, upper map[string]any) int {
 	dir := cardinalOf(lower)
 	hinge := num(upper, "door_hinge_bit")
 	if num(lower, "open_bit") == 0 {
-		return panels[(dir+3)%4]
+		return (dir + 3) % 4
 	}
 	if dir >= 2 {
 		hinge ^= 1
 	}
-	return panels[2*hinge+dir%2]
+	return 2*hinge + dir%2
 }

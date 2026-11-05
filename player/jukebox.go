@@ -8,6 +8,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -30,6 +31,9 @@ const (
 	jukeboxSecondsInTick = 0.05
 	jukeboxNoteHeight    = 1.2
 	jukeboxNoteParticle  = "minecraft:note_particle"
+	// jukeboxExtraReach is added to a player's view radius to get how far off, along the
+	// ground, BDS lets them hear a song (0xA141110, 0xCDC3AF0).
+	jukeboxExtraReach = 46
 )
 
 // loadDiscs reads the music discs.
@@ -41,8 +45,9 @@ func loadDiscs() (map[string]data.MusicDisc, error) {
 	return discs, nil
 }
 
-// jukeboxEntity is a jukebox's block entity. The client plays the song itself when this
-// reaches it with a disc not finished, and stops when the disc is gone.
+// jukeboxEntity is a jukebox's block entity. BDS sends the song itself as a sound with a handle
+// (0xD41E080), to each player in reach, and stops it through the handle; the block entity data
+// does not start it.
 type jukeboxEntity struct {
 	s      *Host
 	saved  map[string]any
@@ -52,6 +57,10 @@ type jukeboxEntity struct {
 	ticks     int64
 	sinceNote int32
 	finished  bool
+	// handle names the song to clients, and hearing is who was sent it.
+	handle  uint64
+	hearing map[*Player]struct{}
+	near    []*world.Entity
 }
 
 // loadJukebox brings a jukebox back as BDS does: with its disc, not playing.
@@ -107,15 +116,99 @@ func (e *jukeboxEntity) insert(r *world.Region, pos cube.Pos, disc ItemStack) {
 	e.record, e.ticks, e.sinceNote, e.finished = disc, 0, 0, false
 	e.setPower(r, pos, jukeboxPower)
 	r.SendBlockEntity(pos)
+	e.handle = e.s.soundHandles.Add(1)
+	e.hearing = make(map[*Player]struct{})
+	e.updateHearing(r, pos)
 }
 
-// eject throws the disc out at the first free block around, as BDS does. Clients stop
-// the song when they get the jukebox without it.
+// updateHearing is BDS's sound range (0xCDDB7A0): a player who came into reach is sent the song
+// from where it has got to, and one who went out of reach has it stopped. Only one who started
+// it with the jukebox is told that a record started.
+func (e *jukeboxEntity) updateHearing(r *world.Region, pos cube.Pos) {
+	disc, ok := e.s.discs[e.record.Name]
+	if !ok {
+		return
+	}
+	centre := blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
+	reach := float32(e.s.viewDistance + jukeboxExtraReach)
+	e.near = r.AppendEntitiesIn(e.near[:0], centre[0]-reach, centre[2]-reach, centre[0]+reach, centre[2]+reach)
+	started := e.ticks == 0
+	for _, o := range e.near {
+		p, ok := o.Owner().(*Player)
+		if !ok {
+			continue
+		}
+		_, heard := e.hearing[p]
+		in := p.hearsAt(centre)
+		switch {
+		case in && !heard:
+			e.hearing[p] = struct{}{}
+			p.send(e.songPacket(disc.Sound, centre, started))
+			if started {
+				p.send(&packet.RecordStarted{Position: blockPosOf(blockVec(pos)), Handle: e.handle})
+			}
+			p.flush()
+		case !in && heard:
+			delete(e.hearing, p)
+			p.send(e.stopPacket())
+			p.flush()
+		}
+	}
+	// One who left the region or the game has no way to hear it any more.
+	for p := range e.hearing {
+		if p.entity == nil || p.entity.Region() != r {
+			delete(e.hearing, p)
+		}
+	}
+	clear(e.near)
+}
+
+// songPacket is the song as BDS sends it: at the middle of the block, at full volume and from
+// where it has got to for one who comes late.
+func (e *jukeboxEntity) songPacket(sound string, centre mgl32.Vec3, fromStart bool) *packet.PlaySound {
+	pk := &packet.PlaySound{
+		SoundName: sound, Position: centre, Volume: 1, Pitch: 1, BypassListenerRangeCheck: true,
+		Handle: protocol.Option(e.handle),
+	}
+	if !fromStart {
+		pk.PlaybackPositionSeconds = protocol.Option(float32(float64(e.ticks) * jukeboxSecondsInTick))
+	}
+	return pk
+}
+
+func (e *jukeboxEntity) stopPacket() *packet.ClientboundUpdateSoundData {
+	return &packet.ClientboundUpdateSoundData{ServerSoundHandle: e.handle, Update: protocol.SoundDataUpdate{Type: protocol.SoundDataUpdateStop}}
+}
+
+// stopSong stops the song for everyone sent it (0xCDDC510, sent out by 0xCDDA990).
+func (e *jukeboxEntity) stopSong(r *world.Region) {
+	for p := range e.hearing {
+		if p.entity != nil && p.entity.Region() == r {
+			p.send(e.stopPacket())
+			p.flush()
+		}
+	}
+	e.hearing = nil
+}
+
+// hearsAt reports whether a sound at centre is in the player's reach, along the ground.
+func (p *Player) hearsAt(centre mgl32.Vec3) bool {
+	if p.entity == nil {
+		return false
+	}
+	at := p.entity.Position()
+	dx, dz := at[0]-centre[0], at[2]-centre[2]
+	reach := float32(p.viewRadius() + jukeboxExtraReach)
+	return dx*dx+dz*dz <= reach*reach
+}
+
+// eject stops the song and throws the disc out at the first free block around, as BDS does.
 func (e *jukeboxEntity) eject(r *world.Region, pos cube.Pos) {
 	if e.record.Empty() {
 		return
 	}
 	disc := e.record
+	e.stopSong(r)
 	e.record, e.ticks, e.sinceNote, e.finished = ItemStack{}, 0, 0, false
 	e.setPower(r, pos, 0)
 	e.s.throwDrops(r, []BlockDrop{NewBlockDrop(e.freeSpot(r, pos), disc)})
@@ -127,7 +220,7 @@ func (e *jukeboxEntity) eject(r *world.Region, pos cube.Pos) {
 func (e *jukeboxEntity) freeSpot(r *world.Region, pos cube.Pos) cube.Pos {
 	for _, off := range [...]cube.Pos{{0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {1, 0, 0}, {-1, 0, 0}, {0, -1, 0}} {
 		at := pos.Add(off)
-		if b, ok := r.Block(at, 0); ok && len(e.s.reg.Blocks.Properties(b).Collision) == 0 {
+		if b, ok := r.Block(at, 0); ok && len(e.s.boxesAt(r, at, b)) == 0 {
 			return at
 		}
 	}
@@ -140,6 +233,7 @@ func (e *jukeboxEntity) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 		return
 	}
 	disc := e.record
+	e.stopSong(r)
 	e.record = ItemStack{}
 	e.s.throwDrops(r, []BlockDrop{NewBlockDrop(e.freeSpot(r, pos), disc)})
 }
@@ -161,6 +255,7 @@ func (e *jukeboxEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		return
 	}
 	if float64(disc.Seconds) >= float64(e.ticks)*jukeboxSecondsInTick {
+		e.updateHearing(r, pos)
 		r.Broadcast(pos, &packet.SpawnParticleEffect{
 			EntityUniqueID: -1,
 			Position:       blockVec(pos).Add(mgl32.Vec3{0.5, jukeboxNoteHeight, 0.5}),
@@ -169,6 +264,7 @@ func (e *jukeboxEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		return
 	}
 	e.finished = true
+	e.stopSong(r)
 	e.setPower(r, pos, 0)
 	r.SendBlockEntity(pos)
 }

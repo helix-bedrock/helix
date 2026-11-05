@@ -680,7 +680,7 @@ func (c *Chest) canOpen(r *world.Region, pos cube.Pos) bool {
 	if !ok || c.s.chests.clear[above] {
 		return true
 	}
-	for _, box := range c.s.reg.Blocks.Properties(above).Collision {
+	for _, box := range c.s.boxesAt(r, pos.Side(cube.FaceUp), above) {
 		if chestLidHits(box) {
 			return false
 		}

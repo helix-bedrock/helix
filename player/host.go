@@ -68,7 +68,9 @@ type HostConfig struct {
 // they run on.
 type Host struct {
 	// enchantIDs numbers enchanting tables' options.
-	enchantIDs   atomic.Uint32
+	enchantIDs atomic.Uint32
+	// soundHandles numbers the sounds that are stopped later.
+	soundHandles atomic.Uint64
 	log          *slog.Logger
 	reg          *registry.Registry
 	recipes      crafting.Book
