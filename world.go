@@ -156,9 +156,7 @@ func (s *Server) closeWorld() error {
 		// level.dat keeps the world's tick, which saved tick times count in.
 		if s.db != nil {
 			s.db.LevelDat().CurrentTick = s.ticker.CurrentTick()
-			if s.clock != nil {
-				errs = append(errs, s.saveClock())
-			}
+			errs = append(errs, s.saveClock())
 		}
 		s.ticker.Close()
 	}
@@ -192,9 +190,27 @@ func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	}
 }
 
+// saveLevel writes level.dat with the world tick and the time as they are now.
+func (s *Server) saveLevel() error {
+	if s.db == nil {
+		return nil
+	}
+	s.db.LevelDat().CurrentTick = s.ticker.CurrentTick()
+	if err := s.saveClock(); err != nil {
+		return err
+	}
+	if err := s.db.SaveLevelDat(); err != nil {
+		return fmt.Errorf("helix: %w", err)
+	}
+	return nil
+}
+
 // saveClock keeps the time as BDS does: the Time in level.dat, which is what it reads back, and
 // the WorldClocks key.
 func (s *Server) saveClock() error {
+	if s.clock == nil {
+		return nil
+	}
 	time := s.clock.Time()
 	s.db.LevelDat().Time = int64(time)
 	value, err := nbt.MarshalEncoding(map[string]any{"clocks": []any{map[string]any{

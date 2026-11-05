@@ -105,6 +105,20 @@ func (q *tickQueue) load(ticks []chunk.ScheduledBlockUpdate, clock int64) {
 	}
 }
 
+// rebase moves the queue back to now if its clock is ahead of it, which happens when the world
+// tick went back because the server was killed before saving it. Each tick keeps how long it had
+// left: otherwise it would wait for however long was lost. Beyond BDS, and only for this.
+func (q *tickQueue) rebase(now int64) {
+	ahead := q.clock - now
+	if ahead <= 0 {
+		return
+	}
+	q.clock = now
+	for i := range q.ticks {
+		q.ticks[i].time -= ahead
+	}
+}
+
 // save returns the queue as the world library stores it, in heap order as
 // BDS saves it.
 func (q *tickQueue) save() []chunk.ScheduledBlockUpdate {

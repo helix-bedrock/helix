@@ -27,6 +27,8 @@ type testWorld struct {
 	d        *world.Dimension
 	// fell is every block the circuit broke.
 	fell chan cube.Pos
+	// leave is the viewer holding the zone, for tests that make it go.
+	leave *world.Viewer
 }
 
 func openWorld(t *testing.T) *testWorld {
@@ -79,6 +81,7 @@ func openWorld(t *testing.T) *testWorld {
 	case <-time.After(10 * time.Second):
 		t.Fatal("zone never loaded")
 	}
+	w.leave = v
 	w.d, w.circuits = d, circuits
 	return w
 }

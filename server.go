@@ -302,18 +302,8 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
 	}
 	defer host.Close(packet.DisconnectReasonShutdown)
-	clocks := time.NewTicker(clockSyncTicks * world.TickDuration)
-	defer clocks.Stop()
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-clocks.C:
-				host.SyncClocks()
-			}
-		}
-	}()
+	stopPeriodic := s.startPeriodic(host)
+	defer stopPeriodic()
 	if err := s.openTransports(); err != nil {
 		_ = s.listener.Close()
 		return err
@@ -555,5 +545,37 @@ func (s *Server) SetTime(time int32) {
 	s.clock.Set(time)
 	if host := s.players.Load(); host != nil {
 		host.SyncClocks()
+	}
+}
+
+// levelSaveInterval is how often level.dat is written while running, so being killed loses little.
+const levelSaveInterval = 30 * time.Second
+
+// startPeriodic runs what happens every so often outside any tick: telling clients the time and
+// saving level.dat. The func it returns stops it and waits, so closing the world follows it.
+func (s *Server) startPeriodic(host *player.Host) (stop func()) {
+	quit, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		clocks := time.NewTicker(clockSyncTicks * world.TickDuration)
+		defer clocks.Stop()
+		saves := time.NewTicker(levelSaveInterval)
+		defer saves.Stop()
+		for {
+			select {
+			case <-quit:
+				return
+			case <-clocks.C:
+				host.SyncClocks()
+			case <-saves.C:
+				if err := s.saveLevel(); err != nil {
+					s.log.Error("Save level.dat", "err", err)
+				}
+			}
+		}
+	}()
+	return func() {
+		close(quit)
+		<-done
 	}
 }

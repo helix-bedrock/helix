@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -147,4 +148,17 @@ func TestBlockTicks(t *testing.T) {
 			t.Error("the scheduled tick was not saved")
 		}
 	})
+}
+
+func TestTickQueueRebase(t *testing.T) {
+	var q tickQueue
+	q.load([]chunk.ScheduledBlockUpdate{{Pos: cube.Pos{1, 2, 3}, Block: 7, Tick: 10020}}, 10000)
+	q.rebase(20000)
+	if q.clock != 10000 || q.ticks[0].time != 10020 {
+		t.Errorf("a clock behind the world moved: %d, %d", q.clock, q.ticks[0].time)
+	}
+	q.rebase(500)
+	if q.clock != 500 || q.ticks[0].time != 520 {
+		t.Errorf("after the world tick went back: clock %d, tick at %d, want 500 and 520", q.clock, q.ticks[0].time)
+	}
 }

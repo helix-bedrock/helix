@@ -371,6 +371,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	}
 	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1}
 	c.ticks.load(col.ScheduledBlocks, col.Tick)
+	c.ticks.rebase(r.d.sched.CurrentTick())
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)
 	col.ScheduledBlocks, col.RandomTicks = nil, nil
 	r.chunks[pos] = c
