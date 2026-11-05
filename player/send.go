@@ -14,6 +14,9 @@ import (
 // connection is gone: the read loop sees it and the player leaves, so
 // it is logged once, not per packet. Runs: anywhere.
 func (p *Player) send(pks ...packet.Packet) bool {
+	if p.conn == nil {
+		return true // a player with no client to tell, as in tests
+	}
 	for _, pk := range pks {
 		if err := p.conn.WritePacket(pk); err != nil {
 			p.logSendError(err, pk)
@@ -26,6 +29,9 @@ func (p *Player) send(pks ...packet.Packet) bool {
 // sendNow sends packets and flushes them at once, for code that is not on
 // a region tick (the network goroutine, the global owner). Runs: anywhere.
 func (p *Player) sendNow(pks ...packet.Packet) bool {
+	if p.conn == nil {
+		return true
+	}
 	if !p.send(pks...) {
 		return false
 	}

@@ -62,8 +62,7 @@ const (
 // taken from a slot the server checked and is never replaced by anything a
 // client sends. Runs: owner of its entity.
 //
-// First pass from BDS 1.26.60: items do not burn in lava or fire and are not
-// pushed out of a block placed on them.
+// First pass from BDS 1.26.60: items do not burn in lava or fire.
 type ItemActor struct {
 	s      *Host
 	entity *world.Entity
@@ -72,6 +71,8 @@ type ItemActor struct {
 
 	age, pickupDelay, throwTime int32
 	onGround, taken             bool
+	// noClip is its collision being off while it rises out of closed-in blocks.
+	noClip bool
 	// saved keeps what BDS saved for the item that Helix does not use (its
 	// health, owner and the actor fields), written back as it was.
 	saved map[string]any
@@ -270,6 +271,9 @@ func (i *ItemActor) tick(e *world.Entity) {
 	if i.taken {
 		return
 	}
+	// BDS looks from the bottom of the box; its position is half the box above that.
+	centre := e.Position()
+	i.pushOut(r, e, mgl32.Vec3{centre[0], centre[1] - itemHalfSize, centre[2]}, centre)
 	rest := i.onGround && i.vel.Dot(i.vel) <= itemRestSpeed && !inWater && i.age%itemRestTicks != 0
 	if !rest {
 		if gravity {
@@ -399,6 +403,9 @@ func (i *ItemActor) moveAndDrag(r *world.Region, e *world.Entity) {
 // the blocks, and stops the velocity on x and z where it hit. hitY reports a
 // hit on the y axis; the caller still needs the velocity's sign.
 func (i *ItemActor) collide(r *world.Region, pos mgl32.Vec3) (out mgl32.Vec3, hitY bool) {
+	if i.noClip {
+		return pos.Add(i.vel), false
+	}
 	for _, axis := range [...]int{1, 0, 2} {
 		d := i.clip(r, pos, axis, i.vel[axis])
 		if d != i.vel[axis] {

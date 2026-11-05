@@ -781,12 +781,18 @@ func (p *Player) tickChest() {
 	if r == nil {
 		return
 	}
-	at := blockVec(p.window.chestPos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
-	if m := p.window.cart; m != nil {
-		at = m.entity.Position()
+	// Checked first, since only then may the cart be read: BDS measures to the middle of the
+	// block a cart is in (0xBC30280).
+	gone := p.windowChest(r) == nil
+	if !gone {
+		at := p.window.chestPos
+		if m := p.window.cart; m != nil {
+			at = floorPos(m.entity.Position())
+		}
+		d := p.entity.Position().Sub(blockVec(at).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
+		gone = d.Dot(d) > chestViewRange*chestViewRange
 	}
-	d := p.entity.Position().Sub(at)
-	if p.windowChest(r) == nil || d.Dot(d) > chestViewRange*chestViewRange {
+	if gone {
 		p.leaveChest(r, true)
 		p.flush()
 	}

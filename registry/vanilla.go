@@ -183,6 +183,17 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
+	push, err := data.BlockPushData()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	pushes, stairs := make(map[string]bool, len(push.Solid)), make(map[string]bool, len(push.Stairs))
+	for _, n := range push.Solid {
+		pushes[n] = true
+	}
+	for _, n := range push.Stairs {
+		stairs[n] = true
+	}
 	climb, err := data.Climbable()
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
@@ -244,7 +255,7 @@ func vanillaBlocks(s *Setup) error {
 			LightEmission: p.LightEmission.At(i), LightDampening: p.LightDampening.At(i),
 			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i),
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
-			Climbable: climbable[st.Name], Material: materials[st.Name],
+			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name],
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)

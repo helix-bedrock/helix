@@ -252,6 +252,8 @@ func (o *XPOrb) tick(e *world.Entity) {
 		vel[2] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
 		r.Broadcast(floorPos(e.Position()), &packet.LevelSoundEvent{SoundType: packet.SoundEventFizz, Position: e.Position()}, nil)
 	}
+	// BDS gives an orb's position as it is, where it takes half the box off an item's.
+	o.body.pushOut(r, e, e.Position(), e.Position())
 	pos, hitY := o.body.collide(r, e.Position())
 	onGround := hitY && vel[1] < 0
 	if hitY {

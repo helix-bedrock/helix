@@ -58,6 +58,11 @@ type Properties struct {
 	Climbable bool
 	// Material is BDS's MaterialType of the block (0 air, 5 water, 6 lava).
 	Material uint8
+	// PushesOut is BDS's flag for a block that pushes items and orbs out of itself and
+	// counts as a closed side when they look for a way out.
+	PushesOut bool
+	// Stairs is BDS's flag for stairs, which push them out more slowly.
+	Stairs bool
 	// SolidMaterial is set when the block's material is solid.
 	SolidMaterial bool
 	// LiquidReaction is what a liquid flowing into the block does.

@@ -4,6 +4,7 @@ import (
 	"maps"
 	"math"
 	"math/rand/v2"
+	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/ride"
@@ -138,8 +139,11 @@ type cartSpec struct {
 	id string
 	// block is the item its block drops as, empty for a plain cart.
 	block string
-	// size and window are its slots, if it has any.
+	// machine is its slots, if it has any. Its window is what the cart says it holds;
+	// opens is the window the client is told to open, which BDS sets apart (0x737E270):
+	// a chest cart opens a plain container and a hopper cart a hopper.
 	machine *machineSpec
+	opens   byte
 	rides   bool
 	hopper  bool
 	tnt     bool
@@ -147,8 +151,8 @@ type cartSpec struct {
 
 var cartSpecs = map[string]*cartSpec{
 	nameMinecart:      {id: nameMinecart, rides: true},
-	nameChestMinecart: {id: nameChestMinecart, block: "minecraft:chest", machine: &machineSpec{id: "Chest", size: chestSize, window: byte(protocol.ContainerTypeCartChest)}},
-	nameHopperMinecart: {id: nameHopperMinecart, block: "minecraft:hopper", hopper: true,
+	nameChestMinecart: {id: nameChestMinecart, block: "minecraft:chest", opens: byte(protocol.ContainerTypeContainer), machine: &machineSpec{id: "Chest", size: chestSize, window: byte(protocol.ContainerTypeCartChest)}},
+	nameHopperMinecart: {id: nameHopperMinecart, block: "minecraft:hopper", hopper: true, opens: byte(protocol.ContainerTypeHopper),
 		machine: &machineSpec{id: "Hopper", size: 5, window: byte(protocol.ContainerTypeCartHopper)}},
 	nameTNTMinecart: {id: nameTNTMinecart, block: nameTNT, tnt: true},
 }
@@ -299,6 +303,7 @@ func (m *Minecart) tick(e *world.Entity) {
 		return
 	}
 	m.settleRiders()
+	m.dropGoneViewers(r)
 	start := e.Position()
 	m.preTick(r, e, start)
 	pos := m.move(r, start)
@@ -1042,18 +1047,29 @@ func (m *Minecart) settleRiders() {
 	}
 }
 
-// openCart opens the cart's slots for the player, as a chest but held by an entity.
+// openCart opens the cart's slots for the player, as BDS's ContainerComponent (0x737E1B0,
+// 0x737E270) then its window (0x4A43A40): refused without the ability, for one who is dead or
+// has a window open, and for a cart that is gone. The window names the block the cart is in
+// and the cart.
 func (p *Player) openCart(m *Minecart) {
 	r := p.entity.Region()
 	w := &p.window
-	if r == nil || w.open || m.chest == nil || !p.abilities.Flag(AbilityOpenContainers) {
+	if r == nil || w.open || m.gone || m.chest == nil || p.dead() || !p.abilities.Flag(AbilityOpenContainers) || m.entity.Region() != r {
 		return
+	}
+	at := floorPos(m.entity.Position())
+	if g := p.s.game; g.chestOpenEv.Has() {
+		e := ChestOpenEvent{Player: p, Region: r, Chest: m.chest, Pos: at}
+		g.chestOpenEv.fire(p.s.log, &e)
+		if e.Blocked || e.Cancelled() {
+			return
+		}
 	}
 	w.nextID()
 	w.open, w.chest, w.cart, w.chestDim = true, true, m, r.Dimension()
 	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: m.chest.windowType(),
-		ContainerPosition:       blockPosOf(m.entity.Position()),
+		WindowID: w.id, ContainerType: m.spec.opens,
+		ContainerPosition:       protocol.BlockPos{int32(at[0]), int32(at[1]), int32(at[2])}, //nolint:gosec // block coordinates fit int32
 		ContainerEntityUniqueID: m.entity.UniqueID(),
 	})
 	p.send(&packet.InventoryContent{WindowID: uint32(w.id), Content: p.chestContent(r, m.chest)})
@@ -1061,15 +1077,31 @@ func (p *Player) openCart(m *Minecart) {
 	m.chest.addViewer(r, p)
 }
 
-// windowChest is the chest the player has open, whatever holds it. Nil if it is gone.
+// windowChest is the chest the player has open, whatever holds it. Nil if it is gone. A cart
+// also counts as gone once it is not in this region, unloaded or handed on: another core owns
+// its slots then, and the items in memory may already be saved, so taking them would make
+// more.
 func (p *Player) windowChest(r *world.Region) *Chest {
 	if m := p.window.cart; m != nil {
-		if m.gone {
+		if m.gone || m.entity.Region() != r {
 			return nil
 		}
 		return m.chest
 	}
 	return p.s.chestAt(r, p.window.chestPos)
+}
+
+// dropGoneViewers lets go of those who have the cart open but are in no region with it, who
+// cannot do so themselves.
+func (m *Minecart) dropGoneViewers(r *world.Region) {
+	if m.chest == nil || len(m.chest.viewers) == 0 {
+		return
+	}
+	for _, v := range slices.Clone(m.chest.viewers) {
+		if v.entity == nil || v.entity.Region() != r {
+			m.chest.removeViewer(r, v)
+		}
+	}
 }
 
 // cartNear finds a minecart near the player by its runtime ID.
