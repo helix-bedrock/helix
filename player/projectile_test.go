@@ -150,3 +150,16 @@ func TestProjectileStartsBelowEyes(t *testing.T) {
 		t.Errorf("starts at %v", got)
 	}
 }
+
+// Near by BDS gives Ticks 0; at its far distance, three quarters of the dropped ticks.
+func TestProjectileMoveTicks(t *testing.T) {
+	s := ProjectileSpec{MoveDroppedTicks: 7, MoveFarDistance: 80}
+	for _, c := range []struct {
+		dist float32
+		want int64
+	}{{0, 0}, {10, 0}, {16, 1}, {40, 2}, {80, 5}, {500, 5}} {
+		if got := s.moveTicks(c.dist); got != c.want {
+			t.Errorf("at %v: %d, want %d", c.dist, got, c.want)
+		}
+	}
+}

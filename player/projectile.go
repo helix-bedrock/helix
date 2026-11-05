@@ -44,6 +44,12 @@ const (
 	projectileScan = 3
 	// projectileClipLimit is how many blocks one tick's flight walks at most, BDS's 200.
 	projectileClipLimit = 200
+	// projectileMoveDropped and projectileMoveFar are BDS's defaults for a definition's
+	// conditional bandwidth optimization, and projectileMoveTicksShare the part of its dropped
+	// ticks BDS uses.
+	projectileMoveDropped    = 10
+	projectileMoveFar        = 80
+	projectileMoveTicksShare = 0.75
 	// projectileMoveMin and projectileRestMin are squared distances, projectileTurnMin degrees:
 	// BDS's limits on when a move is worth sending.
 	projectileMoveMin = 0.0001
@@ -133,6 +139,9 @@ type ProjectileSpec struct {
 	Knockback bool
 	// RemoveOnHit removes it after any hit, and DestroyOnHit after hitting an entity.
 	RemoveOnHit, DestroyOnHit bool
+	// MoveDroppedTicks and MoveFarDistance say how seldom far players get its moves.
+	MoveDroppedTicks int32
+	MoveFarDistance  float32
 	// Stick leaves it in the block it hits, shaking for ShakeTicks.
 	Stick      bool
 	ShakeTicks int32
@@ -198,6 +207,14 @@ const (
 	projectileLiquidInertia = 0.6
 )
 
+// projectileBandwidth is the part of a definition that says how often far players get moves.
+type projectileBandwidth struct {
+	Default struct {
+		Dropped int32   `json:"max_dropped_ticks"`
+		Far     float32 `json:"max_optimized_distance"`
+	} `json:"default_values"`
+}
+
 // ticksPerShakeSecond turns a definition's shake time into ticks.
 const ticksPerShakeSecond = 20
 
@@ -228,7 +245,15 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 			return ProjectileSpec{}, fmt.Errorf("player: projectile %s: %w", id, err)
 		}
 	}
+	band := projectileBandwidth{}
+	band.Default.Dropped, band.Default.Far = projectileMoveDropped, projectileMoveFar
+	if rawBand, has := d.Entity.Components["minecraft:conditional_bandwidth_optimization"]; has {
+		if err := json.Unmarshal(rawBand, &band); err != nil {
+			return ProjectileSpec{}, fmt.Errorf("player: projectile %s: %w", id, err)
+		}
+	}
 	s := ProjectileSpec{
+		MoveDroppedTicks: band.Default.Dropped, MoveFarDistance: band.Default.Far,
 		ID: id, Width: box.Width, Height: box.Height, Power: c.Power, Gravity: c.Gravity,
 		Inertia: projectileInertia, LiquidInertia: projectileLiquidInertia,
 		UncertaintyBase: c.UncertaintyBase, UncertaintyPerDifficulty: c.UncertaintyMult,
@@ -306,10 +331,12 @@ type Projectile struct {
 	pickup   arrowPickup
 	item     ItemStack
 
-	// sentPos, sentRot and sentTick are the last move the players who see it were told.
-	sentPos  mgl32.Vec3
-	sentRot  world.Rotation
-	sentTick int64
+	// sentPos, sentRot and sentGround are the last move those who see it were told, and sentTo
+	// the tick each of them last got one.
+	sentPos    mgl32.Vec3
+	sentRot    world.Rotation
+	sentGround bool
+	sentTo     map[*world.Entity]int64
 	// stuckMoveDue is the move BDS always sends on the tick after it sticks.
 	stuckMoveDue bool
 	// ticked and shown count off its start: BDS makes every projectile invisible when it is
@@ -425,15 +452,18 @@ func (t *Projectile) movePacket(e *world.Entity) packet.Packet {
 	if moved <= projectileMoveMin && turned <= projectileTurnMin && (moved <= projectileRestMin || speed >= projectileRestMin) {
 		return nil
 	}
-	return t.delta(e)
+	t.sendDelta(e)
+	return nil
 }
 
-// delta is BDS's MoveActorDelta (0x8ce8c80): only the fields that changed since the last one,
-// and no head rotation, which only mobs have. Ticks is how long since the last one, as read
-// from BDS's per-player count; Helix sends to every player alike.
-func (t *Projectile) delta(e *world.Entity) *packet.MoveActorDelta {
+// sendDelta is BDS's MoveActorDelta (0x8ce8c80): only the fields that changed since the last
+// one, and no head rotation, which only mobs have. What differs per player is how far they are
+// (0x8ce9d60): further off they get it less often, and Ticks says how many ticks it is meant to
+// last. It is 0 near by, and 0 for all on the tick it lands or leaves the ground.
+func (t *Projectile) sendDelta(e *world.Entity) {
 	pos, rot := e.Position(), e.Rotation()
-	pk := &packet.MoveActorDelta{EntityRuntimeID: e.RuntimeID(), OnGround: e.OnGround(), Ticks: 1}
+	ground := e.OnGround()
+	pk := &packet.MoveActorDelta{EntityRuntimeID: e.RuntimeID(), OnGround: ground}
 	if pos[0] != t.sentPos[0] {
 		pk.PositionX = protocol.Option(pos[0])
 	}
@@ -449,15 +479,42 @@ func (t *Projectile) delta(e *world.Entity) *packet.MoveActorDelta {
 	if rotationByte(rot.Yaw) != rotationByte(t.sentRot.Yaw) {
 		pk.RotationY = protocol.Option(rot.Yaw)
 	}
-	if r := e.Region(); r != nil {
-		now := r.CurrentTick()
-		if t.sentTick != 0 && now > t.sentTick {
-			pk.Ticks = uint64(now - t.sentTick)
-		}
-		t.sentTick = now
+	same := ground == t.sentGround
+	t.sentPos, t.sentRot, t.sentGround = pos, rot, ground
+	r := e.Region()
+	if r == nil {
+		return
 	}
-	t.sentPos, t.sentRot = pos, rot
-	return pk
+	now := r.CurrentTick()
+	e.EachSeer(func(p *world.Entity) {
+		var ticks int64
+		if same {
+			ticks = t.spec.moveTicks(pos.Sub(p.Position()).Len())
+		}
+		if last, ok := t.sentTo[p]; ok && now < last+ticks {
+			return
+		}
+		if t.sentTo == nil {
+			t.sentTo = make(map[*world.Entity]int64)
+		}
+		t.sentTo[p] = now
+		if ticks == 0 {
+			p.SendTo(pk)
+			return
+		}
+		far := *pk
+		far.Ticks = uint64(ticks)
+		p.SendTo(&far)
+	})
+}
+
+// moveTicks is BDS's count for a player dist away.
+func (s ProjectileSpec) moveTicks(dist float32) int64 {
+	share := float32(1)
+	if s.MoveFarDistance >= dist {
+		share = dist / s.MoveFarDistance
+	}
+	return int64(float32(s.MoveDroppedTicks) * projectileMoveTicksShare * share)
 }
 
 // tick is BDS's projectile tick: if stuck, whether the block still holds it; if not, what
@@ -488,7 +545,7 @@ func (t *Projectile) tick(e *world.Entity) {
 func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	if t.stuckMoveDue {
 		t.stuckMoveDue = false
-		e.Send(t.delta(e))
+		t.sendDelta(e)
 	}
 	if t.shake > 0 {
 		e.Send(&packet.ActorEvent{EntityRuntimeID: e.RuntimeID(), EventType: actorEventArrowShake, EventData: t.shake})
