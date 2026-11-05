@@ -38,3 +38,19 @@ func TestClock(t *testing.T) {
 		t.Errorf("stopped clock moved to %d", got)
 	}
 }
+
+func TestNextOccurrence(t *testing.T) {
+	for _, c := range []struct{ now, at, want int32 }{
+		{1000, 6000, 6000},
+		{7000, 6000, 30000},
+		{6000, 6000, 6000},
+		{30000, 13000, 37000},
+	} {
+		if got := NextOccurrence(c.now, c.at); got != c.want {
+			t.Errorf("from %d to %d: %d, want %d", c.now, c.at, got, c.want)
+		}
+	}
+	if at, ok := MarkerTime("midnight"); !ok || at != 18000 {
+		t.Errorf("midnight is %d, %v", at, ok)
+	}
+}

@@ -122,13 +122,16 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "second", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
 		}}},
 	}
+	values := slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions)
+	enums := []protocol.CommandEnum{
+		{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
+		{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
+	}
+	timeCmd, timeValues, timeEnums := timeList(uint32(len(values)), uint32(len(enums))) //nolint:gosec // few values
 	return &packet.AvailableCommands{
-		EnumValues: slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions),
-		Enums: []protocol.CommandEnum{
-			{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
-			{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
-		},
-		Commands: []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant, target},
+		EnumValues: slices.Concat(values, timeValues),
+		Enums:      slices.Concat(enums, timeEnums),
+		Commands:   []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant, target, timeCmd},
 	}
 }
 
@@ -595,6 +598,13 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	var smithStart atomic.Pointer[packet.CraftingData]
 	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
 		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
+		if len(args) > 0 && args[0] == timeCommand {
+			if server := srv.Load(); server != nil {
+				// A failed write means the connection is closing, as above.
+				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: timeRun(server, args[1:])})
+			}
+			return
+		}
 		if len(args) > 0 && args[0] == targetTestCommand {
 			// A failed write means the connection is closing, as above.
 			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: targetTest(p, args[1:])})

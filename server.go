@@ -549,3 +549,11 @@ const clockSyncTicks = 256
 
 // Clock returns the world clock. Valid once the world is open. Safe from any goroutine.
 func (s *Server) Clock() *daytime.Clock { return s.clock }
+
+// SetTime changes the time and tells everyone online. Safe from any goroutine.
+func (s *Server) SetTime(time int32) {
+	s.clock.Set(time)
+	if host := s.players.Load(); host != nil {
+		host.SyncClocks()
+	}
+}

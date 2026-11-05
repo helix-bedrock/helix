@@ -24,7 +24,7 @@ func (s *Host) clockRegistry() *packet.SyncWorldClocks {
 }
 
 // SyncClocks tells everyone online the time, which BDS does every 256 ticks. Clients run their
-// clocks themselves between these. Runs: anywhere but the global owner.
+// clocks themselves between these. Waits for nothing. Runs: anywhere.
 func (s *Host) SyncClocks() {
 	if s.clock == nil {
 		return
@@ -34,7 +34,7 @@ func (s *Host) SyncClocks() {
 		SyncStates:  []protocol.SyncWorldClockStateData{{ClockID: daytime.OverworldClockID, Time: s.clock.Time()}},
 	}
 	g := s.global
-	g.call(func() {
+	g.run(func() {
 		for _, p := range g.order {
 			p.sendNow(pk)
 		}

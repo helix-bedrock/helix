@@ -141,3 +141,40 @@ func SensorSignal(sky uint8, angle float32, darken int32, inverted bool) int32 {
 	power := int32(math.Round(float64(float32(light) * tableCos(a))))
 	return min(max(power, 0), 15)
 }
+
+// markerPrefix is what the names of the markers start with.
+const markerPrefix = "minecraft:"
+
+// MarkerTime returns the time of day of the marker called name, such as noon.
+func MarkerTime(name string) (int32, bool) {
+	for _, m := range Markers {
+		if m.Name == markerPrefix+name {
+			return m.Time, true
+		}
+	}
+	return 0, false
+}
+
+// NextOccurrence is the clock time BDS moves to for a named time of day: that time today if it
+// is still to come, else tomorrow. Already there, the clock stays.
+func NextOccurrence(now, timeOfDay int32) int32 {
+	today := now % DayLength
+	switch {
+	case timeOfDay > today:
+		return now - today + timeOfDay
+	case timeOfDay < today:
+		if now-today > math.MaxInt32-DayLength-timeOfDay {
+			return math.MaxInt32
+		}
+		return now - today + timeOfDay + DayLength
+	}
+	return now
+}
+
+// Added is now moved on by n, stopping at the largest int32.
+func Added(now, n int32) int32 {
+	if now > math.MaxInt32-n {
+		return math.MaxInt32
+	}
+	return now + n
+}
