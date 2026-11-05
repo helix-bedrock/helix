@@ -156,6 +156,9 @@ func (c *Cushion) tick(e *world.Entity) {
 	if r == nil || c.gone {
 		return
 	}
+	if c.s.checkVoid(e); c.gone {
+		return
+	}
 	c.settleRiders()
 	if b, ok := r.Block(floorPos(e.Position()), 0); ok && c.s.lavaBlock(b) {
 		c.Break(r, true)

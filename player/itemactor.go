@@ -260,6 +260,9 @@ func (i *ItemActor) tick(e *world.Entity) {
 	if r == nil || i.taken {
 		return
 	}
+	if i.s.checkVoid(e); i.taken {
+		return
+	}
 	if i.pickupDelay > 0 && i.pickupDelay != itemNeverPickedUp {
 		i.pickupDelay--
 	}

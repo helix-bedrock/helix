@@ -70,6 +70,7 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickPickup()
 	p.tickChest()
 	p.tickUILeftovers()
+	p.s.checkVoid(p.entity)
 }
 
 // vanillaHandlers registers vanilla's packet handlers and systems. They go

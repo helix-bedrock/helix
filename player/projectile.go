@@ -539,6 +539,9 @@ func (t *Projectile) tick(e *world.Entity) {
 	if r == nil || t.gone {
 		return
 	}
+	if t.s.checkVoid(e); t.gone {
+		return
+	}
 	if t.waiting {
 		t.waiting = false
 		return

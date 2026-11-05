@@ -62,8 +62,11 @@ type Systems struct {
 	FoodTick     FoodTickFunc
 	Die          DieFunc
 	// Explode runs explosions.
-	Explode     ExplodeFunc
-	Respawn     RespawnFunc
+	Explode ExplodeFunc
+	Respawn RespawnFunc
+	// OutOfWorld says whether an entity is in the void, Void what the void does to it.
+	OutOfWorld  OutOfWorldFunc
+	Void        VoidFunc
 	ShieldUp    ShieldUpFunc
 	ShieldBlock ShieldBlockFunc
 	Totem       TotemFunc
@@ -181,6 +184,7 @@ type gameplay struct {
 	inventoryViewEv  listeners[InventoryViewEvent]
 	explosionStartEv listeners[ExplosionStartEvent]
 	explosionHitEv   listeners[ExplosionHitEvent]
+	voidEv           listeners[VoidEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
@@ -228,6 +232,7 @@ type gameState struct {
 	inventoryViewEv  listeners[InventoryViewEvent]
 	explosionStartEv listeners[ExplosionStartEvent]
 	explosionHitEv   listeners[ExplosionHitEvent]
+	voidEv           listeners[VoidEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
@@ -408,6 +413,8 @@ func vanillaGameplay(s *Setup) error {
 	sys.Die = vanillaDie
 	sys.Explode = vanillaExplode
 	sys.Respawn = vanillaRespawn
+	sys.OutOfWorld = vanillaOutOfWorld
+	sys.Void = vanillaVoid
 	sys.ShieldUp = vanillaShieldUp
 	sys.ShieldBlock = vanillaShieldBlock
 	sys.Totem = vanillaTotem
@@ -447,7 +454,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -480,6 +487,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.inventoryViewEv.freeze()
 	g.explosionStartEv.freeze()
 	g.explosionHitEv.freeze()
+	g.voidEv.freeze()
 	g.tntPrimeEv.freeze()
 	g.craftEv.freeze()
 	g.smithEv.freeze()

@@ -236,6 +236,9 @@ func (o *XPOrb) tick(e *world.Entity) {
 	if r == nil || o.taken {
 		return
 	}
+	if o.s.checkVoid(e); o.taken {
+		return
+	}
 	o.age++
 	if o.age >= xpOrbLifetime {
 		o.remove(e)

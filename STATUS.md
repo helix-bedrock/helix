@@ -23,7 +23,12 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Players and entities:** players see each other (AddPlayer within BDS's 57-chunk disc,
   `EntityViewRadius2`, changeable while running), MovePlayer for their movement, and the player
   list. Other entities stay in loaded chunks, pass to the region they move into and unload with
-  their chunk; where they were is saved when they leave.
+  their chunk; where they were is saved when they leave. The void is BDS's (not tested in game yet):
+  more than 16 blocks below the dimension's lowest block, so it moves with a deeper world. Players
+  there take 4 void damage a tick, creative and spectator too, as in BDS; everything else (items,
+  orbs, TNT, carts, projectiles, cushions) is removed. `Systems.OutOfWorld` and `Systems.Void`
+  replace the check and what it does, `OnVoid` can stop or change it, `TuneVoidDamage` sets the
+  damage, and an entity owner can answer with its own `OutOfWorld`. Trident Loyalty is not built.
 - **Abilities:** permission levels, game mode and attributes follow BDS 1.26.60 (layered abilities,
   its per-game-mode rules, its saved format) and are sent at join in BDS's order.
 - **Inventory:** items are loaded from and saved in BDS's format. Pick block works as BDS does (not yet tested in game; a block's data on the item is not built). Every inventory change the client

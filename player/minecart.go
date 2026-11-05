@@ -302,6 +302,9 @@ func (m *Minecart) tick(e *world.Entity) {
 	if r == nil || m.gone {
 		return
 	}
+	if m.s.checkVoid(e); m.gone {
+		return
+	}
 	m.settleRiders()
 	m.dropGoneViewers(r)
 	start := e.Position()

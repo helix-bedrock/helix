@@ -83,6 +83,8 @@ const (
 	// TuneFallFree is how many blocks a fall costs nothing.
 	TuneFallFree
 	TuneFallDamageScale
+	// TuneVoidDamage is what the void deals the player each tick it is in it.
+	TuneVoidDamage
 
 	// What the player's hits do, read from the attacker. TuneAttackDamage is added
 	// to its melee damage, TuneDamageDealtScale multiplies the whole hit.
@@ -193,6 +195,7 @@ var tuneSpecs = [tuneCount]tuneSpec{
 	TuneProtectionPoint:      {"protection_point", protectionPoint},
 	TuneFallFree:             {"fall_free", fallFree},
 	TuneFallDamageScale:      {"fall_damage_scale", 1},
+	TuneVoidDamage:           {"void_damage", voidDamage},
 	TuneAttackDamage:         {name: "attack_damage"},
 	TuneDamageDealtScale:     {"damage_dealt_scale", 1},
 	TuneCritMultiplier:       {"crit_multiplier", critMultiplier},
