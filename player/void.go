@@ -54,7 +54,7 @@ func vanillaOutOfWorld(_ *Host, e *world.Entity) bool {
 // else is removed, as BDS's Actor::outOfWorld does.
 func vanillaVoid(s *Host, e *world.Entity) {
 	p, _ := e.Owner().(*Player)
-	if s.game.voidEv.Has() {
+	if s.game != nil && s.game.voidEv.Has() {
 		ev := VoidEvent{Entity: e, Player: p}
 		if p != nil {
 			ev.Damage = p.Tuning(TuneVoidDamage)
@@ -80,8 +80,20 @@ func vanillaVoid(s *Host, e *world.Entity) {
 // its input; where BDS's system falls in the tick against the actors' own was not worked out.
 // Runs: owner of the entity.
 func (s *Host) checkVoid(e *world.Entity) {
-	if e.Region() != nil && s.game.sys.OutOfWorld(s, e) {
-		s.game.sys.Void(s, e)
+	// A Host built without vanilla's Setup, or a plugin that cleared a hook, gets BDS's.
+	var out OutOfWorldFunc
+	var void VoidFunc
+	if s.game != nil {
+		out, void = s.game.sys.OutOfWorld, s.game.sys.Void
+	}
+	if out == nil {
+		out = vanillaOutOfWorld
+	}
+	if void == nil {
+		void = vanillaVoid
+	}
+	if e.Region() != nil && out(s, e) {
+		void(s, e)
 	}
 }
 
@@ -91,7 +103,11 @@ func (p *Player) OutOfWorld(*Host, *world.Entity) { p.voidHurt(p.Tuning(TuneVoid
 
 func (p *Player) voidHurt(damage float32) {
 	p.move.fall = 0
-	p.s.game.sys.Hurt(p, damage, DamageSource{Cause: DamageVoid})
+	hurt := vanillaHurt
+	if p.s.game != nil && p.s.game.sys.Hurt != nil {
+		hurt = p.s.game.sys.Hurt
+	}
+	hurt(p, damage, DamageSource{Cause: DamageVoid})
 }
 
 // OutOfWorld removes the item.

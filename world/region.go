@@ -116,9 +116,20 @@ func (r *Region) ID() uint64 { return r.id }
 func (r *Region) Dimension() *Dimension { return r.d }
 
 // Block returns the block at pos on layer, and false if its chunk is not
-// loaded in this region or the call is made outside the region's tick.
-// Runs: owner.
+// loaded in this region or the call is made outside the region's tick. Above
+// and below the dimension's range it is air, as BDS's BlockSource answers
+// there, so entities fall through the bottom into the void instead of
+// stopping as at an unloaded chunk. Runs: owner.
 func (r *Region) Block(pos cube.Pos, layer uint8) (uint32, bool) {
+	if pos[1] < r.d.r[0] || pos[1] > r.d.r[1] {
+		if !r.ticking.Load() {
+			return 0, false
+		}
+		if _, ok := r.chunks[mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)}]; !ok { //nolint:gosec // block X and Z fit int32 chunks
+			return 0, false
+		}
+		return r.d.conf.Blocks.Air(), true
+	}
 	c, ok := r.chunkAt(pos)
 	if !ok {
 		return 0, false

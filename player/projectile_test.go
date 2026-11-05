@@ -161,13 +161,13 @@ func TestArrowCanStayInLoadedChunks(t *testing.T) {
 	}
 }
 
-// One falling far below the world is gone.
+// One falling into the void is gone.
 func TestArrowGoneBelowWorld(t *testing.T) {
 	p, d := machineWorld(t)
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
 	var arrow *Projectile
 	onRegion(d, func(r *world.Region) {
-		low := float32(r.Dimension().Range()[0]) - projectileBelowWorld - 1
+		low := float32(r.Dimension().Range()[0]) - voidDepth - 1
 		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, low, 8.5}, mgl32.Vec3{0, -1, 0}, spec.Power, nil)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return arrow.gone })

@@ -46,9 +46,6 @@ const (
 	projectileClipLimit = 200
 	// projectileLookAhead is how many ticks of flight ahead its chunks are kept loaded.
 	projectileLookAhead = 10
-	// projectileBelowWorld is how far below the world it is removed, so one falling through
-	// empty chunks does not hold chunks for ever. An assumption, not read from BDS.
-	projectileBelowWorld = 64
 	// projectileMoveDropped and projectileMoveFar are BDS's defaults for a definition's
 	// conditional bandwidth optimization, and projectileMoveTicksShare the part of its dropped
 	// ticks BDS uses.
@@ -571,10 +568,6 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	}
 	if t.stuck {
 		t.tickStuck(r, e)
-		return
-	}
-	if e.Position()[1] < float32(r.Dimension().Range()[0])-projectileBelowWorld {
-		t.remove(e)
 		return
 	}
 	t.keepAhead(r, e)
