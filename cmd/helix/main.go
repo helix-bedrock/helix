@@ -16,6 +16,7 @@ func main() {
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
 	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
 	publicIP := flag.String("public-ip", "", "this network's public IP, so players outside it can join; forward TCP and UDP 19132 on the router")
+	udpPorts := flag.String("udp-ports", "", "BDS's server-udp-ports: each connection takes its own UDP port from these, such as 19133-19200 or 19133-19200:29133-29200 for public:local; forward them on the router")
 	tickDistance := flag.Int("tick-distance", int(helix.DefaultConfig().TickDistance), "radius in chunks kept loaded and ticked around each player, BDS's tick-distance")
 	flag.Parse()
 	level := slog.LevelInfo
@@ -29,6 +30,10 @@ func main() {
 	conf := helix.DefaultConfig()
 	conf.Log = log
 	conf.NetherNet.PublicIP = *publicIP
+	if *udpPorts != "" {
+		conf.NetherNet.UDPPort = 0
+		conf.NetherNet.UDPPorts = *udpPorts
+	}
 	conf.TickDistance = int32(*tickDistance) //nolint:gosec // a small setting, checked by helix.New
 	var testServer atomic.Pointer[helix.Server]
 	if *testcmds {

@@ -23,6 +23,11 @@ type Status struct {
 	ServerID int64
 	// Port and PortV6 are the IPv4 and IPv6 ports.
 	Port, PortV6 uint16
+	// Hardcore says the world is hardcore.
+	Hardcore bool
+	// OnlineAuth says signed-in players' tokens are checked, and SelfSignedAuth
+	// that players who are not signed in are taken.
+	OnlineAuth, SelfSignedAuth bool
 }
 
 // pong is the status in the RakNet pong format, which NetherNet's status

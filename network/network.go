@@ -36,7 +36,7 @@ type Transport interface {
 	// Addr is the address listened on.
 	Addr() net.Addr
 	// SetPong sets the answer to server list pings, in the RakNet pong
-	// format.
+	// format. A transport that also has SetStatus(Status) gets that instead.
 	SetPong(b []byte)
 	// Close stops the transport.
 	Close() error
@@ -119,6 +119,7 @@ type Listener struct {
 	mu         sync.Mutex
 	transports []Transport
 	pong       []byte
+	status     Status
 }
 
 // New returns a Listener. It accepts nothing until [Listener.Serve].
@@ -164,7 +165,7 @@ func (l *Listener) Serve(t Transport) {
 	}
 	l.transports = append(l.transports, t)
 	if l.pong != nil {
-		t.SetPong(l.pong)
+		sendStatus(t, l.status, l.pong)
 	}
 	l.mu.Unlock()
 	l.wg.Add(1)
@@ -176,11 +177,21 @@ func (l *Listener) SetStatus(s Status) {
 	b := s.pong()
 	l.mu.Lock()
 	l.pong = b
+	l.status = s
 	ts := append([]Transport(nil), l.transports...)
 	l.mu.Unlock()
 	for _, t := range ts {
-		t.SetPong(b)
+		sendStatus(t, s, b)
 	}
+}
+
+// sendStatus gives a transport the status in the fullest form it takes.
+func sendStatus(t Transport, s Status, pong []byte) {
+	if st, ok := t.(interface{ SetStatus(Status) }); ok {
+		st.SetStatus(s)
+		return
+	}
+	t.SetPong(pong)
 }
 
 // Accept returns the next player that finished the login sequence.

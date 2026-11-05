@@ -97,11 +97,16 @@ type NetherNetConfig struct {
 	// players do not have to trust the server again after a restart. BDS
 	// saves it only on the "serveridentity save" command.
 	SaveIdentityKey bool
-	// UDPPort carries every connection over one UDP port when not 0.
+	// UDPPort carries every connection over one UDP port when not 0. Set it
+	// to 0 to give each connection its own port, as BDS does.
 	UDPPort uint16
-	// PublicIP is the address players outside this network reach the server
-	// on, for a server behind a router. Empty offers only the machine's own
-	// addresses.
+	// UDPPorts is BDS's server-udp-ports: ports or ranges, each maybe
+	// public:local, with maybe an address first. With UDPPort 0, connections
+	// take their local port from them.
+	UDPPorts string
+	// PublicIP is BDS's server-public-ip, the address players outside this
+	// network reach the server on, for a server behind a router. Empty offers
+	// only the machine's own addresses.
 	PublicIP string
 	// AllowAnonymous accepts clients that send no NetherNet identity. BDS
 	// 1.26.60 refuses them (signaling error 37, IdentityNotAllowed) even
@@ -304,7 +309,7 @@ func (s *Server) openTransports() error {
 			return err
 		}
 		t, err := network.NetherNet(network.NetherNetConfig{
-			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort, PublicIP: s.conf.NetherNet.PublicIP,
+			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort, UDPPorts: s.conf.NetherNet.UDPPorts, PublicIP: s.conf.NetherNet.PublicIP,
 			AllowAnonymous: s.conf.NetherNet.AllowAnonymous, Log: s.log.With("part", "nethernet"),
 		})
 		if err != nil {
@@ -489,6 +494,7 @@ func (s *Server) updateStatus() {
 	st := network.Status{
 		Name: s.conf.Name, LevelName: s.conf.LevelName, Players: s.PlayerCount(), MaxPlayers: s.conf.MaxPlayers,
 		GameMode: "Survival", ServerID: s.serverID, Port: port(s.conf.NetherNet.Address), PortV6: port(s.conf.NetherNet.Address),
+		OnlineAuth: s.conf.OnlineMode, SelfSignedAuth: !s.conf.OnlineMode,
 	}
 	s.listener.SetStatus(st)
 }

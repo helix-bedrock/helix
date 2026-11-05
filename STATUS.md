@@ -7,7 +7,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 ## What works
 
 - **Networking:** NetherNet (RakNet is off by default), and the login the way BDS 1.26.60 does it (Xbox Live
-  checks, encryption, resource packs). NetherNet's HTTP signaling, its limits and its timing were compared with the BDS code and match it; the status reply has fewer fields than BDS, and `-public-ip` adds a host candidate where BDS adds a server-reflexive one.
+  checks, encryption, resource packs). NetherNet's HTTP server, its limits, its timing, the status reply, public addresses and `server-udp-ports` (`-udp-ports`) were compared with the BDS code and match it. Still different: UDP stays on one port by default, WebRTC is pion where BDS has libwebrtc, there is no NetherNet LAN discovery and no sign-in to Microsoft's signaling service.
 - **Worlds:** the world folder (`worlds/Bedrock level`, BDS's layout) opens at boot through the
   `world` library's stores. Players spawn at the level.dat spawn, or where a BDS world saved them.
   Flat and void worlds generate.
