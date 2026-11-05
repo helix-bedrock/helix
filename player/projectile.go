@@ -657,8 +657,9 @@ type projectileHit struct {
 func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileHit, projectileHitKind) {
 	best, kind := projectileHit{}, projectileHitNone
 	limit := float64(2)
-	if at, block, ok := t.s.clipBlocks(r, from, to); ok {
-		best, kind, limit = projectileHit{pos: from.Add(to.Sub(from).Mul(float32(at))), block: block}, projectileHitBlock, at
+	if at, block, lo, hi, ok := t.s.clipBlocks(r, from, to); ok {
+		pos := clampToBox(from.Add(to.Sub(from).Mul(float32(at))), lo, hi)
+		best, kind, limit = projectileHit{pos: pos, block: block}, projectileHitBlock, at
 	}
 	reach := min(max((float32(t.age)-projectileReachFrom)*projectileReachStep, 0), projectileReachMax)
 	lo, hi := minVec(from, to), maxVec(from, to)
@@ -706,9 +707,29 @@ func segmentEntersBox(from, to, lo, hi mgl32.Vec3) (float64, bool) {
 	return t0, true
 }
 
+// clampToBox keeps a point on the box it hit: rounding can leave it just outside, and a stuck
+// projectile must still count as in its block.
+func clampToBox(p, lo, hi mgl32.Vec3) mgl32.Vec3 {
+	for n := range 3 {
+		p[n] = min(max(p[n], lo[n]), hi[n])
+	}
+	return p
+}
+
+// insideBox is BDS's test of whether a stuck projectile's block still holds it (0x7745da0): the
+// faces count, since that is where it hit.
+func insideBox(p, lo, hi mgl32.Vec3) bool {
+	for n := range 3 {
+		if p[n] < lo[n] || p[n] > hi[n] {
+			return false
+		}
+	}
+	return true
+}
+
 // clipBlocks walks the blocks from from to to, and says how far along it first enters a
-// block's collision box and which block. A block not loaded stops it.
-func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.Pos, bool) {
+// block's collision box, which block and which box. A block not loaded stops it.
+func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.Pos, mgl32.Vec3, mgl32.Vec3, bool) {
 	var pos, end, step [3]int
 	var next, delta [3]float64
 	for n := range 3 {
@@ -728,21 +749,22 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 		at := cube.Pos{pos[0], pos[1], pos[2]}
 		b, ok := r.Block(at, 0)
 		if !ok {
-			return 0, at, false
+			return 0, at, mgl32.Vec3{}, mgl32.Vec3{}, false
 		}
 		best, found := 2.0, false
+		var bestLo, bestHi mgl32.Vec3
 		for _, box := range blocks.Properties(b).Collision {
 			lo := mgl32.Vec3{float32(at[0]) + box[0], float32(at[1]) + box[1], float32(at[2]) + box[2]}
 			hi := mgl32.Vec3{float32(at[0]) + box[3], float32(at[1]) + box[4], float32(at[2]) + box[5]}
 			if v, hits := segmentEntersBox(from, to, lo, hi); hits && v < best {
-				best, found = v, true
+				best, found, bestLo, bestHi = v, true, lo, hi
 			}
 		}
 		if found {
-			return best, at, true
+			return best, at, bestLo, bestHi, true
 		}
 		if pos == end {
-			return 0, at, false
+			return 0, at, mgl32.Vec3{}, mgl32.Vec3{}, false
 		}
 		n := 0
 		if next[1] < next[n] {
@@ -752,12 +774,12 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 			n = 2
 		}
 		if next[n] > 1 {
-			return 0, at, false
+			return 0, at, mgl32.Vec3{}, mgl32.Vec3{}, false
 		}
 		pos[n] += step[n]
 		next[n] += delta[n]
 	}
-	return 0, cube.Pos{}, false
+	return 0, cube.Pos{}, mgl32.Vec3{}, mgl32.Vec3{}, false
 }
 
 // apply is what a hit does, BDS's on hit subcomponents as far as built.
@@ -849,7 +871,7 @@ func (t *Projectile) heldBy(r *world.Region, pos mgl32.Vec3) bool {
 		at := t.stuckAt
 		lo := mgl32.Vec3{float32(at[0]) + box[0], float32(at[1]) + box[1], float32(at[2]) + box[2]}
 		hi := mgl32.Vec3{float32(at[0]) + box[3], float32(at[1]) + box[4], float32(at[2]) + box[5]}
-		if overlaps(pos, pos, lo, hi) {
+		if insideBox(pos, lo, hi) {
 			return true
 		}
 	}

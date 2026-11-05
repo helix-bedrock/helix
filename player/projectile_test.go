@@ -163,3 +163,25 @@ func TestProjectileMoveTicks(t *testing.T) {
 		}
 	}
 }
+
+// A projectile that hit a box must count as in it, or it falls out the next tick. Hits land on
+// a face, and rounding can put them just off it.
+func TestProjectileHitStaysInBox(t *testing.T) {
+	lo, hi := mgl32.Vec3{10, 64, 30}, mgl32.Vec3{11, 65, 31}
+	for i := range 20000 {
+		f := float32(i) / 20000
+		from := mgl32.Vec3{10 + f, 65.03 + 3*f, 30.7 - f/2}
+		to := from.Add(mgl32.Vec3{0.05 - f/10, -0.1 - 3*f, f/10 - 0.05})
+		at, hits := segmentEntersBox(from, to, lo, hi)
+		if !hits {
+			continue
+		}
+		pos := clampToBox(from.Add(to.Sub(from).Mul(float32(at))), lo, hi)
+		if !insideBox(pos, lo, hi) {
+			t.Fatalf("hit %v counts as outside its box", pos)
+		}
+	}
+	if insideBox(mgl32.Vec3{10.5, 65.01, 30.5}, lo, hi) {
+		t.Error("a point above the block counts as inside")
+	}
+}
