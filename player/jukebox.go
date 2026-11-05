@@ -31,9 +31,10 @@ const (
 	jukeboxSecondsInTick = 0.05
 	jukeboxNoteHeight    = 1.2
 	jukeboxNoteParticle  = "minecraft:note_particle"
-	// jukeboxExtraReach is added to a player's view radius to get how far off, along the
-	// ground, BDS lets them hear a song (0xA141110, 0xCDC3AF0).
+	// jukeboxExtraReach is added to a player's view radius in blocks to get how far off,
+	// along the ground, BDS lets them hear a song (0xA141110, 0xCDC3AF0).
 	jukeboxExtraReach = 46
+	blocksInChunk     = 16
 )
 
 // loadDiscs reads the music discs.
@@ -130,7 +131,7 @@ func (e *jukeboxEntity) updateHearing(r *world.Region, pos cube.Pos) {
 		return
 	}
 	centre := blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
-	reach := float32(e.s.viewDistance + jukeboxExtraReach)
+	reach := float32(e.s.viewDistance*blocksInChunk + jukeboxExtraReach)
 	e.near = r.AppendEntitiesIn(e.near[:0], centre[0]-reach, centre[2]-reach, centre[0]+reach, centre[2]+reach)
 	started := e.ticks == 0
 	for _, o := range e.near {
@@ -198,7 +199,7 @@ func (p *Player) hearsAt(centre mgl32.Vec3) bool {
 	}
 	at := p.entity.Position()
 	dx, dz := at[0]-centre[0], at[2]-centre[2]
-	reach := float32(p.viewRadius() + jukeboxExtraReach)
+	reach := float32(p.viewRadius()*blocksInChunk + jukeboxExtraReach)
 	return dx*dx+dz*dz <= reach*reach
 }
 
