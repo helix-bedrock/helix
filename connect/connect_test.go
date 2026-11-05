@@ -115,6 +115,32 @@ func TestFences(t *testing.T) {
 		if arm(mid, "south") != 1 || arm(mid.Side(cube.FaceSouth), "north") != 1 {
 			t.Error("two wires did not join")
 		}
+		// Stairs: one facing north with a west-facing stair in front is an outer
+		// corner; one with a west-facing stair behind is an inner corner.
+		stair := func(weirdo int32) uint32 {
+			id, ok := reg.Blocks.StateID("minecraft:oak_stairs", map[string]any{"minecraft:corner": "none", "upside_down_bit": uint8(0), "weirdo_direction": weirdo})
+			if !ok {
+				t.Error("no stair state")
+			}
+			return id
+		}
+		corner := func(pos cube.Pos) string {
+			b, _ := r.Block(pos, 0)
+			v, _ := reg.Blocks.States(b)["minecraft:corner"].(string)
+			return v
+		}
+		s := cube.Pos{4, surfaceY, 4}
+		place(s.Side(cube.FaceNorth), stair(1))
+		place(s, stair(3))
+		if corner(s) != "outer_left" || corner(s.Side(cube.FaceNorth)) != "none" {
+			t.Errorf("outer stairs: %s, front %s", corner(s), corner(s.Side(cube.FaceNorth)))
+		}
+		in := cube.Pos{4, surfaceY, 12}
+		place(in, stair(3))
+		place(in.Side(cube.FaceSouth), stair(1))
+		if corner(in) != "inner_left" {
+			t.Errorf("inner stair: %s", corner(in))
+		}
 	})
 	<-done
 }

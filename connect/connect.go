@@ -1,7 +1,7 @@
 // Package connect is how fences, glass panes, bars and trip wire join their neighbours,
-// as BDS 1.26.60 does it: since 1.26 the arms are in the block's own state, so
-// the server works them out when the block is placed and when a neighbour
-// changes. Walls have a rule of their own and are not here.
+// and how stairs turn into corners, as BDS 1.26.60 does it: since 1.26 the arms and
+// corners are in the block's own state, so the server works them out when the block
+// is placed and when a neighbour changes. Walls have a rule of their own and are not here.
 package connect
 
 import (
@@ -51,6 +51,9 @@ type Table struct {
 	blocks *registry.Blocks
 	rules  []rule
 	group  []int8
+	// stairIndex and stairs are the stair corner facts (stairs.go).
+	stairIndex []uint16
+	stairs     []stairFacts
 }
 
 // New loads BDS's rules for the states of blocks.
@@ -60,6 +63,7 @@ func New(blocks *registry.Blocks) (*Table, error) {
 		return nil, err
 	}
 	t := &Table{blocks: blocks, rules: make([]rule, blocks.BlockCount()), group: make([]int8, blocks.BlockCount())}
+	t.stairIndex, t.stairs = stairsOf(blocks)
 	for id := range t.rules {
 		state := uint32(id) //nolint:gosec // state IDs fit uint32
 		t.group[id] = groupOf(blocks.Name(state), blocks.States(state))
@@ -133,12 +137,15 @@ func groupOf(name string, states map[string]any) int8 {
 	return noGroup
 }
 
-// Connected returns block at pos with its arms set from its neighbours, or block
-// itself if it is not a block that connects. A neighbour in an unloaded chunk
-// does not connect. Runs: owner of the region.
+// Connected returns block at pos with its arms (or a stair's corner) set from its
+// neighbours, or block itself if it is not a block that connects. A neighbour in an
+// unloaded chunk does not connect. Runs: owner of the region.
 func (t *Table) Connected(r *world.Region, pos cube.Pos, block uint32) uint32 {
-	if int(block) >= len(t.group) || t.group[block] == noGroup {
+	if int(block) >= len(t.group) {
 		return block
+	}
+	if t.group[block] == noGroup {
+		return t.StairCorner(r, pos, block)
 	}
 	group := t.group[block]
 	var next map[string]any

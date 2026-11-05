@@ -260,7 +260,7 @@ sibling library folders, so unreleased library changes are used.
 - `circuit/rails.go`, `player/minecart.go`: rails as BDS's `BaseRailBlock::Rail` (shapes, power, detector) and all four minecarts as one `Minecart` with a `cartSpec`, on the same `Chest` slots as machines (`Chest.cart`; `Player.windowChest` finds what is open). Hoppers see carts through `Host.cartsAt`.
 - `player/pushout.go`: BDS's push out of blocks, which only items and experience orbs run; `Properties.PushesOut` and `Stairs` are the block facts it reads.
 - `ride`: riding for anything rideable: seats, seat offset, who may get on, links, where a rider lands. It knows nothing of carts or players: a vehicle keeps a `ride.Vehicle`, a rider implements `ride.Rider`, and `player/riding.go` is the player's side of it (the `vehicle` interface, `mount`, `letOff`).
-- `connect`: the arms of fences, panes, bars and trip wire, kept in their block states since 1.26, from helix-data's rules.
+- `connect`: the arms of fences, panes, bars and trip wire, kept in their block states since 1.26, from helix-data's rules, and stair corners (`stairs.go`, BDS's corner rule).
 - Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
   `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`, `BlockEntityBinder` with its `ChunkHandle`; `Dimension.SetBlockEntities` names who
   makes them; those it does not take stay saved as they were). `player/chest.go` runs chests, ender chests

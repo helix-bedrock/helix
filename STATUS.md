@@ -164,6 +164,10 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Fences, panes and bars (not yet tested in game):** since 1.26 their arms are in the block's own
   state, so the server works them out on placing and when a neighbour changes (new `connect` package,
   from BDS's per-state rules in helix-data's `bds/connections.json`). Walls are not done yet.
+  Stairs work the same way for their corner (`minecraft:corner`, a state since 1.26.50), from BDS
+  1.26.60's rule (`connect/stairs.go`): a stair facing across in front makes an outer corner, one
+  behind makes an inner corner, on the same half only, unless the block on the other side is the very
+  same stair. Not tested in game.
 - **Block entities and chests (first pass, not yet tested in game):** block entities now live with
   their chunk while it is loaded (`world.BlockEntity`): made when their block is set, removed when it
   changes type, ticked, saved in BDS's format and sent to clients in the chunk and when they change.
