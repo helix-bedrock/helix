@@ -113,6 +113,7 @@ func NetherNet(conf NetherNetConfig) (Transport, error) {
 		return err
 	}
 	var se webrtc.SettingEngine
+	nethernet.ApplySettings(&se)
 	se.SetICETimeouts(iceDisconnectedTimeout, iceFailedTimeout, iceKeepalive)
 	mappings, err := portMappings(conf)
 	if err != nil {
