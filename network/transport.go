@@ -3,14 +3,18 @@ package network
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/helix-bedrock/nethernet"
+	"github.com/helix-bedrock/nethernet/discovery"
 	"github.com/helix-bedrock/nethernet/endpoint"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/raknet"
@@ -53,6 +57,12 @@ type NetherNetConfig struct {
 	// public:local, with maybe an address first. Connections take a local port
 	// from them, unless UDPPort is set, and offer the public one too.
 	UDPPorts string
+	// PortMappings is BDS's server-port-mappings: public:local single ports,
+	// without saying which local ports to take.
+	PortMappings string
+	// LAN answers players looking for games on this network, BDS's LAN
+	// signaling, which is on by default.
+	LAN bool
 	// PublicIP is BDS's server-public-ip: the address players outside this
 	// network reach the server at, offered next to the machine's own as a
 	// server-reflexive candidate. The router must forward UDP to the same port.
@@ -94,7 +104,11 @@ func NetherNet(conf NetherNetConfig) (Transport, error) {
 		return nil, err
 	}
 	if conf.UDPPort == 0 && conf.UDPPorts != "" {
-		lo, hi := nethernet.PortRange(mappings)
+		ports, err := nethernet.ParsePortMappings(conf.UDPPorts, netip.Addr{})
+		if err != nil {
+			return nil, fmt.Errorf("network: nethernet udp ports %q: %w", conf.UDPPorts, err)
+		}
+		lo, hi := nethernet.PortRange(ports)
 		if err := se.SetEphemeralUDPPortRange(lo, hi); err != nil {
 			return nil, fmt.Errorf("network: nethernet udp ports %q: %w", conf.UDPPorts, err)
 		}
@@ -112,13 +126,15 @@ func NetherNet(conf NetherNetConfig) (Transport, error) {
 		_ = closeAll()
 		return nil, fmt.Errorf("network: listen nethernet signaling: %w", err)
 	}
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
+	issue := func(context.Context) (*nethernet.Identity, error) { return identity, nil }
 	handler := endpoint.HandlerConfig{Logger: conf.Log}.New()
 	l, err := nethernet.ListenConfig{
-		API:                 webrtc.NewAPI(webrtc.WithSettingEngine(se)),
+		API:                 api,
 		Log:                 conf.Log,
 		AllowAnonymous:      conf.AllowAnonymous,
 		PortMappings:        mappings,
-		IssueServerIdentity: func(context.Context) (*nethernet.Identity, error) { return identity, nil },
+		IssueServerIdentity: issue,
 	}.Listen(handler)
 	if err != nil {
 		_ = tcp.Close()
@@ -131,7 +147,35 @@ func NetherNet(conf NetherNetConfig) (Transport, error) {
 		}
 	}()
 	closers = append(closers, tcp.Close, handler.Close)
-	return &netherNetTransport{Listener: l, handler: handler, addr: tcp.Addr(), close: closeAll}, nil
+	t := &netherNetTransport{Listener: l, handler: handler, addr: tcp.Addr(), close: closeAll}
+	if !conf.LAN {
+		return t, nil
+	}
+	lan, err := listenLAN(conf)
+	if err != nil {
+		// BDS goes on without it when it has no viable network.
+		conf.Log.Warn("no LAN signaling", "err", err)
+		return t, nil
+	}
+	lanListener, err := nethernet.ListenConfig{
+		API:                 api,
+		Log:                 conf.Log,
+		AllowAnonymous:      conf.AllowAnonymous,
+		PortMappings:        mappings,
+		IssueServerIdentity: issue,
+	}.Listen(lan)
+	if err != nil {
+		_ = lan.Close()
+		conf.Log.Warn("no LAN signaling", "err", err)
+		return t, nil
+	}
+	closers = append(closers, lan.Close, lanListener.Close)
+	t.lan = lan
+	t.accepted = make(chan accepted)
+	t.stop = make(chan struct{})
+	go t.acceptFrom(l)
+	go t.acceptFrom(lanListener)
+	return t, nil
 }
 
 // The ICE timings of libwebrtc, which BDS uses: a connection is weak after 2.5 s without
@@ -142,8 +186,9 @@ const (
 	iceKeepalive           = 2500 * time.Millisecond
 )
 
-// portMappings is what conf says about ports seen from outside. A public address with one fixed
-// port and no UDPPorts maps that port to itself.
+// portMappings is what conf says about ports seen from outside. A public address on Helix's one
+// fixed port maps that port to itself. BDS has no fixed port: there a public address only applies
+// to the ports it is told about.
 func portMappings(conf NetherNetConfig) ([]nethernet.PortMapping, error) {
 	var public netip.Addr
 	if conf.PublicIP != "" {
@@ -156,25 +201,83 @@ func portMappings(conf NetherNetConfig) ([]nethernet.PortMapping, error) {
 	if err != nil {
 		return nil, fmt.Errorf("network: nethernet udp ports %q: %w", conf.UDPPorts, err)
 	}
-	if len(mappings) == 0 && public.IsValid() {
-		high := conf.UDPPort
-		if high == 0 {
-			high = 65535
-		}
-		mappings = []nethernet.PortMapping{{Min: conf.UDPPort, Max: high, PublicIP: public}}
+	fixed, err := nethernet.ParseFixedPortMappings(conf.PortMappings, public)
+	if err != nil {
+		return nil, fmt.Errorf("network: nethernet port mappings %q: %w", conf.PortMappings, err)
+	}
+	mappings = append(mappings, fixed...)
+	if len(mappings) == 0 && public.IsValid() && conf.UDPPort != 0 {
+		mappings = []nethernet.PortMapping{{Min: conf.UDPPort, Max: conf.UDPPort, PublicIP: public}}
 	}
 	return mappings, nil
+}
+
+// listenLAN opens BDS's LAN port, or any free one if it is taken, as BDS does.
+func listenLAN(conf NetherNetConfig) (*discovery.Listener, error) {
+	id := make([]byte, 8)
+	if _, err := rand.Read(id); err != nil {
+		return nil, fmt.Errorf("network: lan network id: %w", err)
+	}
+	lc := discovery.ListenConfig{NetworkID: binary.LittleEndian.Uint64(id), DisableBroadcast: true, Log: conf.Log}
+	l, err := lc.Listen(fmt.Sprintf(":%d", discovery.DefaultPort))
+	if err != nil {
+		conf.Log.Info("LAN port already occupied, trying ephemeral port", "port", discovery.DefaultPort)
+		return lc.Listen("")
+	}
+	return l, nil
+}
+
+// accepted is a connection or error from one of a transport's listeners.
+type accepted struct {
+	conn net.Conn
+	err  error
 }
 
 type netherNetTransport struct {
 	*nethernet.Listener
 	handler *endpoint.Handler
-	addr    net.Addr
-	close   func() error
+	// lan answers players on this network. With it, accepted joins what both listeners accept.
+	lan      *discovery.Listener
+	accepted chan accepted
+	stop     chan struct{}
+	stopOnce sync.Once
+	addr     net.Addr
+	close    func() error
 }
 
 func (t *netherNetTransport) Addr() net.Addr   { return t.addr }
 func (t *netherNetTransport) SetPong(b []byte) { t.PongData(b) }
+
+// Accept implements [Transport] over both listeners.
+func (t *netherNetTransport) Accept() (net.Conn, error) {
+	if t.lan == nil {
+		return t.Listener.Accept()
+	}
+	select {
+	case a := <-t.accepted:
+		return a.conn, a.err
+	case <-t.stop:
+		return nil, net.ErrClosed
+	}
+}
+
+// acceptFrom passes on what one listener accepts until it fails.
+func (t *netherNetTransport) acceptFrom(l *nethernet.Listener) {
+	for {
+		c, err := l.Accept()
+		select {
+		case t.accepted <- accepted{c, err}:
+		case <-t.stop:
+			if c != nil {
+				_ = c.Close()
+			}
+			return
+		}
+		if err != nil {
+			return
+		}
+	}
+}
 
 // SetStatus gives the server list all of BDS's fields, which a pong has not.
 func (t *netherNetTransport) SetStatus(s Status) {
@@ -183,8 +286,22 @@ func (t *netherNetTransport) SetStatus(s Status) {
 		PlayerCount: s.Players, MaxPlayerCount: s.MaxPlayers, GameType: s.GameModeID, Hardcore: s.Hardcore,
 		OnlineAuth: s.OnlineAuth, SelfSignedAuth: s.SelfSignedAuth,
 	})
+	if t.lan != nil {
+		t.lan.ServerData(&discovery.ServerData{
+			ServerName: s.Name, Protocol: protocol.CurrentProtocol, Version: protocol.CurrentVersion, LevelName: s.LevelName,
+			GameType: int32(s.GameModeID), PlayerCount: int32(s.Players), MaxPlayerCount: int32(s.MaxPlayers), //nolint:gosec // small counts
+			Hardcore: s.Hardcore, AcceptsOnlineAuth: s.OnlineAuth, AcceptsSelfSignedAuth: s.SelfSignedAuth,
+			Nonce: t.handler.Nonce(), ConnectionType: lanConnectionType,
+		})
+	}
 }
 
+// lanConnectionType is BDS's connection kind for NetherNet without Microsoft's signaling service.
+const lanConnectionType = 4
+
 func (t *netherNetTransport) Close() error {
+	if t.stop != nil {
+		t.stopOnce.Do(func() { close(t.stop) })
+	}
 	return errors.Join(t.Listener.Close(), t.close())
 }

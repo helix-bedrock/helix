@@ -97,9 +97,14 @@ type NetherNetConfig struct {
 	// players do not have to trust the server again after a restart. BDS
 	// saves it only on the "serveridentity save" command.
 	SaveIdentityKey bool
-	// UDPPort carries every connection over one UDP port when not 0. Set it
-	// to 0 to give each connection its own port, as BDS does.
+	// LAN answers players looking for games on this network, BDS's LAN
+	// signaling.
+	LAN bool
+	// UDPPort carries every connection over one UDP port when not 0, so one
+	// forwarded port is enough. BDS gives each connection its own port.
 	UDPPort uint16
+	// PortMappings is BDS's server-port-mappings: public:local single ports.
+	PortMappings string
 	// UDPPorts is BDS's server-udp-ports: ports or ranges, each maybe
 	// public:local, with maybe an address first. With UDPPort 0, connections
 	// take their local port from them.
@@ -127,9 +132,10 @@ type RakNetConfig struct {
 // setting: the name, the world worlds/Bedrock level, 10 players, a view
 // distance of 32 chunks, a tick distance of 4, entities seen within BDS's
 // 57-chunk disc, online mode, NetherNet on port 19132 with the identity key in
-// keys/server_identity_key.pem. Helix differs in two ways: NetherNet's UDP
-// traffic stays on port 19132, so one forwarded port is enough, and RakNet is
-// off, as Minecraft is removing it. Turn it on with RakNet.Enabled.
+// keys/server_identity_key.pem, each connection on its own UDP port, and LAN
+// signaling on. Helix differs in one way: RakNet is off, as Minecraft is
+// removing it. Turn it on with RakNet.Enabled. For one forwarded UDP port, which
+// BDS cannot do, set NetherNet.UDPPort.
 func DefaultConfig() Config {
 	return Config{
 		Name:              "Dedicated Server",
@@ -144,7 +150,7 @@ func DefaultConfig() Config {
 			Enabled:         true,
 			Address:         ":19132",
 			IdentityKeyPath: nethernet.DefaultIdentityKeyPath,
-			UDPPort:         19132,
+			LAN:             true,
 		},
 		RakNet:   RakNetConfig{Address: ":19132"},
 		Network:  network.DefaultConfig(),
@@ -309,7 +315,7 @@ func (s *Server) openTransports() error {
 			return err
 		}
 		t, err := network.NetherNet(network.NetherNetConfig{
-			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort, UDPPorts: s.conf.NetherNet.UDPPorts, PublicIP: s.conf.NetherNet.PublicIP,
+			Address: s.conf.NetherNet.Address, IdentityKey: key, UDPPort: s.conf.NetherNet.UDPPort, UDPPorts: s.conf.NetherNet.UDPPorts, PortMappings: s.conf.NetherNet.PortMappings, LAN: s.conf.NetherNet.LAN, PublicIP: s.conf.NetherNet.PublicIP,
 			AllowAnonymous: s.conf.NetherNet.AllowAnonymous, Log: s.log.With("part", "nethernet"),
 		})
 		if err != nil {

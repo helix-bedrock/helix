@@ -15,7 +15,10 @@ import (
 func main() {
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
 	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
-	publicIP := flag.String("public-ip", "", "this network's public IP, so players outside it can join; forward TCP and UDP 19132 on the router")
+	publicIP := flag.String("public-ip", "", "BDS's server-public-ip: this network's public IP, so players outside it can join; forward TCP 19132 and the UDP ports on the router")
+	udpPort := flag.Uint("udp-port", 0, "carry every connection over this one UDP port, so one forwarded port is enough; not something BDS can do")
+	portMappings := flag.String("port-mappings", "", "BDS's server-port-mappings: public:local single UDP ports")
+	lan := flag.Bool("lan", true, "answer players looking for games on this network")
 	udpPorts := flag.String("udp-ports", "", "BDS's server-udp-ports: each connection takes its own UDP port from these, such as 19133-19200 or 19133-19200:29133-29200 for public:local; forward them on the router")
 	tickDistance := flag.Int("tick-distance", int(helix.DefaultConfig().TickDistance), "radius in chunks kept loaded and ticked around each player, BDS's tick-distance")
 	flag.Parse()
@@ -30,10 +33,10 @@ func main() {
 	conf := helix.DefaultConfig()
 	conf.Log = log
 	conf.NetherNet.PublicIP = *publicIP
-	if *udpPorts != "" {
-		conf.NetherNet.UDPPort = 0
-		conf.NetherNet.UDPPorts = *udpPorts
-	}
+	conf.NetherNet.UDPPort = uint16(*udpPort) //nolint:gosec // a port number
+	conf.NetherNet.UDPPorts = *udpPorts
+	conf.NetherNet.PortMappings = *portMappings
+	conf.NetherNet.LAN = *lan
 	conf.TickDistance = int32(*tickDistance) //nolint:gosec // a small setting, checked by helix.New
 	var testServer atomic.Pointer[helix.Server]
 	if *testcmds {
