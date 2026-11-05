@@ -49,10 +49,11 @@ const (
 	cushionReseat = 2
 )
 
-// dyeColors are the colours in BDS's order, which is a cushion's variant and a bed's colour.
+// dyeColors are the colours in dye order (black first), the order a cushion's variant is
+// read in by the client and saved in. Wool and beds count the other way, from white.
 var dyeColors = [16]string{
-	"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
-	"light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black",
+	"black", "red", "green", "brown", "blue", "purple", "cyan", "light_gray",
+	"gray", "pink", "lime", "yellow", "light_blue", "magenta", "orange", "white",
 }
 
 // cushionColor is the colour of the cushion item called name; false if it is none.
