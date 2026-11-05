@@ -3,6 +3,7 @@ package helix
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -10,9 +11,11 @@ import (
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
+	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -72,10 +75,14 @@ func (s *Server) openWorld() error {
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
+	s.clock = daytime.NewClock(s.ticker.CurrentTick, int32(min(ldat.Time, math.MaxInt32)), ldat.DoDayLightCycle) //nolint:gosec // capped
 	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers, ldat.RandomTickSpeed); err != nil {
 		s.ticker.Close()
 		_ = db.Close()
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
+	}
+	if s.circuits != nil {
+		s.circuits.SetClock(s.clock)
 	}
 	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew)
 	return nil
@@ -149,6 +156,9 @@ func (s *Server) closeWorld() error {
 		// level.dat keeps the world's tick, which saved tick times count in.
 		if s.db != nil {
 			s.db.LevelDat().CurrentTick = s.ticker.CurrentTick()
+			if s.clock != nil {
+				errs = append(errs, s.saveClock())
+			}
 		}
 		s.ticker.Close()
 	}
@@ -180,4 +190,18 @@ func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	if host := s.players.Load(); host != nil {
 		host.FallBlock(r, pos, block)
 	}
+}
+
+// saveClock keeps the time as BDS does: the Time in level.dat, which is what it reads back, and
+// the WorldClocks key.
+func (s *Server) saveClock() error {
+	time := s.clock.Time()
+	s.db.LevelDat().Time = int64(time)
+	value, err := nbt.MarshalEncoding(map[string]any{"clocks": []any{map[string]any{
+		"IsPaused": uint8(0), "Name": daytime.OverworldClockName, "Time": time,
+	}}}, nbt.LittleEndian)
+	if err != nil {
+		return fmt.Errorf("helix: encode world clocks: %w", err)
+	}
+	return s.db.StoreLevel(mcdb.LevelKeyWorldClocks, value)
 }

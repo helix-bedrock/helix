@@ -404,6 +404,8 @@ func (e comparatorEntities) New(block uint32) world.BlockEntity {
 		return &noteEntity{}
 	case kindBell:
 		return &bellEntity{t: e.t}
+	case kindDaylight:
+		return &daylightEntity{t: e.t}
 	}
 	if block == e.t.moving {
 		return &movingEntity{t: e.t, block: e.t.blocks.Air()}
@@ -425,6 +427,8 @@ func (e comparatorEntities) Load(pos cube.Pos, saved map[string]any) (world.Bloc
 		return loadNote(saved), true
 	case bellEntityID:
 		return e.t.loadBell(saved), true
+	case daylightEntityID:
+		return &daylightEntity{t: e.t, saved: maps.Clone(saved)}, true
 	}
 	if id, _ := saved["id"].(string); id == comparatorEntityID {
 		v, _ := saved[outputSignalTag].(int32)

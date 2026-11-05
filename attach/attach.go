@@ -232,6 +232,10 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	if name == "minecraft:rail" || name == "minecraft:golden_rail" || name == "minecraft:detector_rail" || name == "minecraft:activator_rail" {
 		return t.onFloor(r, pos)
 	}
+	if strings.HasSuffix(name, "_button") {
+		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
+		return ok && t.Supports(b, clicked)
+	}
 	if name == tripwireHook {
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
 		return ok && !direction.Vertical(clicked) && t.Supports(b, clicked)
@@ -272,6 +276,14 @@ func (t *Table) WireSurvives(r *world.Region, pos cube.Pos) bool {
 	}
 	n := t.blocks.Name(b)
 	return n == glowstone || n == lamp || n == litLamp
+}
+
+// ButtonHeld is BDS's canSurvive for buttons: the block behind holds things on the face the
+// button is on. What is not loaded counts as holding.
+func (t *Table) ButtonHeld(r *world.Region, pos cube.Pos, block uint32) bool {
+	face := cube.Face(stateInt(t.blocks.States(block), "facing_direction")) //nolint:gosec // state values are small
+	b, ok := r.Block(pos.Side(face.Opposite()), 0)
+	return !ok || t.Supports(b, face)
 }
 
 // DiodeSurvives is BDS's canSurvive for repeaters and comparators: below them a

@@ -12,6 +12,7 @@ import (
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
+	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -229,6 +230,12 @@ type Ticker struct {
 	// entityBox is how plates see entities. Set before any player joins.
 	entityBox EntityBoxFunc
 	cartBox   CartBoxFunc
+	// plateBox is how plates and buttons see entities, if it differs from entityBox. isArrow
+	// picks out what presses wood buttons. Set before any player joins.
+	plateBox EntityBoxFunc
+	isArrow  func(e *world.Entity) bool
+	// clock is what daylight sensors read. Set before any player joins.
+	clock *daytime.Clock
 	// entityPush is how pistons move entities. Set before any player joins.
 	entityPush EntityPushFunc
 	// powerTNT is what power reaching a TNT block does.
@@ -451,6 +458,10 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			}
 		case kindObserver:
 			t.observerHeard(r, pos, from, block)
+		case kindButton:
+			if !t.attach.ButtonHeld(r, pos, block) {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
 		case kindPlate:
 			if !t.attach.DiodeSurvives(r, pos) {
 				r.ScheduleTick(pos, block, 1, 0)
@@ -641,6 +652,8 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		t.observerTick(t.circuitOf(r), pos, block)
 	case kindTarget:
 		t.targetTick(r, pos)
+	case kindButton:
+		t.buttonTick(r, pos, block)
 	case kindPlate:
 		t.plateTick(t.circuitOf(r), pos, block)
 	case kindHook:
@@ -780,6 +793,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetStrength(intState(states, stateSignal))
 			comp.SetAllowUp(true)
 		}
+		t.ensureDaylight(c.r, pos)
 	case kindTarget:
 		// BDS's has no direction and nothing else set until it is hit.
 		c.sys.Create(p, redstone.KindProducer, redstone.NoFace)

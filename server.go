@@ -13,9 +13,11 @@ import (
 	"log/slog"
 	"net"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/circuit"
+	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
@@ -175,6 +177,8 @@ type Server struct {
 	serverID int64
 	reg      *registry.Registry
 	circuits *circuit.Ticker
+	// clock is the world's time, set when the world opens.
+	clock    *daytime.Clock
 	redstone *circuit.Settings
 
 	db          *mcdb.DB
@@ -283,10 +287,12 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		_ = s.listener.Close()
 		return err
 	}
+	host.SetClock(s.clock)
 	s.players.Store(host)
 	if s.circuits != nil {
 		s.circuits.SetDispense(host.Dispense)
 		s.circuits.SetEntityBox(host.EntityBox)
+		s.circuits.SetPlateBox(host.PlateBox, host.IsArrow)
 		s.circuits.SetEntityPush(host.PistonPush)
 		s.circuits.SetCartBox(host.CartBox)
 		s.circuits.SetPowerTNT(host.PowerTNT)
@@ -296,6 +302,18 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
 	}
 	defer host.Close(packet.DisconnectReasonShutdown)
+	clocks := time.NewTicker(clockSyncTicks * world.TickDuration)
+	defer clocks.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-clocks.C:
+				host.SyncClocks()
+			}
+		}
+	}()
 	if err := s.openTransports(); err != nil {
 		_ = s.listener.Close()
 		return err
@@ -525,3 +543,9 @@ func port(addr string) uint16 {
 	}
 	return n
 }
+
+// clockSyncTicks is how often BDS tells clients the time.
+const clockSyncTicks = 256
+
+// Clock returns the world clock. Valid once the world is open. Safe from any goroutine.
+func (s *Server) Clock() *daytime.Clock { return s.clock }

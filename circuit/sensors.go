@@ -40,6 +40,20 @@ type EntityBoxFunc func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool)
 // it plates stay up.
 func (t *Ticker) SetEntityBox(fn EntityBoxFunc) { t.entityBox = fn }
 
+// SetPlateBox sets how plates and buttons see entities where it differs from SetEntityBox, and
+// isArrow what presses wood buttons. Call it before any player joins.
+func (t *Ticker) SetPlateBox(fn EntityBoxFunc, isArrow func(e *world.Entity) bool) {
+	t.plateBox, t.isArrow = fn, isArrow
+}
+
+// boxOf is what plates and buttons see of an entity.
+func (t *Ticker) boxOf(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+	if t.plateBox != nil {
+		return t.plateBox(e)
+	}
+	return t.entityBox(e)
+}
+
 // EntityPushFunc moves an entity a piston runs into. Runs: owner of the entity's region.
 type EntityPushFunc func(r *world.Region, e *world.Entity, by mgl32.Vec3)
 
@@ -176,7 +190,7 @@ func (t *Ticker) plateSignal(c *regionCircuit, pos cube.Pos, rule plateRule) int
 	c.found = c.r.AppendEntitiesIn(c.found[:0], x-plateReach, z-plateReach, x+1+plateReach, z+1+plateReach)
 	var count int32
 	for _, e := range c.found {
-		lo, hi, mob, ok := t.entityBox(e)
+		lo, hi, mob, ok := t.boxOf(e)
 		if !ok || (rule.mobs && !mob) {
 			continue
 		}
@@ -252,7 +266,7 @@ func (t *Ticker) entitiesOnPlates(c *regionCircuit) {
 	}
 	c.moving = c.r.AppendEntities(c.moving[:0])
 	for _, e := range c.moving {
-		lo, hi, _, ok := t.entityBox(e)
+		lo, hi, _, ok := t.boxOf(e)
 		if !ok {
 			continue
 		}
@@ -267,6 +281,8 @@ func (t *Ticker) entitiesOnPlates(c *regionCircuit) {
 					switch t.kind(b) {
 					case kindPlate:
 						t.stepOn(c, pos, b)
+					case kindButton:
+						t.arrowHitsButton(c, e, pos, b)
 					case kindTripWire:
 						if !bitState(t.blocks.States(b), statePowered) {
 							t.wireUpdate(c, pos, b)

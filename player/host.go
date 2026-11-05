@@ -15,6 +15,7 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/crafting"
+	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/registry"
@@ -90,6 +91,8 @@ type Host struct {
 	attach *attach.Table
 	// circuits is what redstone answers for. Set before any player joins.
 	circuits CircuitHooks
+	// clock is the world's time. Set before any player joins.
+	clock *daytime.Clock
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
 	// discs is the music discs by item name.

@@ -406,6 +406,23 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	return lo, hi, false, false
 }
 
+// PlateBox is what plates and buttons see of an entity: EntityBox, and projectiles, which pistons
+// and carts do not take. Their box is taken as centred on their position. Runs: owner of the
+// entity's region.
+func (s *Host) PlateBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+	if t, isProjectile := e.Owner().(*Projectile); isProjectile {
+		at, half := e.Position(), mgl32.Vec3{t.spec.Width / 2, t.spec.Height / 2, t.spec.Width / 2}
+		return at.Sub(half), at.Add(half), false, true
+	}
+	return s.EntityBox(e)
+}
+
+// IsArrow says e is an arrow, what presses wood buttons.
+func (s *Host) IsArrow(e *world.Entity) bool {
+	t, isProjectile := e.Owner().(*Projectile)
+	return isProjectile && t.spec.ID == nameArrow
+}
+
 // PistonPush moves an entity a piston runs into. A player's position is the client's, so
 // the server moves it, stopped by blocks as BDS's actor move is, and corrects the client.
 // Runs: owner of the entity's region.

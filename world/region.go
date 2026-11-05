@@ -62,7 +62,9 @@ type Region struct {
 
 	// Owned by the region's tick, and by the dimension while it does not
 	// tick.
-	chunks       map[mcdb.ChunkPos]*Chunk
+	chunks map[mcdb.ChunkPos]*Chunk
+	// sky is SkyLight's working space, made when first needed.
+	sky          *skySearch
 	holds        map[mcdb.ChunkPos]int
 	sectionHolds map[sectionPos]int
 	loading      map[mcdb.ChunkPos]bool

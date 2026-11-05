@@ -73,11 +73,16 @@ func (p *Player) announce() {
 }
 
 // sendJoin sends the join packets in the order BDS 1.26.60 sends them
-// (SyncActorProperty, SyncWorldClocks, PlayerFog and the camera packets between
+// (SyncActorProperty, PlayerFog and the camera packets between
 // them are not sent yet). False if the connection failed.
 func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) bool {
 	s, lv := p.s, p.s.level
+	var dayTime int64
+	if s.clock != nil {
+		dayTime = int64(s.clock.Time())
+	}
 	p.send(s.reg.JigsawStructures, s.reg.VoxelShapes, &packet.StartGame{
+		Time:           dayTime,
 		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: spawn,
 		Pitch: rot.Pitch, Yaw: rot.Yaw,
 		WorldSeed: lv.Seed, Generator: lv.Generator, WorldGameMode: lv.GameMode, Difficulty: lv.Difficulty, WorldSpawn: worldSpawn,
@@ -91,8 +96,11 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 
 	// The adventure settings and abilities are broadcast, so the player
 	// gets its abilities twice, as from BDS.
-	p.send(&packet.SetSpawnPosition{SpawnType: packet.SpawnTypeWorld, Position: worldSpawn, SpawnPosition: worldSpawn},
-		&packet.SetDifficulty{Difficulty: uint32(lv.Difficulty)}, //nolint:gosec // difficulties are small
+	p.send(&packet.SetSpawnPosition{SpawnType: packet.SpawnTypeWorld, Position: worldSpawn, SpawnPosition: worldSpawn})
+	if s.clock != nil {
+		p.send(s.clockRegistry())
+	}
+	p.send(&packet.SetDifficulty{Difficulty: uint32(lv.Difficulty)}, //nolint:gosec // difficulties are small
 		&packet.SetCommandsEnabled{Enabled: true})
 	adventure := &packet.UpdateAdventureSettings{AutoJump: true}
 	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}

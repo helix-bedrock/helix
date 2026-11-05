@@ -100,10 +100,7 @@ func Use(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, y
 		sound(blocks, r, pos, choose(open, packet.SoundEventButtonClickOff, packet.SoundEventButtonClickOn), block)
 	case kindButton:
 		if !bit(blocks, block, statePressed) {
-			next := with(blocks, block, statePressed, flag(true))
-			setAndUpdate(r, pos, next)
-			sound(blocks, r, pos, packet.SoundEventButtonClickOn, block)
-			r.ScheduleTick(pos, next, buttonTicks(name), 0)
+			PressButton(blocks, r, pos, block)
 		}
 	case kindRepeater:
 		delay, _ := blocks.States(block)[stateDelay].(int32)
@@ -268,12 +265,26 @@ func doorStands(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block ui
 	return blocks.Name(other) == blocks.Name(block) && bit(blocks, other, stateUpper) != upper
 }
 
-// buttonTicks is how long the button called name stays in.
-func buttonTicks(name string) int32 {
-	if name == "minecraft:stone_button" || name == "minecraft:polished_blackstone_button" {
-		return buttonTicksStone
+// ButtonFeelsArrows says arrows press the button called name: wood ones, BDS's flag at +936.
+func ButtonFeelsArrows(name string) bool {
+	return name != "minecraft:stone_button" && name != "minecraft:polished_blackstone_button"
+}
+
+// ButtonTicks is how long the button called name stays in.
+func ButtonTicks(name string) int32 {
+	if ButtonFeelsArrows(name) {
+		return buttonTicksWood
 	}
-	return buttonTicksWood
+	return buttonTicksStone
+}
+
+// PressButton pushes in a button that is up: its state, its click, and the tick that pops it out.
+// Runs: owner of the region.
+func PressButton(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32) {
+	next := with(blocks, block, statePressed, flag(true))
+	setAndUpdate(r, pos, next)
+	sound(blocks, r, pos, packet.SoundEventButtonClickOn, block)
+	r.ScheduleTick(pos, next, ButtonTicks(blocks.Name(block)), 0)
 }
 
 // Ticker adds the blocks that react later to another BlockTicker: buttons pop
