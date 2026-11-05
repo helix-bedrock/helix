@@ -75,7 +75,7 @@ func testCommandList() *packet.AvailableCommands {
 		Overloads: []protocol.CommandOverload{itemOverload},
 	}
 	chest := protocol.Command{
-		Name: chestTestCommand, Description: "Tests the container API: refuse, rewrite, name, price, noopen, nobang, off.",
+		Name: chestTestCommand, Description: "Tests the container and explosion API: refuse, rewrite, name, price, noopen, nobang, playersonly, off.",
 		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
 		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
 			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 2},
@@ -441,12 +441,33 @@ const chestTestCommand = "chesttest"
 // rewrite turns what lands in it into sticks and what is taken into apples, name renames
 // the next chest opened, price shows each player its own price on every item, noopen
 // keeps every container but the player's own inventory shut, nobang stops every
-// explosion and TNT lighting.
-var chestTestActions = []string{"refuse", "rewrite", "name", "price", "noopen", "nobang", "off"}
+// explosion and TNT lighting, playersonly keeps every block and hurts and pushes only
+// players, telling whoever set it off what exploded.
+var chestTestActions = []string{"refuse", "rewrite", "name", "price", "noopen", "nobang", "playersonly", "off"}
+
+// explosionKindNames are the explosion kinds by name, for tellExplosion.
+var explosionKindNames = map[player.ExplosionKind]string{
+	player.ExplosionPlugin: "a plugin", player.ExplosionTNT: "TNT", player.ExplosionTNTMinecart: "a TNT minecart",
+	player.ExplosionBed: "a bed", player.ExplosionRespawnAnchor: "a respawn anchor", player.ExplosionCreeper: "a creeper",
+	player.ExplosionEndCrystal: "an end crystal", player.ExplosionWither: "a wither", player.ExplosionFireball: "a fireball",
+}
+
+// tellExplosion tells the player behind an explosion what it was.
+func tellExplosion(x *player.Explosion) {
+	if x.Attacker == nil {
+		return
+	}
+	msg := fmt.Sprintf("/chesttest: %s exploded", explosionKindNames[x.Kind])
+	if x.FromBlock {
+		msg += fmt.Sprintf(", from the block at %d %d %d", x.BlockPos[0], x.BlockPos[1], x.BlockPos[2])
+	}
+	// A failed write means the connection is closing; nothing to tell.
+	_ = x.Attacker.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: msg + "; blocks kept, only players hit"})
+}
 
 // chestTestFlags are the chest test's switches that stay on until "off".
 type chestTestFlags struct {
-	price, noOpen, noBang atomic.Bool
+	price, noOpen, noBang, playersOnly atomic.Bool
 }
 
 // priceLore is the lore the price test shows: a price that differs per player.
@@ -632,6 +653,18 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	if err := player.OnExplosionStart(setup, func(e *player.ExplosionStartEvent) {
 		if flags.noBang.Load() {
 			e.Cancel()
+			return
+		}
+		if flags.playersOnly.Load() {
+			e.Explosion.BreaksBlocks = false
+			tellExplosion(e.Explosion)
+		}
+	}, player.Normal); err != nil {
+		return err
+	}
+	if err := player.OnExplosionHit(setup, func(e *player.ExplosionHitEvent) {
+		if flags.playersOnly.Load() && e.Player == nil {
+			e.Cancel()
 		}
 	}, player.Normal); err != nil {
 		return err
@@ -712,10 +745,13 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 				flags.noOpen.Store(true)
 			case "nobang":
 				flags.noBang.Store(true)
+			case "playersonly":
+				flags.playersOnly.Store(true)
 			default:
 				chestMode.Store(chestTestOff)
 				flags.noOpen.Store(false)
 				flags.noBang.Store(false)
+				flags.playersOnly.Store(false)
 				if flags.price.Swap(false) {
 					p.RefreshItems()
 				}

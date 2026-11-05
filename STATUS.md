@@ -58,8 +58,11 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   sees of any item can be changed per player, one slot or a whole window at a time, without changing the
   server's item (`OnInventoryView`, `Inventory.SetView`, `Refresh`, `RefreshSlots`, `RefreshFor`,
   `Player.RefreshItems`, `ItemStack.WithLore`); what the player was shown is resent after it moves items.
-  `OnExplosionStart` can stop any explosion before it does anything and `OnTNTPrime` any TNT from
-  lighting. Chests also have pairing and spilling events and their name and pair (`Host.ChestAt`,
+  `OnExplosionStart` can stop any explosion before it does anything or change it (`BreaksBlocks`,
+  damage, knockback), and `OnTNTPrime` any TNT from lighting. Every explosion says what set it off
+  (`Explosion.Kind`, the block it came from, the player behind it), `OnExplosionHit` can change or
+  stop what each entity it reaches gets (only players hurt, say) and `ExplosionEvent.Keep` spares a
+  block. Chests also have pairing and spilling events and their name and pair (`Host.ChestAt`,
   `Host.WithChest`, `Chest`). None of this is tested in game yet; what other players see a player hold
   or wear has no per-player view yet.
   Experience has `OnExperience`, `Player.AddExperience`, `SetLevel` and `Host.SpawnExperience`. Block breaks say what is left behind and

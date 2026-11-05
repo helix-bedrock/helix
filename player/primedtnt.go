@@ -62,7 +62,11 @@ type PrimedTNT struct {
 	fire  bool
 	// owner is the player who lit it, if anyone.
 	owner *Player
-	saved map[string]any
+	// fromBlock, block and from are the TNT block it was lit from, if one; not saved.
+	fromBlock bool
+	block     uint32
+	from      cube.Pos
+	saved     map[string]any
 }
 
 // Entity returns the TNT's entity.
@@ -154,6 +158,7 @@ func (t *PrimedTNT) explosion(e *world.Entity) *Explosion {
 	at := e.Position()
 	x := NewExplosion(mgl32.Vec3{at[0], at[1] - tntHalfSize + tntBlastOffset, at[2]}, t.power)
 	x.Source, x.Attacker, x.Fire, x.Cause = e, t.owner, t.fire, DamageEntityExplosion
+	x.Kind, x.FromBlock, x.Block, x.BlockPos = ExplosionTNT, t.fromBlock, t.block, t.from
 	if !t.s.level.TNTExplosionDropDecay {
 		x.DropRadius = 1
 	}
@@ -311,13 +316,18 @@ func (s *Host) mayPrime(r *world.Region, pos cube.Pos, p *Player, x *Explosion) 
 }
 
 // Exploded lights it with a short fuse; the explosion that took it removes the block.
-func (tntBlock) Exploded(s *Host, r *world.Region, pos cube.Pos, _ uint32, e *Explosion) {
+func (tntBlock) Exploded(s *Host, r *world.Region, pos cube.Pos, block uint32, e *Explosion) {
 	if !s.level.TNTExplodes || !s.mayPrime(r, pos, e.Attacker, e) {
 		return
 	}
 	conf := &s.redstone.Get().TNT
 	fuse := conf.BlastFuseMin + rand.Int32N(conf.BlastFuseMax-conf.BlastFuseMin+1)
-	s.SpawnTNT(r.Dimension(), tntFeet(pos), fuse, e.Attacker)
+	s.SpawnTNT(r.Dimension(), tntFeet(pos), fuse, e.Attacker).litFrom(pos, block)
+}
+
+// litFrom records the TNT block t was lit from.
+func (t *PrimedTNT) litFrom(pos cube.Pos, block uint32) {
+	t.fromBlock, t.from, t.block = true, pos, block
 }
 
 // tntFeet is where TNT lit in a block stands.
@@ -331,15 +341,17 @@ func (s *Host) PrimeBlock(r *world.Region, pos cube.Pos, owner *Player) bool {
 	if !s.level.TNTExplodes || !s.mayPrime(r, pos, owner, nil) {
 		return false
 	}
+	block, _ := r.Block(pos, 0)
 	r.SetBlock(pos, 0, s.reg.Blocks.Air())
 	r.UpdateNeighbours(pos)
-	s.lightTNT(r, pos, owner)
+	s.lightTNT(r, pos, block, owner)
 	return true
 }
 
 // lightTNT is BDS's TNT block lighting: the entity, and the fuse sound where it is.
-func (s *Host) lightTNT(r *world.Region, pos cube.Pos, owner *Player) {
+func (s *Host) lightTNT(r *world.Region, pos cube.Pos, block uint32, owner *Player) {
 	t := s.SpawnTNT(r.Dimension(), tntFeet(pos), s.redstone.Get().TNT.Fuse, owner)
+	t.litFrom(pos, block)
 	levelEvent(r, pos, t.entity.Position(), packet.LevelEventSoundFuse, 0)
 }
 
@@ -361,6 +373,6 @@ func (s *Host) brokenTNT(r *world.Region, pos cube.Pos, block uint32, p *Player)
 		return
 	}
 	if v, _ := blocks.States(block)[stateExplodeBit].(uint8); v != 0 && s.mayPrime(r, pos, p, nil) {
-		s.lightTNT(r, pos, p)
+		s.lightTNT(r, pos, block, p)
 	}
 }

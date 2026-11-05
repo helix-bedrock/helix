@@ -70,14 +70,42 @@ const (
 	DamageEntityExplosion DamageCause = causeEntityBlast
 )
 
+// ExplosionKind is what set an explosion off. Plugins running their own explosions use
+// ExplosionPlugin or a value of their own from ExplosionPluginBase up.
+type ExplosionKind uint16
+
+// The kinds of explosion. Only TNT and TNT minecarts explode so far; the rest are named
+// so plugins can be written for them now, and are filled in as those are built.
+const (
+	ExplosionPlugin ExplosionKind = iota
+	ExplosionTNT
+	ExplosionTNTMinecart
+	ExplosionBed
+	ExplosionRespawnAnchor
+	ExplosionCreeper
+	ExplosionEndCrystal
+	ExplosionWither
+	ExplosionFireball
+	// ExplosionPluginBase is where plugins' own kinds start.
+	ExplosionPluginBase ExplosionKind = 1000
+)
+
 // Explosion is an explosion to run, BDS's Explosion. Make one with [NewExplosion], change
 // what you like and run it with [Host.Explode]. Vanilla's primed TNT is only one user.
 type Explosion struct {
 	// Pos is where it starts; Radius how strong it is.
 	Pos    mgl32.Vec3
 	Radius float32
+	// Kind is what set it off.
+	Kind ExplosionKind
+	// FromBlock says the explosion came from a block: Block is that block's state and
+	// BlockPos where it was. For lit TNT this is the TNT block it was lit from, unless
+	// it was dispensed, spawned by a plugin or loaded from a save.
+	FromBlock bool
+	Block     uint32
+	BlockPos  cube.Pos
 	// Source is what explodes, if anything. It is not hurt, and distances to entities are
-	// measured from it. Attacker is the player behind it.
+	// measured from it. Attacker is the player behind it: who lit the TNT, say.
 	Source   *world.Entity
 	Attacker *Player
 	// Fire sets one in three air blocks in the blast on fire. BreaksBlocks breaks blocks.
@@ -123,6 +151,37 @@ type ExplosionEvent struct {
 	Region    *world.Region
 	Explosion *Explosion
 	Blocks    []cube.Pos
+}
+
+// Keep takes pos out of the blocks the explosion breaks.
+func (e *ExplosionEvent) Keep(pos cube.Pos) {
+	for i, b := range e.Blocks {
+		if b == pos {
+			e.Blocks = append(e.Blocks[:i], e.Blocks[i+1:]...)
+			return
+		}
+	}
+}
+
+// ExplosionHitEvent fires for each entity an explosion reaches, before it is hurt or
+// pushed. Damage and Push may be changed (0 for none); Cancel leaves the entity alone.
+// Hurts is false when vanilla would not hurt it at all (a DamageScale of about 0);
+// setting it makes Damage count. Runs: owner of the explosion's region.
+type ExplosionHitEvent struct {
+	Cancellable
+	Region    *world.Region
+	Explosion *Explosion
+	Entity    *world.Entity
+	// Player is the entity's player, nil for anything else.
+	Player *Player
+	Hurts  bool
+	Damage float32
+	Push   mgl32.Vec3
+}
+
+// OnExplosionHit listens to explosions reaching entities.
+func OnExplosionHit(s *Setup, fn func(e *ExplosionHitEvent), p Priority) error {
+	return addListener(s, &s.h.game.explosionHitEv, fn, p)
 }
 
 // ExplosionStartEvent fires before an explosion does anything at all: before its rays,
@@ -366,23 +425,40 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 		return
 	}
 	impact := (1 - dist/reach) * s.exposure(r, e.Pos, lo, hi) * e.KnockbackScale
-	if float32(math.Abs(float64(e.DamageScale))) > noDamageScale {
-		damage := float32(e.FixedDamage)
+	hurts := float32(math.Abs(float64(e.DamageScale))) > noDamageScale
+	var damage float32
+	if hurts {
+		damage = float32(e.FixedDamage)
 		if !e.HasFixedDamage {
 			damage = ((impact*impact+impact)/2*damageMultiplier*reach + 1) * e.DamageScale
 		}
 		if e.Source != nil && underwater && !e.AllowUnderwater {
 			damage = 0
 		}
+	}
+	var push mgl32.Vec3
+	dir := pos.Sub(e.Pos)
+	if l := dir.Len(); l >= minSpeed && impact != 0 {
+		push = dir.Mul(impact / l)
+	}
+	if s.game.explosionHitEv.Has() {
+		p, _ := o.Owner().(*Player)
+		ev := ExplosionHitEvent{Region: r, Explosion: e, Entity: o, Player: p, Hurts: hurts, Damage: damage, Push: push}
+		s.game.explosionHitEv.fire(s.log, &ev)
+		if ev.Cancelled() {
+			return
+		}
+		hurts, damage, push = ev.Hurts, ev.Damage, ev.Push
+	}
+	if hurts {
 		src := DamageSource{Cause: e.Cause}
 		if e.Attacker != nil {
 			src = DamageSource{Cause: DamageEntityExplosion, Attacker: e.Attacker}
 		}
 		target.BlastHit(damage, src)
 	}
-	dir := pos.Sub(e.Pos)
-	if l := dir.Len(); l >= minSpeed && impact != 0 {
-		target.BlastPush(dir.Mul(impact / l))
+	if push != (mgl32.Vec3{}) {
+		target.BlastPush(push)
 	}
 }
 

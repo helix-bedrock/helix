@@ -145,3 +145,58 @@ func TestRayBlockedByBlock(t *testing.T) {
 		}
 	})
 }
+
+// TestExplosionHitAndCause checks a hit listener can spare entities, Keep spares blocks,
+// and lit TNT knows the block it came from.
+func TestExplosionHitAndCause(t *testing.T) {
+	keep := cube.Pos{8, 0, 8}
+	p, d := apiWorld(t, func(s *Setup) {
+		if err := OnExplosionHit(s, func(e *ExplosionHitEvent) {
+			if e.Player == nil {
+				e.Cancel()
+			}
+		}, Normal); err != nil {
+			t.Fatal(err)
+		}
+		if err := OnExplosion(s, func(e *ExplosionEvent) { e.Keep(keep) }, Normal); err != nil {
+			t.Fatal(err)
+		}
+	})
+	p.s.level.TNTExplodes = true
+	ticket := d.KeepLoaded(world.Radius(0, 0, 3), true)
+	t.Cleanup(ticket.Release)
+	blocks := p.s.reg.Blocks
+	air := blocks.Air()
+	stone, _ := blocks.Block("minecraft:stone")
+	tntID, _ := blocks.Block("minecraft:tnt")
+	var dirt *ItemActor
+	onRegion(d, func(r *world.Region) {
+		y := surface(r, air, 8, 8)
+		keep[1] = y
+		r.SetBlock(keep, 0, stone)
+		dirt = p.s.spawnItem(d, ItemStack{Name: "minecraft:dirt", Count: 1}, mgl32.Vec3{8, float32(y) + 1.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+		p.s.Explode(r, NewExplosion(mgl32.Vec3{8.5, float32(y) + 1, 8.5}, p.s.redstone.Get().TNT.Power))
+	})
+	var x *Explosion
+	onRegion(d, func(r *world.Region) {
+		if b, _ := r.Block(keep, 0); b != stone {
+			t.Errorf("kept block is %s", blocks.Name(b))
+		}
+		at := cube.Pos{3, keep[1] + 1, 3}
+		r.SetBlock(at, 0, tntID)
+		p.s.PrimeBlock(r, at, nil)
+	})
+	onRegion(d, func(r *world.Region) {
+		for _, e := range r.AppendEntitiesIn(nil, 0, 0, 16, 16) {
+			if tnt, ok := e.Owner().(*PrimedTNT); ok {
+				x = tnt.explosion(e)
+			}
+		}
+	})
+	if dirt.taken {
+		t.Error("the hit listener did not spare the item")
+	}
+	if x == nil || x.Kind != ExplosionTNT || !x.FromBlock || x.BlockPos != (cube.Pos{3, keep[1] + 1, 3}) {
+		t.Errorf("lit TNT's explosion %+v", x)
+	}
+}

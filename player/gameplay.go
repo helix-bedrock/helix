@@ -180,6 +180,7 @@ type gameplay struct {
 	containerItemEv  listeners[ContainerItemEvent]
 	inventoryViewEv  listeners[InventoryViewEvent]
 	explosionStartEv listeners[ExplosionStartEvent]
+	explosionHitEv   listeners[ExplosionHitEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
@@ -226,6 +227,7 @@ type gameState struct {
 	containerItemEv  listeners[ContainerItemEvent]
 	inventoryViewEv  listeners[InventoryViewEvent]
 	explosionStartEv listeners[ExplosionStartEvent]
+	explosionHitEv   listeners[ExplosionHitEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
@@ -445,7 +447,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -477,6 +479,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.containerItemEv.freeze()
 	g.inventoryViewEv.freeze()
 	g.explosionStartEv.freeze()
+	g.explosionHitEv.freeze()
 	g.tntPrimeEv.freeze()
 	g.craftEv.freeze()
 	g.smithEv.freeze()

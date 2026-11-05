@@ -895,7 +895,7 @@ func (m *Minecart) tickFuse(r *world.Region, e *world.Entity) {
 	if m.s.level.TNTExplodes {
 		at := e.Position()
 		x := NewExplosion(at, cartTNTPower)
-		x.Source, x.Cause = e, DamageEntityExplosion
+		x.Source, x.Cause, x.Kind = e, DamageEntityExplosion, ExplosionTNTMinecart
 		if !m.s.level.TNTExplosionDropDecay {
 			x.DropRadius = 1
 		}
