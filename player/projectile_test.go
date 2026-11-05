@@ -116,6 +116,34 @@ func TestArrowSticksThenFalls(t *testing.T) {
 	waitRegion(t, d, func(*world.Region) bool { return !arrow.stuck })
 }
 
+// At the edge of the loaded chunks an arrow waits with its speed, and does not drop.
+func TestArrowWaitsAtLoadedEdge(t *testing.T) {
+	p, d := machineWorld(t)
+	var y int
+	onRegion(d, func(r *world.Region) { y = surface(r, p.s.reg.Blocks.Air(), 3, 8) })
+	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
+	var arrow *Projectile
+	onRegion(d, func(r *world.Region) {
+		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 100, 8.5}, mgl32.Vec3{1, 0, 0}, spec.Power, nil)
+	})
+	var last mgl32.Vec3
+	still := 0
+	waitRegion(t, d, func(*world.Region) bool {
+		if pos := arrow.Entity().Position(); pos != last {
+			last, still = pos, 0
+			return false
+		}
+		still++
+		return still > 3 && !arrow.waiting
+	})
+	if arrow.Velocity()[0] < 1 {
+		t.Errorf("waiting at %v it lost its speed: %v", last, arrow.Velocity())
+	}
+	if arrow.stuck || arrow.gone {
+		t.Errorf("it should still be in the air at %v", last)
+	}
+}
+
 // Only what is thrown counts as thrown; an arrow needs a bow or a dispenser.
 func TestThrowableKinds(t *testing.T) {
 	if throwable(nameSnowball) == "" || throwable(nameEgg) == "" || throwable(nameEnderPearl) == "" {

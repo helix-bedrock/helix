@@ -568,9 +568,13 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 			return
 		}
 	}
+	rot := t.rot
 	t.turn()
+	// The next chunk is not loaded. BDS's projectile tick has no such check, and only runs for
+	// an actor being ticked: it waits with its speed, and flies on once the chunk is back.
 	if !e.Apply(world.Movement{Pos: pos, Rot: t.rot, Tick: e.Tick()}) {
-		t.vel = mgl32.Vec3{}
+		t.rot = rot
+		t.age--
 		return
 	}
 	inertia := t.spec.Inertia
