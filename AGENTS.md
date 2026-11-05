@@ -228,7 +228,7 @@ sibling library folders, so unreleased library changes are used.
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every
   player whose client has the chunk, in other regions too.
-- `cmd/helix`: the server program. `-testcmds` adds a stand-in /gamemode
+- `cmd/helix`: the server program. `-tick-distance` sets `Config.TickDistance`. `-testcmds` adds a stand-in /gamemode
   (and /gm), listed to the client with an AvailableCommands packet on its
   first input, for in-game testing until commands are designed, a countdown
   name tag over dropped items through an item view, and /itemtest to try the
