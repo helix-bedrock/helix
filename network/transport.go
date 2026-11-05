@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/helix-bedrock/nethernet"
 	"github.com/helix-bedrock/nethernet/endpoint"
@@ -118,9 +117,9 @@ func NetherNet(conf NetherNetConfig) (Transport, error) {
 		_ = closeAll()
 		return nil, fmt.Errorf("network: nethernet listener: %w", err)
 	}
-	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second}
+	srv := &http.Server{Handler: handler, ReadTimeout: endpoint.RequestTimeout}
 	go func() {
-		if err := srv.Serve(tcp); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(endpoint.NewListener(tcp, conf.Log)); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			conf.Log.Error("nethernet signaling stopped", "err", err)
 		}
 	}()
