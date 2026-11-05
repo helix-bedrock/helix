@@ -105,6 +105,9 @@ type EntityConfig struct {
 	// entity is sent nothing about it, and one who loses sight of it is told
 	// it is gone. Change it with [Entity.SetVisibleTo].
 	VisibleTo func(player *Entity) bool
+	// StaySeen, if set, keeps the entity shown to a player who already sees it after it
+	// leaves that player's disc, for as long as it returns true and the two share a region.
+	StaySeen func(player *Entity) bool
 	// SpawnFor replaces Spawn with packets built for one player, not shared.
 	// Change it with [Entity.SetSpawnFor].
 	SpawnFor func(player *Entity) []packet.Packet
@@ -509,6 +512,9 @@ func (r *Region) updateVisibility() {
 		}
 		for o, k := range p.known {
 			if !k.seen {
+				if o.conf.StaySeen != nil && o.region == r && o.conf.StaySeen(p) {
+					continue
+				}
 				delete(p.known, o)
 				p.conf.Viewer.sendEntity(&packet.RemoveActor{EntityUniqueID: k.id})
 				continue

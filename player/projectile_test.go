@@ -116,12 +116,32 @@ func TestArrowSticksThenFalls(t *testing.T) {
 	waitRegion(t, d, func(*world.Region) bool { return !arrow.stuck })
 }
 
-// At the edge of the loaded chunks an arrow waits with its speed, and does not drop.
-func TestArrowWaitsAtLoadedEdge(t *testing.T) {
+// An arrow keeps flying past the chunks that were loaded when it was shot, with its speed.
+func TestArrowFliesPastLoadedChunks(t *testing.T) {
 	p, d := machineWorld(t)
 	var y int
 	onRegion(d, func(r *world.Region) { y = surface(r, p.s.reg.Blocks.Air(), 3, 8) })
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
+	var arrow *Projectile
+	onRegion(d, func(r *world.Region) {
+		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 100, 8.5}, mgl32.Vec3{1, 0, 0}, spec.Power, nil)
+	})
+	waitRegion(t, d, func(*world.Region) bool { return arrow.Entity().Position()[0] > 120 })
+	if arrow.Velocity()[0] < 1 {
+		t.Errorf("it lost its speed: %v", arrow.Velocity())
+	}
+	if arrow.ahead == nil {
+		t.Error("it holds no chunks ahead of it")
+	}
+}
+
+// With StayInLoaded, as BDS's tick would, it waits at the edge with its speed.
+func TestArrowCanStayInLoadedChunks(t *testing.T) {
+	p, d := machineWorld(t)
+	var y int
+	onRegion(d, func(r *world.Region) { y = surface(r, p.s.reg.Blocks.Air(), 3, 8) })
+	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
+	spec.StayInLoaded = true
 	var arrow *Projectile
 	onRegion(d, func(r *world.Region) {
 		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 100, 8.5}, mgl32.Vec3{1, 0, 0}, spec.Power, nil)
@@ -136,12 +156,21 @@ func TestArrowWaitsAtLoadedEdge(t *testing.T) {
 		still++
 		return still > 3 && !arrow.waiting
 	})
-	if arrow.Velocity()[0] < 1 {
-		t.Errorf("waiting at %v it lost its speed: %v", last, arrow.Velocity())
+	if arrow.Velocity()[0] < 1 || arrow.stuck || arrow.gone {
+		t.Errorf("waiting at %v: velocity %v, stuck %v, gone %v", last, arrow.Velocity(), arrow.stuck, arrow.gone)
 	}
-	if arrow.stuck || arrow.gone {
-		t.Errorf("it should still be in the air at %v", last)
-	}
+}
+
+// One falling far below the world is gone.
+func TestArrowGoneBelowWorld(t *testing.T) {
+	p, d := machineWorld(t)
+	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
+	var arrow *Projectile
+	onRegion(d, func(r *world.Region) {
+		low := float32(r.Dimension().Range()[0]) - projectileBelowWorld - 1
+		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, low, 8.5}, mgl32.Vec3{0, -1, 0}, spec.Power, nil)
+	})
+	waitRegion(t, d, func(*world.Region) bool { return arrow.gone })
 }
 
 // Only what is thrown counts as thrown; an arrow needs a bow or a dispenser.

@@ -44,6 +44,11 @@ const (
 	projectileScan = 3
 	// projectileClipLimit is how many blocks one tick's flight walks at most, BDS's 200.
 	projectileClipLimit = 200
+	// projectileLookAhead is how many ticks of flight ahead its chunks are kept loaded.
+	projectileLookAhead = 10
+	// projectileBelowWorld is how far below the world it is removed, so one falling through
+	// empty chunks does not hold chunks for ever. An assumption, not read from BDS.
+	projectileBelowWorld = 64
 	// projectileMoveDropped and projectileMoveFar are BDS's defaults for a definition's
 	// conditional bandwidth optimization, and projectileMoveTicksShare the part of its dropped
 	// ticks BDS uses.
@@ -139,6 +144,10 @@ type ProjectileSpec struct {
 	Knockback bool
 	// RemoveOnHit removes it after any hit, and DestroyOnHit after hitting an entity.
 	RemoveOnHit, DestroyOnHit bool
+	// StayInLoaded makes it wait at the edge of the loaded chunks, as BDS's tick would. By
+	// default it keeps flying: the chunks ahead of it stay loaded while it does, and those who
+	// see it go on seeing it.
+	StayInLoaded bool
 	// MoveDroppedTicks and MoveFarDistance say how seldom far players get its moves.
 	MoveDroppedTicks int32
 	MoveFarDistance  float32
@@ -331,6 +340,11 @@ type Projectile struct {
 	pickup   arrowPickup
 	item     ItemStack
 
+	// ahead holds the chunks it is about to fly through, aheadFrom and aheadTo the chunks that
+	// were worked out from.
+	ahead              *world.Ticket
+	aheadFrom, aheadTo mcdb.ChunkPos
+
 	// sentPos, sentRot and sentGround are the last move those who see it were told, and sentTo
 	// the tick each of them last got one.
 	sentPos    mgl32.Vec3
@@ -400,6 +414,7 @@ func (t *Projectile) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, ro
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Input: t.tick, Save: t.saveEntity,
+		StaySeen: t.staysSeen, Unloaded: t.unloaded,
 	}
 }
 
@@ -555,6 +570,11 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 		t.tickStuck(r, e)
 		return
 	}
+	if e.Position()[1] < float32(r.Dimension().Range()[0])-projectileBelowWorld {
+		t.remove(e)
+		return
+	}
+	t.keepAhead(r, e)
 	t.age++
 	from := e.Position()
 	to := from.Add(t.vel)
@@ -570,8 +590,7 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	}
 	rot := t.rot
 	t.turn()
-	// The next chunk is not loaded. BDS's projectile tick has no such check, and only runs for
-	// an actor being ticked: it waits with its speed, and flies on once the chunk is back.
+	// The next chunk is not loaded yet: it waits with its speed, and flies on once it is.
 	if !e.Apply(world.Movement{Pos: pos, Rot: t.rot, Tick: e.Tick()}) {
 		t.rot = rot
 		t.age--
@@ -583,6 +602,53 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	}
 	t.vel = t.vel.Mul(inertia)
 	t.vel[1] -= t.spec.Gravity
+}
+
+// staysSeen keeps it shown while it flies, however far.
+func (t *Projectile) staysSeen(*world.Entity) bool {
+	return !t.spec.StayInLoaded && !t.stuck && !t.gone
+}
+
+// unloaded lets go of the chunks ahead when its own chunk unloads.
+func (t *Projectile) unloaded(*world.Entity) { t.releaseAhead() }
+
+// releaseAhead lets the chunks ahead of it unload.
+func (t *Projectile) releaseAhead() {
+	if t.ahead != nil {
+		t.ahead.Release()
+		t.ahead = nil
+	}
+}
+
+// keepAhead keeps the chunks it is about to fly through loaded, once it comes near chunks that
+// are not. Not BDS: the project lead wants projectiles to keep flying. The new hold comes first,
+// so its own chunk never unloads under it.
+func (t *Projectile) keepAhead(r *world.Region, e *world.Entity) {
+	if t.spec.StayInLoaded {
+		return
+	}
+	pos := e.Position()
+	to := pos.Add(t.vel.Mul(projectileLookAhead))
+	from, next := projectileChunk(pos), projectileChunk(to)
+	if t.ahead == nil {
+		at := cube.Pos{itemFloor(to[0]), r.Dimension().Range()[0], itemFloor(to[2])}
+		if _, loaded := r.Block(at, 0); loaded {
+			return
+		}
+	} else if from == t.aheadFrom && next == t.aheadTo {
+		return
+	}
+	old := t.ahead
+	t.ahead = r.Dimension().KeepLoaded(world.Box(int32(itemFloor(pos[0])), int32(itemFloor(pos[2])), int32(itemFloor(to[0])), int32(itemFloor(to[2]))), false)
+	t.aheadFrom, t.aheadTo = from, next
+	if old != nil {
+		old.Release()
+	}
+}
+
+// projectileChunk is the chunk a position is in.
+func projectileChunk(pos mgl32.Vec3) mcdb.ChunkPos {
+	return mcdb.ChunkPos{int32(itemFloor(pos[0]) >> 4), int32(itemFloor(pos[2]) >> 4)}
 }
 
 // sendFlags tells those who see it its flags.
@@ -819,6 +885,7 @@ func (t *Projectile) hitSound(r *world.Region, at mgl32.Vec3) {
 // remove takes it out of the world.
 func (t *Projectile) remove(e *world.Entity) {
 	t.gone = true
+	t.releaseAhead()
 	e.Remove()
 }
 
@@ -827,6 +894,7 @@ func (t *Projectile) stickIn(e *world.Entity, hit projectileHit) {
 	t.vel = mgl32.Vec3{}
 	t.stuck, t.stuckAt, t.stuckTicks, t.shake, t.critical = true, hit.block, 0, t.spec.ShakeTicks, false
 	t.stuckMoveDue = true
+	t.releaseAhead()
 	// BDS's on ground flag is what stuck is; its moves carry it to the client.
 	e.Apply(world.Movement{Pos: hit.pos, Rot: t.rot, OnGround: true, Tick: e.Tick()})
 	t.sendFlags(e)
