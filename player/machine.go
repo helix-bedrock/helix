@@ -298,6 +298,9 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 
 // takeOne puts one of s in the first slot that has room for it.
 func (c *Chest) takeOne(r *world.Region, s ItemStack) bool {
+	if c.shulker && isShulkerBox(s.Name) {
+		return false
+	}
 	limit := s.maxStack(c.s.reg)
 	for i, size := 0, c.Size(r); i < size; i++ {
 		if c.machine != nil && c.machine.crafter && !c.crafterTakes(i, s) {

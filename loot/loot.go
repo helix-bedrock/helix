@@ -236,8 +236,8 @@ func (w *walker) drops(n *data.DropNode) {
 		}
 	case "actor_item":
 		// BDS builds these from the block entity (a banner's pattern, a
-		// shulker box's items, a bed's colour). Those block entities are not
-		// run yet, so the plain item drops.
+		// shulker box's items, a bed's colour). The engine adds what it runs;
+		// here the plain item drops.
 		if n.Name != "" {
 			w.copies(Stack{Name: n.Name}, 1)
 		} else {

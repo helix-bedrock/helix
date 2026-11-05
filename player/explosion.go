@@ -481,9 +481,9 @@ func (s *Host) takeBlocks(r *world.Region, e *Explosion, blocks []cube.Pos) []cu
 		if !ok || b == air {
 			continue
 		}
-		drops = s.blastDrops(b, radius, pos, drops)
+		drops = s.blastDrops(r, b, radius, pos, drops)
 		if extra, has := r.Block(pos, 1); has && extra != air {
-			drops = s.blastDrops(extra, radius, pos, drops)
+			drops = s.blastDrops(r, extra, radius, pos, drops)
 			r.SetBlock(pos, 1, air)
 		}
 		if hit, isHit := s.game.blocks[reg.Name(b)].(Exploded); isHit {
@@ -510,8 +510,9 @@ type blastDrop struct {
 
 // blastDrops adds what a block leaves to the explosion's drops: equal items pile up, as
 // high as more kinds of drops allow.
-func (s *Host) blastDrops(block uint32, radius float32, pos cube.Pos, drops []blastDrop) []blastDrop {
+func (s *Host) blastDrops(r *world.Region, block uint32, radius float32, pos cube.Pos, drops []blastDrop) []blastDrop {
 	items, _ := s.game.sys.Drops(s, block, &loot.Context{Explosion: true, Radius: radius})
+	items = s.shulkerDrops(r, pos, items)
 	for _, it := range items {
 		limit := min(int(it.maxStack(s.reg)), dropStackStep*(len(drops)/dropStackEvery)+dropStackStep)
 		for i := range drops {

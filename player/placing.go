@@ -304,6 +304,9 @@ func vanillaPlace(pl *Placement) bool {
 		if !r.SetBlock(pl.Pos, 0, pl.Block) {
 			return false
 		}
+		if c := p.s.chestAt(r, pl.Pos); c != nil && c.shulker {
+			c.placedFrom(r, pl)
+		}
 		r.UpdateNeighbours(pl.Pos)
 	}
 	r.Broadcast(pl.Pos, &packet.LevelSoundEvent{

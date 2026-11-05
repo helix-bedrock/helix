@@ -109,10 +109,19 @@ func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) ([]Bloc
 			harvest = true
 			var items []ItemStack
 			items, xp = g.sys.Drops(p.s, block, p.breakContext(r, pos))
+			items = p.s.shulkerDrops(r, pos, items)
 			drops = make([]BlockDrop, 0, len(items))
 			for _, it := range items {
 				drops = append(drops, NewBlockDrop(pos, it))
 			}
+		}
+	}
+	// A creative player's break leaves nothing, but BDS still drops a box with items in it
+	// (0xD525270).
+	if c := p.s.chestAt(r, pos); p.creative() && c != nil && c.shulker && !c.emptySlots(chestSize) {
+		items, _ := g.sys.Drops(p.s, block, p.breakContext(r, pos))
+		for _, it := range p.s.shulkerDrops(r, pos, items) {
+			drops = append(drops, NewBlockDrop(pos, it))
 		}
 	}
 	if g.dropsEv.Has() {
@@ -228,6 +237,7 @@ func customNameAt(r *world.Region, pos cube.Pos) string {
 // Runs: on the region tick.
 func (s *Host) FallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	items, _ := s.game.sys.Drops(s, block, &loot.Context{})
+	items = s.shulkerDrops(r, pos, items)
 	if r.SetBlock(pos, 0, s.reg.Blocks.Air()) {
 		r.UpdateNeighbours(pos)
 	}

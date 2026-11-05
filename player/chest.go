@@ -58,6 +58,7 @@ const (
 	chestCopper
 	chestEnder
 	chestMachine
+	chestShulker
 )
 
 // cardinalState is the block state a chest faces by.
@@ -113,6 +114,8 @@ func chestKindOf(name string) int8 {
 		return chestEnder
 	case machineSpecs[name] != nil:
 		return chestMachine
+	case isShulkerBox(name):
+		return chestShulker
 	}
 	return chestNone
 }
@@ -158,6 +161,10 @@ type Chest struct {
 	ender bool
 	// cart is the minecart holding these slots, if no block does.
 	cart *Minecart
+	// shulker says this is a shulker box: a chest that never pairs, whose lid opens
+	// towards facing and whose items leave with the dropped box.
+	shulker bool
+	facing  uint8
 	// machine says this is a hopper, dispenser or dropper rather than a chest: the
 	// same slots and window, without a lid or a partner.
 	machine *machineSpec
@@ -210,7 +217,7 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if spec := machineSpecs[e.s.reg.Blocks.Name(block)]; spec != nil {
 		return &Chest{s: e.s, lead: true, machine: spec}
 	}
-	return &Chest{s: e.s, lead: true, ender: t.kind[block] == chestEnder}
+	return &Chest{s: e.s, lead: true, ender: t.kind[block] == chestEnder, shulker: t.kind[block] == chestShulker, facing: shulkerDefaultFacing}
 }
 
 // Load brings back a chest as BDS loads one. A follower waits for its lead's tick
@@ -226,10 +233,11 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	if spec := machineByID(id); spec != nil {
 		return e.s.loadMachine(pos, saved, spec), true
 	}
-	if id != chestEntityID && id != enderChestEntityID {
+	if id != chestEntityID && id != enderChestEntityID && id != shulkerEntityID {
 		return nil, false
 	}
-	c := &Chest{s: e.s, pos: pos, lead: true, ender: id == enderChestEntityID, saved: maps.Clone(saved)}
+	c := &Chest{s: e.s, pos: pos, lead: true, ender: id == enderChestEntityID, shulker: id == shulkerEntityID, saved: maps.Clone(saved)}
+	c.facing, _ = saved[shulkerFacingTag].(uint8)
 	for _, item := range compounds(saved["Items"]) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < chestSize {
@@ -269,6 +277,9 @@ func (c *Chest) NetworkData(pos cube.Pos) map[string]any {
 	m["id"] = chestEntityID
 	if c.ender {
 		m["id"] = enderChestEntityID
+	}
+	if c.shulker {
+		m["id"], m[shulkerFacingTag] = shulkerEntityID, c.facing
 	}
 	if c.machine != nil {
 		m["id"] = c.machine.id
@@ -320,7 +331,7 @@ func boolByte(b bool) uint8 {
 // BlockEntityPlaced tries the two neighbours a chest facing this way can pair with.
 func (c *Chest) BlockEntityPlaced(r *world.Region, pos cube.Pos) {
 	c.pos = pos
-	if c.ender || c.machine != nil {
+	if c.ender || c.shulker || c.machine != nil {
 		return
 	}
 	block, ok := r.Block(pos, 0)
@@ -433,6 +444,10 @@ func (s *Host) chestAt(r *world.Region, pos cube.Pos) *Chest {
 // half of the items.
 func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	c.pos = pos
+	if c.shulker {
+		c.closeViewers(r)
+		return
+	}
 	c.unpair(r)
 	c.closeViewers(r)
 	items := c.items[:]
@@ -487,7 +502,9 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		}
 		return
 	}
-	c.tickPair(r)
+	if !c.shulker {
+		c.tickPair(r)
+	}
 	if c.open {
 		c.resend++
 		if c.resend >= chestEventResend {
@@ -501,9 +518,9 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	was := c.lid
 	switch {
 	case c.open && was < 1:
-		c.lid = min(was+chestLidSpeed, 1)
+		c.lid = min(was+c.lidSpeed(), 1)
 	case !c.open && was > 0:
-		c.lid = was - chestLidSpeed
+		c.lid = was - c.lidSpeed()
 		if was >= chestLidCloseSound && c.lid < chestLidCloseSound {
 			c.lidSound(r, c.closeSound())
 		}
@@ -549,6 +566,9 @@ func (c *Chest) tickPair(r *world.Region) {
 
 // openSound is the sound of the lid starting to open.
 func (c *Chest) openSound() string {
+	if c.shulker {
+		return packet.SoundEventShulkerBoxOpen
+	}
 	if c.ender {
 		return packet.SoundEventEnderChestOpen
 	}
@@ -557,6 +577,9 @@ func (c *Chest) openSound() string {
 
 // closeSound is the sound of the lid closing.
 func (c *Chest) closeSound() string {
+	if c.shulker {
+		return packet.SoundEventShulkerBoxClosed
+	}
 	if c.ender {
 		return packet.SoundEventEnderChestClosed
 	}
@@ -647,7 +670,7 @@ func (c *Chest) closeViewers(r *world.Region) {
 func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	c := p.s.chestAt(r, u.Pos)
 	if c == nil {
-		c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder, machine: machineSpecs[p.s.reg.Blocks.Name(u.Block)]}
+		c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder, shulker: p.s.chests.kind[u.Block] == chestShulker, facing: shulkerDefaultFacing, machine: machineSpecs[p.s.reg.Blocks.Name(u.Block)]}
 		if !r.SetBlockEntity(u.Pos, c) {
 			return false
 		}
@@ -675,6 +698,9 @@ func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 func (c *Chest) canOpen(r *world.Region, pos cube.Pos) bool {
 	if c.machine != nil {
 		return true
+	}
+	if c.shulker {
+		return c.shulkerCanOpen(r, pos)
 	}
 	above, ok := r.Block(pos.Side(cube.FaceUp), 0)
 	if !ok || c.s.chests.clear[above] {

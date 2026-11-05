@@ -106,6 +106,9 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	if status := p.finishCraft(); status != protocol.ItemStackResponseStatusOK {
 		return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
 	}
+	if p.shulkerInShulker() {
+		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
+	}
 	// Listeners work on the copy, so refusing here changes nothing.
 	if !p.fireChestItems() {
 		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
@@ -269,7 +272,7 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]
-	case containerLevelEntity, protocol.ContainerCrafterLevelEntity:
+	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox:
 		if int(slot) >= len(inv.open) {
 			return r, false
 		}
