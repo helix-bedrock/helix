@@ -136,9 +136,10 @@ sibling library folders, so unreleased library changes are used.
   and saved. `view.go`: what other players see (AddPlayer, MovePlayer)
   and the synched actor data BDS sends a joining player about itself
   (gravity, collision, hitbox), which the client's physics run on.
-  `zones.go`: the chunks published around the player. `container.go`:
-  opening the inventory (Interact) and ContainerClose as BDS answers
-  them, with BDS's window ID counter.
+  `zones.go`: the chunks published around the player. `window.go`:
+  the player's window (BDS's window ID counter, `showWindow`, `closeWindow`), opening the inventory
+  (Interact) and ContainerClose as BDS answers them, and the container events (`OnContainerOpen`,
+  `OnContainerClose`, `OnContainerItem`). Every window opens through `mayOpen` and `showWindow`.
   `player.go`: `Player` = session (connection, identity, skin) + entity +
   saved data. Joins in BDS's order as far as built (PlayerList broadcast,
   StartGame, registry packets, full PlayerList), shows players to each
@@ -148,10 +149,16 @@ sibling library folders, so unreleased library changes are used.
   permission levels and the per-game-mode rules, read from and saved in
   the player's BDS data; `attributes.go`: BDS's 17 player attributes in
   its join order. `SetGameMode` sends what BDS sends: UpdatePlayerGameType to all, then the abilities.
-  `item.go`, `inventory.go`, `stackrequest.go`: the server-held inventory
-  (BDS's saved format and join packets) and BDS's checks on stack
+  `item.go`, `playeritems.go`, `stackrequest.go`: the server-held items
+  (BDS's saved format) and BDS's checks on stack
   requests (take, place, swap, destroy, creative items), applied all or
   nothing on a copy. The client's view of its items is never read back.
+  `inventory.go`: the `Inventory` wrapper every set of slots is reached through, and the only code
+  that writes InventorySlot and InventoryContent, through the per-player view (`OnInventoryView`,
+  `Inventory.SetView`). Packets written in many places have one wrapper each so a protocol change is
+  made once: `sound.go` (`playSound`, `soundEvent`, `blockSound`), `entitydata.go` (`actorData`,
+  `actorEvent`), `send.go` (`blockPos`, own-slot sends). Add to these rather than writing those
+  packets by hand.
   `drop.go`: drops from stack requests and the legacy transaction, stricter
   than BDS: client items are compared, never kept (lead's decision, core
   architecture, not anti-cheat). `Give`, pick-up and held item updates.
@@ -238,7 +245,7 @@ sibling library folders, so unreleased library changes are used.
   with its `Ticker` for buttons popping out and doors breaking.
 - `direction`: every direction beyond `cube`'s faces and positions: `Cardinal` and the numberings block states use for it, the orders BDS walks a block's sides in (`Updates`, `Spread`, `Clockwise`, `Sides`), yaw to direction, axes and BDS's table sine. Systems name what they mean here instead of keeping tables of numbers; a test pins each numbering and order to BDS's.
 - `circuit` (written from BDS's code and not fully tested: only the basics have been tried in game, nothing compared with BDS): vanilla's redstone blocks on the `redstone` library, one System per region (`Ticker`, a `world.RegionTicker`); its components move with their chunks on merges and splits. `comparator.go` has what wire connects to, what comparators read (`SignalEntity` for block entities that work it out themselves) and the comparator's block entity (`Ticker.Entities` wraps the world's list). `piston.go` has pistons and the blocks they move, as block entities (`SetEntityPush` is how they move entities: `Host.PistonPush` moves a player on the server and sends `CorrectPlayerMovePrediction`); `TakeBlockEntity` moves one without spilling it. Hoppers, dispensers and droppers are in `player/machine.go`, as `Chest`s with a `machineSpec`, since they share the chest's slots and window.
-- `player/explosion.go`: BDS's explosion as a struct anyone can run (`Explosion`, `Host.Explode`, `Systems.Explode`, `OnExplosion`, block behaviour `Exploded`, entity owner `Blastable`). `player/primedtnt.go`: lit TNT (`PrimedTNT`, `Host.SpawnTNT`, saved with its chunk) and vanilla's TNT block as a block behaviour.
+- `player/explosion.go`: BDS's explosion as a struct anyone can run (`Explosion`, `Host.Explode`, `Systems.Explode`, `OnExplosionStart` (before anything), `OnExplosion` (once the blocks are known), block behaviour `Exploded`, entity owner `Blastable`). `player/primedtnt.go`: lit TNT (`PrimedTNT`, `Host.SpawnTNT`, `OnTNTPrime`, saved with its chunk) and vanilla's TNT block as a block behaviour.
 - `circuit/config.go`: `Config`, every number redstone runs by, BDS's by default (`DefaultConfig`), and `Settings`, which holds it for the regions to read while `Server.SetRedstone` swaps it. A new redstone number goes here, not in a constant. The circuit library's own numbers are `redstone.Rules`.
 - `player/projectile.go`: everything shot or thrown as one `Projectile` with a `ProjectileSpec` read from its definition (`Host.SpawnProjectile`); `throwItem`, `releaseBow` and `dispenseProjectile` start them. They hold the chunks ahead of them with a `Ticket` while flying and stay shown through `EntityConfig.StaySeen`; `ProjectileSpec.StayInLoaded` turns both off.
 - `circuit/target.go`: target blocks (`Ticker.HitTarget`, reached by `Host.HitTarget`); projectiles call it once they exist, and `-testcmds` adds /targettest.
@@ -249,16 +256,19 @@ sibling library folders, so unreleased library changes are used.
 - `ride`: riding for anything rideable: seats, seat offset, who may get on, links, where a rider lands. It knows nothing of carts or players: a vehicle keeps a `ride.Vehicle`, a rider implements `ride.Rider`, and `player/riding.go` is the player's side of it (the `vehicle` interface, `mount`, `letOff`).
 - `connect`: the arms of fences, panes, bars and trip wire, kept in their block states since 1.26, from helix-data's rules.
 - Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
-  `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`; `Dimension.SetBlockEntities` names who
-  makes them; those it does not take stay saved as they were). `player/chest.go` is the only one run so far:
-  chests and ender chests (items in `Inventory.ender`), BDS 1.26.60's pairing, lid and window, with `Inventory.open` as a stack request's copy of the open
-  chest (container `ContainerLevelEntity`). `player/shulker.go` is what a shulker box does differently, as a `Chest` with `shulker` set (container `ContainerShulkerBox` in stack requests). `player/chestapi.go` is their plugin API: events `OnChestOpen`,
-  `OnChestClose`, `OnChestItem` (per slot a request changes, after BDS's checks; cancelling refuses the whole
-  request, changes make the player get its items resent), `OnChestPair`, `OnChestSpill`, and methods on `Chest`
-  and `Player`, which fire no events. `player/blockdrop.go`: what a player's break drops (`Systems.Drops`, from
+  `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`, `BlockEntityBinder` with its `ChunkHandle`; `Dimension.SetBlockEntities` names who
+  makes them; those it does not take stay saved as they were). `player/chest.go` runs chests, ender chests
+  (items in `playerItems.ender`, reached as `Player.EnderChest`), hoppers, dispensers, droppers, crafters
+  and carts' slots: BDS 1.26.60's pairing, lid and window, with `playerItems.open` as a stack request's copy
+  of the open container (container `ContainerLevelEntity`), and the chest API (`Chest.Inventory`, `Kind`,
+  `OnChestPair`, `OnChestSpill`, name and pairing). A `Chest` marks its chunk for saving through the
+  `world.ChunkHandle` it is bound to, so `Inventory` methods need no region. `player/shulker.go` is what a
+  shulker box does differently, as a `Chest` with `shulker` set (container `ContainerShulkerBox` in stack
+  requests). `ContainerOpenEvent`, `ContainerItemEvent` and the methods, which fire no events, are in
+  `window.go` and `inventory.go`. `player/blockdrop.go`: what a player's break drops (`Systems.Drops`, from
   the `loot` package, BDS's rule per block), `OnBlockDrops`, `Setup.SetBlockDrops`.
   `player/xporb.go`: experience orbs (`XPOrb`, BDS's sizes, merging, pull and touch; saved with the chunk) and
-  levels (`AddExperience`, `OnExperience`). `-testcmds` adds /chesttest to try the chest events in game.
+  levels (`AddExperience`, `OnExperience`). `-testcmds` adds /chesttest to try the container events in game (`price`, `noopen`, `nobang` too).
 
 ## Design
 

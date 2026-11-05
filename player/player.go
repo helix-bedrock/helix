@@ -70,7 +70,8 @@ type Player struct {
 	gameMode   int32
 	abilities  Abilities
 	attributes Attributes
-	inventory  Inventory
+	inventory  playerItems
+	invs       playerInventories
 	requests   requestState
 	effects    []ActiveEffect
 	brk        breakState

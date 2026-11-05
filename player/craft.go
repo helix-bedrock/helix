@@ -7,7 +7,6 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
-	"github.com/helix-bedrock/protocol/packet"
 )
 
 // The crafting grids, as slots of the UI container in BDS 1.26.60.
@@ -104,9 +103,10 @@ func (s *Host) Recipes() *crafting.Table {
 func (p *Player) craftGrid() (start, size, width int, ok bool) {
 	w := &p.window
 	switch {
-	case w.workbench:
+	case !w.open:
+	case w.kind == ContainerCraftingTable:
 		return largeGridStart, largeGridSize, largeGridWidth, true
-	case w.open && !w.chest && !w.station():
+	case w.kind == ContainerInventory:
 		return smallGridStart, smallGridSize, smallGridWidth, true
 	}
 	return 0, 0, 0, false
@@ -115,35 +115,27 @@ func (p *Player) craftGrid() (start, size, width int, ok bool) {
 // useCraftingTable is what clicking a crafting table does: it is taken whether or
 // not it opens, as with a chest.
 func (p *Player) useCraftingTable(r *world.Region, u *BlockUse) bool {
-	if p.openStation(r, u, byte(protocol.ContainerTypeWorkbench)) {
-		p.window.workbench = true
-	}
+	p.openStation(r, u, ContainerCraftingTable, byte(protocol.ContainerTypeWorkbench))
 	return true
 }
 
 // useSmithingTable is the same for a smithing table.
 func (p *Player) useSmithingTable(r *world.Region, u *BlockUse) bool {
-	if p.openStation(r, u, byte(protocol.ContainerTypeSmithingTable)) {
-		p.window.smithing = true
-	}
+	p.openStation(r, u, ContainerSmithingTable, byte(protocol.ContainerTypeSmithingTable))
 	return true
 }
 
-// openStation opens the window of a block with no items of its own, if the player
-// may and none is open.
-func (p *Player) openStation(r *world.Region, u *BlockUse, kind byte) bool {
+// openStation opens the screen of a block with no items of its own, if the player may,
+// none is open and no listener stops it.
+func (p *Player) openStation(r *world.Region, u *BlockUse, kind ContainerKind, window byte) bool {
 	if !p.abilities.Flag(AbilityOpenContainers) || p.window.open {
 		return false
 	}
-	w := &p.window
-	w.nextID()
-	w.open, w.workbenchPos = true, u.Pos
-	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: kind,
-		ContainerPosition:       protocol.BlockPos{int32(u.Pos[0]), int32(u.Pos[1]), int32(u.Pos[2])}, //nolint:gosec // block coordinates fit int32
-		ContainerEntityUniqueID: -1,
-	})
-	p.flush()
+	o := windowOpening{kind: kind, window: window, pos: u.Pos, entity: -1}
+	if !p.mayOpen(r, &o) {
+		return false
+	}
+	p.showWindow(r, &o)
 	return true
 }
 
@@ -164,10 +156,10 @@ func (p *Player) recipeFor(id uint32) (*crafting.Recipe, uint8) {
 // craftRecipe is a craft by hand: the grid must fit the recipe, and each item in it
 // must be consumed once per craft by the actions that follow.
 func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, []slotRef) {
-	if p.window.smithing {
+	if p.window.kind == ContainerSmithingTable {
 		return p.craftSmithing(a)
 	}
-	if p.window.enchanting {
+	if p.window.kind == ContainerEnchantingTable {
 		return p.craftEnchant(a)
 	}
 	c := &p.requests.craft

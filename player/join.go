@@ -113,15 +113,15 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 		s.reg.Biomes.DefinitionPacket(), s.reg.EntityTypes.IdentifiersPacket(),
 		&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()},
 		s.reg.Creative.Packet(), s.reg.Trims.Packet())
-	p.send(p.inventory.contentPackets(s.reg)...)
+	p.sendOwnItems()
 	p.send(p.recipesPacket())
 
 	// BDS sends the player its own synched data on its first tick, then
 	// the next tick the breathing flag once it finds air.
-	p.send(&packet.SetActorData{EntityRuntimeID: p.runtimeID, EntityMetadata: p.ownMetadata()},
-		&packet.SetActorData{EntityRuntimeID: p.runtimeID, EntityMetadata: protocol.EntityMetadata{
+	p.send(actorData(p.runtimeID, p.ownMetadata()),
+		actorData(p.runtimeID, protocol.EntityMetadata{
 			protocol.EntityDataKeyFlags: int64(ownFlags | 1<<protocol.EntityDataFlagBreathing),
-		}})
+		}))
 	return p.sendNow()
 }
 

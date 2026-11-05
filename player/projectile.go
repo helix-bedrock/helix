@@ -563,7 +563,7 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 		t.sendDelta(e)
 	}
 	if t.shake > 0 {
-		e.Send(&packet.ActorEvent{EntityRuntimeID: e.RuntimeID(), EventType: actorEventArrowShake, EventData: t.shake})
+		e.Send(actorEventData(e.RuntimeID(), actorEventArrowShake, t.shake))
 		t.shake = 0
 	}
 	if t.stuck {
@@ -653,7 +653,7 @@ func projectileChunk(pos mgl32.Vec3) mcdb.ChunkPos {
 
 // sendFlags tells those who see it its flags.
 func (t *Projectile) sendFlags(e *world.Entity) {
-	e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyFlags: t.flags()}})
+	e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyFlags: t.flags()}))
 }
 
 // projectileEyes is where a shooter's projectile starts: its eyes and the definition's
@@ -877,7 +877,7 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 // hitSound plays its sound of hitting something.
 func (t *Projectile) hitSound(r *world.Region, at mgl32.Vec3) {
 	if t.spec.HitSound != "" {
-		r.Broadcast(floorPos(at), &packet.LevelSoundEvent{SoundType: t.spec.HitSound, Position: at, ExtraData: -1, EntityType: t.spec.ID}, nil)
+		playSound(r, floorPos(at), soundEvent{name: t.spec.HitSound, pos: at, extra: -1, entity: t.spec.ID}, nil)
 	}
 }
 
@@ -1160,7 +1160,7 @@ func (p *Player) throwItem(held ItemStack) bool {
 	p.thrownAt = now
 	eyes, rot := p.entity.Position(), p.entity.Rotation()
 	p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power, p)
-	r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventThrow, Position: eyes, ExtraData: -1, EntityType: "minecraft:player"}, nil)
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: eyes, extra: -1, entity: "minecraft:player"}, nil)
 	if !p.creative() {
 		p.useHeld()
 	}
@@ -1175,8 +1175,8 @@ func bowPull(ticks int32) float32 {
 
 // arrowSlot is where the arrows a bow would use are: the offhand first, then the inventory
 // in order. -1 for the offhand, and false with none.
-func (inv *Inventory) arrowSlot() (int, bool) {
-	if inv.offhand.Name == nameArrow && inv.offhand.Count > 0 {
+func (inv *playerItems) arrowSlot() (int, bool) {
+	if inv.offhand[0].Name == nameArrow && inv.offhand[0].Count > 0 {
 		return -1, true
 	}
 	for i := range inv.main {
@@ -1237,7 +1237,7 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	if infinity || creative {
 		t.pickup = arrowPickupCreative
 	}
-	r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventBow, Position: eyes, ExtraData: -1, EntityType: "minecraft:player"}, nil)
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBow, pos: eyes, extra: -1, entity: "minecraft:player"}, nil)
 	if creative {
 		return
 	}
@@ -1246,9 +1246,9 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 		return
 	}
 	if slot < 0 {
-		p.inventory.offhand.Count--
-		if p.inventory.offhand.Count <= 0 {
-			p.inventory.offhand = ItemStack{}
+		p.inventory.offhand[0].Count--
+		if p.inventory.offhand[0].Count <= 0 {
+			p.inventory.offhand[0] = ItemStack{}
 		}
 		p.sendEquipment()
 	} else {

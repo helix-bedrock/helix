@@ -205,7 +205,7 @@ func TestEnchantAction(t *testing.T) {
 	p, _ := apiWorld(t, func(*Setup) {})
 	p.rng = rand.New(rand.NewPCG(1, 2))
 	p.attributes.set(attrLevel, 30)
-	p.window.enchanting, p.window.open = true, true
+	p.window.kind, p.window.open = ContainerEnchantingTable, true
 	sword := p.s.freshStack(stack("minecraft:iron_sword", 0))
 	lapis := p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
 	p.inventory.ui[enchantInputSlot], p.inventory.ui[enchantLapisSlot] = sword, lapis
@@ -239,7 +239,7 @@ func TestEnchantSwappedItem(t *testing.T) {
 	p, _ := apiWorld(t, func(*Setup) {})
 	p.rng = rand.New(rand.NewPCG(1, 2))
 	p.attributes.set(attrLevel, 30)
-	p.window.enchanting, p.window.open = true, true
+	p.window.kind, p.window.open = ContainerEnchantingTable, true
 	sword := p.s.freshStack(stack("minecraft:iron_sword", 0))
 	p.inventory.ui[enchantInputSlot] = sword
 	p.inventory.ui[enchantLapisSlot] = p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
@@ -259,7 +259,7 @@ func TestAnvilNameLength(t *testing.T) {
 	p, _ := apiWorld(t, func(*Setup) {})
 	p.rng = rand.New(rand.NewPCG(1, 2))
 	p.attributes.set(attrLevel, 30)
-	p.window.anvil, p.window.open = true, true
+	p.window.kind, p.window.open = ContainerAnvil, true
 	p.inventory.ui[anvilFirstSlot] = p.s.freshStack(stack("minecraft:stick", 0))
 	try := func(name string) uint8 {
 		t.Helper()
@@ -350,7 +350,7 @@ func TestEnchantTableEntity(t *testing.T) {
 // however the client names it, and only in that case.
 func TestEnchantResultSlot(t *testing.T) {
 	p, _ := apiWorld(t, func(*Setup) {})
-	p.window.enchanting, p.window.open = true, true
+	p.window.kind, p.window.open = ContainerEnchantingTable, true
 	book := p.s.freshStack(ItemStack{Name: itemBook, Count: 1})
 	p.inventory.ui[enchantInputSlot] = book
 	st := &p.requests
@@ -431,7 +431,7 @@ func TestBookshelves(t *testing.T) {
 func TestUIItemsAtLoad(t *testing.T) {
 	p, _ := apiWorld(t, func(*Setup) {})
 	ids := func() int32 { return p.s.stackIDs.Add(1) }
-	var inv Inventory
+	var inv playerItems
 	inv.ui[enchantInputSlot] = ItemStack{Name: itemBook, Count: 1}
 	inv.ui[enchantLapisSlot] = ItemStack{Name: itemLapis, Count: 5}
 	if inv.takeUIItems(p.s.reg, ids, true) || !inv.ui[enchantInputSlot].Empty() || !inv.ui[enchantLapisSlot].Empty() {
@@ -440,7 +440,7 @@ func TestUIItemsAtLoad(t *testing.T) {
 	if inv.main[0].Name != itemBook || inv.main[1].Name != itemLapis {
 		t.Fatalf("inventory %+v %+v", inv.main[0], inv.main[1])
 	}
-	var full Inventory
+	var full playerItems
 	for i := range full.main {
 		full.main[i] = ItemStack{Name: "minecraft:iron_sword", Count: 1}
 	}
@@ -448,7 +448,7 @@ func TestUIItemsAtLoad(t *testing.T) {
 	if !full.takeUIItems(p.s.reg, ids, true) || full.ui[enchantInputSlot].Empty() {
 		t.Fatal("no room, but nothing left to drop")
 	}
-	var dead Inventory
+	var dead playerItems
 	dead.ui[enchantInputSlot] = ItemStack{Name: itemBook, Count: 1}
 	if !dead.takeUIItems(p.s.reg, ids, false) || !dead.main[0].Empty() {
 		t.Fatal("a dead player's item went to the inventory")
@@ -460,7 +460,7 @@ func TestEnchantBook(t *testing.T) {
 	p, _ := apiWorld(t, func(*Setup) {})
 	p.rng = rand.New(rand.NewPCG(1, 2))
 	p.attributes.set(attrLevel, 30)
-	p.window.enchanting, p.window.open = true, true
+	p.window.kind, p.window.open = ContainerEnchantingTable, true
 	book := p.s.freshStack(ItemStack{Name: itemBook, Count: 1})
 	p.inventory.ui[enchantInputSlot] = book
 	p.inventory.ui[enchantLapisSlot] = p.s.freshStack(ItemStack{Name: itemLapis, Count: 5})
@@ -534,7 +534,7 @@ func TestRequire(t *testing.T) {
 		s.Systems().EnchantRequire = func(*Player, EnchantOption, int32) EnchantRequirement { return EnchantRequirement{} }
 	})
 	p.rng = rand.New(rand.NewPCG(1, 2))
-	p.window.enchanting, p.window.open = true, true
+	p.window.kind, p.window.open = ContainerEnchantingTable, true
 	sword := p.s.freshStack(stack("minecraft:iron_sword", 0))
 	p.inventory.ui[enchantInputSlot] = sword
 	p.enchant.seeded = true

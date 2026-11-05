@@ -206,7 +206,7 @@ func (p *Player) afterCraft(a craftAfter) {
 	}
 	if a.anvilWear && p.entity != nil {
 		if r := p.entity.Region(); r != nil {
-			p.s.game.sys.AnvilWear(p, r, p.window.workbenchPos)
+			p.s.game.sys.AnvilWear(p, r, p.window.pos)
 		}
 	}
 	if a.experience > 0 && p.entity != nil {
@@ -240,8 +240,7 @@ func (e *enchantTableEntity) NetworkData(pos cube.Pos) map[string]any { return e
 
 // useEnchantingTable is what clicking an enchanting table does.
 func (p *Player) useEnchantingTable(r *world.Region, u *BlockUse) bool {
-	if p.openStation(r, u, byte(protocol.ContainerTypeEnchantment)) {
-		p.window.enchanting = true
+	if p.openStation(r, u, ContainerEnchantingTable, byte(protocol.ContainerTypeEnchantment)) {
 		p.enchant.input, p.enchant.options = -1, nil
 		p.refreshEnchantOptions()
 		p.flush()
@@ -253,17 +252,17 @@ func (p *Player) useEnchantingTable(r *world.Region, u *BlockUse) bool {
 func (w *windowState) holds(container, slot byte) bool {
 	switch container {
 	case protocol.ContainerEnchantingInput:
-		return w.enchanting && slot == enchantInputSlot
+		return w.kind == ContainerEnchantingTable && slot == enchantInputSlot
 	case protocol.ContainerEnchantingMaterial:
-		return w.enchanting && slot == enchantLapisSlot
+		return w.kind == ContainerEnchantingTable && slot == enchantLapisSlot
 	case protocol.ContainerAnvilInput:
-		return w.anvil && slot == anvilFirstSlot
+		return w.kind == ContainerAnvil && slot == anvilFirstSlot
 	case protocol.ContainerAnvilMaterial:
-		return w.anvil && slot == anvilSecondSlot
+		return w.kind == ContainerAnvil && slot == anvilSecondSlot
 	case protocol.ContainerGrindstoneInput:
-		return w.grindstone && slot == grindstoneFirstSlot
+		return w.kind == ContainerGrindstone && slot == grindstoneFirstSlot
 	case protocol.ContainerGrindstoneAdditional:
-		return w.grindstone && slot == grindstoneSecondSlot
+		return w.kind == ContainerGrindstone && slot == grindstoneSecondSlot
 	}
 	return false
 }
@@ -271,7 +270,7 @@ func (w *windowState) holds(container, slot byte) bool {
 // refreshEnchantOptions works out and sends the options when the table's item changed,
 // as BDS's container does on a slot change.
 func (p *Player) refreshEnchantOptions() {
-	if !p.window.enchanting || p.entity == nil {
+	if p.window.kind != ContainerEnchantingTable || p.entity == nil {
 		return
 	}
 	item := p.inventory.ui[enchantInputSlot]
@@ -284,7 +283,7 @@ func (p *Player) refreshEnchantOptions() {
 		if !p.enchant.seeded {
 			p.enchant.seed, p.enchant.seeded = int32(rand.Uint32()>>1), true //nolint:gosec // a table's draw, not a secret
 		}
-		opts = p.s.game.sys.EnchantOptions(p, item, p.s.game.sys.Bookshelves(p, r, p.window.workbenchPos))
+		opts = p.s.game.sys.EnchantOptions(p, item, p.s.game.sys.Bookshelves(p, r, p.window.pos))
 	}
 	if g := p.s.game; g.enchantOptionsEv.Has() {
 		e := EnchantOptionsEvent{Player: p, Item: item, Options: opts}
@@ -626,6 +625,6 @@ func (p *Player) playSound(sound string) {
 	}
 	if r := p.entity.Region(); r != nil {
 		pos := p.entity.Position()
-		r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: sound, Position: pos, ExtraData: -1}, nil)
+		playSound(r, p.blockPos(), soundEvent{name: sound, pos: pos, extra: -1}, nil)
 	}
 }

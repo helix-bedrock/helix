@@ -285,10 +285,7 @@ func (p *Player) showEating(held ItemStack) {
 	if !ok || p.entity == nil {
 		return
 	}
-	p.entity.Send(&packet.ActorEvent{
-		EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventFeed,
-		EventData: int32(t.ID)<<16 | int32(uint16(held.Meta)), //nolint:gosec // item IDs fit
-	})
+	p.entity.Send(actorEventData(p.runtimeID, packet.ActorEventFeed, int32(t.ID)<<16|int32(uint16(held.Meta))))
 }
 
 // vanillaEat is BDS's finishing a food: hunger and saturation, the burp, one item
@@ -307,7 +304,7 @@ func vanillaEat(p *Player, held ItemStack, food FoodItem) {
 	}
 	p.feed(food.Nutrition, food.SaturationModifier)
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventBurp, Position: p.entity.Position(), ExtraData: -1, EntityType: "minecraft:player"}, nil)
+		playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBurp, pos: p.entity.Position(), extra: -1, entity: "minecraft:player"}, nil)
 	}
 	if !p.creative() {
 		p.useHeld()

@@ -167,7 +167,7 @@ func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
 		g.sys.Knockback(p, src.Attacker, src.Extra)
 	}
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventHurt}, nil)
+		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventHurt), nil)
 	}
 	p.wearArmor(raw, src.Cause)
 	g.sys.Exhaust(p, p.Tuning(TuneExhaustDamage))
@@ -325,7 +325,7 @@ func (p *Player) wearArmor(damage float32, cause DamageCause) {
 		}
 	}
 	if changed {
-		p.send(p.inventory.armorPacket(p.s.reg))
+		p.sendArmour()
 		p.showArmor()
 	}
 }

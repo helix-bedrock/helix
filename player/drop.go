@@ -282,7 +282,7 @@ func vanillaPickUp(p *Player, i *ItemActor) {
 // offhandTakes reports whether the offhand can hold more of s, as BDS's
 // canStackInOffhand.
 func (p *Player) offhandTakes(s ItemStack) bool {
-	off := p.inventory.offhand
+	off := p.inventory.offhand[0]
 	return !off.Empty() && off.stacksWith(s) && off.Count < s.maxStack(p.s.reg) && itemDamage(s) == 0
 }
 
@@ -291,11 +291,11 @@ func (p *Player) offhandTakes(s ItemStack) bool {
 // owner of the player's entity.
 func (p *Player) Give(s ItemStack) ItemStack {
 	if p.offhandTakes(s) {
-		off := &p.inventory.offhand
+		off := &p.inventory.offhand[0]
 		moved := min(s.maxStack(p.s.reg)-off.Count, s.Count)
 		off.Count += moved
 		s.Count -= moved
-		p.send(&packet.InventorySlot{WindowID: protocol.WindowIDOffHand, NewItem: off.network(p.s.reg)})
+		p.sendOffhand()
 	}
 	if s.Count == 0 {
 		p.sendEquipment()
@@ -309,12 +309,7 @@ func (p *Player) Give(s ItemStack) ItemStack {
 }
 
 // sendSlot sends an inventory slot as the server has it.
-func (p *Player) sendSlot(i int) {
-	if i < 0 || i >= inventorySize {
-		return
-	}
-	p.send(&packet.InventorySlot{WindowID: protocol.WindowIDInventory, Slot: uint32(i), NewItem: p.inventory.main[i].network(p.s.reg)}) //nolint:gosec // slots are small
-}
+func (p *Player) sendSlot(i int) { p.Inventory().sendSlot(p, i, false) }
 
 // sendEquipment shows the players who see this one what it holds, if that
 // changed.
@@ -343,20 +338,20 @@ func (p *Player) sendEquipment() {
 // offhandChanged reports whether the offhand item differs from what those who see the
 // player were last shown.
 func (p *Player) offhandChanged() bool {
-	off := &p.inventory.offhand
+	off := &p.inventory.offhand[0]
 	return off.netID != p.shownOffhand.netID || off.Count != p.shownOffhand.Count
 }
 
 // offhandEquipment is the offhand item as those who see the player get it, as BDS
 // sends a change of that slot: slots 0 in the offhand window.
 func (p *Player) offhandEquipment() *packet.MobEquipment {
-	return &packet.MobEquipment{EntityRuntimeID: p.runtimeID, NewItem: p.inventory.offhand.network(p.s.reg), WindowID: protocol.WindowIDOffHand}
+	return &packet.MobEquipment{EntityRuntimeID: p.runtimeID, NewItem: p.inventory.offhand[0].network(p.s.reg), WindowID: protocol.WindowIDOffHand}
 }
 
 // showOffhand shows those who see the player its offhand item. Its own client has it
 // from its inventory.
 func (p *Player) showOffhand() {
-	p.shownOffhand = p.inventory.offhand
+	p.shownOffhand = p.inventory.offhand[0]
 	if p.entity != nil {
 		p.entity.Send(p.offhandEquipment())
 	}

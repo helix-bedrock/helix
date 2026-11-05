@@ -393,7 +393,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	}
 	r.UpdateNeighbours(pos)
 	g.sys.Exhaust(p, p.Tuning(TuneExhaustMine))
-	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, pos, blockCenter(pos), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
 	p.s.throwDrops(r, drops)
 	p.s.SpawnExperience(r, blockVec(pos), xp)
 	p.brk.broken++
@@ -424,8 +424,5 @@ func (p *Player) hitSound(r *world.Region) {
 	if !ok {
 		return
 	}
-	r.Broadcast(p.brk.pos, &packet.LevelSoundEvent{
-		SoundType: packet.SoundEventHit, Position: blockVec(p.brk.pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}),
-		ExtraData: int32(p.s.reg.Blocks.Hash(b)), //nolint:gosec // hashes are sent as int32
-	}, p.viewer)
+	playSound(r, p.brk.pos, p.s.blockSound(packet.SoundEventHit, blockCenter(p.brk.pos), b), p.viewer)
 }

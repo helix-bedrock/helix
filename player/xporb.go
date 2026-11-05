@@ -103,7 +103,7 @@ func (o *XPOrb) Value() int32 { return o.value }
 func (o *XPOrb) SetValue(v int32) {
 	o.value = v
 	if o.entity != nil {
-		o.entity.Send(&packet.SetActorData{EntityRuntimeID: o.entity.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyValue: v}})
+		o.entity.Send(actorData(o.entity.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyValue: v}))
 	}
 }
 
@@ -250,7 +250,7 @@ func (o *XPOrb) tick(e *world.Entity) {
 		vel[1] = xpOrbLavaUp
 		vel[0] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
 		vel[2] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
-		r.Broadcast(floorPos(e.Position()), &packet.LevelSoundEvent{SoundType: packet.SoundEventFizz, Position: e.Position()}, nil)
+		playSound(r, floorPos(e.Position()), soundEvent{name: packet.SoundEventFizz, pos: e.Position(), extra: 0}, nil)
 	}
 	// BDS gives an orb's position as it is, where it takes half the box off an item's.
 	o.body.pushOut(r, e, e.Position(), e.Position())
@@ -433,5 +433,5 @@ func (p *Player) levelSound(level int32) {
 	if level < levelSoundLoudest {
 		data = int32(float32(level) * levelSoundScale)
 	}
-	r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventLevelUp, Position: p.entity.Position(), ExtraData: data}, nil)
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventLevelUp, pos: p.entity.Position(), extra: data}, nil)
 }

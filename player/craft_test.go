@@ -47,7 +47,7 @@ func craftTestPlayer(t *testing.T, grid map[int]string) *Player {
 	t.Helper()
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open = true
+	p.window.open, p.window.kind = true, ContainerInventory
 	for slot, name := range grid {
 		p.inventory.ui[slot] = p.s.freshStack(ItemStack{Name: name, Count: 4})
 	}
@@ -109,7 +109,7 @@ func TestCraftRefused(t *testing.T) {
 func TestCraftTableAndMirror(t *testing.T) {
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open, p.window.workbench = true, true
+	p.window.open, p.window.kind = true, ContainerCraftingTable
 	planks, sticks := "minecraft:oak_planks", "minecraft:stick"
 	for slot, name := range map[int]string{33: planks, 34: planks, 36: planks, 37: sticks, 40: sticks} {
 		p.inventory.ui[slot] = p.s.freshStack(ItemStack{Name: name, Count: 1})
@@ -132,7 +132,7 @@ func TestCraftTableAndMirror(t *testing.T) {
 func TestCraftAuto(t *testing.T) {
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open = true
+	p.window.open, p.window.kind = true, ContainerInventory
 	p.inventory.main[1] = p.s.freshStack(ItemStack{Name: "minecraft:oak_planks", Count: 4})
 	used := &protocol.ConsumeStackRequestAction{}
 	used.Count, used.Source = 2, slotInfo(containerCombined, 1, p.inventory.main[1].netID)
@@ -154,7 +154,7 @@ func TestCraftAuto(t *testing.T) {
 func TestCraftSeveralResults(t *testing.T) {
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open, p.window.workbench = true, true
+	p.window.open, p.window.kind = true, ContainerCraftingTable
 	for slot, name := range map[int]string{32: "minecraft:milk_bucket", 33: "minecraft:milk_bucket", 34: "minecraft:milk_bucket", 35: "minecraft:sugar", 36: "minecraft:egg", 37: "minecraft:sugar", 38: "minecraft:wheat", 39: "minecraft:wheat", 40: "minecraft:wheat"} {
 		p.inventory.ui[slot] = p.s.freshStack(ItemStack{Name: name, Count: 1})
 	}
@@ -190,7 +190,7 @@ func TestCraftEvent(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	p.window.open = true
+	p.window.open, p.window.kind = true, ContainerInventory
 	for _, slot := range []int{28, 30} {
 		p.inventory.ui[slot] = p.s.freshStack(ItemStack{Name: "minecraft:oak_planks", Count: 4})
 	}
@@ -317,7 +317,7 @@ func TestCraftClientCannotLie(t *testing.T) {
 	}
 
 	// A chest window has no grid at all.
-	p.window.chest = true
+	p.window.kind = ContainerChest
 	if status, _ := p.craftRecipe(craft(1)); status != protocol.ItemStackResponseStatusInvalidCraftRequest {
 		t.Errorf("craft in a chest window: status %d", status)
 	}
@@ -328,7 +328,7 @@ func TestCraftClientCannotLie(t *testing.T) {
 func TestCraftOtherBlocksRecipe(t *testing.T) {
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open = true
+	p.window.open, p.window.kind = true, ContainerInventory
 	seen := map[string]bool{}
 	for _, r := range p.s.reg.Crafting.Packet().ShapelessRecipes {
 		if r.Block == craftingTableRecipes || r.Block == "deprecated" || seen[r.Block] || len(r.Input) != 1 {
@@ -447,7 +447,7 @@ func TestPlayerRecipes(t *testing.T) {
 	// Smithing follows the same rules.
 	sword := p.s.reg.Crafting.Packet().SmithingTransformRecipes[0]
 	p.applyRecipeEdit(func(r *PlayerRecipes) { r.Reset(); r.Remove(sword.RecipeID) })
-	p.window.open, p.window.smithing = true, true
+	p.window.open, p.window.kind = true, ContainerSmithingTable
 	if status, _ := p.craftSmithing(&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: sword.RecipeNetworkID, NumberOfCrafts: 1}); status != protocol.ItemStackResponseStatusFailedToFindRecipeByNetId {
 		t.Errorf("hidden smithing recipe: status %d", status)
 	}

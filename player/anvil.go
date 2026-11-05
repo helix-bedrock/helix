@@ -189,17 +189,13 @@ func OnGrindstone(s *Setup, fn func(e *GrindstoneEvent), p Priority) error {
 
 // useAnvil is what clicking an anvil does.
 func (p *Player) useAnvil(r *world.Region, u *BlockUse) bool {
-	if p.openStation(r, u, byte(protocol.ContainerTypeAnvil)) {
-		p.window.anvil = true
-	}
+	p.openStation(r, u, ContainerAnvil, byte(protocol.ContainerTypeAnvil))
 	return true
 }
 
 // useGrindstone is what clicking a grindstone does.
 func (p *Player) useGrindstone(r *world.Region, u *BlockUse) bool {
-	if p.openStation(r, u, byte(protocol.ContainerTypeGrindstone)) {
-		p.window.grindstone = true
-	}
+	p.openStation(r, u, ContainerGrindstone, byte(protocol.ContainerTypeGrindstone))
 	return true
 }
 
@@ -443,7 +439,7 @@ func withName(s ItemStack, name string) ItemStack {
 func (p *Player) craftAnvil(a *protocol.CraftRecipeOptionalStackRequestAction) (uint8, []slotRef) {
 	st := &p.requests
 	c := &st.craft
-	if !p.window.anvil {
+	if p.window.kind != ContainerAnvil {
 		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
 	}
 	if c.active {
@@ -632,7 +628,7 @@ func (p *Player) grindstoneMerged(first, second ItemStack) ItemStack {
 func (p *Player) craftGrindstone(a *protocol.CraftGrindstoneRecipeStackRequestAction) (uint8, []slotRef) {
 	st := &p.requests
 	c := &st.craft
-	if !p.window.grindstone {
+	if p.window.kind != ContainerGrindstone {
 		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
 	}
 	if c.active {
@@ -693,7 +689,7 @@ func (p *Player) mendable() []*ItemStack {
 		}
 	}
 	consider(&inv.main[inv.held])
-	consider(&inv.offhand)
+	consider(&inv.offhand[0])
 	for i := range inv.armor {
 		consider(&inv.armor[i])
 	}

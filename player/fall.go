@@ -97,7 +97,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 		if damage >= fallBigDamage {
 			sound = packet.SoundEventFallBig
 		}
-		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: sound, Position: feet, ExtraData: -1, EntityType: "minecraft:player"}, p.viewer)
+		playSound(r, pos, soundEvent{name: sound, pos: feet, extra: -1, entity: "minecraft:player"}, p.viewer)
 		p.s.game.sys.Hurt(p, damage, DamageSource{Cause: DamageFall})
 	}
 	sound := packet.SoundEventLand
@@ -108,8 +108,5 @@ func vanillaFallDamage(p *Player, distance float32) {
 	if !ok {
 		return
 	}
-	r.Broadcast(pos, &packet.LevelSoundEvent{
-		SoundType: sound, Position: feet, EntityType: "minecraft:player",
-		ExtraData: int32(p.s.reg.Blocks.Hash(below)), //nolint:gosec // hashes are sent as int32
-	}, p.viewer)
+	playSound(r, pos, p.s.blockSound(sound, feet, below).by("minecraft:player"), p.viewer)
 }

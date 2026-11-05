@@ -241,7 +241,7 @@ func (s *Host) FallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	if r.SetBlock(pos, 0, s.reg.Blocks.Air()) {
 		r.UpdateNeighbours(pos)
 	}
-	levelEvent(r, pos, blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), levelEventDestroyParticles, int32(s.reg.Blocks.Hash(block))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, pos, blockCenter(pos), levelEventDestroyParticles, int32(s.reg.Blocks.Hash(block))) //nolint:gosec // hashes are sent as int32
 	for _, it := range items {
 		d := NewBlockDrop(pos, it)
 		s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)

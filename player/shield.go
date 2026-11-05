@@ -89,8 +89,8 @@ func (p *Player) SetShieldCooldown(ticks int32) {
 // held item, as BDS looks for it.
 func (p *Player) heldShield() *ItemStack {
 	inv := &p.inventory
-	if inv.offhand.Name == itemShield {
-		return &inv.offhand
+	if inv.offhand[0].Name == itemShield {
+		return &inv.offhand[0]
 	}
 	if s := &inv.main[inv.held]; s.Name == itemShield {
 		return s
@@ -152,11 +152,7 @@ func (p *Player) sendShieldFlags() {
 		return
 	}
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), &packet.SetActorData{
-			EntityRuntimeID: p.runtimeID,
-			EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()},
-			Tick:            p.entity.Tick(),
-		}, nil)
+		r.Broadcast(p.blockPos(), actorDataAt(p.runtimeID, protocol.EntityMetadata{protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()}, p.entity.Tick()), nil)
 	}
 }
 
@@ -267,25 +263,25 @@ func vanillaShieldBlock(p *Player, damage float32, src DamageSource) bool {
 		return false
 	}
 	pos, at := p.entity.Position(), p.blockPos()
-	r.Broadcast(at, &packet.LevelSoundEvent{SoundType: packet.SoundEventShieldBlock, Position: pos, ExtraData: -1}, nil)
+	playSound(r, at, soundEvent{name: packet.SoundEventShieldBlock, pos: pos, extra: -1}, nil)
 	if a := src.Attacker; a != nil && src.Cause == DamageEntityAttack {
 		a.pushOffShield(p)
 		if a.holdsAxe() {
-			r.Broadcast(at, &packet.LevelSoundEvent{SoundType: packet.SoundEventBreak, Position: pos, ExtraData: -1}, nil)
+			playSound(r, at, soundEvent{name: packet.SoundEventBreak, pos: pos, extra: -1}, nil)
 			p.SetShieldCooldown(int32(p.Tuning(TuneShieldCooldown)))
 		}
 	}
 	p.shield.blocked = true
 	if s := p.heldShield(); s != nil && !p.creative() {
-		offhand := s == &p.inventory.offhand
+		offhand := s == &p.inventory.offhand[0]
 		changed, broke := p.wearStack(s, int32(math.Floor(float64(damage)))+1)
 		p.shield.broke = broke
 		if broke && !offhand {
-			r.Broadcast(at, &packet.LevelSoundEvent{SoundType: packet.SoundEventBreak, Position: pos, ExtraData: -1}, nil)
+			playSound(r, at, soundEvent{name: packet.SoundEventBreak, pos: pos, extra: -1}, nil)
 		}
 		if changed {
 			if offhand {
-				p.send(&packet.InventorySlot{WindowID: protocol.WindowIDOffHand, NewItem: p.inventory.offhand.network(p.s.reg)})
+				p.sendOffhand()
 			} else {
 				p.sendHeld()
 			}

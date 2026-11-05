@@ -14,7 +14,7 @@ func smithPlayer(t *testing.T, register func(*Setup)) *Player {
 	t.Helper()
 	p := testPlayer(t)
 	craftGame(t, p, register)
-	p.window.open, p.window.smithing = true, true
+	p.window.open, p.window.kind = true, ContainerSmithingTable
 	p.inventory.ui[smithTemplateSlot] = p.s.freshStack(ItemStack{Name: "minecraft:netherite_upgrade_smithing_template", Count: 2})
 	p.inventory.ui[smithBaseSlot] = p.s.freshStack(ItemStack{Name: "minecraft:diamond_sword", Count: 1, Tag: map[string]any{"Damage": int32(7)}})
 	p.inventory.ui[smithAdditionSlot] = p.s.freshStack(ItemStack{Name: "minecraft:netherite_ingot", Count: 3})
@@ -208,7 +208,7 @@ func TestSmithingClientCannotLie(t *testing.T) {
 func TestArmourTrim(t *testing.T) {
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open, p.window.smithing = true, true
+	p.window.open, p.window.kind = true, ContainerSmithingTable
 	trims := p.s.reg.Trims.Packet()
 	if len(trims.Patterns) != 18 || len(trims.Materials) != 11 {
 		t.Fatalf("%d patterns, %d materials", len(trims.Patterns), len(trims.Materials))
@@ -269,7 +269,7 @@ func TestArmourTrim(t *testing.T) {
 func TestSmithingEveryUpgrade(t *testing.T) {
 	p := testPlayer(t)
 	craftGame(t, p, nil)
-	p.window.open, p.window.smithing = true, true
+	p.window.open, p.window.kind = true, ContainerSmithingTable
 	for _, r := range p.s.reg.Crafting.Packet().SmithingTransformRecipes {
 		recipe, ok := p.s.Recipes().Smithing(r.RecipeNetworkID)
 		if !ok {

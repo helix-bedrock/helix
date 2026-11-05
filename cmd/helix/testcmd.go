@@ -75,7 +75,7 @@ func testCommandList() *packet.AvailableCommands {
 		Overloads: []protocol.CommandOverload{itemOverload},
 	}
 	chest := protocol.Command{
-		Name: chestTestCommand, Description: "Tests the chest API: refuse, rewrite, name, off.",
+		Name: chestTestCommand, Description: "Tests the container API: refuse, rewrite, name, price, noopen, nobang, off.",
 		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
 		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
 			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 2},
@@ -437,10 +437,32 @@ func recipeTest(reg *registry.Registry, start *packet.CraftingData, action, item
 // chestTestCommand is the command that tries the chest API.
 const chestTestCommand = "chesttest"
 
-// chestTestActions are what chestTestCommand takes: refuse every move in a chest,
-// rewrite turns what lands in the chest into sticks and what is taken into apples,
-// name renames the chest in the player's window.
-var chestTestActions = []string{"refuse", "rewrite", "name", "off"}
+// chestTestActions are what chestTestCommand takes: refuse every move in a container,
+// rewrite turns what lands in it into sticks and what is taken into apples, name renames
+// the next chest opened, price shows each player its own price on every item, noopen
+// keeps every container but the player's own inventory shut, nobang stops every
+// explosion and TNT lighting.
+var chestTestActions = []string{"refuse", "rewrite", "name", "price", "noopen", "nobang", "off"}
+
+// chestTestFlags are the chest test's switches that stay on until "off".
+type chestTestFlags struct {
+	price, noOpen, noBang atomic.Bool
+}
+
+// priceLore is the lore the price test shows: a price that differs per player.
+func priceLore(e *player.InventoryViewEvent) {
+	if e.Inventory.Kind() == player.ContainerArmour {
+		return
+	}
+	name := e.Player.Name()
+	for i, it := range e.Items {
+		if it.Empty() {
+			continue
+		}
+		price := (len(name)*7 + len(it.Name)) * int(it.Count)
+		e.Items[i] = it.WithLore(fmt.Sprintf("Price for %s: $%d", name, price))
+	}
+}
 
 // The chest test modes.
 const (
@@ -450,7 +472,7 @@ const (
 )
 
 // chestTest runs the chest test's item rule.
-func chestTest(mode int32, e *player.ChestItemEvent) {
+func chestTest(mode int32, e *player.ContainerItemEvent) {
 	switch mode {
 	case chestTestRefuse:
 		e.Cancel()
@@ -584,13 +606,39 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 		return err
 	}
 	var chestMode atomic.Int32
-	if err := player.OnChestItem(setup, func(e *player.ChestItemEvent) { chestTest(chestMode.Load(), e) }, player.Normal); err != nil {
+	if err := player.OnContainerItem(setup, func(e *player.ContainerItemEvent) { chestTest(chestMode.Load(), e) }, player.Normal); err != nil {
 		return err
 	}
 	var chestNames atomic.Int32
-	if err := player.OnChestOpen(setup, func(e *player.ChestOpenEvent) {
-		if chestNames.Swap(0) != 0 {
+	var flags chestTestFlags
+	if err := player.OnContainerOpen(setup, func(e *player.ContainerOpenEvent) {
+		if flags.noOpen.Load() && e.Kind != player.ContainerInventory {
+			e.Cancel()
+			return
+		}
+		if e.Chest != nil && chestNames.Swap(0) != 0 {
 			e.Chest.SetName(e.Region, "Renamed by /chesttest")
+		}
+	}, player.Normal); err != nil {
+		return err
+	}
+	if err := player.OnInventoryView(setup, func(e *player.InventoryViewEvent) {
+		if flags.price.Load() {
+			priceLore(e)
+		}
+	}, player.Normal); err != nil {
+		return err
+	}
+	if err := player.OnExplosionStart(setup, func(e *player.ExplosionStartEvent) {
+		if flags.noBang.Load() {
+			e.Cancel()
+		}
+	}, player.Normal); err != nil {
+		return err
+	}
+	if err := player.OnTNTPrime(setup, func(e *player.TNTPrimeEvent) {
+		if flags.noBang.Load() {
+			e.Cancel()
 		}
 	}, player.Normal); err != nil {
 		return err
@@ -657,8 +705,20 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 				chestMode.Store(chestTestRewrite)
 			case "name":
 				chestNames.Store(1)
+			case "price":
+				flags.price.Store(true)
+				p.RefreshItems()
+			case "noopen":
+				flags.noOpen.Store(true)
+			case "nobang":
+				flags.noBang.Store(true)
 			default:
 				chestMode.Store(chestTestOff)
+				flags.noOpen.Store(false)
+				flags.noBang.Store(false)
+				if flags.price.Swap(false) {
+					p.RefreshItems()
+				}
 			}
 			return
 		}

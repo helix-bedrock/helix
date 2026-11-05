@@ -69,7 +69,7 @@ func (p *Player) hurtStack(s *ItemStack, n int32) bool {
 	changed, broke := p.wearStack(s, n)
 	if broke {
 		if r := p.entity.Region(); r != nil {
-			r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: packet.SoundEventBreak, Position: p.entity.Position(), ExtraData: -1}, nil)
+			playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBreak, pos: p.entity.Position(), extra: -1}, nil)
 		}
 	}
 	return changed

@@ -44,7 +44,7 @@ func vanillaEquipArmor(p *Player, held ItemStack) bool {
 		}
 	}
 	inv.armor[t.ArmorSlot], inv.main[inv.held] = held, worn
-	p.send(inv.armorPacket(p.s.reg))
+	p.sendArmour()
 	p.sendHeld()
 	p.sendEquipment()
 	p.flush()

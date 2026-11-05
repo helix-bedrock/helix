@@ -49,9 +49,19 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   players get the registry packets; untouched, each is byte for byte BDS's.
 - **Plugins:** can add, replace and delete any registry entry in `Config.Setup`. World packets go
   through a handler table plugins can replace or wrap, per packet or per system (movement so far),
-  on the player's region tick. Chests and ender chests have events before anything happens (open,
-  close, each slot a player changes with the inventory slots it changes, pairing, spilling) and methods
-  to read and change their items, name and pair (`Host.ChestAt`, `Host.WithChest`, `Chest`, `Player.EnderItem`).
+  on the player's region tick. Every set of item slots is an `Inventory` (a player's inventory, armour,
+  offhand, UI slots and ender chest, chests, shulker boxes, hoppers, dispensers, droppers, crafters and
+  carts) that shows its changes to whoever looks (`Player.Inventory`, `Chest.Inventory`, `SetItem`,
+  `AddItem`, `RemoveItem`, `Clear`, `Viewers`). Every window (own inventory, containers, carts and screens
+  such as crafting tables and anvils) fires `OnContainerOpen`, which can keep it shut per player, and
+  `OnContainerClose`; `OnContainerItem` fires for each slot a player's request changes. What each player
+  sees of any item can be changed per player, one slot or a whole window at a time, without changing the
+  server's item (`OnInventoryView`, `Inventory.SetView`, `Refresh`, `RefreshSlots`, `RefreshFor`,
+  `Player.RefreshItems`, `ItemStack.WithLore`); what the player was shown is resent after it moves items.
+  `OnExplosionStart` can stop any explosion before it does anything and `OnTNTPrime` any TNT from
+  lighting. Chests also have pairing and spilling events and their name and pair (`Host.ChestAt`,
+  `Host.WithChest`, `Chest`). None of this is tested in game yet; what other players see a player hold
+  or wear has no per-player view yet.
   Experience has `OnExperience`, `Player.AddExperience`, `SetLevel` and `Host.SpawnExperience`. Block breaks say what is left behind and
   how much the tool wears, and `OnBlockDrops` and `Setup.SetBlockDrops` decide what comes out, where
   and how fast (not yet tested in game).

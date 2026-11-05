@@ -118,9 +118,11 @@ func TestHopperTakesFromChestCartAbove(t *testing.T) {
 	c, at := hopperUnder(t, p, d, y)
 	onRegion(d, func(r *world.Region) { setNamed(t, p, r, at.Side(cube.FaceUp), nameRail, railStates(0)) })
 	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 1.5, 8.5})
-	onRegion(d, func(r *world.Region) { m.Chest().SetItem(r, 3, ItemStack{Name: "minecraft:emerald", Count: 2}) })
+	onRegion(d, func(r *world.Region) {
+		m.Chest().Inventory(r).SetItem(3, ItemStack{Name: "minecraft:emerald", Count: 2})
+	})
 	waitRegion(t, d, func(r *world.Region) bool {
-		return c.Item(r, 0).Count == 2 && m.Chest().Item(r, 3).Empty()
+		return c.Inventory(r).Item(0).Count == 2 && m.Chest().Inventory(r).Item(3).Empty()
 	})
 }
 
@@ -137,10 +139,10 @@ func TestHopperTakesFromMovingChestCart(t *testing.T) {
 	})
 	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 1.5, 7})
 	onRegion(d, func(r *world.Region) {
-		m.Chest().SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 5})
+		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 5})
 		m.SetVelocity(mgl32.Vec3{0, 0, 0.1})
 	})
-	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count > 0 })
+	waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count > 0 })
 }
 
 func TestHopperDoesNotReachCartOnBlockAbove(t *testing.T) {
@@ -151,13 +153,15 @@ func TestHopperDoesNotReachCartOnBlockAbove(t *testing.T) {
 		setNamed(t, p, r, cube.Pos{at[0], at[1] + 2, at[2]}, nameRail, railStates(0))
 	})
 	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 2.5, 8.5})
-	onRegion(d, func(r *world.Region) { m.Chest().SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 2}) })
+	onRegion(d, func(r *world.Region) {
+		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
+	})
 	time.Sleep(500 * time.Millisecond)
 	onRegion(d, func(r *world.Region) {
-		if !c.Item(r, 0).Empty() {
+		if !c.Inventory(r).Item(0).Empty() {
 			t.Error("the hopper reached through a block")
 		}
-		if m.Chest().Item(r, 0).Count != 2 {
+		if m.Chest().Inventory(r).Item(0).Count != 2 {
 			t.Error("the cart lost its items")
 		}
 	})
@@ -171,10 +175,12 @@ func TestHopperFillsCartBelow(t *testing.T) {
 		setNamed(t, p, r, cube.Pos{3, y, 8}, nameRail, railStates(0))
 		setNamed(t, p, r, at, "minecraft:hopper", map[string]any{"facing_direction": int32(0)})
 		c = p.s.chestAt(r, at)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 1})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 1})
 	})
 	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5})
-	waitRegion(t, d, func(r *world.Region) bool { return m.Chest().Item(r, 0).Count == 1 && c.Item(r, 0).Empty() })
+	waitRegion(t, d, func(r *world.Region) bool {
+		return m.Chest().Inventory(r).Item(0).Count == 1 && c.Inventory(r).Item(0).Empty()
+	})
 }
 
 func TestHopperCartTakesFromChestAboveUntilStopped(t *testing.T) {
@@ -185,17 +191,17 @@ func TestHopperCartTakesFromChestAboveUntilStopped(t *testing.T) {
 		setNamed(t, p, r, cube.Pos{3, y, 8}, nameActivatorRail, map[string]any{stateRailDirection: int32(0), stateRailData: uint8(1)})
 		setNamed(t, p, r, above, "minecraft:chest", nil)
 		c = p.s.chestAt(r, above)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 2})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 	})
 	m := p.s.SpawnMinecart(d, nameHopperMinecart, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5})
 	time.Sleep(400 * time.Millisecond)
 	onRegion(d, func(r *world.Region) {
-		if c.Item(r, 0).Count != 2 {
+		if c.Inventory(r).Item(0).Count != 2 {
 			t.Error("a stopped hopper cart took items")
 		}
 		setNamed(t, p, r, cube.Pos{3, y, 8}, nameActivatorRail, map[string]any{stateRailDirection: int32(0), stateRailData: uint8(0)})
 	})
-	waitRegion(t, d, func(r *world.Region) bool { return m.Chest().Item(r, 0).Count > 0 })
+	waitRegion(t, d, func(r *world.Region) bool { return m.Chest().Inventory(r).Item(0).Count > 0 })
 }
 
 func TestTNTCartLightsOnPoweredActivatorRail(t *testing.T) {
@@ -225,7 +231,7 @@ func TestCartBreaksAfterHitsAndDrops(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
 	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.5})
 	onRegion(d, func(r *world.Region) {
-		m.Chest().SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 2})
+		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 		if m.Hurt(r, 1, nil) || m.Hurt(r, 1, nil) {
 			t.Error("broke too soon")
 		}
@@ -249,7 +255,7 @@ func TestCartSavesAndLoads(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
 	m := p.s.SpawnMinecart(d, nameHopperMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.5})
 	onRegion(d, func(r *world.Region) {
-		m.Chest().SetItem(r, 2, ItemStack{Name: "minecraft:emerald", Count: 3})
+		m.Chest().Inventory(r).SetItem(2, ItemStack{Name: "minecraft:emerald", Count: 3})
 		saved, ok := m.saveEntity(m.entity)
 		if !ok || saved.Data["identifier"] != nameHopperMinecart {
 			t.Fatalf("saved %v", saved)
@@ -261,7 +267,7 @@ func TestCartSavesAndLoads(t *testing.T) {
 		var buf [16]*world.Entity
 		for _, e := range r.AppendEntitiesIn(buf[:0], 0, 0, 16, 16) {
 			if b, ok := e.Owner().(*Minecart); ok && e.UniqueID() == 77 {
-				if s := b.Chest().Item(r, 2); s.Count != 3 {
+				if s := b.Chest().Inventory(r).Item(2); s.Count != 3 {
 					t.Errorf("came back with %+v", s)
 				}
 				return
@@ -277,10 +283,10 @@ func TestDispenserPutsCartOnRail(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		setNamed(t, p, r, cube.Pos{10, y, 14}, nameRail, railStates(0))
 		setNamed(t, p, r, at, "minecraft:dispenser", map[string]any{"facing_direction": int32(2)})
-		p.s.chestAt(r, at).SetItem(r, 0, ItemStack{Name: nameMinecart, Count: 2})
+		p.s.chestAt(r, at).Inventory(r).SetItem(0, ItemStack{Name: nameMinecart, Count: 2})
 		b, _ := r.Block(at, 0)
 		p.s.Dispense(r, at, b)
-		if n := p.s.chestAt(r, at).Item(r, 0).Count; n != 1 {
+		if n := p.s.chestAt(r, at).Inventory(r).Item(0).Count; n != 1 {
 			t.Errorf("%d left", n)
 		}
 	})

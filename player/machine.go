@@ -284,7 +284,7 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 			continue
 		}
 		s.Count--
-		c.SetItem(r, i, s)
+		c.Inventory(r).SetItem(i, s)
 		if wasEmpty {
 			to.cooldown = c.s.redstone.Get().Hopper.FirstItemCooldown
 			if to.lastTick < r.CurrentTick() {
@@ -302,20 +302,20 @@ func (c *Chest) takeOne(r *world.Region, s ItemStack) bool {
 		return false
 	}
 	limit := s.maxStack(c.s.reg)
-	for i, size := 0, c.Size(r); i < size; i++ {
+	for i, size := 0, c.Inventory(r).Size(); i < size; i++ {
 		if c.machine != nil && c.machine.crafter && !c.crafterTakes(i, s) {
 			continue
 		}
-		cur := c.Item(r, i)
+		cur := c.Inventory(r).Item(i)
 		switch {
 		case cur.Empty():
 			one := s
 			one.Count = 1
-			c.SetItem(r, i, one)
+			c.Inventory(r).SetItem(i, one)
 			return true
 		case cur.stacksWith(s) && cur.Count < limit:
 			cur.Count++
-			c.SetItem(r, i, cur)
+			c.Inventory(r).SetItem(i, cur)
 			return true
 		}
 	}
@@ -333,13 +333,13 @@ func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
 
 // pullOne takes one item from a container, from its first slot this one has room for.
 func (c *Chest) pullOne(r *world.Region, from *Chest) bool {
-	for i, size := 0, from.Size(r); i < size; i++ {
-		s := from.Item(r, i)
+	for i, size := 0, from.Inventory(r).Size(); i < size; i++ {
+		s := from.Inventory(r).Item(i)
 		if s.Empty() || !c.takeOne(r, s) {
 			continue
 		}
 		s.Count--
-		from.SetItem(r, i, s)
+		from.Inventory(r).SetItem(i, s)
 		return true
 	}
 	return false
@@ -484,7 +484,7 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos, conf *circuit.Hopper
 			at[1]+itemHalfSize < y+conf.PickupLow+inset || at[1]-itemHalfSize > y+conf.PickupHigh-inset {
 			continue
 		}
-		left := c.AddItem(r, i.stack)
+		left := c.Inventory(r).AddItem(i.stack)
 		if left.Count == i.stack.Count {
 			continue
 		}
@@ -534,9 +534,9 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 			slot = i
 		}
 	}
-	center := blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
+	center := blockCenter(pos)
 	if slot < 0 {
-		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClickFail, Position: center, ExtraData: -1}, nil)
+		playSound(r, pos, soundEvent{name: packet.SoundEventBlockClickFail, pos: center, extra: -1}, nil)
 		return
 	}
 	face, front := s.frontOf(block, pos)
@@ -553,28 +553,28 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	}
 	if !c.machine.dropper && IsCartItem(it.Name) && s.dispenseCart(r, front, dir, it.Name) {
 		it.Count--
-		c.SetItem(r, slot, it)
+		c.Inventory(r).SetItem(slot, it)
 		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-		r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
+		playSound(r, pos, soundEvent{name: packet.SoundEventBlockClick, pos: center, extra: -1}, nil)
 		return
 	}
 	if !c.machine.dropper && s.dispenseProjectile(r, pos, at, dir, it.Name) {
 		it.Count--
-		c.SetItem(r, slot, it)
+		c.Inventory(r).SetItem(slot, it)
 		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
 		return
 	}
 	one := it
 	one.Count = 1
 	it.Count--
-	c.SetItem(r, slot, it)
+	c.Inventory(r).SetItem(slot, it)
 	if one.Name == nameTNT && !c.machine.dropper && s.level.TNTExplodes {
 		s.dispenseTNT(r, front)
 	} else {
 		s.eject(r, one, pos, dir, at)
 	}
 	levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: center, ExtraData: -1}, nil)
+	playSound(r, pos, soundEvent{name: packet.SoundEventBlockClick, pos: center, extra: -1}, nil)
 }
 
 // eject throws stack out of the machine at pos, as BDS's dispenser throws an item.
@@ -621,10 +621,10 @@ func (c *Chest) useBucket(r *world.Region, front cube.Pos, slot int, at mgl32.Ve
 		}
 		next = emptyBucket
 	}
-	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: packet.SoundEventBlockClick, Position: at, ExtraData: extra}, nil)
+	playSound(r, pos, soundEvent{name: packet.SoundEventBlockClick, pos: at, extra: extra}, nil)
 	it.Count--
-	c.SetItem(r, slot, it)
-	if rest := c.AddItem(r, ItemStack{Name: next, Count: 1, netID: s.stackIDs.Add(1)}); !rest.Empty() {
+	c.Inventory(r).SetItem(slot, it)
+	if rest := c.Inventory(r).AddItem(ItemStack{Name: next, Count: 1, netID: s.stackIDs.Add(1)}); !rest.Empty() {
 		s.eject(r, rest, pos, dir, at)
 	}
 	return true
@@ -679,7 +679,7 @@ func (c *Chest) pushOne(r *world.Region, at cube.Pos, slot int) bool {
 		return false
 	}
 	s.Count--
-	c.SetItem(r, slot, s)
+	c.Inventory(r).SetItem(slot, s)
 	return true
 }
 

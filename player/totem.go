@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -53,8 +52,8 @@ type TotemFunc func(p *Player, src DamageSource) bool
 // item, as BDS looks for it.
 func (p *Player) heldTotem() *ItemStack {
 	inv := &p.inventory
-	if inv.offhand.Name == itemTotem {
-		return &inv.offhand
+	if inv.offhand[0].Name == itemTotem {
+		return &inv.offhand[0]
 	}
 	if s := &inv.main[inv.held]; s.Name == itemTotem {
 		return s
@@ -91,7 +90,7 @@ func vanillaTotem(p *Player, src DamageSource) bool {
 	}
 	if r := p.entity.Region(); r != nil {
 		at, pos := p.blockPos(), p.entity.Position()
-		r.Broadcast(at, &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventTalismanActivate}, nil)
+		r.Broadcast(at, actorEvent(p.runtimeID, packet.ActorEventTalismanActivate), nil)
 		r.Broadcast(at, &packet.LevelEvent{EventType: packet.LevelEventSoundTotemUsed, Position: pos}, nil)
 	}
 	p.consumeTotem(totem)
@@ -101,10 +100,10 @@ func vanillaTotem(p *Player, src DamageSource) bool {
 // consumeTotem takes the totem that saved the player out of its slot. BDS empties the
 // slot whatever the count; totems do not stack.
 func (p *Player) consumeTotem(totem *ItemStack) {
-	offhand := totem == &p.inventory.offhand
+	offhand := totem == &p.inventory.offhand[0]
 	*totem = ItemStack{}
 	if offhand {
-		p.send(&packet.InventorySlot{WindowID: protocol.WindowIDOffHand, NewItem: totem.network(p.s.reg)})
+		p.sendOffhand()
 	} else {
 		p.sendHeld()
 	}

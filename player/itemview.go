@@ -158,7 +158,7 @@ func (i *ItemActor) sendViews(e *world.Entity) {
 		return
 	}
 	e.EachSeer(func(seer *world.Entity) {
-		seer.SendTo(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: nameMetadata(i.viewFor(seer).Name)})
+		seer.SendTo(actorData(e.RuntimeID(), nameMetadata(i.viewFor(seer).Name)))
 	})
 }
 
@@ -176,7 +176,5 @@ func nameMetadata(name string) protocol.EntityMetadata {
 
 // sendStackSize tells the players who see the item its new count.
 func (i *ItemActor) sendStackSize() {
-	i.entity.Send(&packet.ActorEvent{
-		EntityRuntimeID: i.entity.RuntimeID(), EventType: packet.ActorEventUpdateStackSize, EventData: int32(i.stack.Count),
-	})
+	i.entity.Send(actorEventData(i.entity.RuntimeID(), packet.ActorEventUpdateStackSize, int32(i.stack.Count)))
 }

@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
@@ -195,6 +195,87 @@ type Chest struct {
 	open   bool
 	lid    float32
 	resend int32
+	// inv wraps this chest's slots; whole wraps both halves of a double chest, on the
+	// lead, made for wholeOf.
+	inv, whole *Inventory
+	wholeOf    *Chest
+	// chunk is the chunk the chest is in, to save it when a slot changes.
+	chunk world.ChunkHandle
+}
+
+// BindBlockEntity keeps the chunk the chest is in.
+func (c *Chest) BindBlockEntity(h world.ChunkHandle) { c.chunk = h }
+
+// inventoryViewers are the players with the chest open; the lead keeps them.
+func (c *Chest) inventoryViewers() []*Player { return c.viewers }
+
+// inventoryChanged saves the chest. A cart's slots are saved with the cart.
+func (c *Chest) inventoryChanged(int) { c.chunk.Changed() }
+
+// doubleHolder holds both halves of a double chest's slots.
+type doubleHolder struct{ lead, follower *Chest }
+
+func (h doubleHolder) inventoryViewers() []*Player { return h.lead.viewers }
+
+func (h doubleHolder) inventoryChanged(slot int) {
+	if slot < chestSize {
+		h.lead.chunk.Changed()
+		return
+	}
+	h.follower.chunk.Changed()
+}
+
+// Inventory returns the chest's slots: both halves of a double chest from either half,
+// the lead's first. Nil for an ender chest, whose slots are each player's
+// ([Player.EnderChest]). Runs: owner of the chunk.
+func (c *Chest) Inventory(r *world.Region) *Inventory {
+	if c.ender {
+		return nil
+	}
+	lead, follower := c.halves(r)
+	if follower == nil {
+		return lead.ownInventory()
+	}
+	if lead.whole == nil || lead.wholeOf != follower {
+		lead.whole = &Inventory{
+			s: c.s, kind: ContainerChest, parts: [2][]ItemStack{lead.items[:], follower.items[:]},
+			holder: doubleHolder{lead: lead, follower: follower},
+		}
+		lead.wholeOf = follower
+	}
+	return lead.whole
+}
+
+// ownInventory is this half's slots alone.
+func (c *Chest) ownInventory() *Inventory {
+	if c.inv == nil {
+		c.inv = &Inventory{s: c.s, kind: c.Kind(), parts: [2][]ItemStack{c.items[:c.halfSize()]}, holder: c}
+	}
+	return c.inv
+}
+
+// Kind returns what the chest is: a chest, ender chest, shulker box, hopper, dispenser,
+// dropper or crafter, or a cart's slots.
+func (c *Chest) Kind() ContainerKind {
+	switch {
+	case c.ender:
+		return ContainerEnderChest
+	case c.shulker:
+		return ContainerShulkerBox
+	case c.cart != nil && c.machine != nil && c.machine.hopper:
+		return ContainerHopperMinecart
+	case c.cart != nil:
+		return ContainerChestMinecart
+	case c.machine == nil:
+		return ContainerChest
+	case c.machine.hopper:
+		return ContainerHopper
+	case c.machine.dropper:
+		return ContainerDropper
+	case c.machine.crafter:
+		return ContainerCrafter
+	}
+	return ContainerDispenser
 }
 
 // chestEntities is the world's list of block entities the engine runs.
@@ -597,10 +678,7 @@ func (c *Chest) lidSound(r *world.Region, sound string) {
 	if !ok {
 		return
 	}
-	r.Broadcast(c.pos, &packet.LevelSoundEvent{
-		SoundType: sound, Position: at.Add(mgl32.Vec3{0.5, 0.5, 0.5}),
-		ExtraData: int32(c.s.reg.Blocks.Hash(block)), //nolint:gosec // hashes are sent as int32
-	}, nil)
+	playSound(r, c.pos, c.s.blockSound(sound, at.Add(mgl32.Vec3{0.5, 0.5, 0.5}), block), nil)
 }
 
 // blockEvent tells the players near how the lid stands.
@@ -612,7 +690,7 @@ func (c *Chest) blockEvent(r *world.Region) {
 		return
 	}
 	r.Broadcast(c.pos, &packet.BlockEvent{
-		Position:  protocol.BlockPos{int32(c.pos[0]), int32(c.pos[1]), int32(c.pos[2])}, //nolint:gosec // block coordinates fit int32
+		Position:  blockPos(c.pos),
 		EventType: chestEventOpen, EventData: int32(boolByte(c.open)),
 	}, nil)
 }
@@ -642,10 +720,6 @@ func (c *Chest) removeViewer(r *world.Region, p *Player) {
 		c.open = false
 		c.blockEvent(r)
 	}
-	if g := c.s.game; g.chestCloseEv.Has() {
-		e := ChestCloseEvent{Player: p, Region: r, Chest: c}
-		g.chestCloseEv.fire(c.s.log, &e)
-	}
 }
 
 // closeViewers closes the window of everyone with the chest open. BDS only clears
@@ -659,7 +733,7 @@ func (c *Chest) closeViewers(r *world.Region) {
 		c.removeViewer(r, v)
 		// One who just moved to another region closes itself on its next tick.
 		if v.entity != nil && v.entity.Region() == r {
-			v.closeWindow(true)
+			v.closeWindow(r, true)
 		}
 	}
 }
@@ -678,19 +752,28 @@ func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	if !p.abilities.Flag(AbilityOpenContainers) {
 		return true
 	}
+	if p.window.open {
+		return true
+	}
 	blocked := !c.canOpen(r, u.Pos)
 	if o := c.mate(r); o != nil && !o.canOpen(r, o.pos) {
 		blocked = true
 	}
-	if g := p.s.game; g.chestOpenEv.Has() {
-		e := ChestOpenEvent{Player: p, Region: r, Chest: c, Pos: u.Pos, Blocked: blocked}
-		g.chestOpenEv.fire(p.s.log, &e)
-		blocked = e.Blocked || e.Cancelled()
-	}
-	if !blocked {
+	o := p.chestOpening(r, c, u.Pos)
+	o.blocked = blocked
+	if p.mayOpen(r, &o) {
 		p.openChest(r, c, u.Pos)
 	}
 	return true
+}
+
+// chestOpening is the window a chest opens.
+func (p *Player) chestOpening(r *world.Region, c *Chest, pos cube.Pos) windowOpening {
+	inv := c.Inventory(r)
+	if c.ender {
+		inv = p.EnderChest()
+	}
+	return windowOpening{kind: c.Kind(), window: c.windowType(), pos: pos, entity: -1, inv: inv, chest: c}
 }
 
 // canOpen is BDS's check of the block above: listed blocks never stop the lid, any
@@ -725,46 +808,25 @@ func chestLidHits(box registry.Box) bool {
 // openChest opens the window as BDS's openContainer does: refused while one is
 // open, the next window ID, ContainerOpen at the clicked block, then the contents.
 func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
-	w := &p.window
-	if w.open {
+	if p.window.open {
 		return
 	}
 	lead, _ := c.halves(r)
-	w.nextID()
-	w.open, w.chest, w.chestPos, w.chestDim = true, true, pos, r.Dimension()
-	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: c.windowType(),
-		ContainerPosition:       protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])}, //nolint:gosec // block coordinates fit int32
-		ContainerEntityUniqueID: -1,
-	})
-	p.send(&packet.InventoryContent{WindowID: uint32(w.id), Content: p.chestContent(r, c)})
-	p.flush()
+	o := p.chestOpening(r, c, pos)
+	p.showWindow(r, &o)
 	lead.addViewer(r, p)
-}
-
-// closeWindow forgets the player's chest window. serverSide tells the client,
-// which otherwise closed it itself.
-func (p *Player) closeWindow(serverSide bool) {
-	w := &p.window
-	w.clearStations()
-	w.chest = false
-	w.cart = nil
-	p.inventory.open = nil
-	if serverSide {
-		p.sendNow(&packet.ContainerClose{WindowID: w.id, ContainerType: containerTypeNone, ServerSide: true})
-	}
 }
 
 // leaveChest takes the player off its chest's viewers and closes the window. A chest
 // that is no longer in this region is told on its own tick.
 func (p *Player) leaveChest(r *world.Region, serverSide bool) {
 	w := &p.window
-	if !w.chest {
+	if w.inv == nil {
 		return
 	}
-	pos := w.chestPos
+	pos, dim := w.pos, w.dim
 	cart := w.cart
-	p.closeWindow(serverSide)
+	p.closeWindow(r, serverSide)
 	if cart != nil {
 		if cart.chest != nil {
 			if cr := cart.entity.Region(); cr != nil && (r == nil || cr == r) {
@@ -784,7 +846,6 @@ func (p *Player) leaveChest(r *world.Region, serverSide bool) {
 			return
 		}
 	}
-	dim := p.window.chestDim
 	if dim == nil {
 		return
 	}
@@ -800,7 +861,7 @@ func (p *Player) leaveChest(r *world.Region, serverSide bool) {
 // tickChest closes the player's chest window when the chest is gone or too far, as
 // BDS checks its open container each tick.
 func (p *Player) tickChest() {
-	if !p.window.chest {
+	if p.window.inv == nil {
 		return
 	}
 	r := p.entity.Region()
@@ -811,7 +872,7 @@ func (p *Player) tickChest() {
 	// block a cart is in (0xBC30280).
 	gone := p.windowChest(r) == nil
 	if !gone {
-		at := p.window.chestPos
+		at := p.window.pos
 		if m := p.window.cart; m != nil {
 			at = floorPos(m.entity.Position())
 		}
@@ -824,35 +885,25 @@ func (p *Player) tickChest() {
 	}
 }
 
-// loadChestWork copies the open chest's items for a request to work on, lead's
-// half first; the result stays nil with no chest open.
+// loadChestWork copies the open container's items for a request to work on; the
+// result stays nil with none open.
 func (p *Player) loadChestWork() []ItemStack {
 	st := &p.requests
 	st.chest = st.chest[:0]
-	if !p.window.chest {
+	if p.window.inv == nil {
 		return nil
 	}
 	r := p.entity.Region()
-	if r == nil {
+	if r == nil || p.windowChest(r) == nil {
 		return nil
 	}
-	c := p.windowChest(r)
-	if c == nil {
-		return nil
-	}
-	if c.ender {
-		st.chest = append(st.chest, p.inventory.ender[:]...)
-		return st.chest
-	}
-	lead, follower := c.halves(r)
-	st.chest = append(st.chest, lead.items[:c.halfSize()]...)
-	if follower != nil {
-		st.chest = append(st.chest, follower.items[:]...)
-	}
+	inv := p.window.inv
+	st.chest = append(st.chest, inv.parts[0]...)
+	st.chest = append(st.chest, inv.parts[1]...)
 	return st.chest
 }
 
-// commitChestWork writes back what a request did to the open chest and shows the
+// commitChestWork writes back what a request did to the open container and shows the
 // slots it changed to the others who have it open.
 func (p *Player) commitChestWork() {
 	work := p.inventory.open
@@ -860,39 +911,183 @@ func (p *Player) commitChestWork() {
 		return
 	}
 	r := p.entity.Region()
-	if r == nil {
+	if r == nil || p.windowChest(r) == nil {
 		return
 	}
-	c := p.windowChest(r)
-	if c == nil {
-		return
-	}
-	// An ender chest's items are this player's alone, saved with the player.
-	if c.ender {
-		copy(p.inventory.ender[:], work)
-		return
-	}
-	lead, follower := c.halves(r)
+	inv := p.window.inv
 	for i, s := range work {
-		half, at := lead, i
-		if i >= chestSize {
-			half, at = follower, i-chestSize
-		}
-		if half == nil {
+		cur := inv.at(i)
+		if cur == nil {
 			break
 		}
-		cur := &half.items[at]
 		if cur.netID == s.netID && cur.Count == s.Count {
 			continue
 		}
 		*cur = s
-		if half.cart == nil {
-			r.SaveBlockEntity(half.pos)
-		}
-		for _, v := range lead.viewers {
+		inv.holder.inventoryChanged(i)
+		for _, v := range inv.Viewers() {
 			if v != p {
-				v.sendNow(&packet.InventorySlot{WindowID: uint32(v.window.id), Slot: uint32(i), NewItem: s.network(p.s.reg)}) //nolint:gosec // slots are small
+				inv.sendSlot(v, i, true)
 			}
 		}
 	}
+}
+
+// ChestPairEvent is a placed chest about to pair with the one beside it. Cancel it to
+// leave both single.
+type ChestPairEvent struct {
+	Cancellable
+	Region *world.Region
+	// Chest is the chest just placed, Other the one it would pair with.
+	Chest, Other *Chest
+}
+
+// ChestSpillEvent is a chest's items about to be thrown out because its block went.
+// Change Items to decide what comes out; cancelling means nothing does. Either way the
+// chest's items are gone. An ender chest has none, so it never fires for one.
+type ChestSpillEvent struct {
+	Cancellable
+	Region *world.Region
+	Chest  *Chest
+	Pos    cube.Pos
+	Items  []ItemStack
+}
+
+// OnChestPair listens to placed chests about to pair.
+func OnChestPair(s *Setup, fn func(e *ChestPairEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.chestPairEv.add(s.owner, p, fn)
+	return nil
+}
+
+// OnChestSpill listens to chests about to throw out their items.
+func OnChestSpill(s *Setup, fn func(e *ChestSpillEvent), p Priority) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	s.h.game.chestSpillEv.add(s.owner, p, fn)
+	return nil
+}
+
+// ChestAt returns the chest, ender chest, shulker box, hopper, dispenser, dropper or
+// crafter at pos, nil if none is there. Runs: owner
+// of the chunk.
+func (s *Host) ChestAt(r *world.Region, pos cube.Pos) *Chest { return s.chestAt(r, pos) }
+
+// WithChest runs fn on the owner of the chest at pos in the dimension, loading its
+// chunk; c is nil if no chest is there. Runs: anywhere.
+func (s *Host) WithChest(d *world.Dimension, pos cube.Pos, fn func(r *world.Region, c *Chest)) {
+	d.RunAt(mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)}, func(r *world.Region) { //nolint:gosec // chunk coordinates fit int32
+		fn(r, s.chestAt(r, pos))
+	})
+}
+
+// Overworld returns the overworld.
+func (s *Host) Overworld() *world.Dimension { return s.overworld }
+
+// Pos returns where the chest is.
+func (c *Chest) Pos() cube.Pos { return c.pos }
+
+// Ender reports whether this is an ender chest. Its items are each player's: see
+// Player.EnderChest.
+func (c *Chest) Ender() bool { return c.ender }
+
+// Partner returns the other half's position, false if the chest is single.
+func (c *Chest) Partner() (cube.Pos, bool) { return c.partner, c.paired }
+
+// Lead reports whether this half holds the first slots of a double chest; a single
+// chest is its own lead.
+func (c *Chest) Lead() bool { return c.lead }
+
+// Viewers returns the players with this chest open.
+func (c *Chest) Viewers(r *world.Region) []*Player {
+	lead, _ := c.halves(r)
+	return slices.Clone(lead.viewers)
+}
+
+// CloseViewers closes the window of everyone with this chest open.
+func (c *Chest) CloseViewers(r *world.Region) {
+	lead, _ := c.halves(r)
+	lead.closeViewers(r)
+}
+
+// Name returns the chest's custom name, empty if it has none.
+func (c *Chest) Name() string {
+	name, _ := c.saved["CustomName"].(string)
+	return name
+}
+
+// SetName sets the custom name of the whole chest; empty removes it. Anyone with it
+// open has the window opened again, because a client reads the name only on opening.
+func (c *Chest) SetName(r *world.Region, name string) {
+	lead, follower := c.halves(r)
+	for _, half := range [...]*Chest{lead, follower} {
+		if half == nil {
+			continue
+		}
+		if half.saved == nil {
+			half.saved = map[string]any{}
+		}
+		if name == "" {
+			delete(half.saved, "CustomName")
+		} else {
+			half.saved["CustomName"] = name
+		}
+		half.changed = false
+		r.SendBlockEntity(half.pos)
+		r.SaveBlockEntity(half.pos)
+	}
+	for _, v := range lead.viewers {
+		if v.entity != nil && v.entity.Region() == r {
+			v.reopenChest(r, c)
+		}
+	}
+}
+
+// reopenChest shows the window again, the player staying among the chest's viewers
+// so the lid stays up and no close event fires.
+func (p *Player) reopenChest(r *world.Region, c *Chest) {
+	p.sendNow(&packet.ContainerClose{WindowID: p.window.id, ContainerType: containerTypeNone, ServerSide: true})
+	p.window.open = false
+	p.openChest(r, c, p.window.pos)
+}
+
+// PairWith pairs this chest with other as its lead, closing their windows. BDS's rule
+// must allow it: beside each other, same kind, same direction, other unpaired. False
+// if it does not or this chest already has a partner.
+func (c *Chest) PairWith(r *world.Region, other *Chest) bool {
+	if c.paired || c == other || !c.canPair(r, other) {
+		return false
+	}
+	c.closeViewers(r)
+	other.closeViewers(r)
+	c.link(other.pos, true)
+	other.link(c.pos, false)
+	return true
+}
+
+// Unpair splits a double chest into two single ones, closing their windows.
+func (c *Chest) Unpair(r *world.Region) {
+	if c.paired {
+		c.unpair(r)
+	}
+}
+
+// ComparatorSignal is what a comparator reads from the chest: how full it and its
+// other half are. An ender chest's items belong to players, so it reads as empty.
+func (c *Chest) ComparatorSignal(r *world.Region, _ cube.Pos) int32 {
+	if c.machine != nil && c.machine.crafter {
+		return c.crafterSignal()
+	}
+	var sum circuit.ContainerSum
+	for _, it := range c.Inventory(r).Items() {
+		maxStack := 0
+		if t, ok := c.s.reg.Items.ByName(it.Name); ok {
+			maxStack = int(t.MaxStack)
+		}
+		sum.Add(int(it.Count), maxStack)
+	}
+	return sum.Signal(c.Inventory(r).Size())
 }

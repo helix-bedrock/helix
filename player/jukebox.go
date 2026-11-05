@@ -130,7 +130,7 @@ func (e *jukeboxEntity) updateHearing(r *world.Region, pos cube.Pos) {
 	if !ok {
 		return
 	}
-	centre := blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
+	centre := blockCenter(pos)
 	reach := float32(e.s.viewDistance*blocksInChunk + jukeboxExtraReach)
 	e.near = r.AppendEntitiesIn(e.near[:0], centre[0]-reach, centre[2]-reach, centre[0]+reach, centre[2]+reach)
 	started := e.ticks == 0

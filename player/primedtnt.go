@@ -139,7 +139,7 @@ func (t *PrimedTNT) tick(e *world.Entity) {
 	}
 	if t.fuse > 0 {
 		t.fuse--
-		e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyFuseTime: t.fuse}})
+		e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyFuseTime: t.fuse}))
 		return
 	}
 	t.gone = true
@@ -282,9 +282,37 @@ func ignites(s ItemStack) bool {
 	return false
 }
 
+// TNTPrimeEvent is a TNT block about to be lit: by a player, redstone, fire or another
+// explosion. Cancel it to keep it from lighting. A block lit by an explosion is already
+// taken by it, so then nothing is left; otherwise the block stays. Runs: owner of the
+// region.
+type TNTPrimeEvent struct {
+	Cancellable
+	Region *world.Region
+	Pos    cube.Pos
+	// Player lit it, if a player did. Explosion is the explosion that lit it, if one did.
+	Player    *Player
+	Explosion *Explosion
+}
+
+// OnTNTPrime listens to TNT blocks being lit.
+func OnTNTPrime(s *Setup, fn func(e *TNTPrimeEvent), p Priority) error {
+	return addListener(s, &s.h.game.tntPrimeEv, fn, p)
+}
+
+// mayPrime runs TNTPrimeEvent, false if a listener stopped it.
+func (s *Host) mayPrime(r *world.Region, pos cube.Pos, p *Player, x *Explosion) bool {
+	if !s.game.tntPrimeEv.Has() {
+		return true
+	}
+	e := TNTPrimeEvent{Region: r, Pos: pos, Player: p, Explosion: x}
+	s.game.tntPrimeEv.fire(s.log, &e)
+	return !e.Cancelled()
+}
+
 // Exploded lights it with a short fuse; the explosion that took it removes the block.
 func (tntBlock) Exploded(s *Host, r *world.Region, pos cube.Pos, _ uint32, e *Explosion) {
-	if !s.level.TNTExplodes {
+	if !s.level.TNTExplodes || !s.mayPrime(r, pos, e.Attacker, e) {
 		return
 	}
 	conf := &s.redstone.Get().TNT
@@ -300,7 +328,7 @@ func tntFeet(pos cube.Pos) mgl32.Vec3 {
 // PrimeBlock removes the TNT block at pos and lights it, by owner if a player did it.
 // False if the tntexplodes game rule is off. Runs: owner of the region.
 func (s *Host) PrimeBlock(r *world.Region, pos cube.Pos, owner *Player) bool {
-	if !s.level.TNTExplodes {
+	if !s.level.TNTExplodes || !s.mayPrime(r, pos, owner, nil) {
 		return false
 	}
 	r.SetBlock(pos, 0, s.reg.Blocks.Air())
@@ -332,7 +360,7 @@ func (s *Host) brokenTNT(r *world.Region, pos cube.Pos, block uint32, p *Player)
 	if blocks.Name(block) != nameTNT || !s.level.TNTExplodes {
 		return
 	}
-	if v, _ := blocks.States(block)[stateExplodeBit].(uint8); v != 0 {
+	if v, _ := blocks.States(block)[stateExplodeBit].(uint8); v != 0 && s.mayPrime(r, pos, p, nil) {
 		s.lightTNT(r, pos, p)
 	}
 }

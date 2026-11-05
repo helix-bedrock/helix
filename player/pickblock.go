@@ -65,7 +65,7 @@ func (s *Host) pickedItem(block uint32) (ItemStack, bool) {
 }
 
 // findPicked is where the inventory holds s: the held slot first, as BDS looks, then in order.
-func (inv *Inventory) findPicked(s ItemStack) int {
+func (inv *playerItems) findPicked(s ItemStack) int {
 	matches := func(o ItemStack) bool { return !o.Empty() && o.Name == s.Name && o.Meta == s.Meta }
 	if matches(inv.main[inv.held]) {
 		return int(inv.held)
@@ -88,7 +88,7 @@ func lockedInSlot(s ItemStack) bool {
 // there, else swapped with an empty hotbar slot, else with the held slot. Only creative makes
 // the item: in an empty hotbar slot, else in the held slot, whose stack moves to an empty slot
 // or is lost if there is none. It reports whether anything changed.
-func (inv *Inventory) pick(s ItemStack, creative bool) bool {
+func (inv *playerItems) pick(s ItemStack, creative bool) bool {
 	free := inv.freeSlot()
 	hotbarFree := free >= 0 && free < hotbarSize
 	at := inv.findPicked(s)
@@ -161,11 +161,7 @@ func handleBlockPick(p *Player, pk *packet.BlockPickRequest) {
 	if !inv.pick(stack, creative) {
 		return
 	}
-	content := make([]protocol.ItemInstance, len(inv.main))
-	for i, s := range inv.main {
-		content[i] = s.network(p.s.reg)
-	}
-	p.send(&packet.InventoryContent{WindowID: protocol.WindowIDInventory, Content: content})
+	p.Inventory().sendAll(p, false)
 	p.send(&packet.PlayerHotBar{SelectedHotBarSlot: uint32(inv.held), WindowID: protocol.WindowIDInventory, SelectHotBarSlot: true})
 	p.sendEquipment()
 }

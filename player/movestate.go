@@ -114,11 +114,7 @@ func (p *Player) sendActorFlags() {
 		return
 	}
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), &packet.SetActorData{
-			EntityRuntimeID: p.runtimeID,
-			EntityMetadata:  protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags(), protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()},
-			Tick:            p.entity.Tick(),
-		}, p.viewer)
+		r.Broadcast(p.blockPos(), actorDataAt(p.runtimeID, protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags(), protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()}, p.entity.Tick()), p.viewer)
 	}
 }
 

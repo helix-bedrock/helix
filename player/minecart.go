@@ -853,7 +853,7 @@ func (m *Minecart) pickUpAround(r *world.Region, lo, hi mgl32.Vec3) {
 		if !overlaps(lo, hi, iLo, iHi) {
 			continue
 		}
-		left := m.chest.AddItem(r, i.stack)
+		left := m.chest.Inventory(r).AddItem(i.stack)
 		switch {
 		case left.Empty():
 			i.taken = true
@@ -873,9 +873,9 @@ func (m *Minecart) prime(fuse int32) {
 	}
 	m.lit, m.fuse = true, fuse
 	e := m.entity
-	e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{
+	e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{
 		protocol.EntityDataKeyFlags: int64(m.flags()), protocol.EntityDataKeyFuseTime: m.fuse,
-	}})
+	}))
 	if r := e.Region(); r != nil {
 		levelEvent(r, floorPos(e.Position()), e.Position(), packet.LevelEventSoundFuse, 0)
 	}
@@ -888,7 +888,7 @@ func (m *Minecart) tickFuse(r *world.Region, e *world.Entity) {
 	}
 	if m.fuse > 0 {
 		m.fuse--
-		e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyFuseTime: m.fuse}})
+		e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyFuseTime: m.fuse}))
 		return
 	}
 	m.gone = true
@@ -915,10 +915,10 @@ func (m *Minecart) remove(r *world.Region) {
 }
 
 func (m *Minecart) sendHurt(e *world.Entity) {
-	e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{
+	e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{
 		protocol.EntityDataKeyHurt: m.hurtTime, protocol.EntityDataKeyHurtDirection: m.hurtSide,
 		protocol.EntityDataKeyStructuralIntegrity: m.integrity,
-	}})
+	}))
 }
 
 // Hurt is BDS's Minecart::_hurt: the shake, and it breaks once its integrity is gone or at
@@ -1057,23 +1057,14 @@ func (p *Player) openCart(m *Minecart) {
 	if r == nil || w.open || m.gone || m.chest == nil || p.dead() || !p.abilities.Flag(AbilityOpenContainers) || m.entity.Region() != r {
 		return
 	}
-	at := floorPos(m.entity.Position())
-	if g := p.s.game; g.chestOpenEv.Has() {
-		e := ChestOpenEvent{Player: p, Region: r, Chest: m.chest, Pos: at}
-		g.chestOpenEv.fire(p.s.log, &e)
-		if e.Blocked || e.Cancelled() {
-			return
-		}
+	o := windowOpening{
+		kind: m.chest.Kind(), window: m.spec.opens, pos: floorPos(m.entity.Position()), entity: m.entity.UniqueID(),
+		inv: m.chest.Inventory(r), cart: m,
 	}
-	w.nextID()
-	w.open, w.chest, w.cart, w.chestDim = true, true, m, r.Dimension()
-	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: m.spec.opens,
-		ContainerPosition:       protocol.BlockPos{int32(at[0]), int32(at[1]), int32(at[2])}, //nolint:gosec // block coordinates fit int32
-		ContainerEntityUniqueID: m.entity.UniqueID(),
-	})
-	p.send(&packet.InventoryContent{WindowID: uint32(w.id), Content: p.chestContent(r, m.chest)})
-	p.flush()
+	if !p.mayOpen(r, &o) {
+		return
+	}
+	p.showWindow(r, &o)
 	m.chest.addViewer(r, p)
 }
 
@@ -1088,7 +1079,7 @@ func (p *Player) windowChest(r *world.Region) *Chest {
 		}
 		return m.chest
 	}
-	return p.s.chestAt(r, p.window.chestPos)
+	return p.s.chestAt(r, p.window.pos)
 }
 
 // dropGoneViewers lets go of those who have the cart open but are in no region with it, who

@@ -135,7 +135,7 @@ func (p *Player) showSeat(on bool) {
 	if on {
 		maps.Copy(meta, p.vehicle.riders().Metadata(p))
 	}
-	pk := &packet.SetActorData{EntityRuntimeID: p.entity.RuntimeID(), EntityMetadata: meta}
+	pk := actorData(p.entity.RuntimeID(), meta)
 	p.entity.Send(pk)
 	// A player with no connection has no client to tell.
 	if p.conn != nil {

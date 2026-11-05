@@ -210,7 +210,7 @@ func vanillaAttack(p, target *Player) bool {
 		}
 	}
 	// The attacker's client has played the sound already.
-	r.Broadcast(p.blockPos(), &packet.LevelSoundEvent{SoundType: sound, Position: p.entity.Position(), ExtraData: -1, EntityType: "minecraft:player"}, p.viewer)
+	playSound(r, p.blockPos(), soundEvent{name: sound, pos: p.entity.Position(), extra: -1, entity: "minecraft:player"}, p.viewer)
 	p.flush()
 	return true
 }

@@ -37,6 +37,24 @@ type BlockEntityRemover interface {
 	BlockEntityRemoved(r *Region, pos cube.Pos)
 }
 
+// BlockEntityBinder is a block entity given its chunk's handle whenever it is put in a
+// chunk, so it can mark itself for saving from code that has no region at hand.
+type BlockEntityBinder interface {
+	BindBlockEntity(h ChunkHandle)
+}
+
+// ChunkHandle is the chunk a block entity is in. Runs: owner of that chunk.
+type ChunkHandle struct{ c *Chunk }
+
+// Changed marks the chunk to be saved at the end of the tick, as
+// [Region.SaveBlockEntity] does. A zero handle, or one whose chunk has gone, does
+// nothing that lasts.
+func (h ChunkHandle) Changed() {
+	if h.c != nil {
+		h.c.dirty = true
+	}
+}
+
 // BlockEntities makes block entities: the engine's list of those it runs.
 type BlockEntities interface {
 	// Load returns the live form of a saved block entity. False keeps it saved
@@ -114,6 +132,9 @@ func (c *Chunk) addBlockEntity(pos cube.Pos, be BlockEntity) {
 		c.blockEntities = make(map[cube.Pos]BlockEntity)
 	}
 	c.blockEntities[pos] = be
+	if b, ok := be.(BlockEntityBinder); ok {
+		b.BindBlockEntity(ChunkHandle{c: c})
+	}
 	if _, ok := be.(BlockEntityTicker); ok {
 		c.tickingEntities = append(c.tickingEntities, pos)
 	}

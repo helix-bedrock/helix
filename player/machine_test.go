@@ -80,13 +80,13 @@ func TestHopperMovesChestToChest(t *testing.T) {
 		setNamed(t, p, r, top, "minecraft:chest", nil)
 		setNamed(t, p, r, mid, "minecraft:hopper", map[string]any{"facing_direction": int32(0)})
 		setNamed(t, p, r, low, "minecraft:chest", nil)
-		if !p.s.chestAt(r, top).SetItem(r, 3, ItemStack{Name: "minecraft:emerald", Count: 2}) {
+		if !p.s.chestAt(r, top).Inventory(r).SetItem(3, ItemStack{Name: "minecraft:emerald", Count: 2}) {
 			t.Fatal("no slot")
 		}
 	})
 	waitRegion(t, d, func(r *world.Region) bool {
 		c := p.s.chestAt(r, low)
-		return c != nil && c.Item(r, 0).Count == 2 && p.s.chestAt(r, top).Item(r, 3).Empty()
+		return c != nil && c.Inventory(r).Item(0).Count == 2 && p.s.chestAt(r, top).Inventory(r).Item(3).Empty()
 	})
 }
 
@@ -101,7 +101,7 @@ func TestHopperCollectsItemsAbove(t *testing.T) {
 	// One with a name tag, as -testcmds gives every dropped item, is still just an item.
 	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl32.Vec3{1.5, 70, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
 	onRegion(d, func(*world.Region) { i.SetView(func(*Player, *ItemView) {}) })
-	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 3 })
+	waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count == 3 })
 }
 
 // An item on a slab or stair above a hopper is in reach of it.
@@ -118,7 +118,7 @@ func TestHopperCollectsOnPartBlockAbove(t *testing.T) {
 			})
 			// From above the box, over the low half of the stair: its default rises to the east.
 			p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.25, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
-			waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 2 })
+			waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count == 2 })
 		})
 	}
 }
@@ -137,7 +137,7 @@ func TestHopperLeavesItemOnFullBlockAbove(t *testing.T) {
 	waitRegion(t, d, func(*world.Region) bool { return i.onGround })
 	time.Sleep(300 * time.Millisecond)
 	onRegion(d, func(r *world.Region) {
-		if !c.Item(r, 0).Empty() {
+		if !c.Inventory(r).Item(0).Empty() {
 			t.Error("the hopper took an item through a full block")
 		}
 	})
@@ -158,11 +158,11 @@ func TestHopperTurnedOffHolds(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		setNamed(t, p, r, mid, "minecraft:hopper", map[string]any{"facing_direction": int32(0), "toggle_bit": uint8(1)})
 		setNamed(t, p, r, low, "minecraft:chest", nil)
-		p.s.chestAt(r, mid).SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 1})
+		p.s.chestAt(r, mid).Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 1})
 	})
 	time.Sleep(600 * time.Millisecond)
 	onRegion(d, func(r *world.Region) {
-		if !p.s.chestAt(r, low).Item(r, 0).Empty() {
+		if !p.s.chestAt(r, low).Inventory(r).Item(0).Empty() {
 			t.Error("hopper with power moved an item")
 		}
 	})
@@ -174,7 +174,7 @@ func TestHopperSaves(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		setNamed(t, p, r, at, "minecraft:hopper", nil)
 		c := p.s.chestAt(r, at)
-		c.SetItem(r, 4, ItemStack{Name: "minecraft:emerald", Count: 3})
+		c.Inventory(r).SetItem(4, ItemStack{Name: "minecraft:emerald", Count: 3})
 		saved := c.SaveData(at)
 		if saved["id"] != "Hopper" {
 			t.Errorf("id %v", saved["id"])
@@ -187,7 +187,7 @@ func TestHopperSaves(t *testing.T) {
 		if !ok || back.machine == nil || back.items[4].Count != 3 {
 			t.Errorf("came back as %+v", be)
 		}
-		if n := back.Size(r); n != 5 {
+		if n := back.Inventory(r).Size(); n != 5 {
 			t.Errorf("size %d", n)
 		}
 	})
@@ -199,10 +199,10 @@ func TestDispenserThrowsOneItem(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		setNamed(t, p, r, at, "minecraft:dispenser", map[string]any{"facing_direction": int32(5)})
 		c := p.s.chestAt(r, at)
-		c.SetItem(r, 2, ItemStack{Name: "minecraft:emerald", Count: 2})
+		c.Inventory(r).SetItem(2, ItemStack{Name: "minecraft:emerald", Count: 2})
 		block, _ := r.Block(at, 0)
 		p.s.Dispense(r, at, block)
-		if n := c.Item(r, 2).Count; n != 1 {
+		if n := c.Inventory(r).Item(2).Count; n != 1 {
 			t.Errorf("%d left", n)
 		}
 	})
@@ -214,14 +214,14 @@ func TestDispenserPoursAndFillsBuckets(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		setNamed(t, p, r, at, "minecraft:dispenser", map[string]any{"facing_direction": int32(5)})
 		c := p.s.chestAt(r, at)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:water_bucket", Count: 1})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:water_bucket", Count: 1})
 		block, _ := r.Block(at, 0)
 		p.s.Dispense(r, at, block)
 		b, _ := r.Block(front, 0)
 		if got := p.s.reg.Blocks.Name(b); got != "minecraft:water" {
 			t.Errorf("front is %s", got)
 		}
-		if got := c.Item(r, 0); got.Name != emptyBucket || got.Count != 1 {
+		if got := c.Inventory(r).Item(0); got.Name != emptyBucket || got.Count != 1 {
 			t.Errorf("after pouring the dispenser holds %+v", got)
 		}
 		p.s.Dispense(r, at, block)
@@ -229,7 +229,7 @@ func TestDispenserPoursAndFillsBuckets(t *testing.T) {
 		if got := p.s.reg.Blocks.Name(b); got == "minecraft:water" {
 			t.Error("the empty bucket left the water")
 		}
-		if got := c.Item(r, 0); got.Name != "minecraft:water_bucket" || got.Count != 1 {
+		if got := c.Inventory(r).Item(0); got.Name != "minecraft:water_bucket" || got.Count != 1 {
 			t.Errorf("after filling the dispenser holds %+v", got)
 		}
 	})
@@ -242,10 +242,10 @@ func TestDispenserThrowsBucketItCannotPour(t *testing.T) {
 		setNamed(t, p, r, at, "minecraft:dispenser", map[string]any{"facing_direction": int32(5)})
 		setNamed(t, p, r, front, "minecraft:stone", nil)
 		c := p.s.chestAt(r, at)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:water_bucket", Count: 1})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:water_bucket", Count: 1})
 		block, _ := r.Block(at, 0)
 		p.s.Dispense(r, at, block)
-		if got := c.Item(r, 0); !got.Empty() {
+		if got := c.Inventory(r).Item(0); !got.Empty() {
 			t.Errorf("the dispenser still holds %+v", got)
 		}
 		b, _ := r.Block(front, 0)
@@ -262,13 +262,13 @@ func TestDropperFillsContainerInFront(t *testing.T) {
 		setNamed(t, p, r, at, "minecraft:dropper", map[string]any{"facing_direction": int32(5)})
 		setNamed(t, p, r, front, "minecraft:chest", nil)
 		c := p.s.chestAt(r, at)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 2})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 		block, _ := r.Block(at, 0)
 		p.s.Dispense(r, at, block)
-		if n := p.s.chestAt(r, front).Item(r, 0).Count; n != 1 {
+		if n := p.s.chestAt(r, front).Inventory(r).Item(0).Count; n != 1 {
 			t.Errorf("chest got %d", n)
 		}
-		if n := c.Item(r, 0).Count; n != 1 {
+		if n := c.Inventory(r).Item(0).Count; n != 1 {
 			t.Errorf("%d left", n)
 		}
 	})

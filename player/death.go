@@ -49,7 +49,7 @@ func vanillaDie(p *Player, src DamageSource) {
 	p.brk = breakState{}
 	p.move.fall = 0
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventDeath}, nil)
+		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventDeath), nil)
 	}
 	if key := deathMessage(src.Cause); key != "" {
 		params := []string{p.name}
@@ -88,12 +88,12 @@ func (p *Player) dropAllOnDeath() {
 	inv := &p.inventory
 	p.dropSlots(inv.main[:], true)
 	p.dropSlots(inv.armor[:], false)
-	off := []ItemStack{inv.offhand}
+	off := []ItemStack{inv.offhand[0]}
 	p.dropSlots(off, false)
-	inv.offhand = off[0]
+	inv.offhand[0] = off[0]
 	p.dropSlots(inv.ui[cursorSlot:cursorSlot+1], false)
 	p.dropSlots(inv.main[:], false)
-	p.send(inv.contentPackets(p.s.reg)...)
+	p.sendOwnItems()
 	p.sendEquipment()
 }
 
@@ -176,7 +176,7 @@ func vanillaRespawn(p *Player, pos mgl32.Vec3) {
 	p.s.handlers.movement(p, moveTo(pos, p.entity.Rotation(), p.entity.Tick()))
 	p.send(&packet.SetHealth{Health: int32(p.Health())})
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), &packet.ActorEvent{EntityRuntimeID: p.runtimeID, EventType: packet.ActorEventSpawnAlive}, nil)
+		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventSpawnAlive), nil)
 	}
 	p.flush()
 }

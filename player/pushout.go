@@ -7,7 +7,6 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
-	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
 
@@ -126,7 +125,7 @@ func (i *ItemActor) setNoClip(e *world.Entity, on bool) {
 	if on {
 		flags &^= 1 << protocol.EntityDataFlagHasCollision
 	}
-	e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyFlags: flags}})
+	e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyFlags: flags}))
 }
 
 // boxesHit reports whether the box lo..hi overlaps the box around all of a block's collision

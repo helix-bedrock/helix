@@ -36,7 +36,7 @@ type slotRef struct {
 // requestState is a player's stack request state: the copy a request
 // works on, and the network IDs earlier requests left in each slot.
 type requestState struct {
-	work        Inventory
+	work        playerItems
 	assignments [assignmentsKept]struct {
 		id    int32
 		slots map[[2]byte]int32
@@ -56,6 +56,15 @@ type requestState struct {
 	// refresh means a listener changed what a request did, so the player must be
 	// sent its items after the response.
 	refresh bool
+	// viewed are the slots passed requests changed in inventories with a view, sent
+	// again after the response: the client keeps what it moved as it saw it.
+	viewed []viewedSlot
+}
+
+// viewedSlot is a slot of an inventory with a view.
+type viewedSlot struct {
+	inv  *Inventory
+	slot int
 }
 
 // pendingDrop is an item a request took out to drop.
@@ -76,10 +85,16 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 		resp.Responses = append(resp.Responses, p.stackRequest(req))
 	}
 	p.send(resp)
-	if p.requests.refresh {
-		p.requests.refresh = false
+	st := &p.requests
+	if st.refresh {
+		st.refresh = false
 		p.refreshItems()
+	} else {
+		for _, v := range st.viewed {
+			v.inv.sendSlot(p, v.slot, false)
+		}
 	}
+	st.viewed = st.viewed[:0]
 	p.flush()
 }
 
@@ -134,6 +149,9 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 		}
 		s := p.slotStack(r)
 		slots[key] = s.netID
+		if inv, slot := p.inventoryOf(r); inv.viewed() {
+			st.viewed = append(st.viewed, viewedSlot{inv: inv, slot: slot})
+		}
 		info := protocol.StackResponseSlotInfo{Slot: r.slot, HotbarSlot: r.slot, Count: s.Count, StackNetworkID: s.netID, CustomName: customName(s)}
 		i := containerIndex(resp.ContainerInfo, r.container)
 		if i < 0 {
@@ -163,6 +181,24 @@ func customName(s ItemStack) string {
 	display, _ := s.Tag["display"].(map[string]any)
 	name, _ := display["Name"].(string)
 	return name
+}
+
+// inventoryOf returns the inventory and slot a request's slot is in.
+func (p *Player) inventoryOf(r slotRef) (*Inventory, int) {
+	invs := p.inventories()
+	switch r.kind {
+	case containerCombined:
+		return invs.main, int(r.slot)
+	case containerArmor:
+		return invs.armour, int(r.slot)
+	case containerOffhand:
+		return invs.offhand, 0
+	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox:
+		if p.window.inv != nil {
+			return p.window.inv, int(r.slot)
+		}
+	}
+	return invs.ui, int(r.slot)
 }
 
 // slotStack returns the final stack of a touched slot.
@@ -216,7 +252,7 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 // The hotbar, the inventory and both together are views of one container,
 // as in BDS. Offhand accepts slot 0 and 1 (lenient: which one the client
 // uses is not checked against BDS yet).
-func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
+func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 	r := slotRef{container: container, slot: slot, kind: container}
 	switch container {
 	case containerHotbar:
@@ -243,7 +279,7 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 		if slot > 1 {
 			return r, false
 		}
-		r.stack = &inv.offhand
+		r.stack = &inv.offhand[0]
 	case containerCursor:
 		if slot != cursorSlot {
 			return r, false
@@ -262,7 +298,7 @@ func (p *Player) slot(inv *Inventory, container, slot byte) (slotRef, bool) {
 		r.stack = &inv.ui[slot]
 	case protocol.ContainerSmithingTableTemplate, protocol.ContainerSmithingTableInput, protocol.ContainerSmithingTableMaterial:
 		_, at := smithSlot(container)
-		if !p.window.smithing || int(slot) != at {
+		if p.window.kind != ContainerSmithingTable || int(slot) != at {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]

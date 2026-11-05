@@ -24,9 +24,9 @@ func cartViewers(t *testing.T, id string) (p, q *Player, m *Minecart, d *world.D
 		return m.entity.Region() != nil && q.entity.Region() != nil && p.entity.Region() != nil
 	})
 	onRegion(d, func(r *world.Region) {
-		m.Chest().SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 10})
+		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 10})
 		for _, v := range []*Player{p, q} {
-			v.window.open, v.window.chest, v.window.cart, v.window.chestDim = true, true, m, r.Dimension()
+			v.window.open, v.window.inv, v.window.kind, v.window.cart, v.window.dim = true, m.chest.Inventory(r), m.chest.Kind(), m, r.Dimension()
 			m.chest.addViewer(r, v)
 		}
 	})
@@ -51,7 +51,7 @@ func TestCartOpensAsBDSSays(t *testing.T) {
 func TestCartClientCannotLie(t *testing.T) {
 	p, _, m, d := cartViewers(t, nameHopperMinecart)
 	onRegion(d, func(r *world.Region) {
-		s := m.Chest().Item(r, 0)
+		s := m.Chest().Inventory(r).Item(0)
 		for name, status := range map[string]uint8{
 			"wrong item ID":      takeFromCart(p, 1, 0, s.netID+1000, 1),
 			"more than it holds": takeFromCart(p, 11, 0, s.netID, 2),
@@ -64,7 +64,7 @@ func TestCartClientCannotLie(t *testing.T) {
 				t.Errorf("%s was allowed", name)
 			}
 		}
-		if got := m.Chest().Item(r, 0); got.Count != 10 || !p.inventory.ui[cursorSlot].Empty() {
+		if got := m.Chest().Inventory(r).Item(0); got.Count != 10 || !p.inventory.ui[cursorSlot].Empty() {
 			t.Errorf("refused takes changed the cart to %+v, cursor %+v", got, p.inventory.ui[cursorSlot])
 		}
 	})
@@ -74,7 +74,7 @@ func TestCartClientCannotLie(t *testing.T) {
 func TestTwoPlayersCannotDoubleTakeFromCart(t *testing.T) {
 	p, q, m, d := cartViewers(t, nameChestMinecart)
 	onRegion(d, func(r *world.Region) {
-		id := m.Chest().Item(r, 0).netID
+		id := m.Chest().Inventory(r).Item(0).netID
 		if status := takeFromCart(p, 10, 0, id, 1); status != protocol.ItemStackResponseStatusOK {
 			t.Fatalf("first take: status %d", status)
 		}
@@ -84,8 +84,8 @@ func TestTwoPlayersCannotDoubleTakeFromCart(t *testing.T) {
 		if got, none := p.inventory.ui[cursorSlot].Count, q.inventory.ui[cursorSlot]; got != 10 || !none.Empty() {
 			t.Errorf("cursors hold %d and %+v", got, none)
 		}
-		if !m.Chest().Item(r, 0).Empty() {
-			t.Errorf("cart still holds %+v", m.Chest().Item(r, 0))
+		if !m.Chest().Inventory(r).Item(0).Empty() {
+			t.Errorf("cart still holds %+v", m.Chest().Inventory(r).Item(0))
 		}
 	})
 }
@@ -93,7 +93,7 @@ func TestTwoPlayersCannotDoubleTakeFromCart(t *testing.T) {
 func TestTwoPlayersShareACartStack(t *testing.T) {
 	p, q, m, d := cartViewers(t, nameChestMinecart)
 	onRegion(d, func(r *world.Region) {
-		id := m.Chest().Item(r, 0).netID
+		id := m.Chest().Inventory(r).Item(0).netID
 		if status := takeFromCart(p, 6, 0, id, 1); status != protocol.ItemStackResponseStatusOK {
 			t.Fatalf("first take: status %d", status)
 		}
@@ -103,7 +103,7 @@ func TestTwoPlayersShareACartStack(t *testing.T) {
 		if status := takeFromCart(q, 4, 0, id, 2); status != protocol.ItemStackResponseStatusOK {
 			t.Errorf("the second player could not take what was left: status %d", status)
 		}
-		total := int(p.inventory.ui[cursorSlot].Count) + int(q.inventory.ui[cursorSlot].Count) + int(m.Chest().Item(r, 0).Count)
+		total := int(p.inventory.ui[cursorSlot].Count) + int(q.inventory.ui[cursorSlot].Count) + int(m.Chest().Inventory(r).Item(0).Count)
 		if total != 10 {
 			t.Errorf("10 emeralds became %d", total)
 		}
@@ -114,13 +114,13 @@ func TestTwoPlayersShareACartStack(t *testing.T) {
 func TestBrokenCartWindowTakesNothing(t *testing.T) {
 	p, _, m, d := cartViewers(t, nameChestMinecart)
 	onRegion(d, func(r *world.Region) {
-		id := m.Chest().Item(r, 0).netID
+		id := m.Chest().Inventory(r).Item(0).netID
 		m.Break(r, false)
 		if status := takeFromCart(p, 10, 0, id, 1); status == protocol.ItemStackResponseStatusOK {
 			t.Error("took from a broken cart")
 		}
-		if !p.inventory.ui[cursorSlot].Empty() || p.window.chest {
-			t.Errorf("cursor %+v, window open %v", p.inventory.ui[cursorSlot], p.window.chest)
+		if !p.inventory.ui[cursorSlot].Empty() || p.window.inv != nil {
+			t.Errorf("cursor %+v, window open %v", p.inventory.ui[cursorSlot], p.window.inv != nil)
 		}
 	})
 }
@@ -144,7 +144,7 @@ func TestCartInOtherRegionTakesNothing(t *testing.T) {
 		return owner != nil && owner != r
 	})
 	onRegion(d, func(r *world.Region) {
-		p.window.open, p.window.chest, p.window.cart, p.window.chestDim = true, true, m, r.Dimension()
+		p.window.open, p.window.inv, p.window.kind, p.window.cart, p.window.dim = true, m.chest.Inventory(r), m.chest.Kind(), m, r.Dimension()
 		if status := takeFromCart(p, 10, 0, 77, 1); status == protocol.ItemStackResponseStatusOK {
 			t.Error("took from a cart in another region")
 		}
@@ -153,7 +153,7 @@ func TestCartInOtherRegionTakesNothing(t *testing.T) {
 		}
 		p.flush = func() {}
 		p.tickChest()
-		if p.window.chest {
+		if p.window.inv != nil {
 			t.Error("the window stayed open")
 		}
 	})
@@ -163,10 +163,10 @@ func TestCartInOtherRegionTakesNothing(t *testing.T) {
 func TestHopperAndPlayerShareACart(t *testing.T) {
 	p, _, m, d := cartViewers(t, nameChestMinecart)
 	onRegion(d, func(r *world.Region) {
-		s := m.Chest().Item(r, 0)
+		s := m.Chest().Inventory(r).Item(0)
 		s.Count = 1
-		m.Chest().SetItem(r, 0, s)
-		if status := takeFromCart(p, 2, 0, m.Chest().Item(r, 0).netID, 1); status == protocol.ItemStackResponseStatusOK {
+		m.Chest().Inventory(r).SetItem(0, s)
+		if status := takeFromCart(p, 2, 0, m.Chest().Inventory(r).Item(0).netID, 1); status == protocol.ItemStackResponseStatusOK {
 			t.Error("took more than the hopper left")
 		}
 	})

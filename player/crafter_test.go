@@ -36,12 +36,12 @@ func TestCrafterMakesRecipeIntoChest(t *testing.T) {
 		if p.s.crafterFace(block) != cube.FaceDown {
 			t.Fatalf("face %v", p.s.crafterFace(block))
 		}
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:oak_log", Count: 2})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:oak_log", Count: 2})
 		p.s.Dispense(r, at, block)
 		if c.items[0].Count != 1 {
 			t.Errorf("log left %+v", c.items[0])
 		}
-		if got := chest.Item(r, 0); got.Name != "minecraft:oak_planks" || got.Count != 4 {
+		if got := chest.Inventory(r).Item(0); got.Name != "minecraft:oak_planks" || got.Count != 4 {
 			t.Errorf("chest holds %+v", got)
 		}
 		block, _ = r.Block(at, 0)
@@ -61,10 +61,10 @@ func TestCrafterNoRecipeKeepsItems(t *testing.T) {
 	c, chest, at := crafterAt(t, p, d)
 	onRegion(d, func(r *world.Region) {
 		block, _ := r.Block(at, 0)
-		c.SetItem(r, 4, ItemStack{Name: "minecraft:bedrock", Count: 1})
+		c.Inventory(r).SetItem(4, ItemStack{Name: "minecraft:bedrock", Count: 1})
 		p.s.Dispense(r, at, block)
-		if c.items[4].Count != 1 || !chest.Item(r, 0).Empty() {
-			t.Errorf("slot %+v chest %+v", c.items[4], chest.Item(r, 0))
+		if c.items[4].Count != 1 || !chest.Inventory(r).Item(0).Empty() {
+			t.Errorf("slot %+v chest %+v", c.items[4], chest.Inventory(r).Item(0))
 		}
 	})
 }

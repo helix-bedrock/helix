@@ -76,9 +76,26 @@ func (p *Player) sendBlock(r *world.Region, pos cube.Pos) {
 }
 
 // sendHeld sends the held slot as the server has it.
-func (p *Player) sendHeld() {
-	inv := &p.inventory
-	p.send(&packet.InventorySlot{
-		WindowID: protocol.WindowIDInventory, Slot: uint32(inv.held), NewItem: inv.main[inv.held].network(p.s.reg),
-	})
+func (p *Player) sendHeld() { p.Inventory().sendSlot(p, int(p.inventory.held), false) }
+
+// sendOffhand sends the offhand as the server has it.
+func (p *Player) sendOffhand() { p.Offhand().sendSlot(p, 0, false) }
+
+// sendArmour sends the worn armour as the server has it.
+func (p *Player) sendArmour() { p.Armour().sendAll(p, false) }
+
+// sendOwnItems sends the player's own slots, in BDS 1.26.60's join order: inventory,
+// armour, UI, offhand, then the selected hotbar slot.
+func (p *Player) sendOwnItems() {
+	invs := p.inventories()
+	invs.main.sendAll(p, false)
+	invs.armour.sendAll(p, false)
+	invs.ui.sendAll(p, false)
+	invs.offhand.sendAll(p, false)
+	p.send(&packet.PlayerHotBar{SelectedHotBarSlot: uint32(p.inventory.held), WindowID: protocol.WindowIDInventory, SelectHotBarSlot: true})
+}
+
+// blockPos is a block position as packets carry it.
+func blockPos(pos cube.Pos) protocol.BlockPos {
+	return protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])} //nolint:gosec // block coordinates fit int32
 }

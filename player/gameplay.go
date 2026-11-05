@@ -175,15 +175,18 @@ type gameplay struct {
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
 	// The chest events, and the event about what a broken block drops.
-	chestOpenEv  listeners[ChestOpenEvent]
-	chestCloseEv listeners[ChestCloseEvent]
-	chestItemEv  listeners[ChestItemEvent]
-	craftEv      listeners[CraftEvent]
-	smithEv      listeners[SmithEvent]
-	chestPairEv  listeners[ChestPairEvent]
-	chestSpillEv listeners[ChestSpillEvent]
-	dropsEv      listeners[BlockDropsEvent]
-	xpEv         listeners[ExperienceEvent]
+	containerOpenEv  listeners[ContainerOpenEvent]
+	containerCloseEv listeners[ContainerCloseEvent]
+	containerItemEv  listeners[ContainerItemEvent]
+	inventoryViewEv  listeners[InventoryViewEvent]
+	explosionStartEv listeners[ExplosionStartEvent]
+	tntPrimeEv       listeners[TNTPrimeEvent]
+	craftEv          listeners[CraftEvent]
+	smithEv          listeners[SmithEvent]
+	chestPairEv      listeners[ChestPairEvent]
+	chestSpillEv     listeners[ChestSpillEvent]
+	dropsEv          listeners[BlockDropsEvent]
+	xpEv             listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
 }
@@ -218,15 +221,18 @@ type gameState struct {
 	itemDropEv listeners[ItemDropEvent]
 	itemLoadEv listeners[ItemLoadEvent]
 	// The chest events, and the event about what a broken block drops.
-	chestOpenEv  listeners[ChestOpenEvent]
-	chestCloseEv listeners[ChestCloseEvent]
-	chestItemEv  listeners[ChestItemEvent]
-	craftEv      listeners[CraftEvent]
-	smithEv      listeners[SmithEvent]
-	chestPairEv  listeners[ChestPairEvent]
-	chestSpillEv listeners[ChestSpillEvent]
-	dropsEv      listeners[BlockDropsEvent]
-	xpEv         listeners[ExperienceEvent]
+	containerOpenEv  listeners[ContainerOpenEvent]
+	containerCloseEv listeners[ContainerCloseEvent]
+	containerItemEv  listeners[ContainerItemEvent]
+	inventoryViewEv  listeners[InventoryViewEvent]
+	explosionStartEv listeners[ExplosionStartEvent]
+	tntPrimeEv       listeners[TNTPrimeEvent]
+	craftEv          listeners[CraftEvent]
+	smithEv          listeners[SmithEvent]
+	chestPairEv      listeners[ChestPairEvent]
+	chestSpillEv     listeners[ChestSpillEvent]
+	dropsEv          listeners[BlockDropsEvent]
+	xpEv             listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
 	// tuning is the default of every Tune.
@@ -438,7 +444,8 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
-		chestOpenEv: gs.chestOpenEv, chestCloseEv: gs.chestCloseEv, chestItemEv: gs.chestItemEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
+		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -465,9 +472,12 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.useEv.freeze()
 	g.itemDropEv.freeze()
 	g.itemLoadEv.freeze()
-	g.chestOpenEv.freeze()
-	g.chestCloseEv.freeze()
-	g.chestItemEv.freeze()
+	g.containerOpenEv.freeze()
+	g.containerCloseEv.freeze()
+	g.containerItemEv.freeze()
+	g.inventoryViewEv.freeze()
+	g.explosionStartEv.freeze()
+	g.tntPrimeEv.freeze()
 	g.craftEv.freeze()
 	g.smithEv.freeze()
 	g.chestPairEv.freeze()

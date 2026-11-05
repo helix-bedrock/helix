@@ -125,6 +125,21 @@ type ExplosionEvent struct {
 	Blocks    []cube.Pos
 }
 
+// ExplosionStartEvent fires before an explosion does anything at all: before its rays,
+// damage, sound or block changes, whatever runs it. Cancel it and nothing happens; its
+// source (primed TNT, say) is still used up. Change the explosion to change what it
+// does. Runs: owner of the explosion's region.
+type ExplosionStartEvent struct {
+	Cancellable
+	Region    *world.Region
+	Explosion *Explosion
+}
+
+// OnExplosionStart listens to explosions about to start.
+func OnExplosionStart(s *Setup, fn func(e *ExplosionStartEvent), p Priority) error {
+	return addListener(s, &s.h.game.explosionStartEv, fn, p)
+}
+
 // OnExplosion listens to explosions.
 func OnExplosion(s *Setup, fn func(e *ExplosionEvent), p Priority) error {
 	return addListener(s, &s.h.game.explosionEv, fn, p)
@@ -148,6 +163,16 @@ type Blastable interface {
 
 // Explode runs an explosion. Runs: owner of the region.
 func (s *Host) Explode(r *world.Region, e *Explosion) bool {
+	if e == nil {
+		return false
+	}
+	if s.game.explosionStartEv.Has() {
+		ev := ExplosionStartEvent{Region: r, Explosion: e}
+		s.game.explosionStartEv.fire(s.log, &ev)
+		if ev.Cancelled() {
+			return false
+		}
+	}
 	return s.game.sys.Explode(s, r, e)
 }
 
@@ -175,7 +200,7 @@ func vanillaExplode(s *Host, r *world.Region, e *Explosion) bool {
 	s.blastEntities(r, e, underwater)
 	at := floorPos(e.Pos)
 	if e.Radius > 0 {
-		r.Broadcast(at, &packet.LevelSoundEvent{SoundType: e.Sound, Position: e.Pos, ExtraData: -1}, nil)
+		playSound(r, at, soundEvent{name: e.Sound, pos: e.Pos, extra: -1}, nil)
 		levelEvent(r, at, e.Pos, e.Particle, int32(e.Radius))
 	}
 	smoke := s.takeBlocks(r, e, blocks)

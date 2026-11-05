@@ -106,7 +106,7 @@ func TestOffhandShown(t *testing.T) {
 	if p.offhandChanged() {
 		t.Fatal("nothing held, yet changed")
 	}
-	p.inventory.offhand = ItemStack{Name: "minecraft:totem_of_undying", Count: 1, netID: 9}
+	p.inventory.offhand[0] = ItemStack{Name: "minecraft:totem_of_undying", Count: 1, netID: 9}
 	if !p.offhandChanged() {
 		t.Fatal("new item not noticed")
 	}
@@ -118,7 +118,7 @@ func TestOffhandShown(t *testing.T) {
 	if p.offhandChanged() {
 		t.Error("shown, still changed")
 	}
-	p.inventory.offhand.Count = 2
+	p.inventory.offhand[0].Count = 2
 	if !p.offhandChanged() {
 		t.Error("new count not noticed")
 	}
@@ -131,7 +131,7 @@ func TestShieldRaise(t *testing.T) {
 	p.s.game = &gameplay{tuning: vanillaTuning(exhaustionValues{})}
 	p.s.game.sys.ShieldUp = vanillaShieldUp
 	p.attributes = DefaultAttributes()
-	p.inventory.offhand = ItemStack{Name: itemShield, Count: 1, netID: 3}
+	p.inventory.offhand[0] = ItemStack{Name: itemShield, Count: 1, netID: 3}
 	p.move.flags = 1 << MoveSneaking
 	if got := p.blocksAfter(shieldRaiseTicks); got != shieldRaiseTicks+1 {
 		t.Errorf("raised after %d ticks", got)
@@ -153,7 +153,7 @@ func TestShieldRaise(t *testing.T) {
 	if p.shield.blocking {
 		t.Error("up during a swing")
 	}
-	p.inventory.offhand = ItemStack{}
+	p.inventory.offhand[0] = ItemStack{}
 	p.inventory.main[p.inventory.held] = ItemStack{Name: itemShield, Count: 1, netID: 4}
 	if p.heldShield() != &p.inventory.main[p.inventory.held] {
 		t.Error("a held shield is not found")

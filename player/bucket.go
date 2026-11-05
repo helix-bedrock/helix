@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -79,7 +78,7 @@ func (p *Player) fillBucket(clicked cube.Pos) bool {
 	if !ok {
 		return false
 	}
-	r.Broadcast(clicked, &packet.LevelSoundEvent{SoundType: fill.sound, Position: blockVec(clicked).Add(mgl32.Vec3{0.5, 0.5, 0.5}), ExtraData: -1}, nil)
+	playSound(r, clicked, soundEvent{name: fill.sound, pos: blockCenter(clicked), extra: -1}, nil)
 	if p.creative() {
 		return true
 	}
@@ -140,7 +139,7 @@ func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 	}
 	r.UpdateNeighbours(pos)
 	r.ScheduleTick(pos, block, liquid.TickDelay(liq.kind, false), 0)
-	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: liq.sound, Position: blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), ExtraData: -1}, nil)
+	playSound(r, pos, soundEvent{name: liq.sound, pos: blockCenter(pos), extra: -1}, nil)
 	if !p.creative() {
 		inv := &p.inventory
 		inv.main[inv.held] = ItemStack{Name: emptyBucket, Count: 1, netID: p.s.stackIDs.Add(1)}

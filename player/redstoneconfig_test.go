@@ -45,11 +45,11 @@ func TestHopperCooldownsFromConfig(t *testing.T) {
 		setNamed(t, p, r, at.Side(cube.FaceDown), "minecraft:chest", nil)
 		setNamed(t, p, r, at, "minecraft:hopper", map[string]any{"facing_direction": int32(0)})
 		c = p.s.chestAt(r, at)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 2})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 	})
 	waitRegion(t, d, func(*world.Region) bool { return c.cooldown > 200 && c.cooldown <= 300 })
 	onRegion(d, func(r *world.Region) {
-		c.SetItem(r, 0, ItemStack{})
+		c.Inventory(r).SetItem(0, ItemStack{})
 		c.cooldown = 0
 		p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 1}, mgl32.Vec3{3.5, float32(at[1]) + 1.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
 	})
@@ -68,7 +68,7 @@ func TestHopperItemsPerMove(t *testing.T) {
 		setNamed(t, p, r, at.Side(cube.FaceDown), "minecraft:chest", nil)
 		setNamed(t, p, r, at, "minecraft:hopper", map[string]any{"facing_direction": int32(0)})
 		c = p.s.chestAt(r, at)
-		c.SetItem(r, 0, ItemStack{Name: "minecraft:emerald", Count: 10})
+		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 10})
 	})
-	waitRegion(t, d, func(r *world.Region) bool { return c.Item(r, 0).Count == 7 })
+	waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count == 7 })
 }

@@ -8,25 +8,25 @@ func pickTestStack(name string) ItemStack { return ItemStack{Name: name, Count: 
 func TestPick(t *testing.T) {
 	stone, dirt, sand := pickTestStack("minecraft:stone"), pickTestStack("minecraft:dirt"), pickTestStack("minecraft:sand")
 
-	var inv Inventory
+	var inv playerItems
 	inv.main[4] = stone
 	if !inv.pick(stone, false) || inv.held != 4 {
 		t.Errorf("in hotbar: held %d, want 4", inv.held)
 	}
 
-	inv = Inventory{}
+	inv = playerItems{}
 	if inv.pick(stone, false) {
 		t.Error("survival made an item")
 	}
 
-	inv = Inventory{held: 1}
+	inv = playerItems{held: 1}
 	inv.main[0] = dirt
 	inv.main[20] = stone
 	if !inv.pick(stone, false) || inv.held != 1 || inv.main[1].Name != stone.Name || !inv.main[20].Empty() {
 		t.Errorf("to free slot: held %d, slot 1 %q, slot 20 %q", inv.held, inv.main[1].Name, inv.main[20].Name)
 	}
 
-	inv = Inventory{held: 2}
+	inv = playerItems{held: 2}
 	for i := range hotbarSize {
 		inv.main[i] = dirt
 	}
@@ -35,7 +35,7 @@ func TestPick(t *testing.T) {
 		t.Errorf("swap: held %d, slot 2 %q, slot 20 %q", inv.held, inv.main[2].Name, inv.main[20].Name)
 	}
 
-	inv = Inventory{held: 3}
+	inv = playerItems{held: 3}
 	for i := range hotbarSize {
 		inv.main[i] = dirt
 	}
@@ -43,7 +43,7 @@ func TestPick(t *testing.T) {
 		t.Errorf("creative full hotbar: slot 3 %q, slot %d %q", inv.main[3].Name, hotbarSize, inv.main[hotbarSize].Name)
 	}
 
-	inv = Inventory{held: 3}
+	inv = playerItems{held: 3}
 	for i := range hotbarSize {
 		inv.main[i] = dirt
 	}
