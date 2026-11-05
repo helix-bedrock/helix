@@ -299,6 +299,11 @@ type Projectile struct {
 	pickup   arrowPickup
 	item     ItemStack
 
+	// sentVel, sentPos and sentRot are what the players who see it were last told.
+	sentVel mgl32.Vec3
+	sentPos mgl32.Vec3
+	sentRot world.Rotation
+
 	gone  bool
 	saved map[string]any
 	found []*world.Entity
@@ -382,17 +387,32 @@ func (t *Projectile) flags() int64 {
 	return f
 }
 
-// movePacket is the MoveActorDelta BDS sends (0x8ce8c80), every field each tick. Its ticks are
-// how many this move stands for: BDS counts them per player, for those it skipped sending to
-// when far off, and Helix sends to all every tick.
+// movePacket is the MoveActorDelta BDS sends (0x8ce8c80), with only the fields that changed
+// since the last one. Its ticks are how many this move stands for: BDS counts them per player,
+// for those it skipped sending to when far off, and Helix sends to all every tick.
 func (t *Projectile) movePacket(e *world.Entity) packet.Packet {
 	pos, rot := e.Position(), e.Rotation()
-	return &packet.MoveActorDelta{
-		EntityRuntimeID: e.RuntimeID(),
-		PositionX:       protocol.Option(pos[0]), PositionY: protocol.Option(pos[1]), PositionZ: protocol.Option(pos[2]),
-		RotationX: protocol.Option(rot.Pitch), RotationY: protocol.Option(rot.Yaw), RotationYHead: protocol.Option(rot.HeadYaw),
-		OnGround: e.OnGround(), Ticks: 1,
+	pk := &packet.MoveActorDelta{EntityRuntimeID: e.RuntimeID(), OnGround: e.OnGround(), Ticks: 1}
+	if pos[0] != t.sentPos[0] {
+		pk.PositionX = protocol.Option(pos[0])
 	}
+	if pos[1] != t.sentPos[1] {
+		pk.PositionY = protocol.Option(pos[1])
+	}
+	if pos[2] != t.sentPos[2] {
+		pk.PositionZ = protocol.Option(pos[2])
+	}
+	if rot.Pitch != t.sentRot.Pitch {
+		pk.RotationX = protocol.Option(rot.Pitch)
+	}
+	if rot.Yaw != t.sentRot.Yaw {
+		pk.RotationY = protocol.Option(rot.Yaw)
+	}
+	if rot.HeadYaw != t.sentRot.HeadYaw {
+		pk.RotationYHead = protocol.Option(rot.HeadYaw)
+	}
+	t.sentPos, t.sentRot = pos, rot
+	return pk
 }
 
 // tick is BDS's projectile tick: if stuck, whether the block still holds it; if not, what
@@ -430,6 +450,7 @@ func (t *Projectile) tick(e *world.Entity) {
 	t.turn()
 	if !e.Apply(world.Movement{Pos: pos, Rot: t.rot, Tick: e.Tick()}) {
 		t.vel = mgl32.Vec3{}
+		t.sendMotion(e)
 		return
 	}
 	inertia := t.spec.Inertia
@@ -438,13 +459,18 @@ func (t *Projectile) tick(e *world.Entity) {
 	}
 	t.vel = t.vel.Mul(inertia)
 	t.vel[1] -= t.spec.Gravity
-	t.sendHints(e, false)
+	t.sendMotion(e)
 }
 
-// sendHints tells the client how fast it flies: its definition's
-// use_motion_prediction_hints, which every projectile here turns on.
-func (t *Projectile) sendHints(e *world.Entity, onGround bool) {
-	e.Send(&packet.MotionPredictionHints{EntityRuntimeID: e.RuntimeID(), Velocity: t.vel, OnGround: onGround})
+// sendMotion tells the client its velocity when it changed, with SetActorMotion as BDS's
+// motion system does (0xbc58c00). The client goes on moving it at the last velocity it was
+// told, so a stuck one must be told zero. BDS's server never builds MotionPredictionHints.
+func (t *Projectile) sendMotion(e *world.Entity) {
+	if t.vel == t.sentVel {
+		return
+	}
+	t.sentVel = t.vel
+	e.Send(&packet.SetActorMotion{EntityRuntimeID: e.RuntimeID(), Velocity: t.vel, Tick: e.Tick()})
 }
 
 // projectileEyes is where a shooter's projectile starts: its eyes and the definition's
@@ -661,10 +687,9 @@ func (t *Projectile) remove(e *world.Entity) {
 func (t *Projectile) stickIn(e *world.Entity, hit projectileHit) {
 	t.vel = mgl32.Vec3{}
 	t.stuck, t.stuckAt, t.stuckTicks, t.shake, t.critical = true, hit.block, 0, t.spec.ShakeTicks, false
-	// On the ground is what tells the client it has stopped: without it the client goes on
-	// flying it into the block.
+	// BDS marks it on the ground in its move packet and zeroes its velocity once stuck.
 	e.Apply(world.Movement{Pos: hit.pos, Rot: t.rot, OnGround: true, Tick: e.Tick()})
-	t.sendHints(e, true)
+	t.sendMotion(e)
 	e.Send(&packet.SetActorData{EntityRuntimeID: e.RuntimeID(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyFlags: t.flags()}})
 }
 
