@@ -150,7 +150,7 @@ func (i *ItemActor) addPacket(e *world.Entity, v ItemView) packet.Packet {
 		protocol.EntityDataKeyHeight: float32(2 * itemHalfSize),
 		protocol.EntityDataKeyScale:  float32(1),
 	}
-	maps.Copy(meta, nameMetadata(v.Name))
+	maps.Copy(meta, nameMetadata(v.Name, i.flags()))
 	return &packet.AddItemActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Item: v.Stack.network(i.s.reg),
 		Position: e.Position(), Velocity: i.vel, EntityMetadata: meta,
@@ -163,17 +163,17 @@ func (i *ItemActor) sendViews(e *world.Entity) {
 		return
 	}
 	e.EachSeer(func(seer *world.Entity) {
-		seer.SendTo(actorData(e.RuntimeID(), nameMetadata(i.viewFor(seer).Name)))
+		seer.SendTo(actorData(e.RuntimeID(), nameMetadata(i.viewFor(seer).Name, i.flags())))
 	})
 }
 
-// nameMetadata is the actor flags and name of an item with this name tag.
-func nameMetadata(name string) protocol.EntityMetadata {
+// nameMetadata is the actor flags and name of an item with these flags and this name tag.
+func nameMetadata(name string, flags int64) protocol.EntityMetadata {
 	if name == "" {
-		return protocol.EntityMetadata{protocol.EntityDataKeyFlags: int64(itemFlags), protocol.EntityDataKeyName: "", protocol.EntityDataKeyAlwaysShowNameTag: uint8(0)}
+		return protocol.EntityMetadata{protocol.EntityDataKeyFlags: flags, protocol.EntityDataKeyName: "", protocol.EntityDataKeyAlwaysShowNameTag: uint8(0)}
 	}
 	return protocol.EntityMetadata{
-		protocol.EntityDataKeyFlags:             int64(itemFlags | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName),
+		protocol.EntityDataKeyFlags:             flags | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName,
 		protocol.EntityDataKeyName:              name,
 		protocol.EntityDataKeyAlwaysShowNameTag: uint8(1),
 	}
@@ -192,4 +192,29 @@ func (i *ItemActor) showCount() {
 // sendStackSize tells the players who see the item its new count.
 func (i *ItemActor) sendStackSize() {
 	i.entity.Send(actorEventData(i.entity.RuntimeID(), packet.ActorEventUpdateStackSize, int32(i.stack.Count)))
+}
+
+// flags are the item's actor flags: without collision while it rises out of closed-in
+// blocks, and on fire while it burns.
+func (i *ItemActor) flags() int64 {
+	f := int64(itemFlags)
+	if i.noClip {
+		f &^= 1 << protocol.EntityDataFlagHasCollision
+	}
+	if i.burnTicks > 0 && !i.taken {
+		f |= 1 << protocol.EntityDataFlagOnFire
+	}
+	return f
+}
+
+// sendFlags tells those who see the item its flags; an item with a view keeps them with
+// each seer's name tag.
+func (i *ItemActor) sendFlags(e *world.Entity) {
+	if i.view == nil {
+		e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyFlags: i.flags()}))
+		return
+	}
+	e.EachSeer(func(seer *world.Entity) {
+		seer.SendTo(actorData(e.RuntimeID(), nameMetadata(i.viewFor(seer).Name, i.flags())))
+	})
 }

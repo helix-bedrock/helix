@@ -61,8 +61,6 @@ const (
 // ItemActor is an item lying in the world. Its stack is the server's: it was
 // taken from a slot the server checked and is never replaced by anything a
 // client sends. Runs: owner of its entity.
-//
-// First pass from BDS 1.26.60: items do not burn in lava or fire.
 type ItemActor struct {
 	s      *Host
 	entity *world.Entity
@@ -76,8 +74,11 @@ type ItemActor struct {
 	// saved keeps what BDS saved for the item that Helix does not use (its
 	// health, owner and the actor fields), written back as it was.
 	saved map[string]any
-	// health is what explosions take from.
+	// health is what explosions and fire take from.
 	health int32
+	// burnTicks is its on-fire timer; burnShown whether those who see it were told.
+	burnTicks int32
+	burnShown bool
 	// rule and view are a plugin's: who sees the item and what they are shown.
 	rule func(p *Player) bool
 	view func(p *Player, v *ItemView)
@@ -271,6 +272,9 @@ func (i *ItemActor) tick(e *world.Entity) {
 	}
 	i.applyFlow(r, e.Position())
 	gravity, inWater := i.liquidForces(r, e.Position())
+	if i.tickBurning(r, e, inWater); i.taken {
+		return
+	}
 	if i.age > 0 && i.age%itemMergeInterval == 0 {
 		i.mergeNearby(r, e.Position())
 	}

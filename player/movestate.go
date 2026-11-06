@@ -101,6 +101,9 @@ func (p *Player) actorFlags() int64 {
 	if p.riding {
 		f |= 1 << protocol.EntityDataFlagRiding
 	}
+	if p.burn.ticks > 0 {
+		f |= 1 << protocol.EntityDataFlagOnFire
+	}
 	return f
 }
 

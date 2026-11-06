@@ -73,6 +73,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - 🧪 Jukeboxes and music discs
 - 🧪 Items and orbs pushed out of blocks
 - 🧪 Fire: spreading, burning blocks away, burning out, soul fire, lava setting fire, flint and steel, putting fire out
+- 🧪 Burning: players and dropped items hurt by fire and lava, set on fire, put out by water; netherite does not burn
 - ⬜ Cauldrons, crops growing
 
 ## Containers and crafting
@@ -285,8 +286,19 @@ commits.
   placed or flows), tries ten blocks around it and sets fire next to the first lava-flammable one (BDS's own flag per block, now in helix-data's `block_properties.json`
   as `lava_flammable`; it is not the flame odds). Flint and steel sets fire on the clicked face and
   wears; starting to break a block puts out fire on the clicked face. Not done: rain putting fire out
-  (no weather yet), nether portals, fire charges, entities catching fire and taking fire damage, bees
-  in a burning hive.
+  (no weather yet), nether portals, fire charges, mobs burning (there are no mobs yet), bees in a
+  burning hive.
+- **Burning (not yet tested in game):** from BDS 1.26.60 (`player/burn.go`). Fire and lava hurt a
+  player inside them each tick (1, soul fire 2, as `death.attack.inFire`) and set it on fire for 8
+  seconds, 15% less per level of Fire Protection worn; lava also deals 4 a tick (the player's
+  `minecraft:hurt_on_condition`, `death.attack.lava`). The hurt cooldown lets only the larger hit
+  through. On fire, the player takes 1 every 20 ticks (`death.attack.onFire`) until the time runs
+  out; water puts it out unless the player is still in lava. Fire Resistance stops the damage.
+  Creative and spectator players are not set on fire (assumed, not read). `Player.SetOnFire`,
+  `Extinguish`, `OnFire`. Dropped items have 5 health and take the same fire damage, so they burn
+  away in five ticks; netherite items and ancient debris (BDS's fire-resistant flag, helix-data's
+  `bds/item_flags.json`) do not burn. Not done: rain putting fire out, the contents of a burnt
+  bundle or shulker box spilling.
 - **Creative inventory:** items can be taken from the creative menu (the client's results
   message after a creative take is accepted).
 

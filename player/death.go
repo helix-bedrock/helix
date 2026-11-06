@@ -43,6 +43,7 @@ func vanillaDie(p *Player, src DamageSource) {
 	p.stopUsing()
 	p.lowerShield()
 	p.hurt = hurtState{}
+	p.Extinguish()
 	p.leaveChest(p.entity.Region(), true)
 	if !p.s.level.KeepInventory {
 		p.dropAllOnDeath()
@@ -79,6 +80,12 @@ func deathMessage(cause DamageCause) string {
 		return "death.attack.player"
 	case DamageStarve:
 		return "death.attack.starve"
+	case DamageFire:
+		return "death.attack.inFire"
+	case DamageFireTick:
+		return "death.attack.onFire"
+	case DamageLava:
+		return "death.attack.lava"
 	}
 	return ""
 }

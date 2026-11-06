@@ -92,7 +92,9 @@ type Player struct {
 	thrownAt int64
 	food     foodState
 	hurt     hurtState
-	shield   shieldState
+	// burn is the player's on-fire timer.
+	burn   burnState
+	shield shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
 	// lastUse is what the first click of the held button did, a use constant.

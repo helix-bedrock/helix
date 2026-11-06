@@ -156,7 +156,10 @@ type gameplay struct {
 	mining       *mining
 	// durability, replaceables and notReplacedBy are helix-data's
 	// bds/break_place.json.
-	durability    map[string]data.Durability
+	durability map[string]data.Durability
+	// fireResistant are the items whose dropped item fire and lava do not hurt (helix-data's
+	// bds/item_flags.json).
+	fireResistant map[string]bool
 	replaceables  map[string]bool
 	notReplacedBy map[string]map[string]bool
 	// placement is helix-data's bds/placement.json.
@@ -475,6 +478,10 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	if err != nil {
 		return nil, err
 	}
+	flags, err := data.AllItemFlags()
+	if err != nil {
+		return nil, err
+	}
 	gs := s.h.game
 	if gs.banners == nil {
 		if gs.banners, err = vanillaBanners(); err != nil {
@@ -487,7 +494,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv, explosionEv: gs.explosionEv,
 		sys: gs.sys, effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
-		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
+		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
 		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, banners: gs.banners,

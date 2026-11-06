@@ -6,7 +6,6 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
 )
 
@@ -121,11 +120,7 @@ func (i *ItemActor) setNoClip(e *world.Entity, on bool) {
 	if i.entity != e || i.view != nil {
 		return
 	}
-	flags := int64(itemFlags)
-	if on {
-		flags &^= 1 << protocol.EntityDataFlagHasCollision
-	}
-	e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyFlags: flags}))
+	i.sendFlags(e)
 }
 
 // boxesHit reports whether the box lo..hi overlaps the box around all of a block's collision
