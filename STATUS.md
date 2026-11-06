@@ -293,10 +293,11 @@ commits.
   seconds, 15% less per level of Fire Protection worn; lava also deals 4 a tick (the player's
   `minecraft:hurt_on_condition`, `death.attack.lava`). The hurt cooldown lets only the larger hit
   through. On fire, the player takes 1 every 20 ticks (`death.attack.onFire`) until the time runs
-  out; water puts it out unless the player is still in lava. Fire Resistance stops the damage.
+  out; water puts it out unless the player is still in lava, with the fizz sound and smoke (for
+  burning items too). Fire Resistance stops the damage.
   Creative and spectator players are not set on fire (assumed, not read). `Player.SetOnFire`,
   `Extinguish`, `OnFire`. Dropped items have 5 health and take the same fire damage, so they burn
-  away in five ticks; netherite items and ancient debris (BDS's fire-resistant flag, helix-data's
+  away in five ticks, fizzing each tick in lava; netherite items and ancient debris (BDS's fire-resistant flag, helix-data's
   `bds/item_flags.json`) do not burn. Not done: rain putting fire out, the contents of a burnt
   bundle or shulker box spilling.
 - **Creative inventory:** items can be taken from the creative menu (the client's results

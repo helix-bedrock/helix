@@ -7,6 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
 
@@ -47,6 +48,8 @@ const (
 	// liquidLevels is how many heights a liquid has; a source stands one short of a full
 	// block.
 	liquidLevels = 9
+	// fizzHeightShift is where the height sits in the fizz particles' data, above the width.
+	fizzHeightShift = 8
 )
 
 // burnContact is what an entity's box touches that burns.
@@ -206,6 +209,7 @@ func (p *Player) tickBurning() {
 	}
 	if !immune && p.move.inWater && !c.lava {
 		p.Extinguish()
+		fizzOut(r, lo, hi)
 		return
 	}
 	if immune {
@@ -240,6 +244,9 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 	half := mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
 	c := i.s.touching(r, at.Sub(half), at.Add(half))
 	immune := i.s.game != nil && i.s.game.fireResistant[i.stack.Name]
+	if c.lava && !immune {
+		playSound(r, floorPos(at), soundEvent{name: packet.SoundEventFizz, pos: at}, nil)
+	}
 	if !immune && c.burning() {
 		if c.fire > 0 {
 			i.burnHurt(e, c.fire)
@@ -258,6 +265,7 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 	switch {
 	case inWater && !c.lava:
 		i.burnTicks = 0
+		fizzOut(r, at.Sub(half), at.Add(half))
 	case immune:
 		i.burnTicks -= immuneBurnOut
 	default:
@@ -288,4 +296,16 @@ func (i *ItemActor) showBurning(e *world.Entity) {
 	}
 	i.burnShown = on
 	i.sendFlags(e)
+}
+
+// fizzOut is BDS's sound and smoke of a fire put out by water, for the box lo..hi: the fizz
+// at its middle and the fizz particles from its corner, sized by its width and height.
+func fizzOut(r *world.Region, lo, hi mgl32.Vec3) {
+	mid := lo.Add(hi).Mul(0.5)
+	at := floorPos(mid)
+	playSound(r, at, soundEvent{name: packet.SoundEventFizz, pos: mid, extra: -1}, nil)
+	size := hi.Sub(lo)
+	width := int32(math.Ceil(float64(size[0])))
+	height := int32(math.Ceil(float64(size[1])))
+	levelEvent(r, at, lo, packet.LevelEventParticlesFizzEffect, width+height<<fizzHeightShift)
 }
