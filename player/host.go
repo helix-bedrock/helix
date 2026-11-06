@@ -3,6 +3,7 @@ package player
 import (
 	"errors"
 	"fmt"
+	"github.com/helix-bedrock/helix/command"
 	"log/slog"
 	"net"
 	"os"
@@ -91,6 +92,8 @@ type Host struct {
 	redstone *circuit.Settings
 
 	handlers handlers
+	// commands are the server's commands, shared with the Setup they were registered on.
+	commands *command.Manager
 	game     *gameplay
 	global   *global
 	// connections works out the arms of fences and the like as they are placed.
@@ -165,8 +168,9 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests, discs: discs,
-		furnaces: furnaces,
+		furnaces: furnaces, commands: setup.h.commands,
 	}
+	h.setUpCommands()
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()
 	conf.Overworld.SetEntityLoader(h.loadEntity)

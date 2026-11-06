@@ -109,10 +109,19 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 
 Redstone is not yet compared with BDS side by side: timing, big circuits and edge cases are unproven.
 
+## Commands
+
+- 🧪 Command system (`command` package): commands as Go structs or built in code, no namespace prefix
+- 🧪 Suggestions as the client shows BDS's: enums, live (soft) enums, per-player lists, items and blocks
+- 🧪 BDS's prebuilt lists (game modes, effects, enchantments, entity types, biomes, game rules...)
+- 🧪 Selectors (@a @p @r @s @e @initiator) over every player in every region
+- 🧪 BDS's error messages, permission levels, aliases, middleware
+
 ## Not started
 
+
 - ⬜ Mobs ([entity](https://github.com/helix-bedrock/entity))
-- ⬜ Real commands (only stand-ins with `-testcmds`)
+- ⬜ Vanilla commands (/give, /tp and the rest; only test stand-ins with `-testcmds`)
 - ⬜ Forms and other UI
 
 [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which
@@ -123,6 +132,8 @@ commits.
 
 <details>
 <summary>Every part in detail</summary>
+
+- **Commands (written from BDS 1.26.60's code, not tested in game):** the `command` package. A command is a `Spec` of struct overloads (exported fields are the arguments: int, float, bool, string, `Text`, `Position`, `BlockPosition`, `Targets`, `Literal`, `Item`, `Block`, any enum type, `Optional[T]`) or made with `NewBuilder` (`Param`, `Opt`, `Lit`, `Args`). There is no namespace prefix: a plugin's `home` is /home, and registering a taken name replaces it, logged with both owners. `player.RegisterCommand`, `player.Commands` and `Host.Commands` give the `Manager`: `Register`, `Add`, `Remove`, `Command`, `Commands`, `Wrap` (middleware around every command), `SetEnumOptions`, `RefreshEnum`, `Execute`, `Packet`. Enums are string types with `Type()`; `Options(src)` gives per-player options and `Dynamic()` makes a soft enum whose new options reach players at once (UpdateSoftEnum). BDS 1.26.60's own lists, dumped from its memory (`enum_probe.py`, private), are prebuilt with constants (`EnumItem`, `EnumGameMode`...): game modes, difficulties, dimensions, enchantments, effects, damage causes, equipment slots, game rules, easings, structure rotation and mirror, weather, HUD, permission levels, times of day, fill and setblock modes; Item, Block, EntityType and Biome are filled from the registry in BDS's order (full name then short; short first for entity types). Players get only the commands their command permission allows, at join after the recipes (where BDS sends it is not checked) and again when anything changes. Parsing gives BDS's messages (unknown command, syntax error with the place, not a number, not true or false, no player, no targets); with several overloads the error is the one that got furthest. A panic in a command is caught, logged with its owner, and reported as BDS's unknown error. Output goes back in a CommandOutput. Selectors resolve players only (no other entities yet) with name, type, m, r, rm, x, y, z, l, lm and c, reading every player through the new `Player.State`, which any region may read. Not done yet: vanilla commands, the console as a source, BDS's exact parser (its grammar tables) and selector arguments beyond those, ^ coordinates checked against BDS, whether BDS also puts a command's own name in its alias enum, and the syntax error's context, which shows the whole line where BDS may cut it.
 
 ### What works
 

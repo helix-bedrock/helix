@@ -228,6 +228,9 @@ func (s *Setup) buildBiomePacket(biomes []Biome) *packet.BiomeDefinitionList {
 	return pk
 }
 
+// All returns every biome, in ID order as frozen. Do not change the slice.
+func (bs *Biomes) All() []Biome { return bs.biomes }
+
 // Count returns the number of biomes.
 func (bs *Biomes) Count() int { return len(bs.biomes) }
 

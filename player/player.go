@@ -120,6 +120,8 @@ type Player struct {
 	uiLeftovers bool
 	// rng is the player's random source (item wear).
 	rng *rand.Rand
+	// seen is State, for other regions.
+	seen seenState
 }
 
 // eyeHeight is how far above its feet a player's position is: the client

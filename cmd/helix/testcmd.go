@@ -14,7 +14,6 @@ import (
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
-	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -30,116 +29,6 @@ var testModes = map[string]int32{
 	"a": player.GameModeAdventure, "adventure": player.GameModeAdventure, "2": player.GameModeAdventure,
 	"d": player.GameModeDefault, "default": player.GameModeDefault, "5": player.GameModeDefault,
 	"spectator": player.GameModeSpectator, "6": player.GameModeSpectator,
-}
-
-// testCommandList is the AvailableCommands packet that makes the client
-// show and complete /gamemode and /gm.
-func testCommandList() *packet.AvailableCommands {
-	idx := make([]uint32, len(testModeNames))
-	for i := range idx {
-		idx[i] = uint32(i)
-	}
-	chestIdx := make([]uint32, len(chestTestActions))
-	for i := range chestIdx {
-		chestIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + i)
-	}
-	smithIdx := make([]uint32, len(smithTestActions))
-	for i := range smithIdx {
-		smithIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + len(chestTestActions) + i)
-	}
-	recipeIdx := make([]uint32, len(recipeTestActions))
-	for i := range recipeIdx {
-		recipeIdx[i] = uint32(len(testModeNames) + len(itemTestActions) + len(chestTestActions) + len(smithTestActions) + i)
-	}
-	itemIdx := make([]uint32, len(itemTestActions))
-	for i := range itemIdx {
-		itemIdx[i] = uint32(len(testModeNames) + i)
-	}
-	overload := protocol.CommandOverload{Parameters: []protocol.CommandParameter{{
-		Name: "gameMode", Type: protocol.CommandArgValid | protocol.CommandArgEnum,
-	}}}
-	itemOverload := protocol.CommandOverload{Parameters: []protocol.CommandParameter{
-		{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 1},
-		{Name: "seconds", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-	}}
-	cmd := func(name string) protocol.Command {
-		return protocol.Command{
-			Name: name, Description: "Sets your game mode (test stand-in).",
-			PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-			Overloads: []protocol.CommandOverload{overload},
-		}
-	}
-	item := protocol.Command{
-		Name: itemTestCommand, Description: "Tests the item API: private, life, server, timer, off.",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{itemOverload},
-	}
-	chest := protocol.Command{
-		Name: chestTestCommand, Description: "Tests the container and explosion API: refuse, rewrite, name, price, noopen, nobang, playersonly, off.",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 2},
-		}}},
-	}
-	smith := protocol.Command{
-		Name: smithTestCommand, Description: "Tests the smithing API: clear, remove, change, reset.",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 3},
-		}}},
-	}
-	recipe := protocol.Command{
-		Name: recipeTestCommand, Description: "Tests the recipe API: clear, table, remove [item], change, add, reset, hide [item], hideall, show.",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | 4},
-			{Name: "item", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-		}}},
-	}
-	tune := protocol.Command{
-		Name: tuneTestCommand, Description: "Tests the number API: <name> <value>, clear [name], server <name> <value>, serverclear [name].",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
-			{Name: "name", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-			{Name: "value", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-		}}},
-	}
-	enchant := protocol.Command{
-		Name: enchantTestCommand, Description: "Tests enchanting: levels <n>, max <enchantment id> <level>.",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
-			{Name: "value", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
-			{Name: "level", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-		}}},
-	}
-	target := protocol.Command{
-		Name: targetTestCommand, Description: "Hits nearby target blocks: [edge] [arrow].",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "first", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-			{Name: "second", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
-		}}},
-	}
-	damage := protocol.Command{
-		Name: damageTestCommand, Description: "Damages the item in your hand: <amount>, max, or fix.",
-		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
-		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "amount", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
-		}}},
-	}
-	values := slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions)
-	enums := []protocol.CommandEnum{
-		{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
-		{Type: "SmithTestAction", ValueIndices: smithIdx}, {Type: "RecipeTestAction", ValueIndices: recipeIdx},
-	}
-	timeCmd, timeValues, timeEnums := timeList(uint32(len(values)), uint32(len(enums))) //nolint:gosec // few values
-	return &packet.AvailableCommands{
-		EnumValues: slices.Concat(values, timeValues),
-		Enums:      slices.Concat(enums, timeEnums),
-		Commands:   []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant, target, damage, timeCmd},
-	}
 }
 
 // ticksPerSecond is the server's tick rate.
@@ -653,18 +542,6 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	if err := player.OnItemLoad(setup, func(e *player.ItemLoadEvent) { showItemTimer(e.Item, settings) }, player.Normal); err != nil {
 		return err
 	}
-	list := testCommandList()
-	var sent sync.Map // *player.Player -> struct{}, so a rejoin gets it again
-	if err := player.WrapHandle(setup, func(p *player.Player, pk *packet.PlayerAuthInput, next player.PacketHandler[*packet.PlayerAuthInput]) {
-		if _, done := sent.LoadOrStore(p, struct{}{}); !done {
-			// A failed write means the connection is closing; the read loop
-			// ends the session, so there is nothing more to do here.
-			_ = p.Conn().WritePacket(list)
-		}
-		next(p, pk)
-	}); err != nil {
-		return err
-	}
 	var chestMode atomic.Int32
 	if err := player.OnContainerItem(setup, func(e *player.ContainerItemEvent) { chestTest(chestMode.Load(), e) }, player.Normal); err != nil {
 		return err
@@ -715,102 +592,5 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 	}, player.Normal); err != nil {
 		return err
 	}
-	var smithStart atomic.Pointer[packet.CraftingData]
-	return player.Handle(setup, func(p *player.Player, pk *packet.CommandRequest) {
-		args := strings.Fields(strings.TrimPrefix(pk.CommandLine, "/"))
-		if len(args) > 0 && args[0] == timeCommand {
-			if server := srv.Load(); server != nil {
-				// A failed write means the connection is closing, as above.
-				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: timeRun(server, args[1:])})
-			}
-			return
-		}
-		if len(args) > 0 && args[0] == targetTestCommand {
-			// A failed write means the connection is closing, as above.
-			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: targetTest(p, args[1:])})
-			return
-		}
-		if len(args) == 2 && args[0] == damageTestCommand {
-			// A failed write means the connection is closing, as above.
-			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: damageTest(p, args[1:])})
-			return
-		}
-		if len(args) > 1 && args[0] == enchantTestCommand {
-			// A failed write means the connection is closing, as above.
-			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: enchantTest(p, args[1:])})
-			return
-		}
-		if len(args) > 1 && args[0] == tuneTestCommand {
-			// A failed write means the connection is closing, as above.
-			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: tuneTest(p, args[1:])})
-			return
-		}
-		if (len(args) == 2 || len(args) == 3) && args[0] == recipeTestCommand {
-			if msg, ok := recipeTestPlayer(p, args[1], recipeTestItem(args[2:])); ok {
-				// A failed write means the connection is closing, as above.
-				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: msg})
-				return
-			}
-			if server := srv.Load(); server != nil {
-				reg := server.Registry()
-				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())
-				// Reset is back to how the server started, so nobody keeps a hidden recipe.
-				if args[1] == "reset" {
-					for _, o := range server.Players() {
-						o.EditRecipes(func(r *player.PlayerRecipes) { r.Reset() })
-					}
-				}
-				// A failed write means the connection is closing, as above.
-				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: recipeTest(reg, smithStart.Load(), args[1], recipeTestItem(args[2:]))})
-			}
-			return
-		}
-		if len(args) == 2 && args[0] == smithTestCommand {
-			if server := srv.Load(); server != nil {
-				reg := server.Registry()
-				smithStart.CompareAndSwap(nil, reg.Crafting.Packet())
-				// A failed write means the connection is closing, as above.
-				_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: smithTest(reg, smithStart.Load(), args[1])})
-			}
-			return
-		}
-		if len(args) == 2 && args[0] == chestTestCommand {
-			switch args[1] {
-			case "refuse":
-				chestMode.Store(chestTestRefuse)
-			case "rewrite":
-				chestMode.Store(chestTestRewrite)
-			case "name":
-				chestNames.Store(1)
-			case "price":
-				flags.price.Store(true)
-				p.RefreshItems()
-			case "noopen":
-				flags.noOpen.Store(true)
-			case "nobang":
-				flags.noBang.Store(true)
-			case "playersonly":
-				flags.playersOnly.Store(true)
-			default:
-				chestMode.Store(chestTestOff)
-				flags.noOpen.Store(false)
-				flags.noBang.Store(false)
-				flags.playersOnly.Store(false)
-				if flags.price.Swap(false) {
-					p.RefreshItems()
-				}
-			}
-			return
-		}
-		if len(args) > 0 && args[0] == itemTestCommand {
-			// A failed write means the connection is closing, as above.
-			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: itemTest(p, settings(p), srv, args[1:])})
-			return
-		}
-		if len(args) == 2 && (args[0] == "gamemode" || args[0] == "gm") {
-			if mode, ok := testModes[strings.ToLower(args[1])]; ok {
-				p.SetGameMode(mode)
-			}
-		}
-	})
+	return registerTestCommands(setup, srv, settings, &chestMode, &chestNames, &flags)
 }

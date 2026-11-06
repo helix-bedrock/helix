@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/helix-bedrock/helix/command"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -25,6 +26,7 @@ type handlerState struct {
 	packets  map[uint32]handlerEntry
 	movement movementEntry
 	game     *gameState
+	commands *command.Manager
 }
 
 // PacketHandler handles a packet from a player on the player's region
@@ -54,7 +56,7 @@ func NewSetup(log *slog.Logger) (*Setup, error) {
 }
 
 func newSetup(log *slog.Logger) *Setup {
-	return &Setup{owner: "minecraft", h: &handlerState{log: log, packets: map[uint32]handlerEntry{}, game: newGameState()}}
+	return &Setup{owner: "minecraft", h: &handlerState{log: log, packets: map[uint32]handlerEntry{}, game: newGameState(), commands: command.NewManager(log)}}
 }
 
 // As returns the same Setup acting for owner, a plugin's name in the log.

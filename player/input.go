@@ -71,6 +71,7 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickChest()
 	p.tickUILeftovers()
 	p.s.checkVoid(p.entity)
+	p.publishState()
 }
 
 // vanillaHandlers registers vanilla's packet handlers and systems. They go
@@ -98,6 +99,9 @@ func vanillaHandlers(s *Setup) error {
 		return err
 	}
 	if err := Handle(s, handleToggleCrafterSlot); err != nil {
+		return err
+	}
+	if err := Handle(s, handleCommandRequest); err != nil {
 		return err
 	}
 	if err := Handle(s, handleRespawn); err != nil {

@@ -115,6 +115,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 		s.reg.Creative.Packet(), s.reg.Trims.Packet())
 	p.sendOwnItems()
 	p.send(p.recipesPacket())
+	p.send(p.commandsPacket())
 
 	// BDS sends the player its own synched data on its first tick, then
 	// the next tick the breathing flag once it finds air.
@@ -160,6 +161,8 @@ func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) (leave func())
 		rot world.Rotation
 	}
 	removed := make(chan last, 1)
+	// Until its first tick, others see where it spawns.
+	p.seen.store(PlayerState{Position: spawn.Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: rot, GameMode: p.gameMode, Level: p.Level()})
 	p.entity = s.overworld.AddEntity(world.EntityConfig{
 		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: spawn, Rot: rot, Viewer: p.viewer, Owner: p,
 		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,

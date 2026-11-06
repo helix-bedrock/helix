@@ -66,7 +66,6 @@ func TestCraftRepairRules(t *testing.T) {
 	}
 }
 
-
 // TestCraftRepairTimes checks that a client cannot make more repaired items than the two
 // inputs allow: asking for two crafts, or taking two results from one, is refused and
 // changes nothing.
