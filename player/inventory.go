@@ -463,6 +463,9 @@ func (p *Player) inventories() *playerInventories {
 // player's region, as for the methods below and every method of what they return.
 func (p *Player) Inventory() *Inventory { return p.inventories().main }
 
+// Held is the item in the player's hand. Runs: the player's region.
+func (p *Player) Held() ItemStack { return p.inventory.main[p.inventory.held] }
+
 // Armour returns the player's armour: helmet, chestplate, leggings, boots and body.
 func (p *Player) Armour() *Inventory { return p.inventories().armour }
 

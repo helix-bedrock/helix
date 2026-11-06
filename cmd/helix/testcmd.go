@@ -122,6 +122,13 @@ func testCommandList() *packet.AvailableCommands {
 			{Name: "second", Type: protocol.CommandArgValid | protocol.CommandArgTypeString, Optional: true},
 		}}},
 	}
+	damage := protocol.Command{
+		Name: damageTestCommand, Description: "Damages the item in your hand: <amount>, max, or fix.",
+		PermissionLevel: protocol.CommandPermissionLevelAny, AliasesOffset: ^uint32(0),
+		Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "amount", Type: protocol.CommandArgValid | protocol.CommandArgTypeString},
+		}}},
+	}
 	values := slices.Concat(testModeNames, itemTestActions, chestTestActions, smithTestActions, recipeTestActions)
 	enums := []protocol.CommandEnum{
 		{Type: "GameMode", ValueIndices: idx}, {Type: "ItemTestAction", ValueIndices: itemIdx}, {Type: "ChestTestAction", ValueIndices: chestIdx},
@@ -131,7 +138,7 @@ func testCommandList() *packet.AvailableCommands {
 	return &packet.AvailableCommands{
 		EnumValues: slices.Concat(values, timeValues),
 		Enums:      slices.Concat(enums, timeEnums),
-		Commands:   []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant, target, timeCmd},
+		Commands:   []protocol.Command{cmd("gamemode"), cmd("gm"), item, chest, smith, recipe, tune, enchant, target, damage, timeCmd},
 	}
 }
 
@@ -197,6 +204,38 @@ func targetTest(p *player.Player, args []string) string {
 		}
 	}
 	return fmt.Sprintf("Hit %d target blocks.", hits)
+}
+
+// damageTestCommand damages the held item, to try repairs without wearing tools out.
+const damageTestCommand = "damageitem"
+
+// damageTest runs /damageitem: <amount> adds that much damage (a negative amount takes it
+// off), max leaves none of the durability, fix makes the item as new. It never breaks the
+// item, and refuses one that cannot be damaged.
+func damageTest(p *player.Player, args []string) string {
+	held := p.Held()
+	if held.Empty() {
+		return "You hold nothing."
+	}
+	most := p.MaxDamage(held.Name)
+	var damage int32
+	switch args[0] {
+	case "max":
+		damage = most
+	case "fix":
+		damage = 0
+	default:
+		n, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil {
+			return "Use: /damageitem <amount>, max, or fix"
+		}
+		damage = int32(min(max(int64(held.Damage())+n, 0), int64(most))) //nolint:gosec // clamped
+	}
+	if !p.SetHeldDamage(damage) {
+		return held.Name + " cannot be damaged."
+	}
+	now := p.Held()
+	return fmt.Sprintf("%s: %d damage, %d of %d durability left.", now.Name, now.Damage(), most-now.Damage(), most)
 }
 
 // enchantTestCommand is the command that gives levels and tries changing an
@@ -689,6 +728,11 @@ func setUpTestCommands(s *helix.Setup, srv *atomic.Pointer[helix.Server]) error 
 		if len(args) > 0 && args[0] == targetTestCommand {
 			// A failed write means the connection is closing, as above.
 			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: targetTest(p, args[1:])})
+			return
+		}
+		if len(args) == 2 && args[0] == damageTestCommand {
+			// A failed write means the connection is closing, as above.
+			_ = p.Conn().WritePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: damageTest(p, args[1:])})
 			return
 		}
 		if len(args) > 1 && args[0] == enchantTestCommand {

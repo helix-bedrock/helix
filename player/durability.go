@@ -117,3 +117,26 @@ func (p *Player) wearStack(s *ItemStack, n int32) (changed, broke bool) {
 
 // durabilityTable indexes helix-data's durability by item name.
 func durabilityTable(b *data.BreakPlace) map[string]data.Durability { return b.Items }
+
+// Damage is the damage an item has taken, 0 when new.
+func (s ItemStack) Damage() int32 { return itemDamage(s) }
+
+// MaxDamage is the most damage an item can take before it breaks, 0 for an item without
+// durability.
+func (p *Player) MaxDamage(name string) int32 { return p.maxDamage(name) }
+
+// SetHeldDamage sets the damage of the item in the player's hand, from 0 to its most, and
+// shows it at once. Nothing rolls for Unbreaking and nothing breaks. It reports false
+// for an item that cannot be damaged (none, no durability, or marked unbreakable). Runs:
+// the player's region.
+func (p *Player) SetHeldDamage(damage int32) bool {
+	inv := &p.inventory
+	held := &inv.main[inv.held]
+	if !p.damageable(*held) {
+		return false
+	}
+	*held = withDamage(*held, min(max(damage, 0), p.maxDamage(held.Name)))
+	p.sendHeld()
+	p.flush()
+	return true
+}
