@@ -3,6 +3,7 @@ package player
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -116,15 +117,15 @@ func TestBannerRoundTrip(t *testing.T) {
 	}
 }
 
-// shieldRecipeID is the network ID BDS sends the shield and banner recipe under.
-func shieldRecipeID(t *testing.T, p *Player) uint32 {
+// specialRecipeID is the network ID BDS sends a special recipe under.
+func specialRecipeID(t *testing.T, p *Player, recipe uuid.UUID) uint32 {
 	t.Helper()
 	for _, r := range p.s.reg.Crafting.Packet().MultiRecipes {
-		if r.UUID == shieldBannerRecipe {
+		if r.UUID == recipe {
 			return r.RecipeNetworkID
 		}
 	}
-	t.Fatal("no shield recipe in CraftingData")
+	t.Fatalf("no recipe %s in CraftingData", recipe)
 	return 0
 }
 
@@ -137,7 +138,7 @@ func TestShieldBanner(t *testing.T) {
 	p.inventory.ui[28] = p.s.freshStack(ItemStack{Name: shieldItem, Count: 1, Tag: map[string]any{"Damage": int32(3)}})
 	p.inventory.ui[30] = p.s.freshStack(banner)
 	req := protocol.ItemStackRequest{RequestID: 1, Actions: []protocol.StackRequestAction{
-		&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: shieldRecipeID(t, p), NumberOfCrafts: 1},
+		&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: specialRecipeID(t, p, shieldBannerRecipe), NumberOfCrafts: 1},
 		&protocol.CraftResultsDeprecatedStackRequestAction{TimesCrafted: 1},
 		consume(p, 28), consume(p, 30),
 		take(1, slotInfo(containerCreatedOutput, createdOutputSlot, 0), slotInfo(containerCombined, 1, 0)),

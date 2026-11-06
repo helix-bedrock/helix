@@ -91,10 +91,45 @@ func vanillaShieldBanner(_ *Player, grid []ItemStack) ItemStack {
 	return result
 }
 
-// craftSpecial is a craft of one of BDS's special recipes, worked out in code. Only the
-// shield and banner one is built; the rest are refused as unknown.
+// shieldBannerResult runs the ShieldBanner system and its event for a grid, with the
+// stack request status.
+func (p *Player) shieldBannerResult(grid []ItemStack) (ItemStack, uint8) {
+	g := p.s.game
+	result := g.sys.ShieldBanner(p, grid)
+	if result.Empty() {
+		return result, protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems
+	}
+	if !g.shieldBannerEv.Has() {
+		return result, protocol.ItemStackResponseStatusOK
+	}
+	shield, banner, _ := shieldAndBanner(grid)
+	e := ShieldBannerEvent{Player: p, Shield: shield, Banner: banner, Result: result}
+	g.shieldBannerEv.fire(p.s.log, &e)
+	return specialEventResult(e.Cancelled(), e.Result)
+}
+
+// specialEventResult is the status a special recipe's event leaves: cancelled, or with
+// its result taken away.
+func specialEventResult(cancelled bool, result ItemStack) (ItemStack, uint8) {
+	switch {
+	case cancelled:
+		return ItemStack{}, protocol.ItemStackResponseStatusInvalidCraftRequest
+	case result.Empty():
+		return ItemStack{}, protocol.ItemStackResponseStatusInvalidCraftResultItem
+	}
+	return result, protocol.ItemStackResponseStatusOK
+}
+
+// craftSpecial is a craft of one of BDS's special recipes, worked out in code. The shield
+// and banner one and the repair one are built; the rest are refused as unknown.
 func (p *Player) craftSpecial(a *protocol.CraftRecipeStackRequestAction, recipe uuid.UUID) (uint8, []slotRef) {
-	if recipe != shieldBannerRecipe {
+	var result func([]ItemStack) (ItemStack, uint8)
+	switch recipe {
+	case shieldBannerRecipe:
+		result = p.shieldBannerResult
+	case repairItemRecipe:
+		result = p.craftRepairResult
+	default:
 		return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId, nil
 	}
 	st := &p.requests
@@ -110,21 +145,9 @@ func (p *Player) craftSpecial(a *protocol.CraftRecipeStackRequestAction, recipe 
 		return protocol.ItemStackResponseStatusInvalidNumCrafts, nil
 	}
 	grid := slices.Clone(st.work.ui[start : start+size])
-	g := p.s.game
-	result := g.sys.ShieldBanner(p, grid)
-	if result.Empty() {
-		return protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems, nil
-	}
-	if g.shieldBannerEv.Has() {
-		shield, banner, _ := shieldAndBanner(grid)
-		e := ShieldBannerEvent{Player: p, Shield: shield, Banner: banner, Result: result}
-		g.shieldBannerEv.fire(p.s.log, &e)
-		if e.Cancelled() {
-			return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
-		}
-		if result = e.Result; result.Empty() {
-			return protocol.ItemStackResponseStatusInvalidCraftResultItem, nil
-		}
+	made, status := result(grid)
+	if status != protocol.ItemStackResponseStatusOK {
+		return status, nil
 	}
 	c.active, c.times = true, a.NumberOfCrafts
 	for i := range size {
@@ -132,7 +155,7 @@ func (p *Player) craftSpecial(a *protocol.CraftRecipeStackRequestAction, recipe 
 			c.slots = append(c.slots, expectedSlot{container: protocol.ContainerCraftingInput, slot: byte(start + i), item: s, left: a.NumberOfCrafts}) //nolint:gosec // slots are small
 		}
 	}
-	c.results = append(c.results, craftResult{stack: result, left: int32(result.Count) * int32(a.NumberOfCrafts)})
+	c.results = append(c.results, craftResult{stack: made, left: int32(made.Count) * int32(a.NumberOfCrafts)})
 	// As at a table: the client is sent the item the server made.
 	st.refresh = true
 	return protocol.ItemStackResponseStatusOK, nil
