@@ -182,13 +182,15 @@ func handleInteract(p *Player, pk *packet.Interact) {
 	if p.window.open {
 		return
 	}
-	if pk.TargetEntityRuntimeID == p.runtimeID {
-		p.openInventory(p.entity.Region())
+	// The client asks this way to open a chest or hopper minecart.
+	if m := p.cartInReach(pk.TargetEntityRuntimeID); m != nil && m.chest != nil {
+		p.openCart(m)
 		return
 	}
-	// The client asks this way to open a chest or hopper minecart.
-	if m := p.cartInReach(pk.TargetEntityRuntimeID); m != nil {
-		p.openCart(m)
+	// A rider names what it sits on: a vehicle with no slots of its own opens the
+	// player's inventory.
+	if pk.TargetEntityRuntimeID == p.runtimeID || p.vehicle != nil && pk.TargetEntityRuntimeID == p.vehicle.rideEntity().RuntimeID() {
+		p.openInventory(p.entity.Region())
 	}
 }
 
