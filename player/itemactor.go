@@ -381,12 +381,7 @@ func (i *ItemActor) merge(o *ItemActor) bool {
 		keep.SetView(gone.view)
 		return true
 	}
-	if keep.view != nil {
-		// The view may show another stack, so it is asked again.
-		keep.entity.Respawn()
-		return true
-	}
-	keep.sendStackSize()
+	keep.showCount()
 	return true
 }
 

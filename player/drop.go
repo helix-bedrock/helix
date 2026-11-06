@@ -261,17 +261,17 @@ func vanillaPickUp(p *Player, i *ItemActor) {
 	if !p.creative() && !p.inventory.canAdd(p.s.reg, i.stack) && !p.offhandTakes(i.stack) {
 		return
 	}
-	rest := p.Give(i.stack)
-	r := i.entity.Region()
-	if r == nil {
+	// An item no region holds is not taken, so nothing is given for it.
+	if i.taken || i.entity.Region() == nil {
 		return
 	}
+	rest := p.Give(i.stack)
 	if !rest.Empty() && !p.creative() {
 		if rest.Count == i.stack.Count {
 			return
 		}
 		i.stack.Count = rest.Count
-		i.sendStackSize()
+		i.showCount()
 		return
 	}
 	i.taken = true

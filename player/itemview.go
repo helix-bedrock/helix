@@ -179,6 +179,16 @@ func nameMetadata(name string) protocol.EntityMetadata {
 	}
 }
 
+// showCount shows a changed count to those who see the item; a view may show
+// another stack, so it is asked again instead.
+func (i *ItemActor) showCount() {
+	if i.view != nil {
+		i.entity.Respawn()
+		return
+	}
+	i.sendStackSize()
+}
+
 // sendStackSize tells the players who see the item its new count.
 func (i *ItemActor) sendStackSize() {
 	i.entity.Send(actorEventData(i.entity.RuntimeID(), packet.ActorEventUpdateStackSize, int32(i.stack.Count)))
