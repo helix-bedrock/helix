@@ -281,8 +281,8 @@ commits.
   by the flame odds around them, more on harder difficulties and half as much in humid biomes. It
   burns forever on netherrack, magma and bedrock with `infiniburn_bit`, goes out without a block to
   stand on or burn, and turns to soul fire on soul sand and soul soil; soul fire stays only there.
-  `dofiretick` off stops all of it. Lava's random tick tries ten blocks around it and sets fire next
-  to the first lava-flammable one (BDS's own flag per block, now in helix-data's `block_properties.json`
+  `dofiretick` off stops all of it. Lava's random tick, and every lava tick (so soon after lava is
+  placed or flows), tries ten blocks around it and sets fire next to the first lava-flammable one (BDS's own flag per block, now in helix-data's `block_properties.json`
   as `lava_flammable`; it is not the flame odds). Flint and steel sets fire on the clicked face and
   wears; starting to break a block puts out fire on the clicked face. Not done: rain putting fire out
   (no weather yet), nether portals, fire charges, entities catching fire and taking fire damage, bees

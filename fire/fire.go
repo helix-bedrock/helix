@@ -260,6 +260,11 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 			t.remove(r, pos)
 		}
 	default:
+		// BDS's liquid tick tries lava's fire first, as its random tick does: lava sets fire
+		// soon after it is placed or flows, not only on random ticks.
+		if t.is(block, isLava) {
+			t.lavaTick(r, pos)
+		}
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
 }
