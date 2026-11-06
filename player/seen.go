@@ -156,18 +156,27 @@ func (h *Host) FindXUID(xuid string) (*Player, bool) {
 }
 
 // NewItem is a stack of an item by name ("apple" or "minecraft:apple"), with a block
-// item's block filled in. It reports false for a name no item has. Runs: anywhere.
+// item's block filled in. It reports false for a name no item has, and for the
+// block-only entries BDS lists without an item (double slabs, wall signs). Runs: anywhere.
 func (s *Host) NewItem(name string, count int, meta int16) (ItemStack, bool) {
 	if !strings.Contains(name, ":") {
 		name = "minecraft:" + name
 	}
-	if _, ok := s.reg.Items.ByName(name); !ok {
+	t, ok := s.reg.Items.ByName(name)
+	if !ok || t.MaxStack == 0 {
 		return ItemStack{}, false
 	}
 	it := ItemStack{Name: name, Count: uint8(min(max(count, 0), 255)), Meta: meta} //nolint:gosec // clamped
-	blocks := s.reg.Blocks
-	if id, ok := blocks.Block(name); ok {
-		it.Block = map[string]any{"name": blocks.Name(id), "states": blocks.States(id), "version": blocks.Version(id)}
+	// A block item carries its block as the creative inventory BDS sends has it; items
+	// named like a block that are not block items (doors, say) carry none.
+	for _, c := range s.reg.Creative.Packet().Items {
+		if c.Item.NetworkID != int32(t.ID) || c.Item.BlockRuntimeID == 0 {
+			continue
+		}
+		if id, ok := s.reg.Blocks.HashToRuntimeID(uint32(c.Item.BlockRuntimeID)); ok { //nolint:gosec // hashes are sent as int32
+			it.Block = map[string]any{"name": s.reg.Blocks.Name(id), "states": s.reg.Blocks.States(id), "version": s.reg.Blocks.Version(id)}
+		}
+		break
 	}
 	return it, true
 }

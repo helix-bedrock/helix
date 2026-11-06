@@ -197,7 +197,13 @@ func matchesSelector(p *Player, at mgl32.Vec3, sel command.Selector) bool {
 func (h *Host) setUpCommands() {
 	m := h.commands
 	var items []string
-	h.reg.Items.Each(func(t registry.ItemType) { items = appendCommandNames(items, t.Name) })
+	// Block-only entries (MaxStack 0: double slabs, wall signs...) are not items, and
+	// BDS's Item list leaves them out.
+	h.reg.Items.Each(func(t registry.ItemType) {
+		if t.MaxStack > 0 {
+			items = appendCommandNames(items, t.Name)
+		}
+	})
 	m.SetEnumOptions(command.EnumItem, items)
 	var blocks []string
 	seen := map[string]bool{}
