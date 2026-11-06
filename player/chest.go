@@ -169,6 +169,8 @@ type Chest struct {
 	// machine says this is a hopper, dispenser or dropper rather than a chest: the
 	// same slots and window, without a lid or a partner.
 	machine *machineSpec
+	// furnace is a furnace's, blast furnace's or smoker's own part.
+	furnace *Furnace
 	// cooldown and lastTick are a hopper's, in ticks.
 	cooldown int32
 	lastTick int64
@@ -275,6 +277,8 @@ func (c *Chest) Kind() ContainerKind {
 		return ContainerDropper
 	case c.machine.crafter:
 		return ContainerCrafter
+	case c.machine.furnace != nil:
+		return c.machine.furnace.kind
 	}
 	return ContainerDispenser
 }
@@ -300,7 +304,7 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 		return nil
 	}
 	if spec := machineSpecs[e.s.reg.Blocks.Name(block)]; spec != nil {
-		return &Chest{s: e.s, lead: true, machine: spec}
+		return e.s.newMachine(cube.Pos{}, spec)
 	}
 	return &Chest{s: e.s, lead: true, ender: t.kind[block] == chestEnder, shulker: t.kind[block] == chestShulker, facing: shulkerDefaultFacing}
 }
@@ -404,6 +408,9 @@ func (c *Chest) SaveData(pos cube.Pos) map[string]any {
 		delete(m, "Findable")
 		if c.machine.hopper {
 			m[transferCooldownTag] = c.cooldown
+		}
+		if c.furnace != nil {
+			c.furnace.save(m)
 		}
 	}
 	return m
@@ -538,6 +545,9 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	}
 	c.unpair(r)
 	c.closeViewers(r)
+	if c.furnace != nil {
+		c.furnaceBroken(r, pos)
+	}
 	items := c.items[:]
 	if g := c.s.game; !c.ender && g.chestSpillEv.Has() {
 		e := ChestSpillEvent{Region: r, Chest: c, Pos: pos, Items: slices.Clone(items)}
@@ -587,6 +597,9 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		}
 		if c.machine.crafter {
 			c.tickCrafter(r, pos)
+		}
+		if c.furnace != nil {
+			c.tickFurnace(r, pos)
 		}
 		return
 	}
@@ -751,7 +764,11 @@ func (c *Chest) closeViewers(r *world.Region) {
 func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	c := p.s.chestAt(r, u.Pos)
 	if c == nil {
-		c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder, shulker: p.s.chests.kind[u.Block] == chestShulker, facing: shulkerDefaultFacing, machine: machineSpecs[p.s.reg.Blocks.Name(u.Block)]}
+		if spec := machineSpecs[p.s.reg.Blocks.Name(u.Block)]; spec != nil {
+			c = p.s.newMachine(u.Pos, spec)
+		} else {
+			c = &Chest{s: p.s, pos: u.Pos, lead: true, ender: p.s.chests.kind[u.Block] == chestEnder, shulker: p.s.chests.kind[u.Block] == chestShulker, facing: shulkerDefaultFacing}
+		}
 		if !r.SetBlockEntity(u.Pos, c) {
 			return false
 		}
@@ -822,6 +839,9 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 	o := p.chestOpening(r, c, pos)
 	p.showWindow(r, &o)
 	lead.addViewer(r, p)
+	if c.furnace != nil {
+		c.furnace.showAll(p)
+	}
 }
 
 // leaveChest takes the player off its chest's viewers and closes the window. A chest
@@ -929,6 +949,9 @@ func (p *Player) commitChestWork() {
 		}
 		if cur.netID == s.netID && cur.Count == s.Count {
 			continue
+		}
+		if c := p.windowChest(r); c != nil && c.furnace != nil && i == furnaceResult && !cur.Empty() && (s.Empty() || cur.stacksWith(s) && s.Count < cur.Count) {
+			c.resultTaken(r, p, *cur, int(cur.Count)-int(s.Count))
 		}
 		*cur = s
 		inv.holder.inventoryChanged(i)

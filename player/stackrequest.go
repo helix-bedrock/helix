@@ -193,7 +193,9 @@ func (p *Player) inventoryOf(r slotRef) (*Inventory, int) {
 		return invs.armour, int(r.slot)
 	case containerOffhand:
 		return invs.offhand, 0
-	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox:
+	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox,
+		protocol.ContainerFurnaceIngredient, protocol.ContainerBlastFurnaceIngredient, protocol.ContainerSmokerIngredient,
+		protocol.ContainerFurnaceFuel, protocol.ContainerFurnaceResult:
 		if p.window.inv != nil {
 			return p.window.inv, int(r.slot)
 		}
@@ -310,6 +312,12 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 		r.stack = &inv.ui[slot]
 	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox:
 		if int(slot) >= len(inv.open) {
+			return r, false
+		}
+		r.stack = &inv.open[slot]
+	case protocol.ContainerFurnaceIngredient, protocol.ContainerBlastFurnaceIngredient, protocol.ContainerSmokerIngredient,
+		protocol.ContainerFurnaceFuel, protocol.ContainerFurnaceResult:
+		if !p.furnaceSlot(container, slot) || int(slot) >= len(inv.open) {
 			return r, false
 		}
 		r.stack = &inv.open[slot]
@@ -536,6 +544,10 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	case protocol.ContainerSmithingTableTemplate, protocol.ContainerSmithingTableInput, protocol.ContainerSmithingTableMaterial:
 		slot, _ := smithSlot(r.kind)
 		return p.s.Recipes().SmithingAllows(slot, p.craftItem(s))
+	case protocol.ContainerFurnaceResult:
+		return false
+	case protocol.ContainerFurnaceFuel:
+		return p.furnaceFuelAllowed(s)
 	case protocol.ContainerEnchantingInput:
 		return s.Count == 1
 	case protocol.ContainerEnchantingMaterial:

@@ -64,6 +64,11 @@ type Systems struct {
 	// Explode runs explosions.
 	Explode ExplodeFunc
 	Respawn RespawnFunc
+	// FurnaceFuel is how long an item burns in a furnace, FurnaceResult what a furnace
+	// makes of an item, FurnaceXP the experience one smelted item gives.
+	FurnaceFuel   FurnaceFuelFunc
+	FurnaceResult FurnaceResultFunc
+	FurnaceXP     FurnaceXPFunc
 	// OutOfWorld says whether an entity is in the void, Void what the void does to it.
 	OutOfWorld  OutOfWorldFunc
 	Void        VoidFunc
@@ -185,6 +190,8 @@ type gameplay struct {
 	explosionStartEv listeners[ExplosionStartEvent]
 	explosionHitEv   listeners[ExplosionHitEvent]
 	voidEv           listeners[VoidEvent]
+	furnaceBurnEv    listeners[FurnaceBurnEvent]
+	furnaceSmeltEv   listeners[FurnaceSmeltEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
@@ -233,6 +240,8 @@ type gameState struct {
 	explosionStartEv listeners[ExplosionStartEvent]
 	explosionHitEv   listeners[ExplosionHitEvent]
 	voidEv           listeners[VoidEvent]
+	furnaceBurnEv    listeners[FurnaceBurnEvent]
+	furnaceSmeltEv   listeners[FurnaceSmeltEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
@@ -413,6 +422,9 @@ func vanillaGameplay(s *Setup) error {
 	sys.Die = vanillaDie
 	sys.Explode = vanillaExplode
 	sys.Respawn = vanillaRespawn
+	sys.FurnaceFuel = vanillaFurnaceFuel
+	sys.FurnaceResult = vanillaFurnaceResult
+	sys.FurnaceXP = vanillaFurnaceXP
 	sys.OutOfWorld = vanillaOutOfWorld
 	sys.Void = vanillaVoid
 	sys.ShieldUp = vanillaShieldUp
@@ -454,7 +466,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -488,6 +500,8 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.explosionStartEv.freeze()
 	g.explosionHitEv.freeze()
 	g.voidEv.freeze()
+	g.furnaceBurnEv.freeze()
+	g.furnaceSmeltEv.freeze()
 	g.tntPrimeEv.freeze()
 	g.craftEv.freeze()
 	g.smithEv.freeze()

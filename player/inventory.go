@@ -29,6 +29,11 @@ const (
 	ContainerDispenser
 	ContainerDropper
 	ContainerCrafter
+	// ContainerFurnace, ContainerBlastFurnace and ContainerSmoker have three slots: the
+	// input, the fuel and the result.
+	ContainerFurnace
+	ContainerBlastFurnace
+	ContainerSmoker
 	// Carts with slots.
 	ContainerChestMinecart
 	ContainerHopperMinecart

@@ -19,6 +19,9 @@ func machineWorld(t *testing.T) (*Player, *world.Dimension) {
 	if p.s.attach, err = attach.New(p.s.reg.Blocks); err != nil {
 		t.Fatal(err)
 	}
+	if p.s.furnaces, err = loadFurnaceFacts(); err != nil {
+		t.Fatal(err)
+	}
 	d.SetBlockEntities(chestEntities{s: p.s})
 	return p, d
 }

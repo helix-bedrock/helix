@@ -103,6 +103,8 @@ type Host struct {
 	clock *daytime.Clock
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
+	// furnaces are BDS's fuel, experience and cook times.
+	furnaces *furnaceFacts
 	// discs is the music discs by item name.
 	discs map[string]data.MusicDisc
 	// drops holds what each block drops.
@@ -147,6 +149,10 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: drops: %w", err)
 	}
+	furnaces, err := loadFurnaceFacts()
+	if err != nil {
+		return nil, fmt.Errorf("player: furnaces: %w", err)
+	}
 	for name, rule := range g.dropRules {
 		drops.Set(name, rule)
 	}
@@ -159,6 +165,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests, discs: discs,
+		furnaces: furnaces,
 	}
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()

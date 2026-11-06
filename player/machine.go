@@ -47,14 +47,22 @@ type machineSpec struct {
 	dropper bool
 	// crafter makes recipes instead of giving out what it holds.
 	crafter bool
+	// furnace smelts: a furnace, blast furnace or smoker, lit or not.
+	furnace *furnaceKind
 }
 
 // machineSpecs are the blocks that have only slots.
 var machineSpecs = map[string]*machineSpec{
-	"minecraft:hopper":    {id: "Hopper", size: 5, window: byte(protocol.ContainerTypeHopper), hopper: true},
-	"minecraft:dispenser": {id: "Dispenser", size: 9, window: byte(protocol.ContainerTypeDispenser)},
-	"minecraft:dropper":   {id: "Dropper", size: 9, window: byte(protocol.ContainerTypeDropper), dropper: true},
-	crafterBlock:          {id: crafterEntityID, size: crafterSize, window: byte(protocol.ContainerTypeCrafter), crafter: true},
+	"minecraft:hopper":            {id: "Hopper", size: 5, window: byte(protocol.ContainerTypeHopper), hopper: true},
+	"minecraft:dispenser":         {id: "Dispenser", size: 9, window: byte(protocol.ContainerTypeDispenser)},
+	"minecraft:dropper":           {id: "Dropper", size: 9, window: byte(protocol.ContainerTypeDropper), dropper: true},
+	crafterBlock:                  {id: crafterEntityID, size: crafterSize, window: byte(protocol.ContainerTypeCrafter), crafter: true},
+	"minecraft:furnace":           furnaceSpec,
+	"minecraft:lit_furnace":       furnaceSpec,
+	"minecraft:blast_furnace":     blastFurnaceSpec,
+	"minecraft:lit_blast_furnace": blastFurnaceSpec,
+	"minecraft:smoker":            smokerSpec,
+	"minecraft:lit_smoker":        smokerSpec,
 }
 
 // machineByID is the spec of a saved id, nil if it is no such block.
@@ -69,7 +77,11 @@ func machineByID(id string) *machineSpec {
 
 // loadMachine brings back a saved hopper, dispenser or dropper.
 func (s *Host) loadMachine(pos cube.Pos, saved map[string]any, spec *machineSpec) *Chest {
-	c := &Chest{s: s, pos: pos, lead: true, machine: spec, saved: maps.Clone(saved)}
+	c := s.newMachine(pos, spec)
+	c.saved = maps.Clone(saved)
+	if c.furnace != nil {
+		c.furnace.load(saved)
+	}
 	for _, item := range compounds(saved["Items"]) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < spec.size {
@@ -280,7 +292,7 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 		if s.Empty() {
 			continue
 		}
-		if !to.takeOne(r, s) {
+		if !c.putOne(r, to, s) {
 			continue
 		}
 		s.Count--
@@ -294,6 +306,15 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 		return true
 	}
 	return false
+}
+
+// putOne puts one of s into to: a furnace takes it by the side it comes from, any other
+// container in its first slot with room.
+func (c *Chest) putOne(r *world.Region, to *Chest, s ItemStack) bool {
+	if to.furnace != nil {
+		return to.furnaceTakeOne(r, s, c.cart == nil && c.pos[1] > to.pos[1])
+	}
+	return to.takeOne(r, s)
 }
 
 // takeOne puts one of s in the first slot that has room for it.
@@ -333,6 +354,9 @@ func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
 
 // pullOne takes one item from a container, from its first slot this one has room for.
 func (c *Chest) pullOne(r *world.Region, from *Chest) bool {
+	if from.furnace != nil {
+		return from.furnaceGiveOne(r, c)
+	}
 	for i, size := 0, from.Inventory(r).Size(); i < size; i++ {
 		s := from.Inventory(r).Item(i)
 		if s.Empty() || !c.takeOne(r, s) {
@@ -675,7 +699,7 @@ func (c *Chest) pushOne(r *world.Region, at cube.Pos, slot int) bool {
 		return false
 	}
 	s := c.items[slot]
-	if !to.takeOne(r, s) {
+	if !c.putOne(r, to, s) {
 		return false
 	}
 	s.Count--

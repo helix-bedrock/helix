@@ -182,7 +182,13 @@ type Table struct {
 	source   *packet.CraftingData
 	recipes  map[uint32]*Recipe
 	smithing map[uint32]*SmithingRecipe
+	// smelt and smeltTags are the one-item recipes of furnaces and campfires, by block,
+	// then by the input's name or tag.
+	smelt, smeltTags map[string]map[string][]*Recipe
 }
+
+// smeltBlocks are the blocks whose recipes take one item, looked up by that item.
+var smeltBlocks = map[string]bool{"furnace": true, "blast_furnace": true, "smoker": true, "campfire": true, "soul_campfire": true}
 
 // NewTable reads the shaped and shapeless recipes of a packet. The rest of the packet
 // is what other screens or special rules use, so it is not in the table.
@@ -211,12 +217,68 @@ func NewTable(pk *packet.CraftingData) *Table {
 		}
 	}
 	for _, r := range pk.ShapelessRecipes {
-		t.recipes[r.RecipeNetworkID] = &Recipe{
+		rec := &Recipe{
 			ID: r.RecipeID, NetworkID: r.RecipeNetworkID, Block: r.Block,
 			Input: ingredients(r.Input), Output: r.Output,
 		}
+		t.recipes[r.RecipeNetworkID] = rec
+		if smeltBlocks[r.Block] && len(rec.Input) == 1 && !rec.Input[0].Empty() && len(rec.Output) != 0 {
+			t.addSmelt(rec)
+		}
 	}
 	return t
+}
+
+// addSmelt files a one-item recipe under its block and input.
+func (t *Table) addSmelt(r *Recipe) {
+	lists, key := &t.smelt, r.Input[0].Name
+	if r.Input[0].Tag != "" {
+		lists, key = &t.smeltTags, r.Input[0].Tag
+	}
+	if *lists == nil {
+		*lists = map[string]map[string][]*Recipe{}
+	}
+	byInput := (*lists)[r.Block]
+	if byInput == nil {
+		byInput = map[string][]*Recipe{}
+		(*lists)[r.Block] = byInput
+	}
+	byInput[key] = append(byInput[key], r)
+}
+
+// Smelt returns the recipe block makes from one item, or nil: one naming the item's own
+// aux value first, then one taking any variant, then one taking a tag the item has, the
+// lowest network ID among equals. It allocates nothing, so a furnace may ask every tick.
+func (t *Table) Smelt(block string, it Item) *Recipe {
+	if it.Empty() {
+		return nil
+	}
+	var exact, variant *Recipe
+	byInput := t.smelt[block]
+	for _, r := range byInput[it.Name] {
+		switch in := r.Input[0]; {
+		case in.Meta == int32(it.Meta) && (exact == nil || r.NetworkID < exact.NetworkID):
+			exact = r
+		case in.Meta == anyMeta && (variant == nil || r.NetworkID < variant.NetworkID):
+			variant = r
+		}
+	}
+	if exact != nil {
+		return exact
+	}
+	if variant != nil {
+		return variant
+	}
+	var tagged *Recipe
+	byTag := t.smeltTags[block]
+	for _, tag := range it.Tags {
+		for _, r := range byTag[tag] {
+			if tagged == nil || r.NetworkID < tagged.NetworkID {
+				tagged = r
+			}
+		}
+	}
+	return tagged
 }
 
 // Recipe returns the recipe with a network ID.

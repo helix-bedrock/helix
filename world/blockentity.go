@@ -37,6 +37,13 @@ type BlockEntityRemover interface {
 	BlockEntityRemoved(r *Region, pos cube.Pos)
 }
 
+// BlockEntityKeeper is a block entity that stays when its block changes to another type,
+// if it says so: a furnace lighting or going out swaps between two blocks and keeps its
+// slots, as BDS's furnace does. A kept block entity is neither told nor replaced.
+type BlockEntityKeeper interface {
+	KeepBlockEntity(block uint32) bool
+}
+
 // BlockEntityBinder is a block entity given its chunk's handle whenever it is put in a
 // chunk, so it can mark itself for saving from code that has no region at hand.
 type BlockEntityBinder interface {
@@ -158,6 +165,11 @@ func (c *Chunk) removeBlockEntity(pos cube.Pos) (BlockEntity, bool) {
 func (r *Region) blockTypeChanged(c *Chunk, pos cube.Pos, old, block uint32) {
 	blocks := r.d.conf.Blocks
 	if blocks.Name(old) == blocks.Name(block) {
+		return
+	}
+	if k, ok := c.blockEntities[pos].(BlockEntityKeeper); ok && k.KeepBlockEntity(block) {
+		c.dirty = true
+		c.netChanged()
 		return
 	}
 	if be, ok := c.removeBlockEntity(pos); ok {
