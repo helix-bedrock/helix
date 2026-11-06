@@ -141,8 +141,8 @@ const ticksPerSecond = 20
 // showItemTimer shows how long an item has left, as minutes and seconds, then
 // the name of the player looking, so the tag proves each player gets their own.
 // A player who turned the timer off gets no tag, on every item, within a second.
-// Only with -testcmds. Items with a view never merge, so stacks do not join
-// even for a player with the timer off.
+// Only with -testcmds. Items with a view still merge; the one that stays keeps
+// its tag.
 func showItemTimer(i *player.ItemActor, settings func(*player.Player) *itemTestDrops) {
 	i.SetView(func(p *player.Player, v *player.ItemView) {
 		if settings(p).timerOff.Load() {

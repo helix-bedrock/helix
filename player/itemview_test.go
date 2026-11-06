@@ -152,8 +152,13 @@ func TestItemsSetApartDoNotMerge(t *testing.T) {
 	stack := ItemStack{Name: "minecraft:emerald", Count: 3}
 	a := p.s.newItem(stack, mgl32.Vec3{}, 0, 0)
 	b := p.s.newItem(stack, mgl32.Vec3{}, 0, 0)
-	b.SetView(func(*Player, *ItemView) {})
+	b.SetVisibility(func(*Player) bool { return true })
 	if a.merge(b) || b.merge(a) {
-		t.Fatal("an item with a view merged")
+		t.Fatal("an item with a visibility rule merged")
+	}
+	c := p.s.newItem(stack, mgl32.Vec3{}, 0, 0)
+	c.SetView(func(*Player, *ItemView) {})
+	if a.setApart(c) || c.setApart(a) {
+		t.Fatal("an item with only a view was kept apart")
 	}
 }

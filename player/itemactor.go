@@ -360,9 +360,9 @@ func boxesApart(a, b mgl32.Vec3, d float32) bool {
 
 // merge joins two items as BDS does: the larger stack stays, the other on a
 // tie, if the stacks match and fit one slot. Items a plugin set apart never
-// merge, so a private item does not join a public one.
+// merge (see setApart).
 func (i *ItemActor) merge(o *ItemActor) bool {
-	if i.custom() || o.custom() || i.pickupDelay == itemNeverPickedUp || o.pickupDelay == itemNeverPickedUp || !o.stack.stacksWith(i.stack) {
+	if i.setApart(o) || i.pickupDelay == itemNeverPickedUp || o.pickupDelay == itemNeverPickedUp || !o.stack.stacksWith(i.stack) {
 		return false
 	}
 	keep, gone := o, i
@@ -377,6 +377,15 @@ func (i *ItemActor) merge(o *ItemActor) bool {
 	keep.age = min(keep.age, gone.age)
 	gone.taken = true
 	gone.entity.Remove()
+	if keep.view == nil && gone.view != nil {
+		keep.SetView(gone.view)
+		return true
+	}
+	if keep.view != nil {
+		// The view may show another stack, so it is asked again.
+		keep.entity.Respawn()
+		return true
+	}
 	keep.sendStackSize()
 	return true
 }

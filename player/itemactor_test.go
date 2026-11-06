@@ -107,3 +107,47 @@ func TestLiquidFlow(t *testing.T) {
 		t.Fatalf("velocity %v, want towards +x", i.vel)
 	}
 }
+
+// TestItemsMergeInRegion runs a real region: two coal items lying together,
+// one with a view, merge into one stack of 63 at their 25th tick.
+func TestItemsMergeInRegion(t *testing.T) {
+	p := testPlayer(t)
+	reg := p.s.reg
+	db, err := mcdb.Config{Blocks: reg.Blocks}.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	r, _ := mcdb.Overworld.Range()
+	flat, err := world.ParseFlat("", reg.Blocks, reg.Biomes, r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conf := world.DefaultConfig()
+	conf.Store, conf.Blocks, conf.Biomes, conf.Generator = db, reg.Blocks, reg.Biomes, flat
+	d, err := world.New(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = d.Close() }()
+	p.s.game = &gameplay{}
+	v := d.AddViewer(func(packet.Packet) {}, func() {})
+	defer v.Close()
+	v.Move(world.ChunkPos(8, 8), 2)
+
+	at := mgl32.Vec3{8.5, -59.875, 8.5}
+	a := p.s.spawnItem(d, ItemStack{Name: "minecraft:coal", Count: 30}, at, mgl32.Vec3{}, world.Rotation{}, chestPickupDelay, 0)
+	b := p.s.spawnItem(d, ItemStack{Name: "minecraft:coal", Count: 33}, at.Add(mgl32.Vec3{0.6, 0, 0.6}), mgl32.Vec3{}, world.Rotation{}, chestPickupDelay, 0)
+	var done atomic.Bool
+	d.RunAt(world.ChunkPos(8, 8), func(*world.Region) { a.SetView(func(*Player, *ItemView) {}) })
+	deadline := time.Now().Add(10 * time.Second)
+	for !done.Load() {
+		if time.Now().After(deadline) {
+			t.Fatalf("never merged: %d taken %v, %d taken %v", a.stack.Count, a.taken, b.stack.Count, b.taken)
+		}
+		d.RunAt(world.ChunkPos(8, 8), func(*world.Region) {
+			done.Store(a.taken && !b.taken && b.stack.Count == 63 && b.view != nil)
+		})
+		time.Sleep(50 * time.Millisecond)
+	}
+}

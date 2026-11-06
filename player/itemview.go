@@ -98,8 +98,13 @@ func (i *ItemActor) CanSee(p *Player) bool {
 	return i.rule(p)
 }
 
-// custom reports whether plugins set this item apart, so it does not merge.
-func (i *ItemActor) custom() bool { return i.rule != nil || i.view != nil || i.lifetime != 0 }
+// setApart reports whether a plugin keeps this item from merging with o: a
+// visibility rule on either, so a private item never joins a public one, or a
+// different lifetime. A view only changes what players are shown, so it does not
+// keep items apart; the item that stays keeps its view.
+func (i *ItemActor) setApart(o *ItemActor) bool {
+	return i.rule != nil || o.rule != nil || i.lifetime != o.lifetime
+}
 
 // visibleFunc is the rule for the world, nil when everyone sees the item.
 func (i *ItemActor) visibleFunc() func(*world.Entity) bool {

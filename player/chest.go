@@ -563,13 +563,18 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	c.items = [chestSize]ItemStack{}
 }
 
-// throwStack throws a slot's items out in piles, as BDS's container drop does.
+// throwStack throws a slot's items out in piles, as BDS's container drop does
+// (0xB53D210): one place per slot, drawn before the first pile, so the piles
+// start together and merge on the ground; each pile gets its own velocity.
 func (c *Chest) throwStack(r *world.Region, s ItemStack) {
+	if s.Empty() {
+		return
+	}
+	at := blockVec(c.pos).Add(mgl32.Vec3{chestThrowOffset(), chestThrowOffset(), chestThrowOffset()})
 	for !s.Empty() {
 		pile := s
 		pile.Count = min(uint8(rand.IntN(chestPileExtra))+chestPileMin, s.Count) //nolint:gosec // an item's scatter, not a secret
 		s.Count -= pile.Count
-		at := blockVec(c.pos).Add(mgl32.Vec3{chestThrowOffset(), chestThrowOffset(), chestThrowOffset()})
 		vel := mgl32.Vec3{chestThrowDrift(), chestThrowDrift() + chestThrowUp, chestThrowDrift()}
 		c.s.spawnItem(r.Dimension(), pile, at, vel, world.Rotation{}, chestPickupDelay, 0)
 	}

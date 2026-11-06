@@ -170,8 +170,8 @@ sibling library folders, so unreleased library changes are used.
   `SetVisibility` (per player; refused players get no packets and cannot pick it
   up), `SetView` (per player name and shown item, server unchanged), `SetStack`
   (the real item), `SetLifetime` and the server-wide `Host.SetItemLifetime`,
-  events `OnItemDrop`, `OnItemLoad`. Rules are not saved and
-  items with one never merge. Packets about an entity go through `Entity.Send`,
+  events `OnItemDrop`, `OnItemLoad`. Rules are not saved; items with a
+  visibility rule or a different lifetime never merge, a view does not stop a merge. Packets about an entity go through `Entity.Send`,
   which reaches only those who see it, never `Region.Broadcast`; the world's
   `EntityConfig.VisibleTo` and `SpawnFor` work for any entity.
   Armour and offhand take the items BDS allows (registry `Wearable`,
