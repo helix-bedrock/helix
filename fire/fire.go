@@ -114,8 +114,12 @@ type Ticker struct {
 	prime   PrimeFunc
 	rules   atomic.Pointer[Rules]
 	info    []info
-	// fire holds the fire state of each age, soulFire the soul fire block.
-	fire     [maxAge + 1]uint32
+	// fire holds the default fire state (no connections) of each age, soulFire the soul fire
+	// block.
+	fire [maxAge + 1]uint32
+	// ages holds, for each fire state, its age and the same state at every age: fire has
+	// connection states besides its age.
+	ages     map[uint32]*fireAges
 	soulFire uint32
 	hasFire  bool
 }
@@ -143,13 +147,9 @@ func NewTicker(reg *registry.Registry, support *attach.Table, rules Rules, prime
 	b := reg.Blocks
 	t := &Ticker{BlockTicker: next, blocks: b, biomes: reg.Biomes, support: support, prime: prime, info: make([]info, b.Count())}
 	t.rules.Store(&rules)
-	for age := range int32(maxAge + 1) {
-		id, ok := b.StateID(FireName, map[string]any{ageState: age})
-		if !ok || int(id) >= len(t.info) {
-			continue
-		}
-		t.fire[age], t.hasFire = id, true
-		t.info[id] |= isFire
+	t.ages = map[uint32]*fireAges{}
+	if def, ok := b.Block(FireName); ok {
+		t.fire, t.hasFire = t.agesOf(def).states, true
 	}
 	named := map[string]info{
 		netherrack: infiniburn, magma: infiniburn, soulSand: soulBase, soulSoil: soulBase,
@@ -159,6 +159,9 @@ func NewTicker(reg *registry.Registry, support *attach.Table, rules Rules, prime
 		name := b.Name(id)
 		t.info[id] |= named[name]
 		switch name {
+		case FireName:
+			t.info[id] |= isFire
+			t.ages[id] = t.agesOf(id)
 		case SoulFireName:
 			t.info[id] |= isSoulFire
 		case bedrock:
@@ -184,14 +187,50 @@ func (t *Ticker) is(block uint32, i info) bool {
 	return int(block) < len(t.info) && t.info[block]&i != 0
 }
 
+// fireAges is one fire state's age and the same state at every age.
+type fireAges struct {
+	age    int
+	states [maxAge + 1]uint32
+}
+
+// agesOf finds the fire state block at every age, keeping its other states. An age the
+// registry does not know keeps block.
+func (t *Ticker) agesOf(block uint32) *fireAges {
+	states := t.blocks.States(block)
+	a := &fireAges{}
+	if v, ok := states[ageState].(int32); ok {
+		a.age = int(v)
+	}
+	with := make(map[string]any, len(states))
+	for k, v := range states {
+		with[k] = v
+	}
+	name := t.blocks.Name(block)
+	for age := range int32(maxAge + 1) {
+		with[ageState] = age
+		id, ok := t.blocks.StateID(name, with)
+		if !ok {
+			id = block
+		}
+		a.states[age] = id
+	}
+	return a
+}
+
 // age is the age of a fire state.
 func (t *Ticker) age(block uint32) int {
-	for a, id := range t.fire {
-		if id == block {
-			return a
-		}
+	if a, ok := t.ages[block]; ok {
+		return a.age
 	}
 	return 0
+}
+
+// aged is the fire state block at age, keeping its connections.
+func (t *Ticker) aged(block uint32, age int) uint32 {
+	if a, ok := t.ages[block]; ok {
+		return a.states[age]
+	}
+	return t.fire[age]
 }
 
 // RandomTicks takes lava's random ticks and the next ticker's.

@@ -45,7 +45,7 @@ func (t *Ticker) tick(r *world.Region, pos cube.Pos, block uint32) {
 	age := t.age(block)
 	if !forever && age < maxAge {
 		if older := min(age+rng.IntN(3)/2, maxAge); older != age {
-			block = t.fire[older]
+			block = t.aged(block, older)
 			age = older
 			l := t.local(r)
 			l.aging = true
