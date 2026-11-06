@@ -19,6 +19,7 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/commands"
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
@@ -178,6 +179,8 @@ type Server struct {
 	serverID int64
 	reg      *registry.Registry
 	circuits *circuit.Ticker
+	// fire is the vanilla fire ticker, nil when the config gave a BlockTicker.
+	fire *fire.Ticker
 	// clock is the world's time, set when the world opens.
 	clock    *daytime.Clock
 	redstone *circuit.Settings

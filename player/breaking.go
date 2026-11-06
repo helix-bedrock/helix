@@ -240,6 +240,10 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 // it. True if the block broke at once (creative, or a block with no break
 // time).
 func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
+	if p.inReach(pos) && p.putOutFire(r, pos, face) {
+		p.stopBreak()
+		return false
+	}
 	if !p.creative() {
 		p.startCrack(r, pos)
 	}
@@ -253,8 +257,7 @@ func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
 	p.brk.active, p.brk.pos, p.brk.face = true, pos, face
 	// BDS's GameMode start destroys the block now in creative and when it
 	// has no break time (a player-input check for touch controls that skips
-	// this is not ported, nor putting out fire on the clicked face). The
-	// next block waits the cooldown.
+	// this is not ported). The next block waits the cooldown.
 	b, ok := p.breakInfo(r, pos)
 	if !ok || b.Block == p.s.reg.Blocks.Air() {
 		return false

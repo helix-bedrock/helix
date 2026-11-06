@@ -183,8 +183,7 @@ func TickDelay(k Kind, ultraWarm bool) int32 {
 	return 0
 }
 
-// RandomTicks is false: lava's random tick sets fire, which is not
-// ported.
+// RandomTicks is false: lava's random tick, which sets fire, is the fire package's.
 func (*Liquids) RandomTicks(uint32, uint8) bool { return false }
 
 // RandomTick does nothing.

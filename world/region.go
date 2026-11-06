@@ -137,6 +137,18 @@ func (r *Region) Block(pos cube.Pos, layer uint8) (uint32, bool) {
 	return c.col.Chunk.Block(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer), true //nolint:gosec // masked and range-checked
 }
 
+// Biome returns the ID of the biome at pos, and false if its chunk is not loaded in this region.
+// Above and below the dimension's range it is the biome at the nearest height inside it. Runs:
+// owner.
+func (r *Region) Biome(pos cube.Pos) (int16, bool) {
+	pos[1] = min(max(pos[1], r.d.r[0]), r.d.r[1])
+	c, ok := r.chunkAt(pos)
+	if !ok {
+		return 0, false
+	}
+	return int16(c.col.Chunk.Biome(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15))), true //nolint:gosec // masked, clamped, and biome IDs fit int16
+}
+
 // SetBlock sets the block at pos on layer, as BDS's chunk does: setting
 // air on layer 0 over a block holding something in its second layer (water
 // in a waterlogged block) moves that down to layer 0 instead. A block that can

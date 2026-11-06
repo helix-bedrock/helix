@@ -143,6 +143,9 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 // useHeldOn is the held item's part of useItemOn, for a block item: the target,
 // the check, the state, then the placing. False if nothing was placed.
 func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
+	if held.Name == nameFlintSteel {
+		return p.lightFire(r, clicked, face, held)
+	}
 	if _, ok := bucketLiquids[held.Name]; ok {
 		return p.pourBucket(clicked, face, held)
 	}

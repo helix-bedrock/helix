@@ -32,6 +32,9 @@ type Biome struct {
 	MapWaterColour int32
 	// Rain is false for dry biomes.
 	Rain bool
+	// Humid halves how readily fire spreads in the biome. Vanilla biomes take it from their
+	// minecraft:humidity component and, without one, from Downfall above 0.85, as BDS does.
+	Humid bool
 	// Tags group biomes, such as "overworld" or "monster".
 	Tags []string
 

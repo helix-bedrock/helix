@@ -1,9 +1,12 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/helix-bedrock/helix-data/data"
+	files "github.com/helix-bedrock/helix-data/data/1.26.60"
 	"github.com/helix-bedrock/protocol/nbt"
 )
 
@@ -49,6 +52,7 @@ func vanillaBiomes(s *Setup) error {
 			Name: name, ID: id, Temperature: d.Temperature, Downfall: d.Downfall, FoliageSnow: d.FoliageSnow,
 			Depth: d.Depth, Scale: d.Scale, MapWaterColour: d.MapWaterColour, Rain: d.Rain, gen: d.ChunkGeneration,
 		}
+		b.Humid = vanillaHumid(name, d.Downfall)
 		if tags, ok := d.Tags.Value(); ok {
 			b.hasTags = true
 			for _, t := range tags {
@@ -253,7 +257,7 @@ func vanillaBlocks(s *Setup) error {
 		i := len(t.States)
 		t.States = append(t.States, BlockState{States: st.Properties, Version: st.Version, Properties: Properties{
 			LightEmission: p.LightEmission.At(i), LightDampening: p.LightDampening.At(i),
-			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i),
+			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i), LavaFlammable: p.LavaFlammable.At(i) == 1,
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name],
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
@@ -377,4 +381,35 @@ func vanillaLiquids() (liquidFacts, error) {
 		f.lavaBlocking[b] = true
 	}
 	return f, nil
+}
+
+// biomeFile is the part of a vanilla biome file vanillaHumid reads.
+type biomeFile struct {
+	Biome struct {
+		Components struct {
+			Humidity *biomeHumidity `json:"minecraft:humidity"`
+		} `json:"components"`
+	} `json:"minecraft:biome"`
+}
+
+// biomeHumidity is a biome file's minecraft:humidity component.
+type biomeHumidity struct {
+	IsHumid bool `json:"is_humid"`
+}
+
+// humidDownfall is the downfall above which a biome without a minecraft:humidity component is
+// humid, BDS's rule.
+const humidDownfall = 0.85
+
+// vanillaHumid is whether a vanilla biome is humid: its file's minecraft:humidity component,
+// else downfall above humidDownfall.
+func vanillaHumid(name string, downfall float32) bool {
+	raw, err := files.Files().ReadFile("vanilla/biomes/" + strings.TrimPrefix(name, "minecraft:") + ".biome.json")
+	if err == nil {
+		var doc biomeFile
+		if json.Unmarshal(raw, &doc) == nil && doc.Biome.Components.Humidity != nil {
+			return doc.Biome.Components.Humidity.IsHumid
+		}
+	}
+	return downfall > humidDownfall
 }

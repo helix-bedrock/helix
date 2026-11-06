@@ -12,6 +12,7 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
@@ -78,7 +79,7 @@ func (s *Server) openWorld() error {
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
 	s.clock = daytime.NewClock(s.ticker.CurrentTick, int32(min(ldat.Time, math.MaxInt32)), ldat.DoDayLightCycle) //nolint:gosec // capped
-	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers, ldat.RandomTickSpeed); err != nil {
+	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers, ldat.RandomTickSpeed, ldat.DoFireTick); err != nil {
 		s.ticker.Close()
 		_ = db.Close()
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
@@ -94,7 +95,7 @@ func (s *Server) openWorld() error {
 // Vanilla terrain generation is not hooked up yet: until it is, chunks an
 // infinite world has not saved are empty and never saved, so the world
 // still gets real terrain once the generator is there.
-func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpeed int32) error {
+func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpeed int32, doFireTick bool) error {
 	conf := world.DefaultConfig()
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
@@ -110,7 +111,9 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		if err != nil {
 			return err
 		}
-		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, liquid.New(s.reg.Blocks)))))
+		rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
+		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, liquid.New(s.reg.Blocks))
+		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, s.fire))))
 		if err != nil {
 			return err
 		}
@@ -184,6 +187,17 @@ func (s *Server) WorldStore() mcdb.WorldStore { return s.worldStore }
 // PlayerStore is the store of the players' saved data. It is set while Run
 // runs.
 func (s *Server) PlayerStore() mcdb.PlayerStore { return s.playerStore }
+
+// primeTNT lights the TNT block fire reached, once players can be served.
+func (s *Server) primeTNT(r *world.Region, pos cube.Pos) {
+	if host := s.players.Load(); host != nil {
+		host.PrimeBlock(r, pos, nil)
+	}
+}
+
+// Fire is the vanilla fire ticker: fire, soul fire and lava lighting fire. Nil when the
+// server was given its own BlockTicker.
+func (s *Server) Fire() *fire.Ticker { return s.fire }
 
 // fallBlock breaks a block that lost what held it, once players can be served.
 func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {

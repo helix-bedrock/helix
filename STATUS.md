@@ -1,6 +1,6 @@
 # What Helix does
 
-Status as of 2026-11-05. Helix was **restarted from scratch with its own architecture.** Everything
+Status as of 2026-11-06. Helix was **restarted from scratch with its own architecture.** Everything
 is written from BDS 1.26.60's code, so it should behave as vanilla does; the marks say how far each
 part has been checked.
 
@@ -72,7 +72,8 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - 🧪 Signs and hanging signs (placing, writing both sides, dyes, glow ink, wax)
 - 🧪 Jukeboxes and music discs
 - 🧪 Items and orbs pushed out of blocks
-- ⬜ Fire spreading and burning, signs, cauldrons, crops growing
+- 🧪 Fire: spreading, burning blocks away, burning out, soul fire, lava setting fire, flint and steel, putting fire out
+- ⬜ Cauldrons, crops growing
 
 ## Containers and crafting
 
@@ -273,6 +274,19 @@ commits.
   Liquids flow into waterloggable blocks' second layer and replace plants, torches and the like
   (no drops yet). Breaking or placing a block wakes the liquids beside it. Buckets pour water
   and lava (water into waterloggable blocks) and become empty buckets outside creative.
+- **Fire (not yet tested in game):** written from BDS 1.26.60's FireBlock, SoulFireBlock, lava's
+  random tick and FlintAndSteelItem (package `fire`, `fire.Ticker`, `Server.Fire`, `SetRules`). Fire
+  ages, ticks every 30 to 39 ticks, burns the six blocks around it by their burn odds (turning them to
+  fire or air, lighting campfires, priming TNT), and lights empty blocks from one below to four above
+  by the flame odds around them, more on harder difficulties and half as much in humid biomes. It
+  burns forever on netherrack, magma and bedrock with `infiniburn_bit`, goes out without a block to
+  stand on or burn, and turns to soul fire on soul sand and soul soil; soul fire stays only there.
+  `dofiretick` off stops all of it. Lava's random tick tries ten blocks around it and sets fire next
+  to the first lava-flammable one (BDS's own flag per block, now in helix-data's `block_properties.json`
+  as `lava_flammable`; it is not the flame odds). Flint and steel sets fire on the clicked face and
+  wears; starting to break a block puts out fire on the clicked face. Not done: rain putting fire out
+  (no weather yet), nether portals, fire charges, entities catching fire and taking fire damage, bees
+  in a burning hive.
 - **Creative inventory:** items can be taken from the creative menu (the client's results
   message after a creative take is accepted).
 

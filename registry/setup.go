@@ -38,6 +38,9 @@ type Properties struct {
 	FlameOdds uint16
 	// BurnOdds is how readily fire destroys the state.
 	BurnOdds uint16
+	// LavaFlammable is set when lava lights fire next to the state, BDS's own flag beside the
+	// odds.
+	LavaFlammable bool
 	// ExplosionResistance is the state's resistance to explosions.
 	ExplosionResistance float32
 	// Friction is the state's friction; higher is more slippery.
