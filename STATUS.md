@@ -229,7 +229,8 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
   infinite world's ungenerated ones), do not burn in lava or fire, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
-  A broken container throws each slot's piles from one place, as BDS does, and items lying within
+  A broken furnace, blast furnace or smoker drops each slot as one item, as BDS does (random piles
+  off); other containers throw each slot's piles from one place, as BDS does, and items lying within
   BDS's merge box (0.5 past their own, every 25 ticks) join up to the item's max stack; a plugin's
   item view no longer stops a merge. Piles that slide further apart than that stay apart, which
   is what BDS's code does as read; whether BDS in game joins them more often is not checked.

@@ -557,23 +557,29 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 			items = nil
 		}
 	}
+	// BDS's furnace break (0xD414AD0) drops its slots with random piles off, so each
+	// slot lands as one item; chests, barrels, hoppers and dispensers throw piles.
+	piles := c.furnace == nil
 	for _, s := range items {
-		c.throwStack(r, s)
+		c.throwStack(r, s, piles)
 	}
 	c.items = [chestSize]ItemStack{}
 }
 
-// throwStack throws a slot's items out in piles, as BDS's container drop does
-// (0xB53D210): one place per slot, drawn before the first pile, so the piles
-// start together and merge on the ground; each pile gets its own velocity.
-func (c *Chest) throwStack(r *world.Region, s ItemStack) {
+// throwStack throws a slot's items out, as BDS's container drop does
+// (0xB53D210): one place per slot, drawn before the first pile, and with piles
+// on, piles of 10 to 30 that start together, each with its own velocity. With
+// piles off the whole slot is one item.
+func (c *Chest) throwStack(r *world.Region, s ItemStack, piles bool) {
 	if s.Empty() {
 		return
 	}
 	at := blockVec(c.pos).Add(mgl32.Vec3{chestThrowOffset(), chestThrowOffset(), chestThrowOffset()})
 	for !s.Empty() {
 		pile := s
-		pile.Count = min(uint8(rand.IntN(chestPileExtra))+chestPileMin, s.Count) //nolint:gosec // an item's scatter, not a secret
+		if piles {
+			pile.Count = min(uint8(rand.IntN(chestPileExtra))+chestPileMin, s.Count) //nolint:gosec // an item's scatter, not a secret
+		}
 		s.Count -= pile.Count
 		vel := mgl32.Vec3{chestThrowDrift(), chestThrowDrift() + chestThrowUp, chestThrowDrift()}
 		c.s.spawnItem(r.Dimension(), pile, at, vel, world.Rotation{}, chestPickupDelay, 0)
