@@ -65,3 +65,43 @@ func TestCraftRepairRules(t *testing.T) {
 		t.Fatalf("spear %+v", got)
 	}
 }
+
+
+// TestCraftRepairTimes checks that a client cannot make more repaired items than the two
+// inputs allow: asking for two crafts, or taking two results from one, is refused and
+// changes nothing.
+func TestCraftRepairTimes(t *testing.T) {
+	cases := []struct {
+		name          string
+		times         byte
+		consume, took byte
+	}{
+		{"two crafts, one used each, two taken", 2, 1, 2},
+		{"two crafts, two used each, two taken", 2, 2, 2},
+		{"two crafts, one used each, one taken", 2, 1, 1},
+		{"one craft, two taken", 1, 1, 2},
+		{"one craft, two used each, one taken", 1, 2, 1},
+	}
+	pick := ItemStack{Name: "minecraft:iron_pickaxe", Count: 1}
+	for _, c := range cases {
+		p := testPlayer(t)
+		craftGame(t, p, nil)
+		p.window.open, p.window.kind = true, ContainerInventory
+		p.inventory.ui[28] = p.s.freshStack(withDamage(pick, 200))
+		p.inventory.ui[31] = p.s.freshStack(withDamage(pick, 150))
+		a, b := consume(p, 28), consume(p, 31)
+		a.Count, b.Count = c.consume, c.consume
+		req := protocol.ItemStackRequest{RequestID: 1, Actions: []protocol.StackRequestAction{
+			&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: specialRecipeID(t, p, repairItemRecipe), NumberOfCrafts: c.times},
+			&protocol.CraftResultsDeprecatedStackRequestAction{TimesCrafted: c.times},
+			a, b,
+			take(c.took, slotInfo(containerCreatedOutput, createdOutputSlot, 0), slotInfo(containerCombined, 1, 0)),
+		}}
+		if r := p.stackRequest(req); r.Status == protocol.ItemStackResponseStatusOK {
+			t.Errorf("%s: accepted", c.name)
+		}
+		if p.inventory.ui[28].Count != 1 || p.inventory.ui[31].Count != 1 || !p.inventory.main[1].Empty() {
+			t.Errorf("%s: slots changed: %+v %+v, got %+v", c.name, p.inventory.ui[28], p.inventory.ui[31], p.inventory.main[1])
+		}
+	}
+}
