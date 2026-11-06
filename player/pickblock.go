@@ -45,6 +45,8 @@ func (s *Host) pickedItem(block uint32) (ItemStack, bool) {
 	item := name
 	if as, ok := pickedAs[name]; ok {
 		item = as
+	} else if isSignBlock(name) {
+		item = signItemOf(name)
 	} else if strings.Contains(name, "double_") && strings.HasSuffix(name, "_slab") {
 		item = strings.Replace(name, "double_", "", 1)
 	} else {

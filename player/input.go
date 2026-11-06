@@ -105,6 +105,9 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleCommandRequest); err != nil {
 		return err
 	}
+	if err := Handle(s, handleBlockActorData); err != nil {
+		return err
+	}
 	if err := Handle(s, handleRespawn); err != nil {
 		return err
 	}

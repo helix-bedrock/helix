@@ -302,6 +302,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if isBannerBlock(e.s.reg.Blocks.Name(block)) {
 		return &bannerEntity{}
 	}
+	if name := e.s.reg.Blocks.Name(block); isSignBlock(name) {
+		return newSignEntity(isHangingSignName(name))
+	}
 	t := e.s.chests
 	if int(block) >= len(t.kind) || t.kind[block] == chestNone {
 		return nil
@@ -324,6 +327,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == bannerEntityID {
 		return e.s.loadBanner(saved), true
+	}
+	if id == signEntityID || id == hangingSignEntityID {
+		return loadSign(saved), true
 	}
 	if id == enchantTableEntityID {
 		return &enchantTableEntity{saved: maps.Clone(saved)}, true

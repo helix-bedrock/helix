@@ -239,8 +239,11 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
 		return ok && t.Supports(b, clicked)
 	}
-	if name == standingBanner || name == wallBanner {
+	if name == standingBanner || name == wallBanner || isSign(name) {
 		return t.bannerHeld(r, pos, block)
+	}
+	if isHangingSign(name) {
+		return t.hangingSignHeld(r, pos, block)
 	}
 	if name == tripwireHook {
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
@@ -381,7 +384,7 @@ func torchFaceOf(state string) cube.Face {
 // bannerHolder is the block a banner needs solid, as BannerBlock's canSurvive: below a
 // standing banner, behind a wall banner (the side away from its facing).
 func (t *Table) bannerHolder(pos cube.Pos, block uint32) (cube.Pos, bool) {
-	if t.blocks.Name(block) == standingBanner {
+	if n := t.blocks.Name(block); n == standingBanner || strings.HasSuffix(n, "standing_sign") {
 		return pos.Side(cube.FaceDown), true
 	}
 	f := stateInt(t.blocks.States(block), "facing_direction")
@@ -407,9 +410,13 @@ func (t *Table) solidMaterial(r *world.Region, pos cube.Pos) bool {
 // at from changed. A holder in a chunk that is not loaded counts as there.
 func (t *Table) survives(r *world.Region, pos, from cube.Pos, block uint32) bool {
 	states := t.blocks.States(block)
-	if n := t.blocks.Name(block); n == standingBanner || n == wallBanner {
+	if n := t.blocks.Name(block); n == standingBanner || n == wallBanner || isSign(n) {
 		holder, ok := t.bannerHolder(pos, block)
 		return from != holder || !loaded(r, holder) || (ok && t.solidMaterial(r, holder))
+	}
+	if isHangingSign(t.blocks.Name(block)) {
+		above := pos.Side(cube.FaceUp)
+		return from != above || !loaded(r, above) || t.hangingSignHeld(r, pos, block)
 	}
 	switch t.kinds[t.blocks.Name(block)] {
 	case kindTorch:
@@ -463,4 +470,23 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		return
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
+}
+
+// isSign reports whether name is a standing or wall sign, which SignBlock's canSurvive holds
+// up the way a banner is: by solid material below or behind.
+func isSign(name string) bool {
+	return strings.HasSuffix(name, "standing_sign") || strings.HasSuffix(name, "wall_sign")
+}
+
+// isHangingSign reports whether name is a hanging sign.
+func isHangingSign(name string) bool { return strings.HasSuffix(name, "_hanging_sign") }
+
+// hangingSignHeld is HangingSignBlock's canSurvive: one hanging from a side always stays,
+// one under a block needs something above to hang from. BDS asks the block above for its
+// support type; Helix reads that as a lantern's rule (written from BDS 1.26.60, medium).
+func (t *Table) hangingSignHeld(r *world.Region, pos cube.Pos, block uint32) bool {
+	if stateInt(t.blocks.States(block), "hanging") == 0 {
+		return true
+	}
+	return t.canHang(r, pos)
 }

@@ -158,6 +158,12 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == bannerItem {
 		return p.placeBanner(r, clicked, face, held)
 	}
+	if isHangingSignName(held.Name) {
+		return p.placeHangingSign(r, clicked, face, held)
+	}
+	if isSignItem(held.Name) {
+		return p.placeSign(r, clicked, face, held)
+	}
 	if IsCartItem(held.Name) {
 		return p.placeCart(r, clicked, held.Name)
 	}

@@ -83,6 +83,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
 		return p.useAnvil(r, u)
 	}
+	if isSignBlock(blocks.Name(u.Block)) {
+		return p.useSign(r, u)
+	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)
 	}
