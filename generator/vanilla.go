@@ -24,7 +24,7 @@ const cacheChunks = 1024
 // Vanilla is BDS 1.26.60's overworld from the worldgen library: terrain,
 // biomes, caves, ores, plants, trees and structures, the same world BDS makes
 // from the seed. Structures bring their block entities (chests keep their loot
-// table and seed). It is safe for use by many goroutines at once.
+// table and seed), and springs their pending tick, so they flow. It is safe for use by many goroutines at once.
 type Vanilla struct {
 	gen   *overworld.Overworld
 	cache *overworld.TerrainCache
@@ -153,7 +153,14 @@ func (v *Vanilla) fill(pos mcdb.ChunkPos, c *chunk.Chunk, col *chunk.Column) {
 			Pos: cube.Pos{int(be.X), int(be.Y), int(be.Z)}, Data: be.Data,
 		})
 	}
-	wc.BlockEntities = wc.BlockEntities[:0]
+	// Ticks generation left pending (springs) go on the chunk's queue, counted on
+	// its clock as BDS saves them; the world's liquids run them like any other.
+	for _, t := range wc.Ticks {
+		col.ScheduledBlocks = append(col.ScheduledBlocks, chunk.ScheduledBlockUpdate{
+			Pos: cube.Pos{int(t.X), int(t.Y), int(t.Z)}, Block: t.Block, Tick: col.Tick + int64(t.Delay),
+		})
+	}
+	wc.BlockEntities, wc.Ticks = wc.BlockEntities[:0], wc.Ticks[:0]
 }
 
 // SpawnHeight is the Y above the highest block of the column at x, z that

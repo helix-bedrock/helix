@@ -156,7 +156,9 @@ commits.
   `Config.Generators` (`generator.Type`). Empty means what level.dat says; a new world is vanilla.
   The options are a worldgen JSON file for vanilla (biomes, features, structures, terrain) and the
   flat layers for flat. Structure block entities (chests, beds, bells, spawners) come with their
-  chunks; chests keep their loot table and seed but are not filled when opened yet. Unchanged
+  chunks; chests keep their loot table and seed but are not filled when opened yet. Springs come with the
+  block tick BDS's spring feature leaves pending (one tick after generation, on the chunk's queue), so
+  they pour out of cave walls in Helix's own liquid ticks. Unchanged
   generated chunks are not saved, as BDS. Players start on the ground of the spawn column
   (`world.Spawner`): BDS's spawn search is not ported. worldgen makes the Nether and the End too;
   Helix does not open those dimensions or move players between them yet, so only the overworld's
