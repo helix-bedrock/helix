@@ -737,20 +737,31 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetAllowUp(true)
 		}
 	case kindDoor:
+		// The open state seeds a new consumer only: a player opening the door changes
+		// its state too, and taking that as power would make the circuit shut it again.
+		created := c.sys.Component(p, redstone.KindConsumer) == nil
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
-			comp.SetStrength(onOff(bitState(states, stateOpen)))
+			if created {
+				comp.SetStrength(onOff(bitState(states, stateOpen)))
+			}
 			comp.SetHalfPulse(true)
 		}
 	case kindTrapdoor:
+		created := c.sys.Component(p, redstone.KindConsumer) == nil
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
-			comp.SetStrength(onOff(bitState(states, stateOpen)))
+			if created {
+				comp.SetStrength(onOff(bitState(states, stateOpen)))
+			}
 			comp.SetAllowUp(true)
 			comp.SetHalfPulse(true)
 			comp.SetIgnoreFirst(true)
 		}
 	case kindGate:
+		created := c.sys.Component(p, redstone.KindConsumer) == nil
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
-			comp.SetStrength(onOff(bitState(states, stateOpen)))
+			if created {
+				comp.SetStrength(onOff(bitState(states, stateOpen)))
+			}
 			comp.SetAllowUp(true)
 		}
 	case kindHopper:

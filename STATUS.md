@@ -291,7 +291,7 @@ commits.
   like, other than chests) do not open.
 - **Block use (first pass, not yet tested in game):** clicking a block follows BDS's order: the
   `OnBlockUse` event, the block's use, then the held item, and a held click stays with whichever the
-  first click did. Doors, trapdoors, fence gates, levers and buttons work (new `blockuse` package).
+  first click did. Doors, trapdoors, fence gates, levers and buttons work (new `blockuse` package). A door, trapdoor or gate opened by hand no longer shuts itself straight away: redstone took its new open state as power and then shut it when it found none (fixed 2026-11-05, not yet re-tested in game).
   Doors place both halves with BDS's hinge rule and fall apart without their other half or support.
   Buttons pop out after 20 or 30 ticks. No redstone output yet. Other blocks with a use (furnaces,
   beds...) do not react yet, so a block in hand is placed against them.
