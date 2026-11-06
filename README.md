@@ -41,7 +41,9 @@ tick on many cores at once, so large servers stay smooth.
 go run ./cmd/helix
 ```
 
-The server opens the world in `worlds/Bedrock level` (BDS's layout).
+The server opens the world in `worlds/Bedrock level` (BDS's layout). Add `-testcmds` for stand-in
+commands while real ones are built: `/gamemode`, `/damageitem` (wear the held item, to try repairs),
+`/enchanttest`, `/tune` and more.
 
 ## Features
 
@@ -51,6 +53,8 @@ The server opens the world in `worlds/Bedrock level` (BDS's layout).
   by plugins, also while running.
 - **Data-driven:** blocks, items, biomes, entities, creative items and recipes are loaded from
   Mojang's data in [helix-data](https://github.com/helix-bedrock/helix-data), not hard-coded.
+- **The server decides:** items, inventories and craft results are held and worked out by the server.
+  What a client sends is checked against that and never kept.
 - **Multi-core:** regions tick in parallel and merge and split as players move.
 - **BDS worlds:** opens and saves worlds in BDS's own format, so they move between Helix and BDS.
 
@@ -67,11 +71,14 @@ What works today and what is left is in [STATUS.md](STATUS.md).
 | Regions (parallel ticking, merge and split) | ✅ done |
 | Block ticks (random and scheduled) | 🟡 ticks run; water and lava flow, other blocks have no behaviour yet |
 | Players (spawn, movement, seeing each other, abilities, attributes) | 🟡 in progress |
-| Inventory, chests, crafting, smithing, enchanting | 🟡 written from BDS's code; items are held by the server |
+| Inventory, chests, shulker boxes, furnaces, crafting, smithing | 🟡 written from BDS's code; items are held by the server |
+| Enchanting tables, anvils, grindstones, repairing in the crafting grid | 🟡 written from BDS's code; enchanting reported working in game |
+| Banners, looms, shields with banners | 🟡 written from BDS's code, not tested in game |
 | Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | ⬜ not hooked up |
 | Redstone ([redstone](https://github.com/helix-bedrock/redstone)), pistons, hoppers, TNT | 🟡 written from BDS's code, not fully tested |
 | Rails and minecarts (plain, chest, hopper, TNT) | 🟡 written from BDS's code, not tested in game |
-| Player combat, health, hunger, death | 🟡 written from BDS's code, not fully tested |
+| Player combat, health, hunger, death, shields, totems | 🟡 written from BDS's code, not fully tested |
+| Projectiles (snowballs, eggs, ender pearls, bows), riding, world time | 🟡 written from BDS's code, not tested in game |
 | Mobs ([entity](https://github.com/helix-bedrock/entity)), commands, UI | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
