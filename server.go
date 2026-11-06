@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/circuit"
+	"github.com/helix-bedrock/helix/commands"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
@@ -420,6 +421,9 @@ func (s *Server) buildRegistry() error {
 	ps, err := player.NewSetup(s.log.With("part", "setup"))
 	if err != nil {
 		return err
+	}
+	if err := commands.Register(ps); err != nil {
+		return fmt.Errorf("helix: commands: %w", err)
 	}
 	setup := &Setup{Setup: reg, Player: ps}
 	if s.conf.Setup != nil {

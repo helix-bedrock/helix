@@ -62,6 +62,7 @@ func (p *Player) handleInput(*world.Entity) {
 		}
 		run[i] = nil
 	}
+	p.runQueued()
 	p.tickUsing()
 	if !p.dead() {
 		p.s.game.sys.FoodTick(p)

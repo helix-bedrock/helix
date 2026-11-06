@@ -122,6 +122,8 @@ type Player struct {
 	rng *rand.Rand
 	// seen is State, for other regions.
 	seen seenState
+	// runs are what Run queued for the player's tick.
+	runs runQueue
 }
 
 // eyeHeight is how far above its feet a player's position is: the client

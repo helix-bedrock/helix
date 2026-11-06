@@ -2,10 +2,13 @@ package player
 
 import (
 	"math"
+	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // PlayerState is what anything may read about a player from any region: where it is and
@@ -77,4 +80,125 @@ func (p *Player) publishState() {
 		Position: p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: p.entity.Rotation(),
 		GameMode: p.gameMode, Level: p.Level(), Region: p.entity.Region(),
 	})
+}
+
+// maxQueuedRuns is how many Run calls may wait for one player's tick; more are refused,
+// so a loop cannot grow the queue without end.
+const maxQueuedRuns = 4096
+
+// runQueue holds what other regions asked a player's owner to run.
+type runQueue struct {
+	mu  sync.Mutex
+	in  []func(*Player)
+	run []func(*Player)
+}
+
+// Run runs fn with the player on the player's own region, at its next tick, where fn may
+// read and change everything about it: inventory, health, effects, game mode, position.
+// It is how code on one region reaches a player on another; fn should hand any answer
+// back the same way (Run on another player) rather than wait. It reports false if the
+// queue is full. Nothing runs for a player that left before its next tick. Runs:
+// anywhere.
+func (p *Player) Run(fn func(p *Player)) bool {
+	if fn == nil {
+		return false
+	}
+	q := &p.runs
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if len(q.in) >= maxQueuedRuns {
+		return false
+	}
+	q.in = append(q.in, fn)
+	return true
+}
+
+// runQueued runs what Run queued. Runs: the player's region tick.
+func (p *Player) runQueued() {
+	q := &p.runs
+	q.mu.Lock()
+	q.run, q.in = q.in, q.run[:0]
+	q.mu.Unlock()
+	for i, fn := range q.run {
+		p.s.game.safeRun(p, fn)
+		q.run[i] = nil
+	}
+}
+
+// safeRun runs a queued call, keeping the server up if it panics.
+func (g *gameplay) safeRun(p *Player, fn func(*Player)) {
+	defer func() {
+		if r := recover(); r != nil {
+			p.s.log.Error("Player.Run panicked", "player", p.name, "panic", r)
+		}
+	}()
+	fn(p)
+}
+
+// FindName is the online player with a name, any case. Runs: anywhere.
+func (h *Host) FindName(name string) (*Player, bool) {
+	for _, p := range h.Online() {
+		if strings.EqualFold(p.name, name) {
+			return p, true
+		}
+	}
+	return nil, false
+}
+
+// FindXUID is the online player with an Xbox user ID. Runs: anywhere.
+func (h *Host) FindXUID(xuid string) (*Player, bool) {
+	for _, p := range h.Online() {
+		if p.xuid == xuid {
+			return p, true
+		}
+	}
+	return nil, false
+}
+
+// NewItem is a stack of an item by name ("apple" or "minecraft:apple"), with a block
+// item's block filled in. It reports false for a name no item has. Runs: anywhere.
+func (s *Host) NewItem(name string, count int, meta int16) (ItemStack, bool) {
+	if !strings.Contains(name, ":") {
+		name = "minecraft:" + name
+	}
+	if _, ok := s.reg.Items.ByName(name); !ok {
+		return ItemStack{}, false
+	}
+	it := ItemStack{Name: name, Count: uint8(min(max(count, 0), 255)), Meta: meta} //nolint:gosec // clamped
+	blocks := s.reg.Blocks
+	if id, ok := blocks.Block(name); ok {
+		it.Block = map[string]any{"name": blocks.Name(id), "states": blocks.States(id), "version": blocks.Version(id)}
+	}
+	return it, true
+}
+
+// MaxStack is how many of an item fit in one slot, 0 for an unknown item. Runs: anywhere.
+func (s *Host) MaxStack(name string) int { return int(ItemStack{Name: name}.maxStack(s.reg)) }
+
+// Drop throws a stack out of the player as dropping it would, or gives it back if it
+// cannot be dropped, so nothing is lost. Runs: the player's region.
+func (p *Player) Drop(s ItemStack) { p.dropOrGiveBack(s, false) }
+
+// Message shows the player a line of chat text. Runs: the player's region.
+func (p *Player) Message(text string) {
+	p.send(&packet.Text{TextType: packet.TextTypeRaw, Message: text})
+	p.flush()
+}
+
+// MessageTranslated shows the player a line in the game's words, a translation key such
+// as "commands.give.successRecipient" with its parameters. Runs: the player's region.
+func (p *Player) MessageTranslated(key string, params ...string) {
+	p.send(&packet.Text{TextType: packet.TextTypeTranslation, NeedsTranslation: true, Message: key, Parameters: params})
+	p.flush()
+}
+
+// SetPermission sets the player's permission level (PermissionVisitor, Member, Operator
+// or Custom) and the command level that comes with it, as BDS does, and sends the player
+// its new abilities and the commands it may now run. Runs: the player's region.
+func (p *Player) SetPermission(level uint8) {
+	p.abilities.SetPermission(level)
+	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
+	p.send(abilities, p.commandsPacket())
+	p.flush()
+	p.broadcast(abilities)
 }

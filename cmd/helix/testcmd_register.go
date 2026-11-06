@@ -159,6 +159,14 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return damageTest(p, args)
 		}},
+		{"optest", "Makes you an operator, or a member with off (test stand-in until there is an ops list).", nil, func(p *player.Player, args []string) string {
+			if len(args) == 1 && args[0] == "off" {
+				p.SetPermission(player.PermissionMember)
+				return "You are a member now."
+			}
+			p.SetPermission(player.PermissionOperator)
+			return "You are an operator now."
+		}},
 		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""

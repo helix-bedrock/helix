@@ -116,12 +116,14 @@ Redstone is not yet compared with BDS side by side: timing, big circuits and edg
 - 🧪 BDS's prebuilt lists (game modes, effects, enchantments, entity types, biomes, game rules...)
 - 🧪 Selectors (@a @p @r @s @e @initiator) over every player in every region
 - 🧪 BDS's error messages, permission levels, aliases, middleware
+- 🧪 Reaching any player from any region: `Player.State` to read, `Player.Run` to act, `Host.Find`, `FindName`, `FindXUID`
 
 ## Not started
 
 
 - ⬜ Mobs ([entity](https://github.com/helix-bedrock/entity))
-- ⬜ Vanilla commands (/give, /tp and the rest; only test stand-ins with `-testcmds`)
+- 🧪 `/give` (in the `commands` package; plugins can remove or replace any built-in command)
+- ⬜ The other vanilla commands (/tp, /gamemode and the rest; test stand-ins with `-testcmds`)
 - ⬜ Forms and other UI
 
 [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which
@@ -133,6 +135,7 @@ commits.
 <details>
 <summary>Every part in detail</summary>
 
+- **Built-in commands and reaching players (written from BDS 1.26.60's code, not tested in game):** built-in commands live in the `commands` package, one file each, on the public API only, registered for the owner "minecraft" by the server; a plugin removes one with `player.Commands(setup).Remove` or replaces it by registering the same name. `/give <player> <itemName> [amount] [data]` follows BDS's GiveCommand: amount 1 to 32767 and data 0 to 32767 with BDS's too small and too big messages, whole stacks into the inventory and the rest dropped at the player, "commands.give.success" to the runner and "commands.give.successRecipient" to each player; the components argument is not built, and the item's name in the message is the name typed (BDS's item display name not read). Operators only (game directors), as in BDS: with `-testcmds`, `/optest` makes you one (`/optest off` undoes it) until Helix has an ops list. New player API: `Player.Run` runs a function on the player's own region at its next tick (the way to reach a player in another region; panics are caught and logged), `Host.FindName`, `Host.FindXUID`, `Host.NewItem`, `Host.MaxStack`, `Player.Drop`, `Player.Message`, `Player.MessageTranslated` and `Player.SetPermission`.
 - **Commands (written from BDS 1.26.60's code, not tested in game):** the `command` package. A command is a `Spec` of struct overloads (exported fields are the arguments: int, float, bool, string, `Text`, `Position`, `BlockPosition`, `Targets`, `Literal`, `Item`, `Block`, any enum type, `Optional[T]`) or made with `NewBuilder` (`Param`, `Opt`, `Lit`, `Args`). There is no namespace prefix: a plugin's `home` is /home, and registering a taken name replaces it, logged with both owners. `player.RegisterCommand`, `player.Commands` and `Host.Commands` give the `Manager`: `Register`, `Add`, `Remove`, `Command`, `Commands`, `Wrap` (middleware around every command), `SetEnumOptions`, `RefreshEnum`, `Execute`, `Packet`. Enums are string types with `Type()`; `Options(src)` gives per-player options and `Dynamic()` makes a soft enum whose new options reach players at once (UpdateSoftEnum). BDS 1.26.60's own lists, dumped from its memory (`enum_probe.py`, private), are prebuilt with constants (`EnumItem`, `EnumGameMode`...): game modes, difficulties, dimensions, enchantments, effects, damage causes, equipment slots, game rules, easings, structure rotation and mirror, weather, HUD, permission levels, times of day, fill and setblock modes; Item, Block, EntityType and Biome are filled from the registry in BDS's order (full name then short; short first for entity types). Players get only the commands their command permission allows, at join after the recipes (where BDS sends it is not checked) and again when anything changes. Parsing gives BDS's messages (unknown command, syntax error with the place, not a number, not true or false, no player, no targets); with several overloads the error is the one that got furthest. A panic in a command is caught, logged with its owner, and reported as BDS's unknown error. Output goes back in a CommandOutput. Selectors resolve players only (no other entities yet) with name, type, m, r, rm, x, y, z, l, lm and c, reading every player through the new `Player.State`, which any region may read. Not done yet: vanilla commands, the console as a source, BDS's exact parser (its grammar tables) and selector arguments beyond those, ^ coordinates checked against BDS, whether BDS also puts a command's own name in its alias enum, and the syntax error's context, which shows the whole line where BDS may cut it.
 
 ### What works
