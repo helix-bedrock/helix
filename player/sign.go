@@ -409,12 +409,19 @@ func (s *Host) signYaw(block uint32) float64 {
 		return hangingSignYaw[facing-2]
 	case strings.HasSuffix(name, "wall_sign"):
 		if facing < 2 || facing > 5 {
-			return 180
+			return 0
 		}
-		return wallSignYaw[facing-2]
+		return wallSignYaw[facing-2] + plainSignTurn
+	case isHangingSignName(name):
+		return math.Mod(float64(rotation)*360/signRotations+180, 360)
 	}
-	return math.Mod(float64(rotation)*360/signRotations+180, 360)
+	return math.Mod(float64(rotation)*360/signRotations+180+plainSignTurn, 360)
 }
+
+// plainSignTurn turns standing and wall signs from the rotation read in BDS's SignBlock to
+// the one the side rule needs: tested in game, BDS's numbers as read gave the back side to
+// a player in front of a wall sign, while hanging signs, read the same way, were right.
+const plainSignTurn = 180
 
 // signBackFaces reports whether the player sees the sign's back, BDS's rule: the player's
 // side of the line through the sign's middle along its rotation. Helix takes the block's
