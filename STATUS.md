@@ -1,10 +1,130 @@
 # What Helix does
 
-Status as of 2026-11-05. Helix was **restarted from scratch with its own architecture.** Players can
-join, spawn in a BDS world, see each other, use their inventory, break and place blocks, and
-sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
+Status as of 2026-11-05. Helix was **restarted from scratch with its own architecture.** Everything
+is written from BDS 1.26.60's code, so it should behave as vanilla does; the marks say how far each
+part has been checked.
 
-## What works
+| Mark | Means |
+|---|---|
+| ✅ | Works, and checked in game or against BDS |
+| 🧪 | Built from BDS's code, not tested in game yet |
+| 🟡 | Partly built: some of it is missing |
+| ⬜ | Not built yet |
+
+The full notes for each part (API names, what is assumed, what differs from BDS) are at the
+[bottom of this page](#full-notes).
+
+## Server and world
+
+- ✅ Joining: NetherNet, Xbox Live login, encryption, resource packs
+- 🧪 Signing in to Microsoft's signaling service (only run against a fake service)
+- ⬜ RakNet on by default (it is off)
+- ✅ Opening and saving BDS worlds, in BDS's own format
+- ✅ Flat and void worlds
+- ⬜ Vanilla terrain generation (an infinite world shows only what it has saved)
+- ✅ Loading, sending and saving chunks; keeping chunks loaded without a player
+- ✅ Regions ticking on many cores, merging and splitting as players move
+- ✅ Registry: blocks, items, biomes, entities, creative items and recipes, byte for byte BDS's
+- ✅ Block ticks (random and scheduled)
+- 🧪 World time and the day cycle (`/time` with `-testcmds`)
+- ⬜ Weather
+- 🧪 The void (damage below the world, items removed)
+
+## Players
+
+- ✅ Spawning, seeing each other, the player list
+- ✅ Abilities, game modes, permission levels, attributes
+- 🧪 Sneaking, sprinting, swimming, gliding, crawling
+- 🧪 Fall damage, hunger and exhaustion
+- 🧪 Health, natural regeneration, starving
+- 🧪 Hitting other players: damage, critical hits, knockback, armour
+- 🧪 Shields, totems, putting armour on by using it
+- 🧪 Death, death messages, respawning
+- 🟡 Respawning at beds and respawn anchors, experience drops on death
+- 🧪 Riding (minecarts so far)
+- ⬜ Server-side movement checks (left to the optional anti-cheat module)
+
+## Items and inventory
+
+- ✅ Inventory, held by the server: every change the client asks for is checked
+- ✅ Creative inventory
+- 🧪 Pick block
+- 🧪 Dropping and picking up items, items floating and joining up
+- 🧪 Eating food
+- 🧪 Tools wearing out and breaking
+- 🧪 Buckets (water and lava)
+- 🧪 Experience orbs and levels
+- 🧪 Snowballs, eggs, ender pearls, bows and arrows
+- ⬜ Potions, milk, crossbows, tridents, mace, fishing
+
+## Blocks
+
+- 🧪 Breaking blocks (speed, tools, enchantments, effects)
+- 🧪 Placing blocks, facing and turning as BDS places them
+- 🧪 Block drops and experience, for all 1,480 blocks
+- 🧪 Water and lava flowing, making obsidian, cobblestone, stone and basalt
+- 🧪 Doors, trapdoors, fence gates, levers, buttons
+- 🧪 Fences, panes, bars, stair corners
+- ⬜ Walls joining up
+- 🧪 Torches, lanterns, ladders falling off without support
+- 🧪 Beds, straw beds and cushions, sleeping through the night
+- 🧪 Banners (standing and on walls, patterns kept)
+- 🧪 Jukeboxes and music discs
+- 🧪 Items and orbs pushed out of blocks
+- ⬜ Fire spreading and burning, signs, cauldrons, crops growing
+
+## Containers and crafting
+
+- 🧪 Chests, trapped chests, copper chests, double chests
+- 🧪 Ender chests
+- 🧪 Shulker boxes (items kept when broken)
+- 🧪 Furnaces, blast furnaces, smokers
+- 🧪 Hoppers, dispensers, droppers, crafters
+- 🧪 Chest and hopper minecart windows
+- ⬜ Barrels, loot tables in chests
+- 🧪 Crafting in the inventory and on the crafting table, and from the recipe book
+- 🟡 Special recipes: shields with banners and repairs are built; fireworks, map copies, banner copies and the rest are not
+- 🧪 Repairing two items in the crafting grid
+- 🧪 Smithing tables: upgrades and armour trims
+- ⬜ Stonecutter, cartography table, brewing stand
+- ⬜ Unlocking recipes (the recipe book may show few or none)
+
+## Enchanting and repairing
+
+- ✅ Enchanting tables (the lead reports them working in game)
+- 🧪 Anvils: repairing, merging, books, renaming, anvils wearing
+- 🧪 Grindstones
+- 🧪 Looms
+- 🟡 Enchantment effects: most built; Fire Aspect, Smite, Bane, Depth Strider, Frost Walker and a few more are not
+
+## Redstone
+
+- ✅ Wire, repeaters, torches, lamps, copper bulbs, comparators (checked in game, basics only)
+- 🧪 Pistons and sticky pistons
+- 🧪 Observers, pressure plates, note blocks, daylight sensors, target blocks
+- 🧪 Tripwire, bells, trapped chests
+- 🧪 TNT and explosions
+- 🧪 Rails and minecarts (plain, chest, hopper, TNT)
+- ⬜ Command blocks and command block minecarts
+
+Redstone is not yet compared with BDS side by side: timing, big circuits and edge cases are unproven.
+
+## Not started
+
+- ⬜ Mobs ([entity](https://github.com/helix-bedrock/entity))
+- ⬜ Real commands (only stand-ins with `-testcmds`)
+- ⬜ Forms and other UI
+
+[API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which
+topics are designed. **The API is not stable yet:** names and behaviour may still change between
+commits.
+
+## Full notes
+
+<details>
+<summary>Every part in detail</summary>
+
+### What works
 
 - **Networking:** NetherNet (RakNet is off by default), and the login the way BDS 1.26.60 does it (Xbox Live
   checks, encryption, resource packs). NetherNet's HTTP server, its limits, its timing, the status reply, public addresses and `server-udp-ports` (`-udp-ports`) were compared with the BDS code and match it. NetherNet LAN signaling is on, and each connection has its own UDP port as in BDS; `-udp-port` puts them all on one port instead. Signing in to Microsoft's signaling service is written from the BDS code (`-nethernet-id`, `-application-id`, `-application-tenant-id`, `AppCertificate.pfx`) but has only run against a fake service. Still different: WebRTC is pion where BDS has libwebrtc. Stricter than BDS on purpose, against floods and oversized input only: a message is cut at the 256 KiB announced in SDP and a packet at 16 MiB, at most 1024 offers are negotiated at once, one address may hold 16 of the 64 HTTP connections, and LAN discovery takes packets from local networks only. One-segment packets are received with no copy, and SCTP skips its checksum when the client offers that.
@@ -141,7 +261,7 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
 - **Creative inventory:** items can be taken from the creative menu (the client's results
   message after a creative take is accepted).
 
-## What is left
+### What is left
 
 - **Vanilla terrain generation** is not hooked up yet, so an infinite world shows only what it has
   saved.
@@ -253,3 +373,5 @@ sneak, sprint, swim and take fall damage. Everything follows BDS 1.26.60.
   [API_DESIGN.md](https://github.com/helix-bedrock/.github/blob/main/API_DESIGN.md) lists which
   topics are designed.
 - **The API is not stable yet.** Names and behaviour may still change between commits.
+
+</details>
