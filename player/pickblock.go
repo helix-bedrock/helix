@@ -23,6 +23,7 @@ var unpickable = map[string]bool{
 // the plain item. BDS's block classes override their pick item for these; the names here are
 // read from Helix's block list, not from each override.
 var pickedAs = map[string]string{
+	standingBanner: bannerItem, wallBanner: bannerItem,
 	"minecraft:powered_repeater":           "minecraft:repeater",
 	"minecraft:powered_comparator":         "minecraft:comparator",
 	"minecraft:lit_furnace":                "minecraft:furnace",
@@ -146,6 +147,8 @@ func handleBlockPick(p *Player, pk *packet.BlockPickRequest) {
 	if !ok {
 		return
 	}
+	// A banner comes with its colour and patterns, as BDS's asItemInstance gives it.
+	stack = bannerDrops(r, pos, []ItemStack{stack})[0]
 	creative := p.creative()
 	reach := float32(pickReach)
 	if creative {

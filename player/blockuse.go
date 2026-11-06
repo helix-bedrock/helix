@@ -78,6 +78,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useEnchantingTable(r, u)
 	case grindstone:
 		return p.useGrindstone(r, u)
+	case loomBlock:
+		return p.useLoom(r, u)
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
 		return p.useAnvil(r, u)
 	}

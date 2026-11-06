@@ -38,6 +38,9 @@ const (
 	comparator   = "minecraft:unpowered_comparator"
 	comparatorOn = "minecraft:powered_comparator"
 	flowingLava  = "minecraft:flowing_lava"
+	// Banners stand on a solid block or hang on the side of one.
+	standingBanner = "minecraft:standing_banner"
+	wallBanner     = "minecraft:wall_banner"
 )
 
 // snowFull is the height state of a full block of snow layers.
@@ -236,6 +239,9 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
 		return ok && t.Supports(b, clicked)
 	}
+	if name == standingBanner || name == wallBanner {
+		return t.bannerHeld(r, pos, block)
+	}
 	if name == tripwireHook {
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
 		return ok && !direction.Vertical(clicked) && t.Supports(b, clicked)
@@ -372,10 +378,39 @@ func torchFaceOf(state string) cube.Face {
 	return cube.FaceUp
 }
 
+// bannerHolder is the block a banner needs solid, as BannerBlock's canSurvive: below a
+// standing banner, behind a wall banner (the side away from its facing).
+func (t *Table) bannerHolder(pos cube.Pos, block uint32) (cube.Pos, bool) {
+	if t.blocks.Name(block) == standingBanner {
+		return pos.Side(cube.FaceDown), true
+	}
+	f := stateInt(t.blocks.States(block), "facing_direction")
+	if f < int(cube.FaceNorth) || f > int(cube.FaceEast) {
+		return cube.Pos{}, false
+	}
+	return pos.Side(cube.Face(f).Opposite()), true
+}
+
+// bannerHeld reports whether a banner at pos has its holder.
+func (t *Table) bannerHeld(r *world.Region, pos cube.Pos, block uint32) bool {
+	holder, ok := t.bannerHolder(pos, block)
+	return ok && t.solidMaterial(r, holder)
+}
+
+// solidMaterial is BDS's Material isSolid of the block at pos, which banners stand on.
+func (t *Table) solidMaterial(r *world.Region, pos cube.Pos) bool {
+	b, ok := r.Block(pos, 0)
+	return ok && t.blocks.Properties(b).SolidMaterial
+}
+
 // survives reports whether the block at pos still has its holder after the block
 // at from changed. A holder in a chunk that is not loaded counts as there.
 func (t *Table) survives(r *world.Region, pos, from cube.Pos, block uint32) bool {
 	states := t.blocks.States(block)
+	if n := t.blocks.Name(block); n == standingBanner || n == wallBanner {
+		holder, ok := t.bannerHolder(pos, block)
+		return from != holder || !loaded(r, holder) || (ok && t.solidMaterial(r, holder))
+	}
 	switch t.kinds[t.blocks.Name(block)] {
 	case kindTorch:
 		face := torchFaceOf(stateString(states, "torch_facing_direction"))

@@ -239,6 +239,8 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 		return p.craftAnvil(a)
 	case *protocol.CraftGrindstoneRecipeStackRequestAction:
 		return p.craftGrindstone(a)
+	case *protocol.CraftLoomRecipeStackRequestAction:
+		return p.craftLoom(a)
 	case *protocol.CraftResultsDeprecatedStackRequestAction:
 		// The client follows every craft (creative ones too) with the
 		// items it expects; the server made the result itself, so the
@@ -305,7 +307,8 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 		}
 		r.stack = &inv.ui[slot]
 	case protocol.ContainerEnchantingInput, protocol.ContainerEnchantingMaterial, protocol.ContainerAnvilInput, protocol.ContainerAnvilMaterial,
-		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional:
+		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional,
+		protocol.ContainerLoomInput, protocol.ContainerLoomDye, protocol.ContainerLoomMaterial:
 		if !p.window.holds(container, slot) {
 			return r, false
 		}

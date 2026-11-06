@@ -34,6 +34,8 @@ type Systems struct {
 	// AnvilWear runs after an anvil at pos was used.
 	AnvilWear  func(p *Player, r *world.Region, pos cube.Pos)
 	Grindstone GrindstoneFunc
+	// Loom is what a loom makes.
+	Loom LoomFunc
 	// Breaking.
 	BreakStart  BreakStartFunc
 	BreakTime   BreakTimeFunc
@@ -195,10 +197,13 @@ type gameplay struct {
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
-	chestPairEv      listeners[ChestPairEvent]
-	chestSpillEv     listeners[ChestSpillEvent]
-	dropsEv          listeners[BlockDropsEvent]
-	xpEv             listeners[ExperienceEvent]
+	loomEv           listeners[LoomEvent]
+	// banners is what banners and looms read.
+	banners      *BannerTable
+	chestPairEv  listeners[ChestPairEvent]
+	chestSpillEv listeners[ChestSpillEvent]
+	dropsEv      listeners[BlockDropsEvent]
+	xpEv         listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
 }
@@ -245,10 +250,13 @@ type gameState struct {
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
-	chestPairEv      listeners[ChestPairEvent]
-	chestSpillEv     listeners[ChestSpillEvent]
-	dropsEv          listeners[BlockDropsEvent]
-	xpEv             listeners[ExperienceEvent]
+	loomEv           listeners[LoomEvent]
+	// banners is what banners and looms read.
+	banners      *BannerTable
+	chestPairEv  listeners[ChestPairEvent]
+	chestSpillEv listeners[ChestSpillEvent]
+	dropsEv      listeners[BlockDropsEvent]
+	xpEv         listeners[ExperienceEvent]
 	// dropRules replace blocks' drop rules; a nil rule drops nothing.
 	dropRules map[string]loot.Rule
 	// tuning is the default of every Tune.
@@ -390,6 +398,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.Anvil = vanillaAnvil
 	sys.AnvilWear = vanillaAnvilWear
 	sys.Grindstone = vanillaGrindstone
+	sys.Loom = vanillaLoom
 	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
 	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }
 	sys.BreakTime = g.vanillaBreakTime
@@ -458,6 +467,12 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		return nil, err
 	}
 	gs := s.h.game
+	if gs.banners == nil {
+		if gs.banners, err = vanillaBanners(); err != nil {
+			return nil, err
+		}
+	}
+	gs.banners.index()
 	g := gs.out
 	*g = gameplay{
 		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv, explosionEv: gs.explosionEv,
@@ -466,7 +481,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, banners: gs.banners,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -505,6 +520,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.tntPrimeEv.freeze()
 	g.craftEv.freeze()
 	g.smithEv.freeze()
+	g.loomEv.freeze()
 	g.chestPairEv.freeze()
 	g.chestSpillEv.freeze()
 	g.dropsEv.freeze()

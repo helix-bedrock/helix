@@ -44,6 +44,7 @@ const (
 	ContainerAnvil
 	ContainerGrindstone
 	ContainerEnchantingTable
+	ContainerLoom
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

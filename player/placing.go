@@ -155,6 +155,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if isBedItem(held.Name) {
 		return p.placeBed(r, clicked, face, held)
 	}
+	if held.Name == bannerItem {
+		return p.placeBanner(r, clicked, face, held)
+	}
 	if IsCartItem(held.Name) {
 		return p.placeCart(r, clicked, held.Name)
 	}
@@ -179,8 +182,8 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 }
 
 // plantedBlocks is the block of each item named differently from what it places.
-// Signs and banners are not here: their block depends on the face clicked and
-// their block entities are not built.
+// Signs are not here: their block depends on the face clicked and their block
+// entities are not built. Banners place in banner.go.
 var plantedBlocks = map[string]string{
 	"minecraft:redstone":          "minecraft:redstone_wire",
 	"minecraft:repeater":          "minecraft:unpowered_repeater",
