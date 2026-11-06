@@ -297,7 +297,7 @@ commits.
   burning items too). Fire Resistance stops the damage.
   Creative and spectator players are not set on fire (assumed, not read). `Player.SetOnFire`,
   `Extinguish`, `OnFire`. Dropped items have 5 health and take the same fire damage, so they burn
-  away in five ticks, fizzing each tick in lava; netherite items and ancient debris (BDS's fire-resistant flag, helix-data's
+  away in five ticks, fizzing each tick in lava or fire; netherite items and ancient debris (BDS's fire-resistant flag, helix-data's
   `bds/item_flags.json`) do not burn. Not done: rain putting fire out, the contents of a burnt
   bundle or shulker box spilling.
 - **Creative inventory:** items can be taken from the creative menu (the client's results

@@ -244,7 +244,9 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 	half := mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
 	c := i.s.touching(r, at.Sub(half), at.Add(half))
 	immune := i.s.game != nil && i.s.game.fireResistant[i.stack.Name]
-	if c.lava && !immune {
+	// BDS's item tick fizzes in lava; the lead heard the same in fire on BDS, which the code read so
+	// far does not show.
+	if (c.lava || c.fire > 0) && !immune {
 		playSound(r, floorPos(at), soundEvent{name: packet.SoundEventFizz, pos: at}, nil)
 	}
 	if !immune && c.burning() {
