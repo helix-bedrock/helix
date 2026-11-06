@@ -34,8 +34,9 @@ type Systems struct {
 	// AnvilWear runs after an anvil at pos was used.
 	AnvilWear  func(p *Player, r *world.Region, pos cube.Pos)
 	Grindstone GrindstoneFunc
-	// Loom is what a loom makes.
-	Loom LoomFunc
+	// Loom is what a loom makes, ShieldBanner what a shield and a banner crafted together make.
+	Loom         LoomFunc
+	ShieldBanner ShieldBannerFunc
 	// Breaking.
 	BreakStart  BreakStartFunc
 	BreakTime   BreakTimeFunc
@@ -198,6 +199,7 @@ type gameplay struct {
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
 	loomEv           listeners[LoomEvent]
+	shieldBannerEv   listeners[ShieldBannerEvent]
 	// banners is what banners and looms read.
 	banners      *BannerTable
 	chestPairEv  listeners[ChestPairEvent]
@@ -251,6 +253,7 @@ type gameState struct {
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
 	loomEv           listeners[LoomEvent]
+	shieldBannerEv   listeners[ShieldBannerEvent]
 	// banners is what banners and looms read.
 	banners      *BannerTable
 	chestPairEv  listeners[ChestPairEvent]
@@ -399,6 +402,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.AnvilWear = vanillaAnvilWear
 	sys.Grindstone = vanillaGrindstone
 	sys.Loom = vanillaLoom
+	sys.ShieldBanner = vanillaShieldBanner
 	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
 	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }
 	sys.BreakTime = g.vanillaBreakTime
@@ -481,7 +485,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, banners: gs.banners,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, banners: gs.banners,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -521,6 +525,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.craftEv.freeze()
 	g.smithEv.freeze()
 	g.loomEv.freeze()
+	g.shieldBannerEv.freeze()
 	g.chestPairEv.freeze()
 	g.chestSpillEv.freeze()
 	g.dropsEv.freeze()

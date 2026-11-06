@@ -115,3 +115,53 @@ func TestBannerRoundTrip(t *testing.T) {
 		t.Fatalf("rotation facing south: %d", r)
 	}
 }
+
+// shieldRecipeID is the network ID BDS sends the shield and banner recipe under.
+func shieldRecipeID(t *testing.T, p *Player) uint32 {
+	t.Helper()
+	for _, r := range p.s.reg.Crafting.Packet().MultiRecipes {
+		if r.UUID == shieldBannerRecipe {
+			return r.RecipeNetworkID
+		}
+	}
+	t.Fatal("no shield recipe in CraftingData")
+	return 0
+}
+
+// TestShieldBanner crafts a patterned banner onto a shield as a client asks for it.
+func TestShieldBanner(t *testing.T) {
+	p := testPlayer(t)
+	craftGame(t, p, nil)
+	p.window.open, p.window.kind = true, ContainerInventory
+	banner := withTag(ItemStack{Name: bannerItem, Meta: 1, Count: 1}, bannerPatternsTag, patternList([]BannerLayer{{"bo", 15}}))
+	p.inventory.ui[28] = p.s.freshStack(ItemStack{Name: shieldItem, Count: 1, Tag: map[string]any{"Damage": int32(3)}})
+	p.inventory.ui[30] = p.s.freshStack(banner)
+	req := protocol.ItemStackRequest{RequestID: 1, Actions: []protocol.StackRequestAction{
+		&protocol.CraftRecipeStackRequestAction{RecipeNetworkID: shieldRecipeID(t, p), NumberOfCrafts: 1},
+		&protocol.CraftResultsDeprecatedStackRequestAction{TimesCrafted: 1},
+		consume(p, 28), consume(p, 30),
+		take(1, slotInfo(containerCreatedOutput, createdOutputSlot, 0), slotInfo(containerCombined, 1, 0)),
+	}}
+	if r := p.stackRequest(req); r.Status != protocol.ItemStackResponseStatusOK {
+		t.Fatalf("refused: %d", r.Status)
+	}
+	s := p.inventory.main[1]
+	if s.Name != shieldItem || s.Tag[bannerBaseTag] != int32(1) || s.Tag["Damage"] != int32(3) {
+		t.Fatalf("result %+v", s)
+	}
+	if l := p.s.banners().readPatterns(s.Tag[bannerPatternsTag], 6); len(l) != 1 || l[0].Pattern != "bo" {
+		t.Fatalf("patterns %+v", l)
+	}
+	if !p.inventory.ui[28].Empty() || !p.inventory.ui[30].Empty() {
+		t.Fatal("inputs not used")
+	}
+	// A decorated shield takes no second banner; an ominous banner gives the illager pattern.
+	if got := vanillaShieldBanner(p, []ItemStack{s, banner}); !got.Empty() {
+		t.Error("decorated shield took a banner")
+	}
+	ominous := withTag(ItemStack{Name: bannerItem, Meta: 15, Count: 1}, bannerTypeTag, BannerOminous)
+	got := vanillaShieldBanner(p, []ItemStack{{Name: shieldItem, Count: 1}, ominous})
+	if l, _ := got.Tag[bannerPatternsTag].([]any); len(l) != 1 || l[0].(map[string]any)[bannerPatternTag] != ominousPattern {
+		t.Errorf("ominous %+v", got.Tag)
+	}
+}

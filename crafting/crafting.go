@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -182,6 +183,9 @@ type Table struct {
 	source   *packet.CraftingData
 	recipes  map[uint32]*Recipe
 	smithing map[uint32]*SmithingRecipe
+	// special is BDS's special recipes (its multi recipes), worked out in code, by
+	// network ID to the UUID that says which one.
+	special map[uint32]uuid.UUID
 	// smelt and smeltTags are the one-item recipes of furnaces and campfires, by block,
 	// then by the input's name or tag.
 	smelt, smeltTags map[string]map[string][]*Recipe
@@ -196,6 +200,10 @@ func NewTable(pk *packet.CraftingData) *Table {
 	t := &Table{
 		source: pk, recipes: make(map[uint32]*Recipe, len(pk.ShapedRecipes)+len(pk.ShapelessRecipes)),
 		smithing: make(map[uint32]*SmithingRecipe, len(pk.SmithingTransformRecipes)),
+		special:  make(map[uint32]uuid.UUID, len(pk.MultiRecipes)),
+	}
+	for _, r := range pk.MultiRecipes {
+		t.special[r.RecipeNetworkID] = r.UUID
 	}
 	for _, r := range pk.SmithingTransformRecipes {
 		t.smithing[r.RecipeNetworkID] = &SmithingRecipe{
@@ -279,6 +287,12 @@ func (t *Table) Smelt(block string, it Item) *Recipe {
 		}
 	}
 	return tagged
+}
+
+// Special returns the UUID of the special recipe (BDS's multi recipe) with a network ID.
+func (t *Table) Special(id uint32) (uuid.UUID, bool) {
+	u, ok := t.special[id]
+	return u, ok
 }
 
 // Recipe returns the recipe with a network ID.
