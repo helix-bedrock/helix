@@ -377,11 +377,10 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			d.log.Error("load chunk", "pos", pos, "err", err)
 		}
 		discard = !errors.Is(err, mcdb.ErrNotFound) || d.conf.DiscardGenerated
-		c := chunk.New(d.conf.Blocks, d.r)
-		if err := d.conf.Generator.Generate(pos, c); err != nil {
+		col = &chunk.Column{Chunk: chunk.New(d.conf.Blocks, d.r), Finalisation: chunk.DefaultFinalisation()}
+		if err := d.generate(pos, col); err != nil {
 			d.log.Error("generate chunk", "pos", pos, "err", err)
 		}
-		col = &chunk.Column{Chunk: c, Finalisation: chunk.DefaultFinalisation()}
 	} else {
 		col.Chunk.ReplaceBiomes(d.resolveBiome)
 	}
@@ -392,6 +391,20 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
 	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard) })
+}
+
+// generate fills a new column with the dimension's generator, recovering a panic in it so one
+// bad chunk does not stop the server.
+func (d *Dimension) generate(pos mcdb.ChunkPos, col *chunk.Column) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("generator panicked: %v", r)
+		}
+	}()
+	if g, ok := d.conf.Generator.(ColumnGenerator); ok {
+		return g.GenerateColumn(pos, col)
+	}
+	return d.conf.Generator.Generate(pos, col.Chunk)
 }
 
 // resolveBiome maps a saved biome ID to the one it loads as.

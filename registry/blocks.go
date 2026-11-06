@@ -18,9 +18,10 @@ import (
 // to Count()-1; the states of one block have consecutive IDs. Its methods
 // are safe for use by many goroutines at once.
 type Blocks struct {
-	names      []string // per block
-	firstState []uint32 // per block
-	defaults   []uint32 // per block
+	names      []string   // per block
+	firstState []uint32   // per block
+	defaults   []uint32   // per block
+	tags       [][]string // per block
 	byName     map[string]uint32
 
 	stateBlock []uint32 // per state: its block
@@ -144,6 +145,7 @@ func (s *Setup) freezeBlocks() (*Blocks, error) {
 		b.names = append(b.names, name)
 		b.firstState = append(b.firstState, first)
 		b.defaults = append(b.defaults, first+uint32(t.Default)) //nolint:gosec // checked by RegisterBlock
+		b.tags = append(b.tags, slices.Clone(t.Tags))
 		b.byName[name] = idx
 		for _, st := range t.States {
 			id := uint32(len(b.states)) //nolint:gosec // far below 2^32 states
@@ -196,6 +198,23 @@ func (s *Setup) freezeBlocks() (*Blocks, error) {
 	}
 	b.props.Store(&props)
 	return b, nil
+}
+
+// Tags returns the tags of the block of state id, as BDS holds them. The
+// slice is shared: do not change it.
+func (b *Blocks) Tags(id uint32) []string {
+	if int(id) >= len(b.stateBlock) {
+		return nil
+	}
+	return b.tags[b.stateBlock[id]]
+}
+
+// Default returns the default state of the block of state id.
+func (b *Blocks) Default(id uint32) uint32 {
+	if int(id) >= len(b.stateBlock) {
+		return b.air
+	}
+	return b.defaults[b.stateBlock[id]]
 }
 
 // Definitions returns the block definitions StartGame carries, for blocks

@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	settings := flag.String("config", "server.properties", "the server settings file, in BDS's server.properties format; written with the defaults if missing")
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
 	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
 	publicIP := flag.String("public-ip", "", "BDS's server-public-ip: this network's public IP, so players outside it can join; forward TCP 19132 and the UDP ports on the router")
@@ -35,6 +36,10 @@ func main() {
 
 	conf := helix.DefaultConfig()
 	conf.Log = log
+	if err := conf.LoadProperties(*settings); err != nil {
+		log.Error("cannot start", "err", err)
+		return
+	}
 	conf.NetherNet.PublicIP = *publicIP
 	conf.NetherNet.UDPPort = uint16(*udpPort) //nolint:gosec // a port number
 	conf.NetherNet.UDPPorts = *udpPorts
@@ -43,7 +48,12 @@ func main() {
 	conf.NetherNet.SignInID = *nethernetID
 	conf.NetherNet.ApplicationID = *applicationID
 	conf.NetherNet.ApplicationTenantID = *applicationTenantID
-	conf.TickDistance = int32(*tickDistance) //nolint:gosec // a small setting, checked by helix.New
+	// The flag wins over the settings file only when given.
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "tick-distance" {
+			conf.TickDistance = int32(*tickDistance) //nolint:gosec // a small setting, checked by helix.New
+		}
+	})
 	var testServer atomic.Pointer[helix.Server]
 	if *testcmds {
 		conf.Setup = testCommands(&testServer)

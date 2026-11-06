@@ -110,8 +110,17 @@ sibling library folders, so unreleased library changes are used.
   sent and released. Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the
   end of each tick from a copy-on-write snapshot. Generators: `Flat`
-  (level.dat's layers), `Empty`; vanilla generation is not hooked up, so
-  an infinite world's unsaved chunks are empty and never saved.
+  (level.dat's layers), `Empty`, any `Generator`; a `ColumnGenerator` also
+  hands over block entities, a `Spawner` answers the spawn height.
+- `generator`: the world types `Config.WorldType` picks by name (`Types`,
+  `Default`: vanilla, flat, void; plugins add their own `Type`). `Vanilla`
+  is worldgen's 1.26.60 overworld built over the registry's own states
+  (`blocks.New`), so its indices are Helix state IDs; block tags and
+  translucency come from the registry (`Blocks.Tags`, `Properties.Translucency`).
+- `properties.go`: `Config.LoadProperties`, the server settings file in
+  BDS's server.properties format (`level-type`, `level-type-options` are
+  Helix's own keys); cmd/helix reads it (`-config`), flags given on the
+  command line win.
 - `setup.go`: `Setup`, the one boot builder: the registry's `Setup` plus
   `Player`, the player package's Setup. Vanilla registers through both
   first, then `Config.Setup`.

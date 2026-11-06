@@ -214,6 +214,14 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return err
 	}
+	transl, err := data.BlockTranslucency()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	mining, err := data.MiningData()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
 	definitions := make(map[string]map[string]any, len(defs))
 	for _, d := range defs {
 		definitions[d.Name] = d.Properties
@@ -248,7 +256,7 @@ func vanillaBlocks(s *Setup) error {
 			if err := flush(); err != nil {
 				return err
 			}
-			t = BlockType{Name: st.Name}
+			t = BlockType{Name: st.Name, Tags: mining.Blocks[st.Name].Tags}
 		}
 		p, ok := props[st.Name]
 		if !ok {
@@ -257,7 +265,7 @@ func vanillaBlocks(s *Setup) error {
 		i := len(t.States)
 		t.States = append(t.States, BlockState{States: st.Properties, Version: st.Version, Properties: Properties{
 			LightEmission: p.LightEmission.At(i), LightDampening: p.LightDampening.At(i),
-			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i), LavaFlammable: p.LavaFlammable.At(i) == 1,
+			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i), LavaFlammable: p.LavaFlammable.At(i) == 1, Translucency: transl[st.Name],
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name],
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],

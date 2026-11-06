@@ -20,6 +20,7 @@ import (
 	"github.com/helix-bedrock/helix/commands"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/fire"
+	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
@@ -43,8 +44,25 @@ type Config struct {
 	WorldsDir string
 	// Storage replaces where the world and players are kept.
 	Storage StorageConfig
-	// Generator makes the overworld's chunks the world has not saved. Nil
-	// means the generator level.dat names.
+	// WorldType names how chunks the world has not saved are made: a name in
+	// Generators, by default "vanilla" (BDS's terrain), "flat" or "void". Empty
+	// means the type level.dat names, and vanilla for a new world. A type set
+	// here is written to level.dat, so the world stays that type.
+	WorldType string
+	// WorldTypeOptions is the type's own setting: for vanilla the path of a
+	// worldgen JSON file that changes the world (biomes, features,
+	// structures, terrain), for flat the layers as FlatWorldLayers JSON.
+	// Empty means the type's defaults.
+	WorldTypeOptions string
+	// Generators are the world types WorldType picks from. DefaultConfig
+	// fills in vanilla, flat and void; add your own here. Nil means those
+	// three.
+	Generators generator.Types
+	// Seed is a new world's seed, BDS's level-seed. Nil means a random one.
+	// An existing world keeps its own.
+	Seed *int64
+	// Generator, when set, makes the overworld's chunks instead of the world
+	// type: for a generator built outside the type table.
 	Generator world.Generator
 	// BlockTicker gives blocks their ticks and their reactions to changes
 	// beside them. Nil means vanilla's, which so far is water and lava
@@ -163,9 +181,10 @@ func DefaultConfig() Config {
 			IdentityKeyPath: nethernet.DefaultIdentityKeyPath,
 			LAN:             true,
 		},
-		RakNet:   RakNetConfig{Address: ":19132"},
-		Network:  network.DefaultConfig(),
-		Redstone: circuit.DefaultConfig(),
+		RakNet:     RakNetConfig{Address: ":19132"},
+		Network:    network.DefaultConfig(),
+		Redstone:   circuit.DefaultConfig(),
+		Generators: generator.Default(),
 	}
 }
 

@@ -41,6 +41,9 @@ type Properties struct {
 	// LavaFlammable is set when lava lights fire next to the state, BDS's own flag beside the
 	// odds.
 	LavaFlammable bool
+	// Translucency is how much light and sight pass through, 0 (opaque) to 1, as BDS keeps it
+	// for the block; world generation reads it.
+	Translucency float32
 	// ExplosionResistance is the state's resistance to explosions.
 	ExplosionResistance float32
 	// Friction is the state's friction; higher is more slippery.
@@ -140,6 +143,10 @@ type BlockType struct {
 	// Default is the index in States of the state the block is placed in
 	// and that replaces it when it is deleted.
 	Default int
+	// Tags are the block's tags as BDS holds them, some with the minecraft:
+	// namespace and some without ("minecraft:is_axe_item_destructible",
+	// "wood").
+	Tags []string
 	// Definition is what the client is told about a block it does not
 	// have built in, in StartGame: components, states, geometry. BDS
 	// sends one for each data-driven vanilla block; nil for the others.

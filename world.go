@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
@@ -13,6 +14,7 @@ import (
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/fire"
+	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
@@ -36,13 +38,6 @@ type StorageConfig struct {
 	Players mcdb.PlayerStore
 }
 
-// Generator types level.dat stores, as BDS numbers them.
-const (
-	generatorOverworld int32 = 1
-	generatorFlat      int32 = 2
-	generatorVoid      int32 = 5
-)
-
 // openWorld opens the world folder WorldsDir/LevelName, as BDS keeps its
 // worlds, and the stores. A new world gets LevelName as its name.
 func (s *Server) openWorld() error {
@@ -59,7 +54,16 @@ func (s *Server) openWorld() error {
 	ldat := db.LevelDat()
 	if isNew {
 		ldat.LevelName = s.conf.LevelName
+		if s.conf.Seed != nil {
+			ldat.RandomSeed = *s.conf.Seed
+		}
 	}
+	worldType, gt, err := s.worldType(ldat.Generator, isNew)
+	if err != nil {
+		_ = db.Close()
+		return fmt.Errorf("helix: open world %q: %w", dir, err)
+	}
+	ldat.Generator = gt.Level
 	s.db, s.worldStore, s.playerStore = db, mcdb.WorldStore(db), mcdb.PlayerStore(db)
 	if st := s.conf.Storage.World; st != nil {
 		s.worldStore = st
@@ -79,7 +83,7 @@ func (s *Server) openWorld() error {
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
 	s.clock = daytime.NewClock(s.ticker.CurrentTick, int32(min(ldat.Time, math.MaxInt32)), ldat.DoDayLightCycle) //nolint:gosec // capped
-	if err := s.openOverworld(ldat.Generator, ldat.FlatWorldLayers, ldat.RandomTickSpeed, ldat.DoFireTick); err != nil {
+	if err := s.openOverworld(worldType, gt, ldat.RandomSeed, ldat.FlatWorldLayers, ldat.RandomTickSpeed, ldat.DoFireTick); err != nil {
 		s.ticker.Close()
 		_ = db.Close()
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
@@ -87,15 +91,40 @@ func (s *Server) openWorld() error {
 	if s.circuits != nil {
 		s.circuits.SetClock(s.clock)
 	}
-	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew)
+	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew, "type", worldType, "seed", ldat.RandomSeed)
 	return nil
 }
 
-// openOverworld starts the overworld with the generator level.dat names.
-// Vanilla terrain generation is not hooked up yet: until it is, chunks an
-// infinite world has not saved are empty and never saved, so the world
-// still gets real terrain once the generator is there.
-func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpeed int32, doFireTick bool) error {
+// worldType picks the world type: the configured one, else the one level.dat
+// names, else vanilla for a new world. Its level.dat number is filled in.
+func (s *Server) worldType(level int32, isNew bool) (string, generator.Type, error) {
+	types := s.conf.Generators
+	if types == nil {
+		types = generator.Default()
+	}
+	name := s.conf.WorldType
+	switch {
+	case name != "":
+	case isNew:
+		name = generator.NameVanilla
+	default:
+		name = generator.ForLevel(level)
+	}
+	t, ok := types[name]
+	if !ok || t.New == nil {
+		return "", generator.Type{}, fmt.Errorf("unknown world type %q (have %s)", name, strings.Join(types.Names(), ", "))
+	}
+	if t.Level == 0 {
+		t.Level = generator.LevelInfinite
+	}
+	if !isNew && s.conf.WorldType != "" && t.Level != level {
+		s.log.Warn("the world was made as another type: chunks it has not saved yet are made as the configured type", "type", name, "level.dat", generator.ForLevel(level))
+	}
+	return name, t, nil
+}
+
+// openOverworld starts the overworld with the world type's generator.
+func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, flatLayers string, randomTickSpeed int32, doFireTick bool) error {
 	conf := world.DefaultConfig()
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
@@ -122,25 +151,30 @@ func (s *Server) openOverworld(generator int32, flatLayers string, randomTickSpe
 		s.circuits = circuits
 	}
 	r, _ := mcdb.Overworld.Range()
-	switch {
-	case s.conf.Generator != nil:
-		conf.Generator = s.conf.Generator
-	case generator == generatorFlat:
-		flat, err := world.ParseFlat(flatLayers, s.reg.Blocks, s.reg.Biomes, r)
+	conf.Generator = s.conf.Generator
+	if conf.Generator == nil {
+		g, err := gt.New(generator.Context{
+			Registry: s.reg, Seed: seed, Dimension: mcdb.Overworld, Range: r,
+			Options: s.conf.WorldTypeOptions, FlatLayers: flatLayers, Log: s.log,
+		})
 		if err != nil {
-			return err
+			return fmt.Errorf("world type %s: %w", typeName, err)
 		}
-		conf.Generator = flat
-		top := int32(flat.Bottom)
-		for _, l := range flat.Layers {
+		conf.Generator = g
+	}
+	switch g := conf.Generator.(type) {
+	case world.Flat:
+		top := int32(g.Bottom)
+		for _, l := range g.Layers {
 			top += int32(l.Count) //nolint:gosec // layer counts are small
 		}
 		s.level.Surface = top
-	case generator == generatorVoid:
-		conf.Generator = world.Empty{}
-	default:
-		conf.Generator, conf.DiscardGenerated = world.Empty{}, true
-		s.log.Warn("vanilla world generation is not hooked up yet: chunks this world has not saved are empty and are not saved", "generator", generator)
+	case world.Spawner:
+		// The spawn is out of range until BDS's spawn search places it, which is not
+		// ported: players start on the ground at the spawn column instead.
+		if sp := s.level.Spawn; sp[1] < int32(r[0]) || sp[1] > int32(r[1]) {
+			s.level.Surface = g.SpawnHeight(sp[0], sp[2])
+		}
 	}
 	d, err := world.New(conf)
 	if err != nil {

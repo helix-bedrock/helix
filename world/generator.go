@@ -18,6 +18,23 @@ type Generator interface {
 	Generate(pos mcdb.ChunkPos, c *chunk.Chunk) error
 }
 
+// ColumnGenerator is a Generator that also makes block entities, such as the
+// chests and beds of structures. The dimension calls GenerateColumn instead
+// of Generate; the block entities are added to col.BlockEntities in their
+// saved form, as if the chunk had been loaded.
+type ColumnGenerator interface {
+	Generator
+	GenerateColumn(pos mcdb.ChunkPos, col *chunk.Column) error
+}
+
+// Spawner is a Generator that knows where a player can stand: the Y of the
+// block above the ground of the column at x, z. Joining players start there
+// while the world has not placed its spawn. It may be called from any
+// goroutine.
+type Spawner interface {
+	SpawnHeight(x, z int32) int32
+}
+
 // Empty generates nothing: every chunk stays air. It is BDS's void world.
 type Empty struct{}
 

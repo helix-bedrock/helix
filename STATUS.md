@@ -21,7 +21,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - ⬜ RakNet on by default (it is off)
 - ✅ Opening and saving BDS worlds, in BDS's own format
 - ✅ Flat and void worlds
-- ⬜ Vanilla terrain generation (an infinite world shows only what it has saved)
+- 🧪 Vanilla terrain generation (the worldgen library, overworld only) and world types picked in `server.properties`
 - ✅ Loading, sending and saving chunks; keeping chunks loaded without a player
 - ✅ Regions ticking on many cores, merging and splitting as players move
 - ✅ Registry: blocks, items, biomes, entities, creative items and recipes, byte for byte BDS's
@@ -148,6 +148,20 @@ commits.
 - **Worlds:** the world folder (`worlds/Bedrock level`, BDS's layout) opens at boot through the
   `world` library's stores. Players spawn at the level.dat spawn, or where a BDS world saved them.
   Flat and void worlds generate.
+- **World types and settings:** `server.properties` (BDS's format; `-config` names another file,
+  written with the defaults if missing) holds `server-name`, `max-players`, `online-mode`,
+  `view-distance`, `tick-distance`, `level-name`, `level-seed` and Helix's own `level-type` and
+  `level-type-options`. `level-type` is `vanilla` (BDS 1.26.60's overworld from the worldgen library,
+  built over Helix's own block and biome registry), `flat`, `void`, or a type a plugin adds to
+  `Config.Generators` (`generator.Type`). Empty means what level.dat says; a new world is vanilla.
+  The options are a worldgen JSON file for vanilla (biomes, features, structures, terrain) and the
+  flat layers for flat. Structure block entities (chests, beds, bells, spawners) come with their
+  chunks; chests keep their loot table and seed but are not filled when opened yet. Unchanged
+  generated chunks are not saved, as BDS. Players start on the ground of the spawn column
+  (`world.Spawner`): BDS's spawn search is not ported. The Nether and the End are not opened yet,
+  so their generators are not hooked up. Text seeds are refused: how BDS turns text into a number
+  is not read. Vanilla terrain through Helix's registry is not yet compared block for block with a
+  BDS world of the same seed; a check of 64 chunks gave real terrain at about 25 ms a chunk.
 - **Chunks:** each player's simulation zone (tick-distance) stays loaded and changed chunks are
   saved at the end of each tick. The view zone (view-distance) is loaded, encoded once, sent in
   BDS's sub-chunk request mode and released. A ticket (`KeepLoaded` on a box, a radius or a list of
@@ -305,8 +319,8 @@ commits.
 
 ### What is left
 
-- **Vanilla terrain generation** is not hooked up yet, so an infinite world shows only what it has
-  saved.
+- **World generation:** the Nether and the End, BDS's spawn search, filling structure chests from
+  their loot tables, text seeds, and the mobs structures spawn.
 - **Block behaviour:** water and lava are the only blocks with behaviour so far. Lava does not set
   fire, blocks liquids replace drop nothing, stairs and slabs let water out on every side (BDS
   decides by their shape), and placing a waterloggable block into water does not keep the water.
@@ -388,8 +402,7 @@ commits.
   `RemoveFor`) or change and add (`Set`) shaped and shapeless recipes of any block, at boot or while running. Screens
   not built yet list their recipes but cannot use them. Torches, lanterns and ladders place and fall off by BDS's rules (`attach` package, helix-data `bds/support.json`): which way they face, what may hold them, and they drop when their holder goes. A grid only makes recipes tagged for the crafting table, whatever recipe the client names. `Player.EditRecipes` takes recipes away from one player (`Remove`, `RemoveFor`, `ClearBlock`, `Clear`, `Reset`): that player gets a filtered list and the server refuses the rest. Those rules are not saved. Items left in a grid stay there when the window closes:
   no return was found in BDS, so the client is taken to move them, which is not confirmed. **Item entities** are a first pass: they are saved with their chunk
-  (not yet compared with a world BDS saved, and lost in chunks that are never saved, such as an
-  infinite world's ungenerated ones), do not burn in lava or fire, and their
+  (not yet compared with a world BDS saved), do not burn in lava or fire, and their
   spawn data is not yet compared with BDS. Item stack requests inside PlayerAuthInput are ignored.
   A broken furnace, blast furnace or smoker drops each slot as one item, as BDS does (random piles
   off); other containers throw each slot's piles from one place, as BDS does, and items lying within
