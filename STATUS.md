@@ -1,12 +1,12 @@
 # What Helix does
 
-Status as of 2026-11-06. Helix was **restarted from scratch with its own architecture.** Everything
+Status as of 2026-11-07. Helix was **restarted from scratch with its own architecture.** Everything
 is written from BDS 1.26.60's code, so it should behave as vanilla does; the marks say how far each
 part has been checked.
 
 | Mark | Means |
 |---|---|
-| ✅ | Works, and checked in game or against BDS |
+| ✅ | Works, and checked in game or against BDS (the basics at least; not every case) |
 | 🧪 | Built from BDS's code, not tested in game yet |
 | 🟡 | Partly built: some of it is missing |
 | ⬜ | Not built yet |
@@ -25,7 +25,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - ✅ Loading, sending and saving chunks; keeping chunks loaded without a player
 - ✅ Regions ticking on many cores, merging and splitting as players move
 - ✅ Registry: blocks, items, biomes, entities, creative items and recipes, byte for byte BDS's
-- ✅ Block ticks (random and scheduled)
+- 🟡 Block ticks: random and scheduled ticks run; many blocks' tick behaviour is added, not all
 - 🧪 World time and the day cycle (`/time` with `-testcmds`)
 - ⬜ Weather
 - 🧪 The void (damage below the world, items removed)
@@ -35,10 +35,11 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - ✅ Spawning, seeing each other, the player list
 - ✅ Abilities, game modes, permission levels, attributes
 - 🧪 Sneaking, sprinting, swimming, gliding, crawling
-- 🧪 Fall damage, hunger and exhaustion
-- 🧪 Health, natural regeneration, starving
-- 🧪 Hitting other players: damage, critical hits, knockback, armour
-- 🧪 Shields, totems, putting armour on by using it
+- ✅ Fall damage, hunger and exhaustion
+- ✅ Health, natural regeneration, starving
+- ✅ Hitting other players: damage, critical hits, knockback, armour
+- ✅ Totems
+- 🧪 Shields, putting armour on by using it
 - 🧪 Death, death messages, respawning
 - 🟡 Respawning at beds and respawn anchors, experience drops on death
 - 🧪 Riding (minecarts so far)
@@ -54,7 +55,8 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - 🧪 Tools wearing out and breaking
 - 🧪 Buckets (water and lava)
 - 🧪 Experience orbs and levels
-- 🧪 Snowballs, eggs, ender pearls, bows and arrows
+- ✅ Bows and arrows
+- 🟡 Snowballs, eggs, ender pearls: built, but not working in game yet
 - ⬜ Potions, milk, crossbows, tridents, mace, fishing
 
 ## Blocks
@@ -78,17 +80,17 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 
 ## Containers and crafting
 
-- 🧪 Chests, trapped chests, copper chests, double chests
+- ✅ Chests, trapped chests, copper chests, double chests
 - 🧪 Ender chests
-- 🧪 Shulker boxes (items kept when broken)
-- 🧪 Furnaces, blast furnaces, smokers
+- ✅ Shulker boxes (items kept when broken)
+- ✅ Furnaces, blast furnaces, smokers
 - 🧪 Hoppers, dispensers, droppers, crafters
 - 🧪 Chest and hopper minecart windows
 - ⬜ Barrels, loot tables in chests
-- 🧪 Crafting in the inventory and on the crafting table, and from the recipe book
+- ✅ Crafting in the inventory and on the crafting table, and from the recipe book
 - 🟡 Special recipes: shields with banners and repairs are built; fireworks, map copies, banner copies and the rest are not
 - 🧪 Repairing two items in the crafting grid
-- 🧪 Smithing tables: upgrades and armour trims
+- ✅ Smithing tables: upgrades and armour trims
 - ⬜ Stonecutter, cartography table, brewing stand
 - ⬜ Unlocking recipes (the recipe book may show few or none)
 
@@ -102,15 +104,16 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 
 ## Redstone
 
-- ✅ Wire, repeaters, torches, lamps, copper bulbs, comparators (checked in game, basics only)
-- 🧪 Pistons and sticky pistons
-- 🧪 Observers, pressure plates, note blocks, daylight sensors, target blocks
-- 🧪 Tripwire, bells, trapped chests
+- ✅ Wire, repeaters, torches, lamps, copper bulbs, comparators
+- ✅ Pistons and sticky pistons
+- ✅ Observers, pressure plates, note blocks, daylight sensors, target blocks
+- ✅ Tripwire, bells, trapped chests
 - 🧪 TNT and explosions
-- 🧪 Rails and minecarts (plain, chest, hopper, TNT)
+- ✅ Rails and minecarts (plain, chest, hopper, TNT)
 - ⬜ Command blocks and command block minecarts
 
-Redstone is not yet compared with BDS side by side: timing, big circuits and edge cases are unproven.
+Redstone basically fully works in game, but it was written from BDS's code and is not fully tested:
+it is not yet compared with BDS side by side, so timing, big circuits and edge cases are unproven.
 
 ## Commands
 
