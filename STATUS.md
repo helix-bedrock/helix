@@ -21,7 +21,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - ⬜ RakNet on by default (it is off)
 - ✅ Opening and saving BDS worlds, in BDS's own format
 - ✅ Flat and void worlds
-- 🧪 Vanilla terrain generation in the overworld (the worldgen library) and world types picked in `server.properties`
+- ✅ Vanilla terrain generation in the overworld (the worldgen library) and world types picked in `server.properties`
 - ✅ Loading, sending and saving chunks; keeping chunks loaded without a player
 - ✅ Regions ticking on many cores, merging and splitting as players move
 - ✅ Registry: blocks, items, biomes, entities, creative items and recipes, byte for byte BDS's

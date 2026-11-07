@@ -74,7 +74,7 @@ What works today and what is left is in [STATUS.md](STATUS.md).
 | Inventory, chests, shulker boxes, furnaces, crafting, smithing | ✅ from BDS's code; basic use checked in game, not every case |
 | Enchanting tables, anvils, grindstones, repairing in the crafting grid | 🟡 written from BDS's code; enchanting reported working in game |
 | Banners, looms, shields with banners | 🟡 written from BDS's code, not tested in game |
-| Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | 🧪 overworld hooked up, world types in `server.properties`; not tested in game |
+| Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | ✅ overworld hooked up, world types in `server.properties`; checked in game |
 | Redstone ([redstone](https://github.com/helix-bedrock/redstone)), pistons, hoppers, TNT | ✅ works in game; written from BDS's code, not fully tested against BDS |
 | Rails and minecarts (plain, chest, hopper, TNT) | ✅ works in game |
 | Player combat, health, hunger, death, shields, totems | ✅ checked in game, not every case |
