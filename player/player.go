@@ -40,6 +40,11 @@ type Player struct {
 	recipeRules atomic.Pointer[recipeRules]
 	recipeCache atomic.Pointer[recipeView]
 
+	// initialised is set once the client says it finished joining
+	// (SetLocalPlayerAsInitialised). Portals wait for it: a dimension change
+	// in the middle of the join disconnects the client. Runs: anywhere.
+	initialised atomic.Bool
+
 	// Session: fixed once the player joined. Runs: anywhere.
 	uuid      uuid.UUID
 	name      string

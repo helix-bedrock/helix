@@ -118,7 +118,7 @@ func (p *Player) tickPortal() {
 		}
 		return
 	}
-	if p.s.portals == nil || p.dead() || p.moving != nil || p.vehicle != nil || p.gameMode == GameModeSpectator {
+	if p.s.portals == nil || !p.initialised.Load() || p.dead() || p.moving != nil || p.vehicle != nil || p.gameMode == GameModeSpectator {
 		return
 	}
 	r := p.entity.Region()

@@ -245,6 +245,7 @@ func (p *Player) readLoop(done <-chan struct{}) {
 			p.send(p.currentViewer().SubChunks(pk))
 			p.flush()
 		case *packet.SetLocalPlayerAsInitialised:
+			p.initialised.Store(true)
 			s.log.Info("Player spawned", "name", p.name)
 		}
 	}
