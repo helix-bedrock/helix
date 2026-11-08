@@ -264,6 +264,17 @@ commits.
   absorption goes first. A full player regains health and an empty one starves, by difficulty. Empty buckets take
   liquids, and a block that can hold water keeps the source it is placed in. Not done yet: potions, milk, bows,
   tridents, mace, most item cooldowns, interacting with entities, mobs.
+- **Elytra and fireworks (built 2026-11-08, not yet tested in game):** gliding follows BDS 1.26.60: a start from the
+  client is refused (and sent back) on the ground, riding, in water, after rising 0.15 or more, or without an elytra
+  that still flies (damage below max - 1); gliding stops when that changes. The elytra takes 1 damage every 20 gliding
+  ticks (Unbreaking counts). Hitting a wall hurts (speed lost x 10 - 3, fly-into-wall) with the fall sounds; BDS
+  measures the speed in its own glide simulation, Helix from the client's movements. The glide physics run on the
+  client. Rockets (`FireworkRocket`, `Host.LaunchFirework`): used while gliding they ride with the player and send the
+  glide boost (`MovementEffect`) for their lifetime; used on a block they fly up from the click; dispensers shoot
+  them out of their face. Lifetime 10 x (Flight + 1) + rand(6) + rand(7); the explosion shows the particles to all
+  who see it (also on a gliding player) and, with stars, hurts 5 + 2 per star: the rider in full, players within 5
+  blocks it sees by distance. Hooks: `Systems.StartGlide`, `GlideTick`, `GlideCrash`, `Firework`; events `OnGlide`,
+  `OnFirework`. Not done: crossbow rockets, saving rockets with the chunk, the firework crafting recipe.
 - **Damage pipeline (built 2026-11-08, not yet tested in game):** every hurt of a player (melee, arrows, falls,
   fire, the void, explosions, starving, Thorns) is a `Hit`: a base and lists of parts (bonuses: melee enchantments,
   Strength and Weakness, critical hit, damage scale; reductions: damage scale, helmet, armour, toughness, Breach,

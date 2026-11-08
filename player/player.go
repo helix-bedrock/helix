@@ -92,6 +92,7 @@ type Player struct {
 	thrownAt int64
 	food     foodState
 	hurt     hurtState
+	glide    glideState
 	// burn is the player's on-fire timer.
 	burn   burnState
 	shield shieldState

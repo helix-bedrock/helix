@@ -82,8 +82,23 @@ type moveState struct {
 	fall    float32
 	// velocity is the player's last movement, as knockback starts from it.
 	velocity mgl32.Vec3
-	// climbing and inWater are what the last movement found.
-	climbing, inWater bool
+	// climbing, inWater and onGround are what the last movement found.
+	climbing, inWater, onGround bool
+}
+
+// glideInput is the client asking to start or stop gliding. A start goes through the
+// StartGlide system, and a refused one is sent back, as BDS's server decides gliding.
+func (p *Player) glideInput(start, stop bool) {
+	switch {
+	case stop:
+		p.SetGliding(false)
+	case start && !p.Gliding():
+		if p.s.game.sys.StartGlide(p) {
+			p.SetGliding(true)
+			return
+		}
+		p.sendOwnFlags()
+	}
 }
 
 // actorFlags are the player's actor flags as other players see them.
@@ -128,6 +143,10 @@ func (p *Player) sendActorFlags() {
 // client's simulation reached too.
 func vanillaMoveFlags(p *Player, in protocol.InputFlags) {
 	for f, fl := range moveFlagInputs {
+		if MoveFlag(f) == MoveGliding {
+			p.glideInput(in.Load(fl.start), in.Load(fl.stop))
+			continue
+		}
 		switch {
 		case in.Load(fl.stop):
 			p.SetMoving(MoveFlag(f), false)
@@ -170,7 +189,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 	if b, ok := r.Block(feet, 0); ok {
 		m.Climbing = p.s.reg.Blocks.Properties(b).Climbable
 	}
-	p.move.climbing, p.move.inWater = m.Climbing, m.InWater
+	p.move.climbing, p.move.inWater, p.move.onGround = m.Climbing, m.InWater, m.OnGround
 	sys := p.s.game.sys
 	sys.Fall(p, &m)
 	// BDS's FoodExhaustionSystem leaves out anyone riding.

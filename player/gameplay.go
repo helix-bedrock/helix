@@ -60,6 +60,13 @@ type Systems struct {
 	Fall       FallFunc
 	FallDamage FallDamageFunc
 	MoveCost   MoveCostFunc
+	// Gliding: StartGlide decides a start, GlideTick runs each tick (time, wear, stopping),
+	// GlideCrash is running into a wall.
+	StartGlide StartGlideFunc
+	GlideTick  GlideTickFunc
+	GlideCrash GlideCrashFunc
+	// Firework is a firework rocket exploding: its particles, then its damage.
+	Firework FireworkFunc
 	// Health and food.
 	Hurt HurtFunc
 	// TakeHit hurts a player with a Hit; HitParts adds the target's parts to it.
@@ -198,6 +205,8 @@ type gameplay struct {
 	furnaceBurnEv    listeners[FurnaceBurnEvent]
 	furnaceSmeltEv   listeners[FurnaceSmeltEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
+	glideEv          listeners[GlideEvent]
+	fireworkEv       listeners[FireworkEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
 	loomEv           listeners[LoomEvent]
@@ -252,6 +261,8 @@ type gameState struct {
 	furnaceBurnEv    listeners[FurnaceBurnEvent]
 	furnaceSmeltEv   listeners[FurnaceSmeltEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
+	glideEv          listeners[GlideEvent]
+	fireworkEv       listeners[FireworkEvent]
 	craftEv          listeners[CraftEvent]
 	smithEv          listeners[SmithEvent]
 	loomEv           listeners[LoomEvent]
@@ -426,6 +437,10 @@ func vanillaGameplay(s *Setup) error {
 	sys.Fall = vanillaFall
 	sys.FallDamage = vanillaFallDamage
 	sys.MoveCost = vanillaMoveCost
+	sys.StartGlide = vanillaStartGlide
+	sys.GlideTick = vanillaGlideTick
+	sys.GlideCrash = vanillaGlideCrash
+	sys.Firework = vanillaFirework
 	sys.Hurt = vanillaHurt
 	sys.TakeHit = vanillaTakeHit
 	sys.HitParts = vanillaHitParts
@@ -494,7 +509,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, banners: gs.banners,
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, glideEv: gs.glideEv, fireworkEv: gs.fireworkEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, banners: gs.banners,
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -530,6 +545,8 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.furnaceBurnEv.freeze()
 	g.furnaceSmeltEv.freeze()
 	g.tntPrimeEv.freeze()
+	g.glideEv.freeze()
+	g.fireworkEv.freeze()
 	g.craftEv.freeze()
 	g.smithEv.freeze()
 	g.loomEv.freeze()

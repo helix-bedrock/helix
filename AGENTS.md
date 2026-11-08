@@ -236,7 +236,7 @@ sibling library folders, so unreleased library changes are used.
   FoodTick, Attack, AttackParts, Knockback, UseItem, FoodOf, Eat), with events `OnHit`,
   `OnItemUse`, `OnItemEat`. `hit.go`: every hurt is a `Hit` of parts (Bonuses, Reductions, After; each
   `Off` or `Scale`d, plus `PartCustom`), built by AttackParts/HitParts, changed in one `OnHit`, resolved in
-  BDS's order; `Player.EditEnchantment` gives one player its own copy of an enchantment. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
+  BDS's order; `Player.EditEnchantment` gives one player its own copy of an enchantment. `elytra.go`: gliding (`Systems.StartGlide`, `GlideTick`, `GlideCrash`, `OnGlide`): BDS's start and stop rules, elytra wear, wall crashes. `firework.go`: firework rockets (`FireworkRocket`, `Host.LaunchFirework`, `Systems.Firework`, `OnFirework`): use while gliding (glide boost by `MovementEffect`), use on a block, dispensers, the explosion's particles and damage. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
   player's own (`Player.SetTuning`, `ClearTuning`, `ClearAllTuning`; not saved), the server's while running (the same on `Host`
   and `Server`), the default (vanilla's, or `Setup.SetTuning`). Vanilla's systems read `Player.Tuning` instead of constants; a new
   number of these systems gets a Tune too. `-testcmds` adds /tune. `death.go`: BDS's death (`Die`: items thrown unless

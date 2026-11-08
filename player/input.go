@@ -64,6 +64,9 @@ func (p *Player) handleInput(*world.Entity) {
 		run[i] = nil
 	}
 	p.runQueued()
+	if !p.dead() {
+		p.s.game.sys.GlideTick(p)
+	}
 	p.tickUsing()
 	if !p.dead() {
 		p.s.game.sys.FoodTick(p)
@@ -141,6 +144,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 			sys.Jump(p)
 		}
 	}
+	before := flatSpeed(p.move.velocity)
 	p.move.velocity = pk.Delta
 	p.move.forward = pk.MoveVector[1]
 	if p.vehicle != nil && pk.InputData.Load(packet.InputFlagStartSneaking) {
@@ -161,6 +165,9 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	})
 	if !p.dead() {
 		p.afterMove(from, collided)
+		if p.Gliding() && pk.InputData.Load(packet.InputFlagHorizontalCollision) && p.entity != nil {
+			sys.GlideCrash(p, before, flatSpeed(p.entity.Position().Sub(from)))
+		}
 	}
 }
 
