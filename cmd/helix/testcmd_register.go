@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/helix-bedrock/helix/daytime"
 	"strings"
 	"sync/atomic"
 
@@ -153,6 +154,14 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 		{tuneTestCommand, "Tests the number API: <name> <value>, clear [name], server <name> <value>, serverclear [name].", nil, tuneTest},
 		{enchantTestCommand, "Tests enchanting: levels <n>, max <enchantment id> <level>.", nil, enchantTest},
 		{targetTestCommand, "Hits nearby target blocks: [edge] [arrow].", nil, targetTest},
+		{lightTestCommand, "Shows the server's sky and block light where you stand.", nil, func(p *player.Player, _ []string) string {
+			var darken uint8
+			if server := srv.Load(); server != nil && server.Clock() != nil {
+				c := server.Clock()
+				darken = uint8(min(max(daytime.SkyDarken(c.Time(), c.Cycle()), 0), 15)) //nolint:gosec // 0 to 15
+			}
+			return lightTest(p, darken)
+		}},
 		{damageTestCommand, "Damages the item in your hand: <amount>, max, or fix.", nil, func(p *player.Player, args []string) string {
 			if len(args) != 1 {
 				return "Use: /damageitem <amount>, max, or fix"

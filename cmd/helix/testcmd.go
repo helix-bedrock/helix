@@ -95,6 +95,28 @@ func targetTest(p *player.Player, args []string) string {
 	return fmt.Sprintf("Hit %d target blocks.", hits)
 }
 
+// lightTestCommand shows the light the server keeps where the player stands. The client
+// works out its own light, so this is the only way to see the server's.
+const lightTestCommand = "lighttest"
+
+// lightTest runs /lighttest: the sky and block light in the block at the player's feet,
+// and the brightness after the night's darkening (skyDarken).
+func lightTest(p *player.Player, skyDarken uint8) string {
+	e := p.Entity()
+	if e == nil || e.Region() == nil {
+		return "Not in the world."
+	}
+	r := e.Region()
+	at := e.Position()
+	pos := cube.Pos{int(math.Floor(float64(at[0]))), int(math.Floor(float64(at[1]))), int(math.Floor(float64(at[2])))}
+	sky, block, ok := r.Light(pos)
+	if !ok {
+		return "No light here: the chunk is not loaded."
+	}
+	return fmt.Sprintf("At %d %d %d: sky %d, block %d, brightness now %d (night takes %d off the sky).",
+		pos[0], pos[1], pos[2], sky, block, r.Brightness(pos, skyDarken), skyDarken)
+}
+
 // damageTestCommand damages the held item, to try repairs without wearing tools out.
 const damageTestCommand = "damageitem"
 
