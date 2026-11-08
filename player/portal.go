@@ -113,6 +113,7 @@ func (p *Player) tickPortal() {
 			st.waited++
 			if st.arrival(r) {
 				st.arrival, st.waited = nil, 0
+				p.finishArrival()
 			}
 		}
 		return
@@ -310,10 +311,13 @@ func (p *Player) changeDimension(mv *dimMove) {
 	p.entity.Remove()
 }
 
-// arrive puts the player in the dimension of its move, as BDS 1.26.60's client expects
-// a dimension change: ChangeDimension with a new loading screen, all sounds stopped,
-// PlayStatus PlayerSpawn and the dimension change done action, then the chunks of the
-// new dimension around it. It runs on the old region when it took the entity out.
+// arrive puts the player in the dimension of its move, as BDS 1.26.60's
+// PlayerDimensionTransferer does: ChangeDimension with a new loading screen
+// (sub_CDEA5D0), then the chunks of the new dimension around it; the dimension change
+// done action follows once the player is placed there (sub_CDEB1F0, see
+// finishArrival). BDS sends PlayStatus PlayerSpawn only on the first spawn
+// (sub_A13F8E0), never on a dimension change. It runs on the old region when it took
+// the entity out.
 func (p *Player) arrive(mv *dimMove) {
 	z := &p.zone
 	z.mu.Lock()
@@ -324,15 +328,19 @@ func (p *Player) arrive(mv *dimMove) {
 	z.mu.Unlock()
 	old.Close()
 	p.portal.loadingScreen++
-	p.send(&packet.ChangeDimension{Dimension: p.s.dimensionID(mv.to), Position: mv.eyes, Respawn: mv.respawn, LoadingScreenID: protocol.Option(p.portal.loadingScreen)},
-		&packet.StopSound{StopAll: true},
-		&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn},
-		&packet.PlayerAction{EntityRuntimeID: p.runtimeID, ActionType: protocol.PlayerActionDimensionChangeDone})
+	p.send(&packet.ChangeDimension{Dimension: p.s.dimensionID(mv.to), Position: mv.eyes, Respawn: mv.respawn, LoadingScreenID: protocol.Option(p.portal.loadingScreen)})
 	p.portal.arrival, p.portal.waited = mv.arrive, 0
 	p.portal.changing, p.portal.changingTicks = true, 0
 	p.move = moveState{}
 	p.entity = mv.to.AddEntity(p.entityConfig(mv.eyes, mv.rot))
 	p.moveZones(mv.eyes)
+	p.flush()
+}
+
+// finishArrival tells the client the dimension change is done, once the player is
+// placed in the new dimension, as BDS's transferer sends PlayerAction 14 last.
+func (p *Player) finishArrival() {
+	p.send(&packet.PlayerAction{EntityRuntimeID: p.runtimeID, ActionType: protocol.PlayerActionDimensionChangeDone})
 	p.flush()
 }
 

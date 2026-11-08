@@ -352,7 +352,7 @@ commits.
 
 - **Portals and dimensions (built 2026-11-08 from BDS 1.26.60's code, not tested in game):** the
   Nether and the End are open and players move between them (`player/portal.go`, the `portal`
-  package, `end.go`). Nether portals: fire inside an empty obsidian frame (flint and steel, or fire placed or spreading
+  package, `end.go`). A dimension change sends what BDS's PlayerDimensionTransferer sends: ChangeDimension, then the new chunks, and the dimension change done action only once the player is placed (no PlayStatus or StopSound, which BDS sends only on the first spawn). Nether portals: fire inside an empty obsidian frame (flint and steel, or fire placed or spreading
   there in the overworld or the Nether, as BDS's fire onPlace) (2 to 21 wide, 3 to
   21 tall, corners not needed) fills it with portal blocks (all set before any neighbour update, as BDS does, so the portal does not break itself while filling); a frame that breaks or loses a portal block
   breaks the portal. A survival or adventure player goes through after standing 80 ticks in it, a
