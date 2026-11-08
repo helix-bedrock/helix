@@ -145,8 +145,8 @@ func TestChest(t *testing.T) {
 		total := 0
 		for _, e := range r.AppendEntitiesIn(nil, 0, 0, 15, 15) {
 			if it, ok := e.Owner().(*ItemActor); ok {
-				if it.stack.Count > chestPileMin+chestPileExtra-1 {
-					t.Errorf("pile of %d", it.stack.Count)
+				if it.stack.Count != 64 {
+					t.Errorf("slot split into a pile of %d", it.stack.Count)
 				}
 				total += int(it.stack.Count)
 			}

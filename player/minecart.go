@@ -953,12 +953,9 @@ func (m *Minecart) Break(r *world.Region, drops bool) {
 	}
 	pos := m.entity.Position()
 	if m.chest != nil {
-		for i, size := 0, m.chest.halfSize(); i < size; i++ {
-			if s := m.chest.items[i]; !s.Empty() {
-				m.s.spawnItem(r.Dimension(), s, pos, mgl32.Vec3{}, world.Rotation{}, cartDropDelay, 0)
-				m.chest.items[i] = ItemStack{}
-			}
-		}
+		size := m.chest.halfSize()
+		m.s.spillSlots(r, m.chest.items[:size], pos, false, cartDropDelay)
+		clear(m.chest.items[:size])
 	}
 	if drops {
 		if m.spec.block != "" {

@@ -36,14 +36,11 @@ const (
 	chestLidInset  = 0.0625
 	// chestViewRange is how far a player may be from an open chest.
 	chestViewRange = 12
-	// Thrown items land inside the block's middle, in piles of chestPileMin plus
-	// up to chestPileExtra-1 items, moving a little and upward.
+	// Thrown items land inside the block's middle, moving a little and upward.
 	chestThrowInset  = 0.1
 	chestThrowSpan   = 0.8
 	chestThrowSpeed  = 0.05
 	chestThrowUp     = 0.2
-	chestPileMin     = 10
-	chestPileExtra   = 21
 	chestPickupDelay = 10
 	// chestEntityID and enderChestEntityID are the saved IDs of their block
 	// entities.
@@ -569,32 +566,31 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 			items = nil
 		}
 	}
-	// BDS's furnace break (0xD414AD0) drops its slots with random piles off, so each
-	// slot lands as one item; chests, barrels, hoppers and dispensers throw piles.
-	piles := c.furnace == nil
-	for _, s := range items {
-		c.throwStack(r, s, piles)
-	}
+	c.s.spillSlots(r, items, blockVec(pos), true, chestPickupDelay)
 	c.items = [chestSize]ItemStack{}
 }
 
-// throwStack throws a slot's items out, as BDS's container drop does
-// (0xB53D210): one place per slot, drawn before the first pile, and with piles
-// on, piles of 10 to 30 that start together, each with its own velocity. With
-// piles off the whole slot is one item.
-func (c *Chest) throwStack(r *world.Region, s ItemStack, piles bool) {
-	if s.Empty() {
-		return
-	}
-	at := blockVec(c.pos).Add(mgl32.Vec3{chestThrowOffset(), chestThrowOffset(), chestThrowOffset()})
-	for !s.Empty() {
-		pile := s
-		if piles {
-			pile.Count = min(uint8(rand.IntN(chestPileExtra))+chestPileMin, s.Count) //nolint:gosec // an item's scatter, not a secret
+// spillSlots drops the slots of a broken container, each slot as one whole item, so
+// a slot of 63 ends as one item of 63. Every container spills through it: chests,
+// barrels, hoppers, dispensers, droppers, crafters, furnaces and carts.
+//
+// Lenient where the lead says so (2026-11-08): BDS 1.26.60's container drop
+// (0xB53D210) throws chests, barrels, shulker boxes and hoppers in piles of 10 to
+// 30 (their breaks pass 1; the furnace's passes 0), yet in game BDS ends with one
+// stack and Helix's piles stayed apart, so every slot drops whole as a furnace's do.
+// With scatter, as a block's drop, each slot lands at its own place inside the block
+// at origin's corner with a little speed, upward; without, all land at origin, still.
+func (s *Host) spillSlots(r *world.Region, items []ItemStack, origin mgl32.Vec3, scatter bool, pickupDelay int32) {
+	for _, it := range items {
+		if it.Empty() {
+			continue
 		}
-		s.Count -= pile.Count
-		vel := mgl32.Vec3{chestThrowDrift(), chestThrowDrift() + chestThrowUp, chestThrowDrift()}
-		c.s.spawnItem(r.Dimension(), pile, at, vel, world.Rotation{}, chestPickupDelay, 0)
+		at, vel := origin, mgl32.Vec3{}
+		if scatter {
+			at = origin.Add(mgl32.Vec3{chestThrowOffset(), chestThrowOffset(), chestThrowOffset()})
+			vel = mgl32.Vec3{chestThrowDrift(), chestThrowDrift() + chestThrowUp, chestThrowDrift()}
+		}
+		s.spawnItem(r.Dimension(), it, at, vel, world.Rotation{}, pickupDelay, 0)
 	}
 }
 

@@ -335,14 +335,16 @@ func liquidAt(reg *registry.Registry, r *world.Region, pos cube.Pos) (material u
 
 // mergeNearby joins the item with the items around it.
 func (i *ItemActor) mergeNearby(r *world.Region, pos mgl32.Vec3) {
-	reach := float32(itemHalfSize + itemMergeReach)
+	// Both boxes count: BDS grows this item's box by the reach and takes every item
+	// whose box it touches.
+	reach := float32(2*itemHalfSize + itemMergeReach)
 	var buf [16]*world.Entity
 	for _, o := range r.AppendEntitiesIn(buf[:0], pos[0]-reach, pos[2]-reach, pos[0]+reach, pos[2]+reach) {
 		other, ok := o.Owner().(*ItemActor)
 		if !ok || other == i || other.taken {
 			continue
 		}
-		if p := o.Position(); boxesApart(pos, p, 2*itemHalfSize+itemMergeReach) {
+		if p := o.Position(); boxesApart(pos, p, reach) {
 			continue
 		}
 		if i.merge(other) && i.taken {
