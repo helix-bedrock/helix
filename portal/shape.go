@@ -220,15 +220,20 @@ func (b *Blocks) edge(at func(cube.Pos) uint32, pos, dir cube.Pos) int {
 	return 0
 }
 
-// fill sets the inside of s to portal blocks, with neighbour updates.
+// fill sets the inside of s to portal blocks. Like BDS's createPortalBlocks
+// (sub_CDB0D00, which writes into a buffer that trySpawnPortal applies after), every
+// block is set before any neighbour update goes out: a portal told about its neighbour
+// while the frame is half filled would see it not full and break.
 func (b *Blocks) fill(r *world.Region, s shape) {
 	portal := b.portalFor(s.axis)
 	for h := range s.height {
 		for i := range s.width {
-			p := s.bottomLeft.Add(cube.Pos{s.right[0] * i, h, s.right[2] * i})
-			if r.SetBlock(p, 0, portal) {
-				r.UpdateNeighbours(p)
-			}
+			r.SetBlock(s.bottomLeft.Add(cube.Pos{s.right[0] * i, h, s.right[2] * i}), 0, portal)
+		}
+	}
+	for h := range s.height {
+		for i := range s.width {
+			r.UpdateNeighbours(s.bottomLeft.Add(cube.Pos{s.right[0] * i, h, s.right[2] * i}))
 		}
 	}
 }

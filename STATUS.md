@@ -354,7 +354,7 @@ commits.
   Nether and the End are open and players move between them (`player/portal.go`, the `portal`
   package, `end.go`). Nether portals: fire inside an empty obsidian frame (flint and steel, or fire placed or spreading
   there in the overworld or the Nether, as BDS's fire onPlace) (2 to 21 wide, 3 to
-  21 tall, corners not needed) fills it with portal blocks; a frame that breaks or loses a portal block
+  21 tall, corners not needed) fills it with portal blocks (all set before any neighbour update, as BDS does, so the portal does not break itself while filling); a frame that breaks or loses a portal block
   breaks the portal. A survival or adventure player goes through after standing 80 ticks in it, a
   creative one at once, with BDS's cooldowns (10 ticks, 300 after a trip) and the time falling by 4 a
   tick outside. x and z are divided or multiplied by 8 (y kept, within 32 million); the arrival takes
