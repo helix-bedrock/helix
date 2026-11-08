@@ -94,6 +94,9 @@ func (b *Blocks) typeOf(id uint32) uint32 {
 // IsPortal reports whether block is a nether portal block.
 func (b *Blocks) IsPortal(block uint32) bool { return b.typeOf(block) == b.portalType }
 
+// IsFire reports whether block is fire (not soul fire), whose onPlace lights portals.
+func (b *Blocks) IsFire(block uint32) bool { return b.typeOf(block) == b.fireType }
+
 // IsEndPortal reports whether block is an end portal block.
 func (b *Blocks) IsEndPortal(block uint32) bool { return b.typeOf(block) == b.endPortalType }
 

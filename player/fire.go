@@ -12,7 +12,8 @@ const nameSoulFire = "minecraft:soul_fire"
 // lightFire is BDS's FlintAndSteelItem: always on the block beside the clicked face. If that
 // block is air it plays the ignite sound and sets fire there (the fire turns to soul fire on
 // soul sand or soul soil by itself). Either way the item wears by one, as BDS's code does.
-// Fire lit inside an empty obsidian frame makes a nether portal instead (trySpawnPortal).
+// Fire lit inside an empty obsidian frame makes a nether portal instead (trySpawnPortal,
+// which FlintAndSteelItem calls itself before the fire's own onPlace).
 func (p *Player) lightFire(r *world.Region, clicked cube.Pos, face int32, held ItemStack) bool {
 	if face < 0 || face > int32(cube.FaceEast) || !p.inReach(clicked) {
 		return false

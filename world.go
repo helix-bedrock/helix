@@ -146,7 +146,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		}
 		rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
 		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, liquid.New(s.reg.Blocks))
-		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.fire)))))
+		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire)))))
 		if err != nil {
 			return err
 		}
@@ -186,6 +186,18 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	}
 	s.overworld = d
 	return s.openOtherDimensions(conf, typeName, seed)
+}
+
+// dimensionOf is BDS's number of an open dimension. Runs: anywhere once the world is
+// open.
+func (s *Server) dimensionOf(d *world.Dimension) mcdb.Dimension {
+	switch {
+	case d != nil && d == s.nether:
+		return mcdb.Nether
+	case d != nil && d == s.end:
+		return mcdb.End
+	}
+	return mcdb.Overworld
 }
 
 // openPortals loads the portal records from the world's portals key.

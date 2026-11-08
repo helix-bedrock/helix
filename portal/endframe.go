@@ -9,13 +9,21 @@ import (
 // portal: the frames stand on the 5 by 5 square's sides, corners left out.
 const endRingReach = 2
 
-// ringOffsets are the twelve frame places around a portal's middle.
-var ringOffsets = func() []cube.Pos {
-	var out []cube.Pos
+// ringFrame is one of the twelve frame places around a portal's middle, and the way the
+// frame there must face: toward the middle, as the frames of BDS's stronghold portal
+// room do and its pattern check (sub_CAF3EF0) wants.
+type ringFrame struct {
+	off    cube.Pos
+	facing string
+}
+
+// ringFrames are the twelve frame places around a portal's middle.
+var ringFrames = func() []ringFrame {
+	var out []ringFrame
 	for i := -1; i <= 1; i++ {
 		out = append(out,
-			cube.Pos{i, 0, -endRingReach}, cube.Pos{i, 0, endRingReach},
-			cube.Pos{-endRingReach, 0, i}, cube.Pos{endRingReach, 0, i})
+			ringFrame{cube.Pos{i, 0, -endRingReach}, "south"}, ringFrame{cube.Pos{i, 0, endRingReach}, "north"},
+			ringFrame{cube.Pos{-endRingReach, 0, i}, "east"}, ringFrame{cube.Pos{endRingReach, 0, i}, "west"})
 	}
 	return out
 }()
@@ -47,13 +55,11 @@ func (p *Portals) WithEye(block uint32) (uint32, bool) {
 
 // OpenEndPortal is the end portal frame's pattern check (BDS sub_CAF30D0 on a 5 by 5
 // BlockPattern): when the frame at pos got its eye and it completes a ring of twelve
-// frames with eyes around a 3 by 3 square, the square becomes end portal. It reports
-// whether a portal opened, with the middle of the square.
-//
-// BDS also checks that the frames face inward; Helix takes any facing so far.
+// frames with eyes, all facing the middle, around a 3 by 3 square, the square becomes
+// end portal. It reports whether a portal opened, with the middle of the square.
 func (p *Portals) OpenEndPortal(r *world.Region, pos cube.Pos) (cube.Pos, bool) {
-	for _, off := range ringOffsets {
-		mid := pos.Sub(off)
+	for _, f := range ringFrames {
+		mid := pos.Sub(f.off)
 		if !p.ringDone(r, mid) {
 			continue
 		}
@@ -70,14 +76,17 @@ func (p *Portals) OpenEndPortal(r *world.Region, pos cube.Pos) (cube.Pos, bool) 
 	return cube.Pos{}, false
 }
 
-// ringDone reports whether all twelve frames around mid have their eye.
+// ringDone reports whether all twelve frames around mid have their eye and face mid.
 func (p *Portals) ringDone(r *world.Region, mid cube.Pos) bool {
-	for _, off := range ringOffsets {
-		b, ok := r.Block(mid.Add(off), 0)
+	for _, f := range ringFrames {
+		b, ok := r.Block(mid.Add(f.off), 0)
 		if !ok {
 			return false
 		}
 		if frame, eye := p.IsFrame(b); !frame || !eye {
+			return false
+		}
+		if facing, _ := p.reg.States(b)[stateDirection].(string); facing != f.facing {
 			return false
 		}
 	}
