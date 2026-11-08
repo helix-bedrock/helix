@@ -18,6 +18,9 @@ func (p *Player) send(pks ...packet.Packet) bool {
 		return true // a player with no client to tell, as in tests
 	}
 	for _, pk := range pks {
+		if p.traceSends.Load() > 0 && p.traceSends.Add(-1) >= 0 {
+			p.s.log.Debug("packet to player", "name", p.name, "packet", describePacket(pk))
+		}
 		if err := p.conn.WritePacket(pk); err != nil {
 			p.logSendError(err, pk)
 			return false
@@ -98,4 +101,22 @@ func (p *Player) sendOwnItems() {
 // blockPos is a block position as packets carry it.
 func blockPos(pos cube.Pos) protocol.BlockPos {
 	return protocol.BlockPos{int32(pos[0]), int32(pos[1]), int32(pos[2])} //nolint:gosec // block coordinates fit int32
+}
+
+// describePacket is a short text of pk for the debug trace: large payloads left out.
+func describePacket(pk packet.Packet) string {
+	switch pk := pk.(type) {
+	case *packet.LevelChunk:
+		return fmt.Sprintf("LevelChunk dim=%d pos=%v limit=%v", pk.Dimension, pk.Position, pk.SubChunkLimit)
+	case *packet.SubChunk:
+		res := make([]string, len(pk.SubChunkEntries))
+		for i, e := range pk.SubChunkEntries {
+			res[i] = fmt.Sprintf("%v:%d", e.Offset, e.Result)
+		}
+		return fmt.Sprintf("SubChunk dim=%d pos=%v %v", pk.Dimension, pk.Position, res)
+	case *packet.UpdateBlock, *packet.ChangeDimension, *packet.PlayerAction, *packet.MovePlayer,
+		*packet.NetworkChunkPublisherUpdate, *packet.PlayStatus, *packet.RemoveActor:
+		return fmt.Sprintf("%T %+v", pk, pk)
+	}
+	return fmt.Sprintf("%T", pk)
 }

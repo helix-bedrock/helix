@@ -37,6 +37,8 @@ const (
 	// arrivalWaitTicks is how long an arrival waits for the chunks around it before it
 	// builds or finds the portal with what is loaded.
 	arrivalWaitTicks = 200
+	// dimensionTrace is how many packets after a dimension change -debug logs.
+	dimensionTrace = 400
 )
 
 // portalState is the player's PortalCooldownDurationComponent and its arrival.
@@ -328,6 +330,7 @@ func (p *Player) arrive(mv *dimMove) {
 	z.mu.Unlock()
 	old.Close()
 	p.portal.loadingScreen++
+	p.traceSends.Store(dimensionTrace)
 	p.send(&packet.ChangeDimension{Dimension: p.s.dimensionID(mv.to), Position: mv.eyes, Respawn: mv.respawn, LoadingScreenID: protocol.Option(p.portal.loadingScreen)})
 	p.portal.arrival, p.portal.waited = mv.arrive, 0
 	p.portal.changing, p.portal.changingTicks = true, 0

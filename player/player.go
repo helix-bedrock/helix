@@ -44,6 +44,9 @@ type Player struct {
 	// (SetLocalPlayerAsInitialised). Portals wait for it: a dimension change
 	// in the middle of the join disconnects the client. Runs: anywhere.
 	initialised atomic.Bool
+	// traceSends counts down the packets logged at debug level after a
+	// dimension change, to see what the client gets around it. Runs: anywhere.
+	traceSends atomic.Int32
 
 	// Session: fixed once the player joined. Runs: anywhere.
 	uuid      uuid.UUID
