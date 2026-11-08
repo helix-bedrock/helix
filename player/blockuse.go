@@ -1,8 +1,12 @@
 package player
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/blockuse"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
 
@@ -62,6 +66,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if b, ok := p.s.game.blocks[blocks.Name(u.Block)].(Usable); ok {
 		return b.Use(u)
 	}
+	if lightLevel(blocks.Name(u.Block)) >= 0 && lightLevel(u.Item.Name) >= 0 {
+		return p.useLightBlock(r, u)
+	}
 	if p.s.chests.kind[u.Block] != chestNone {
 		return p.useChest(r, u)
 	}
@@ -96,4 +103,34 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return true
 	}
 	return blockuse.Use(blocks, r, u.Pos, u.Block, p.entity.Rotation().Yaw)
+}
+
+// lightBlockPrefix starts the names of the sixteen light blocks, light_block_0 to 15.
+const lightBlockPrefix = "minecraft:light_block_"
+
+// lightLevel is the level in a light block's name, -1 if name is no light block.
+func lightLevel(name string) int {
+	n, ok := strings.CutPrefix(name, lightBlockPrefix)
+	if !ok {
+		return -1
+	}
+	level, err := strconv.Atoi(n)
+	if err != nil || level < 0 || level > 15 {
+		return -1
+	}
+	return level
+}
+
+// useLightBlock is BDS 1.26.60's light block click (sub_D557A40): a light block held on a
+// light block always takes the click, so nothing is placed, and in creative the block
+// becomes the next level, 15 going round to 0 (the chain its registration builds).
+func (p *Player) useLightBlock(r *world.Region, u *BlockUse) bool {
+	if !p.creative() {
+		return true
+	}
+	next := lightBlockPrefix + strconv.Itoa((lightLevel(p.s.reg.Blocks.Name(u.Block))+1)%16)
+	if id, ok := p.s.reg.Blocks.Block(next); ok && r.SetBlock(u.Pos, 0, id) {
+		r.UpdateNeighbours(u.Pos)
+	}
+	return true
 }
