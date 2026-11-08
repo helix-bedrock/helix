@@ -19,8 +19,16 @@ type Viewer struct {
 	// id orders the viewers of a region, so they are updated in a fixed
 	// order.
 	id    uint64
-	send  func(pk packet.Packet)
+	out   func(pk packet.Packet)
 	flush func()
+
+	// sendMu orders sends with Close: once Close returned, nothing more goes
+	// out through this viewer. A player changing dimension closes its old
+	// viewer before telling the client, and a block change of the old
+	// dimension arriving after that is one the client cannot place (its Y
+	// may be outside the new dimension) and disconnects over.
+	sendMu sync.Mutex
+	closed bool
 
 	// region is the region the viewer stands in. Guarded by d.mu.
 	region *Region
@@ -57,7 +65,7 @@ type Viewer struct {
 // until the first Move. Runs: anywhere.
 func (d *Dimension) AddViewer(send func(pk packet.Packet), flush func()) *Viewer {
 	v := &Viewer{
-		d: d, send: send, flush: flush, ready: make(chan struct{}), lastRadius: -1,
+		d: d, out: send, flush: flush, ready: make(chan struct{}), lastRadius: -1,
 		nets: map[mcdb.ChunkPos]*NetChunk{}, known: map[mcdb.ChunkPos]bool{},
 		waiting: map[mcdb.ChunkPos]bool{}, held: map[mcdb.ChunkPos]bool{},
 	}
@@ -91,6 +99,18 @@ func (v *Viewer) Close() {
 	v.mu.Lock()
 	v.removed = true
 	v.mu.Unlock()
+	v.sendMu.Lock()
+	v.closed = true
+	v.sendMu.Unlock()
+}
+
+// send queues pk for the client, unless the viewer was closed.
+func (v *Viewer) send(pk packet.Packet) {
+	v.sendMu.Lock()
+	defer v.sendMu.Unlock()
+	if !v.closed {
+		v.out(pk)
+	}
 }
 
 // SubChunks answers the client's request for sub chunks of chunks it was
