@@ -525,36 +525,6 @@ func thornsAfterHurt(wearer, attacker *Player, level int16) {
 	attacker.playSound(packet.SoundEventThorns)
 }
 
-// armorAfterHurt runs the worn enchantments' AfterHurt when attacker has hit the player.
-func (p *Player) armorAfterHurt(attacker *Player) {
-	g := p.s.game
-	for _, s := range p.inventory.armor {
-		if s.Empty() {
-			continue
-		}
-		enchantLevels(s, func(id, level int16) {
-			if e, ok := g.enchant(id); ok && e.AfterHurt != nil {
-				e.AfterHurt(p, attacker, level)
-			}
-		})
-	}
-}
-
-// breached is share after the enchantments on the player's held item. A nil player is
-// a hit with no attacker.
-func (p *Player) breached(share float32) float32 {
-	if p == nil {
-		return share
-	}
-	g := p.s.game
-	enchantLevels(p.inventory.Held(), func(id, level int16) {
-		if e, ok := g.enchant(id); ok && e.Breach != nil {
-			share = e.Breach(level, share)
-		}
-	})
-	return share
-}
-
 // EnchantLevel is an enchantment and its level on an item.
 type EnchantLevel struct {
 	ID    int16

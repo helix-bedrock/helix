@@ -38,6 +38,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - ✅ Fall damage, hunger and exhaustion
 - ✅ Health, natural regeneration, starving
 - ✅ Hitting other players: damage, critical hits, knockback, armour
+- 🧪 Damage pipeline: every hurt is made of parts plugins can turn off or scale, one `OnHit` event, per-player enchantments
 - ✅ Totems
 - 🧪 Shields, putting armour on by using it
 - 🧪 Death, death messages, respawning
@@ -263,6 +264,14 @@ commits.
   absorption goes first. A full player regains health and an empty one starves, by difficulty. Empty buckets take
   liquids, and a block that can hold water keeps the source it is placed in. Not done yet: potions, milk, bows,
   tridents, mace, most item cooldowns, interacting with entities, mobs.
+- **Damage pipeline (built 2026-11-08, not yet tested in game):** every hurt of a player (melee, arrows, falls,
+  fire, the void, explosions, starving, Thorns) is a `Hit`: a base and lists of parts (bonuses: melee enchantments,
+  Strength and Weakness, critical hit, damage scale; reductions: damage scale, helmet, armour, toughness, Breach,
+  protection enchantments, Resistance, hurt time, absorption; after: knockback, Thorns, armour and weapon wear,
+  exhaustion). One `OnHit` event lets a plugin turn any part off, scale it or add its own, then the engine works
+  the damage out in BDS 1.26.60's order and caps. `Player.EditEnchantment` gives one player its own copy of an
+  enchantment (say weaker Sharpness). `OnPlayerAttack` and `OnPlayerHurt` are gone; `OnHit` replaces both. A plain
+  hurt (`Systems.Hurt`) still takes a damage and source. Damage sensors, mobs and the mace are not built.
 - **Shields, totems and putting armour on by using it (built from BDS 1.26.60, not yet tested in game):** sneaking raises a shield in the
   offhand or hand, and after 5 ticks it stops hits from in front, wears down, shakes and pushes the attacker back; an axe puts it on
   cooldown for 5 seconds. A totem in either hand saves a player from a killing hit, except from the void: 1 health, its effects and

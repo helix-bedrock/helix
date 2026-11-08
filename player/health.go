@@ -83,20 +83,6 @@ type hurtState struct {
 	last  float32
 }
 
-// PlayerHurtEvent fires before a player takes damage. Damage may be changed; Cancel
-// stops the hurt.
-type PlayerHurtEvent struct {
-	Cancellable
-	Player *Player
-	Damage float32
-	Source DamageSource
-}
-
-// OnPlayerHurt listens to players being hurt.
-func OnPlayerHurt(s *Setup, fn func(e *PlayerHurtEvent), p Priority) error {
-	return addListener(s, &s.h.game.hurtEv, fn, p)
-}
-
 // Health returns the player's health. Runs: the player's region.
 func (p *Player) Health() float32 { return p.attributes.get(attrHealth) }
 
@@ -121,68 +107,20 @@ func (p *Player) tickHurt() {
 	}
 }
 
-// vanillaHurt is BDS's hurt through the health attribute: the event, what armour and
-// effects leave, the hurt time letting only what is above the last hurt through,
-// absorption first and health for the rest, then the hurt effects (hurt time, knockback,
-// the hurt event), armour wear and the damage exhaustion. At no health left the Die
-// system runs, unless a totem saves the player. A shield stops the hit before any of
-// this. Damage sensors are not built yet. Returns whether the player was hurt.
+// vanillaHurt is a hurt of damage from src with no attacker parts: a Hit with damage as
+// its base, taken by the TakeHit system. Returns whether the player was hurt.
 func vanillaHurt(p *Player, damage float32, src DamageSource) bool {
-	if damage <= 0 || p.dead() || p.invulnerable() && src.Cause != DamageVoid {
-		return false
-	}
-	g := p.s.game
-	if g.sys.ShieldBlock(p, damage, src) {
-		p.flush()
-		return false
-	}
-	if g.hurtEv.Has() {
-		e := PlayerHurtEvent{Player: p, Damage: damage, Source: src}
-		g.hurtEv.fire(p.s.log, &e)
-		if e.Cancelled() || e.Damage <= 0 {
-			return false
-		}
-		damage = e.Damage
-	}
-	damage *= p.Tuning(TuneDamageTakenScale)
 	if damage <= 0 {
 		return false
 	}
-	raw := damage
-	damage = g.sys.ReduceDamage(p, damage, src)
-	if p.hurt.ticks > 0 && src.Cause != DamageNone && src.Cause != DamageSelfDestruct {
-		if damage <= p.hurt.last {
-			return false
-		}
-		damage -= p.hurt.last
-	}
-	p.takeHealth(damage, src)
-	if p.hurt.ticks > 0 {
-		p.hurt.last += damage
-	} else {
-		p.hurt.last = damage
-	}
-	p.hurt.ticks = int32(p.Tuning(TuneHurtTicks))
-	if src.Knockback && src.Attacker != nil {
-		g.sys.Knockback(p, src.Attacker, src.Extra)
-	}
-	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventHurt), nil)
-	}
-	p.wearArmor(raw, src.Cause)
-	g.sys.Exhaust(p, p.Tuning(TuneExhaustDamage))
-	if p.dead() {
-		g.sys.Die(p, src)
-	}
-	p.flush()
-	return true
+	return p.s.game.sys.TakeHit(NewHit(p, damage, src))
 }
 
-// takeHealth takes damage off absorption, then health. A hit that would kill goes to
+// takeHealth takes damage off absorption (when absorb), then health. A hit that would kill goes to
 // the totem first: BDS's health only changes for those who see the player at the end
 // of its tick, so they never see it at 0 when a totem saves it.
-func (p *Player) takeHealth(damage float32, src DamageSource) {
-	if abs := p.attributes.get(attrAbsorption); abs > 0 && src.Cause != DamageSelfDestruct {
+func (p *Player) takeHealth(damage float32, src DamageSource, absorb bool) {
+	if abs := p.attributes.get(attrAbsorption); abs > 0 && absorb {
 		used := min(abs, damage)
 		damage -= used
 		p.setAttributes(attrAbsorption, abs-used)
@@ -192,21 +130,6 @@ func (p *Player) takeHealth(damage float32, src DamageSource) {
 		return
 	}
 	p.SetHealth(left)
-}
-
-// vanillaReduceDamage is BDS's damage after armour, then its enchantments, then each
-// effect's Resist for causes it applies to.
-func vanillaReduceDamage(p *Player, damage float32, src DamageSource) float32 {
-	damage = p.afterArmor(damage, src)
-	damage = p.afterProtection(damage, src.Cause)
-	if resisted(src.Cause) {
-		for _, a := range p.effects {
-			if e, ok := p.s.game.effects[a.ID]; ok && e.Resist != nil {
-				damage = e.Resist(a.Amplifier, damage)
-			}
-		}
-	}
-	return damage
 }
 
 // resistanceDamage is BDS's Resistance: a fifth off per level, none left past level 4.
@@ -225,58 +148,6 @@ func armorBypassed(cause DamageCause) bool {
 // resisted reports whether effects apply to cause.
 func resisted(cause DamageCause) bool {
 	return cause >= causeResistedFrom || cause >= 0 && causesResisted>>cause&1 != 0
-}
-
-// afterArmor is BDS's armour: a helmet takes a quarter off falling blocks; armour and
-// toughness then take a share.
-func (p *Player) afterArmor(damage float32, src DamageSource) float32 {
-	cause := src.Cause
-	if armorBypassed(cause) {
-		return damage
-	}
-	inv := &p.inventory
-	if !inv.armor[0].Empty() && cause >= 0 && cause < causeFallingLimit && causesFallingHit>>cause&1 != 0 {
-		damage *= helmetFalling
-	}
-	var armor, tough float32
-	for _, s := range inv.armor {
-		if s.Empty() {
-			continue
-		}
-		if v, ok := p.s.game.combat.armor[s.Name]; ok {
-			armor += float32(v.Protection)
-			tough += float32(v.Toughness)
-		}
-	}
-	armor = max(armor+p.Tuning(TuneArmor), 0)
-	tough = max(tough+p.Tuning(TuneToughness), 0)
-	v := damage/(tough*toughnessShare+toughnessBase) + armor
-	share := p.Tuning(TuneArmorMaxShare)
-	if v <= armorFullPoints {
-		share = max(v, armor*armorMinShare) / armorPerPoint
-	}
-	return damage * (1 - src.Attacker.breached(share))
-}
-
-// afterProtection is BDS's armour enchantments: each piece's points count, up to a
-// limit, each taking a share off.
-func (p *Player) afterProtection(damage float32, cause DamageCause) float32 {
-	if cause == causeEnchantsSkip {
-		return damage
-	}
-	var points int32
-	for _, s := range p.inventory.armor {
-		if s.Empty() || points >= maxProtectionCount {
-			continue
-		}
-		enchantLevels(s, func(id, level int16) {
-			if e, ok := p.s.game.enchant(id); ok && e.Protection != nil && points < maxProtectionCount {
-				points += e.Protection(level, cause)
-			}
-		})
-	}
-	counted := max(min(float32(points)+p.Tuning(TuneProtection), p.Tuning(TuneProtectionLimit)), 0)
-	return damage * (counted*-p.Tuning(TuneProtectionPoint) + 1)
 }
 
 // protectionKind is BDS's armour enchantment of one kind: its level, times what the
@@ -311,12 +182,9 @@ func protectionKind(kind int) func(level int16, cause DamageCause) int32 {
 	}
 }
 
-// wearArmor is BDS's armour wear: each piece takes a quarter of the damage, at least
-// one, for causes armour applies to.
-func (p *Player) wearArmor(damage float32, cause DamageCause) {
-	if armorBypassed(cause) {
-		return
-	}
+// wearArmor is BDS's armour wear (0xBFE91C0): each piece takes a quarter of the damage,
+// at least one. The PartArmorWear of a hit runs it for causes armour applies to.
+func (p *Player) wearArmor(damage float32) {
 	n := max(int32(damage)/armorWearShare, armorWearMin)
 	changed := false
 	for i := range p.inventory.armor {

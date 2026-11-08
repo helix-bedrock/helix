@@ -63,34 +63,8 @@ const (
 	EffectWeakness  int32 = 18
 )
 
-// Attack is one player's hit on another as it is worked out.
-type Attack struct {
-	Attacker, Target *Player
-	// Damage is what the hit deals before the target's armour.
-	Damage float32
-	// Critical is set for a critical hit, whose multiplier is in Damage.
-	Critical bool
-	// Knockback is the extra knockback of the hit.
-	Knockback float32
-}
-
-// PlayerAttackEvent fires before a player's hit lands. Attack may be changed;
-// Cancel stops the hit.
-type PlayerAttackEvent struct {
-	Cancellable
-	Attack *Attack
-}
-
-// OnPlayerAttack listens to players hitting players.
-func OnPlayerAttack(s *Setup, fn func(e *PlayerAttackEvent), p Priority) error {
-	return addListener(s, &s.h.game.attackEv, fn, p)
-}
-
 // AttackFunc is a player hitting target; false if nothing happened.
 type AttackFunc func(p, target *Player) bool
-
-// AttackDamageFunc is what the player's hit deals, before a critical hit.
-type AttackDamageFunc func(p, target *Player) float32
 
 // KnockbackFunc pushes target away from attacker. extra is the extra knockback
 // of the hit.
@@ -166,9 +140,10 @@ func (p *Player) playerNear(id uint64) *Player {
 	return nil
 }
 
-// vanillaAttack is BDS's player attack: the abilities and pvp rule, the event, the
-// damage, a critical hit, the hurt, then what the hit costs the attacker and its
-// item, and its sound. Mace and cooldowns are not built yet.
+// vanillaAttack is BDS's player attack (0xBCEC360): the abilities and pvp rule, the
+// hit's parts from the AttackParts system, the target's hurt (with the HitEvent), then
+// what the hit costs the attacker and its item, and its sound. Mace and cooldowns are
+// not built yet.
 func vanillaAttack(p, target *Player) bool {
 	if !p.abilities.Flag(AbilityAttackPlayers) || !p.s.level.PVP {
 		return false
@@ -177,36 +152,17 @@ func vanillaAttack(p, target *Player) bool {
 	if r == nil {
 		return false
 	}
-	a := Attack{Attacker: p, Target: target, Damage: g.sys.AttackDamage(p, target)}
-	if a.Damage > 0 {
-		if a.Critical = p.canCrit(); a.Critical {
-			a.Damage *= p.Tuning(TuneCritMultiplier)
-		}
-		a.Damage *= p.Tuning(TuneDamageDealtScale)
-		a.Knockback = p.knockbackOf()
-	}
-	if g.attackEv.Has() {
-		e := PlayerAttackEvent{Attack: &a}
-		g.attackEv.fire(p.s.log, &e)
-		if e.Cancelled() {
-			return false
-		}
-	}
+	h := g.sys.AttackParts(p, target)
 	sound := packet.SoundEventAttackNoDamage
-	if a.Damage > 0 {
-		sound = packet.SoundEventAttackStrong
-		if a.Critical {
-			sound = packet.SoundEventAttackCritical
-		}
-		if g.sys.Hurt(target, a.Damage, DamageSource{Cause: DamageEntityAttack, Attacker: p, Knockback: true, Extra: a.Knockback}) {
-			g.sys.Exhaust(p, p.Tuning(TuneExhaustAttack))
-			if a.Critical {
+	if h != nil && h.addBonuses(h.Base) > 0 {
+		critical := h.Critical()
+		if g.sys.TakeHit(h) {
+			sound = packet.SoundEventAttackStrong
+			if critical {
+				sound = packet.SoundEventAttackCritical
 				target.entity.Send(&packet.Animate{ActionType: packet.AnimateActionCriticalHit, EntityRuntimeID: target.runtimeID, Data: critEventData})
 			}
-			p.hurtHeld(g.hitWear(p.inventory.Held().Name))
-			target.armorAfterHurt(p)
-		} else {
-			sound = packet.SoundEventAttackNoDamage
+			h.attackerAfter()
 		}
 	}
 	// The attacker's client has played the sound already.
@@ -221,31 +177,6 @@ func (g *gameplay) hitWear(item string) int32 {
 		return hitWearWeapon
 	}
 	return hitWearDefault
-}
-
-// vanillaAttackDamage is BDS's melee damage: the attack damage attribute, the held
-// item, its enchantments' damage floored, then each effect's Attack in order.
-func vanillaAttackDamage(p, target *Player) float32 {
-	g, held := p.s.game, p.inventory.Held()
-	v := p.attributes.get(attrAttackDamage) + p.Tuning(TuneAttackDamage)
-	if !held.Empty() {
-		v += float32(g.combat.damage[held.Name])
-	}
-	var enchants float32
-	enchantLevels(held, func(id, level int16) {
-		if e, ok := g.enchant(id); ok && e.Melee != nil {
-			enchants += e.Melee(p, level, target)
-		}
-	})
-	v += float32(math.Floor(float64(enchants)))
-	for _, id := range [...]int32{EffectStrength, EffectWeakness} {
-		if amp, ok := p.Effect(id); ok {
-			if e, ok := g.effects[id]; ok && e.Attack != nil {
-				v = e.Attack(amp, v)
-			}
-		}
-	}
-	return v
 }
 
 // sharpnessDamage is BDS's Sharpness.
@@ -282,7 +213,7 @@ func (p *Player) canCrit() bool {
 func (p *Player) knockbackOf() float32 {
 	var level int16
 	enchantLevels(p.inventory.Held(), func(id, l int16) {
-		if e, ok := p.s.game.enchant(id); ok && e.Knockback {
+		if e, ok := p.hitEnchant(id); ok && e.Knockback {
 			level = l
 		}
 	})

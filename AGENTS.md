@@ -232,9 +232,11 @@ sibling library folders, so unreleased library changes are used.
   (BDS's checks, damage from the attribute, item, enchantments and effects, critical hits, knockback, item wear, arm
   swing relay); numbers from helix-data's `bds/item_combat.json`. `shield.go`: BDS's shield (`ShieldUp`, `ShieldBlock`, `OnPlayerBlock`, actor flags in the second set), `totem.go`: its totem (`Totem`, `OnPlayerTotem`, asked before health reaches 0 so those who see the player never see it dead), `armoruse.go`: using armour swaps it with what is worn (`EquipArmor`, `OnArmorEquip`). Effects have `Added`, `Removed` and `Tick` hooks (Regeneration, Absorption). `eat.go`: items used in the air, so far foods, read from each
   item's own data. `bucket.go` fills and pours; `world.Region.SetBlock` keeps a water source in the second layer of a block
-  that can hold it. All are `Systems` hooks (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, ReduceDamage, Exhaust,
-  FoodTick, Attack, AttackDamage, Knockback, UseItem, FoodOf, Eat), with events `OnPlayerAttack`,
-  `OnPlayerHurt`, `OnItemUse`, `OnItemEat`. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
+  that can hold it. All are `Systems` hooks (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, TakeHit, HitParts, Exhaust,
+  FoodTick, Attack, AttackParts, Knockback, UseItem, FoodOf, Eat), with events `OnHit`,
+  `OnItemUse`, `OnItemEat`. `hit.go`: every hurt is a `Hit` of parts (Bonuses, Reductions, After; each
+  `Off` or `Scale`d, plus `PartCustom`), built by AttackParts/HitParts, changed in one `OnHit`, resolved in
+  BDS's order; `Player.EditEnchantment` gives one player its own copy of an enchantment. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
   player's own (`Player.SetTuning`, `ClearTuning`, `ClearAllTuning`; not saved), the server's while running (the same on `Host`
   and `Server`), the default (vanilla's, or `Setup.SetTuning`). Vanilla's systems read `Player.Tuning` instead of constants; a new
   number of these systems gets a Tune too. `-testcmds` adds /tune. `death.go`: BDS's death (`Die`: items thrown unless

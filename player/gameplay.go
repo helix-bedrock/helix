@@ -61,11 +61,13 @@ type Systems struct {
 	FallDamage FallDamageFunc
 	MoveCost   MoveCostFunc
 	// Health and food.
-	Hurt         HurtFunc
-	ReduceDamage ReduceDamageFunc
-	Exhaust      ExhaustFunc
-	FoodTick     FoodTickFunc
-	Die          DieFunc
+	Hurt HurtFunc
+	// TakeHit hurts a player with a Hit; HitParts adds the target's parts to it.
+	TakeHit  TakeHitFunc
+	HitParts HitPartsFunc
+	Exhaust  ExhaustFunc
+	FoodTick FoodTickFunc
+	Die      DieFunc
 	// Explode runs explosions.
 	Explode ExplodeFunc
 	Respawn RespawnFunc
@@ -81,9 +83,9 @@ type Systems struct {
 	ShieldBlock ShieldBlockFunc
 	Totem       TotemFunc
 	// Hitting.
-	Attack       AttackFunc
-	AttackDamage AttackDamageFunc
-	Knockback    KnockbackFunc
+	Attack      AttackFunc
+	AttackParts AttackPartsFunc
+	Knockback   KnockbackFunc
 	// Using items in the air.
 	UseItem    UseItemFunc
 	EquipArmor EquipArmorFunc
@@ -116,10 +118,6 @@ type MoveCostFunc func(p *Player, m *MoveInfo) float32
 
 // HurtFunc deals damage to the player; false if it was not hurt.
 type HurtFunc func(p *Player, damage float32, src DamageSource) bool
-
-// ReduceDamageFunc is what is left of damage after what the player wears and has:
-// armour, its enchantments and effects.
-type ReduceDamageFunc func(p *Player, damage float32, src DamageSource) float32
 
 // FoodTickFunc is the player's hunger once a tick: regaining health and starving.
 type FoodTickFunc func(p *Player)
@@ -174,8 +172,7 @@ type gameplay struct {
 	// The events of using items, hitting and being hurt.
 	itemUseEv listeners[ItemUseEvent]
 	itemEatEv listeners[ItemEatEvent]
-	attackEv  listeners[PlayerAttackEvent]
-	hurtEv    listeners[PlayerHurtEvent]
+	hitEv     listeners[HitEvent]
 	// explosionEv is explosions.
 	explosionEv listeners[ExplosionEvent]
 	// The events of shields, totems and armour.
@@ -235,9 +232,8 @@ type gameState struct {
 	// The events of using items, hitting and being hurt.
 	itemUseEv   listeners[ItemUseEvent]
 	itemEatEv   listeners[ItemEatEvent]
-	attackEv    listeners[PlayerAttackEvent]
 	explosionEv listeners[ExplosionEvent]
-	hurtEv      listeners[PlayerHurtEvent]
+	hitEv       listeners[HitEvent]
 	// The events of shields, totems and armour.
 	blockEv      listeners[PlayerBlockEvent]
 	totemEv      listeners[PlayerTotemEvent]
@@ -431,11 +427,12 @@ func vanillaGameplay(s *Setup) error {
 	sys.FallDamage = vanillaFallDamage
 	sys.MoveCost = vanillaMoveCost
 	sys.Hurt = vanillaHurt
-	sys.ReduceDamage = vanillaReduceDamage
+	sys.TakeHit = vanillaTakeHit
+	sys.HitParts = vanillaHitParts
 	sys.Exhaust = vanillaExhaust
 	sys.FoodTick = vanillaFoodTick
 	sys.Attack = vanillaAttack
-	sys.AttackDamage = vanillaAttackDamage
+	sys.AttackParts = vanillaAttackParts
 	sys.Knockback = vanillaKnockback
 	sys.UseItem = vanillaUseItem
 	sys.FoodOf = vanillaFoodOf
@@ -491,7 +488,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	gs.banners.index()
 	g := gs.out
 	*g = gameplay{
-		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, attackEv: gs.attackEv, hurtEv: gs.hurtEv, explosionEv: gs.explosionEv,
+		tuning: gs.tuning, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, hitEv: gs.hitEv, explosionEv: gs.explosionEv,
 		sys: gs.sys, effects: maps.Clone(gs.effects),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
@@ -513,8 +510,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	}
 	g.itemUseEv.freeze()
 	g.itemEatEv.freeze()
-	g.attackEv.freeze()
-	g.hurtEv.freeze()
+	g.hitEv.freeze()
 	g.explosionEv.freeze()
 	g.blockEv.freeze()
 	g.totemEv.freeze()

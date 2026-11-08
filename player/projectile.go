@@ -1007,9 +1007,6 @@ func (t *Projectile) hitPlayer(target *Player) {
 	if (hurt || damage <= 0) && t.spec.Knockback {
 		target.projectileKnockback(t.vel, t.punch)
 	}
-	if hurt && t.owner != nil {
-		target.armorAfterHurt(t.owner)
-	}
 }
 
 // projectileKnockback pushes the player along a flight.

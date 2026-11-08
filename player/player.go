@@ -113,6 +113,8 @@ type Player struct {
 	breakSpeed float32
 	// tuned is the numbers the player has of its own; nil when it has none.
 	tuned *playerTuning
+	// enchants are the player's own copies of enchantments, read before the server's.
+	ownEnchants playerEnchants
 	// lastLevelSound is the tick of the last level sound.
 	lastLevelSound int64
 	reachScale     float32
