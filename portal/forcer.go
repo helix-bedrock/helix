@@ -186,17 +186,23 @@ func (p *Portals) Make(r *world.Region, dim mcdb.Dimension, from mgl32.Vec3, rng
 		axis = AxisZ
 	}
 	portal := p.portalFor(axis)
+	// Each pass sets every frame and portal block first, as BDS's setBlock with flag 2
+	// (no neighbour update), and only then updates the neighbours of all of them in the
+	// same order (sub_CE5EAC0 after the pass). A portal told of a neighbour while the
+	// frame is half built would find it not whole and break.
 	for range buildPasses {
 		for l := range frameColumns {
 			for h := -1; h <= frameTop; h++ {
-				pos := cube.Pos{bx + (l-1)*sx, by + h, bz + (l-1)*sz}
 				b := portal
 				if l == 0 || l == frameColumns-1 || h == -1 || h == frameTop {
 					b = p.obsidian
 				}
-				if r.SetBlock(pos, 0, b) {
-					r.UpdateNeighbours(pos)
-				}
+				r.SetBlock(cube.Pos{bx + (l-1)*sx, by + h, bz + (l-1)*sz}, 0, b)
+			}
+		}
+		for l := range frameColumns {
+			for h := -1; h <= frameTop; h++ {
+				r.UpdateNeighbours(cube.Pos{bx + (l-1)*sx, by + h, bz + (l-1)*sz})
 			}
 		}
 	}

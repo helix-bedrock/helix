@@ -1,8 +1,0 @@
-time=2026-11-01T17:16:55.054-07:00 level=INFO msg="Registry frozen" "block states"=23960 items=2080 biomes=89 "entity types"=138
-time=2026-11-01T17:16:55.099-07:00 level=INFO msg="World opened" dir="worlds\\Bedrock level" name="Bedrock level" new=false
-time=2026-11-01T17:16:55.336-07:00 level=INFO msg="Xbox Live checks ready" issuer=https://authorization.franchise.minecraft-services.net/ "clock offset"=-2.3363588s
-time=2026-11-01T17:16:55.337-07:00 level=WARN msg="server identity key generated for this run only; players must trust the server again after a restart" path=keys/server_identity_key.pem
-time=2026-11-01T17:16:55.339-07:00 level=INFO msg="NetherNet listening" addr=[::]:19132
-time=2026-11-01T17:16:55.340-07:00 level=INFO msg="RakNet listening" addr=[::]:19132
-time=2026-11-01T17:19:46.988-07:00 level=INFO msg="Player connected" part=players name="THE BOSS9345" xuid=2535411451658263 addr="8815722646099906718 (11807669959031220634) (udp4 host 192.168.1.170:49694 (resolved: 192.168.1.170:49694))"
-time=2026-11-01T17:19:48.915-07:00 level=INFO msg="Player spawned" part=players name="THE BOSS9345"
