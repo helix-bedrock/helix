@@ -264,7 +264,7 @@ commits.
   absorption goes first. A full player regains health and an empty one starves, by difficulty. Empty buckets take
   liquids, and a block that can hold water keeps the source it is placed in. Not done yet: potions, milk, bows,
   tridents, mace, most item cooldowns, interacting with entities, mobs.
-- **Elytra and fireworks (built 2026-11-08, not yet tested in game):** gliding follows BDS 1.26.60: a start from the
+- **Elytra and fireworks (built 2026-11-08, checked in game by the lead the same day; what other players see not checked yet):** gliding follows BDS 1.26.60: a start from the
   client is refused (and sent back) on the ground, riding, in water, after rising 0.15 or more, or without an elytra
   that still flies (damage below max - 1); gliding stops when that changes. The elytra takes 1 damage every 20 gliding
   ticks (Unbreaking counts). Hitting a wall hurts (speed lost x 10 - 3, fly-into-wall) with the fall sounds; BDS
@@ -274,7 +274,12 @@ commits.
   them out of their face. Lifetime 10 x (Flight + 1) + rand(6) + rand(7); the explosion shows the particles to all
   who see it (also on a gliding player) and, with stars, hurts 5 + 2 per star: the rider in full, players within 5
   blocks it sees by distance. Hooks: `Systems.StartGlide`, `GlideTick`, `GlideCrash`, `Firework`; events `OnGlide`,
-  `OnFirework`. Not done: crossbow rockets, saving rockets with the chunk, the firework crafting recipe.
+  `OnFirework`. **Not built (known gaps):** rockets shot from crossbows (BDS's `fireworksRocketServerProjectileHit`);
+  crafting firework rockets and firework stars (BDS makes them by its own special recipes); sculk vibrations (BDS sends
+  game events when a rocket launches and explodes and every 10 ticks of gliding, which sculk sensors, and through them
+  redstone, would pick up; Helix has no sculk sensors or game events yet); flying rockets are not saved with the chunk
+  (BDS saves them); BDS's telemetry/achievement message for star rockets with trail and twinkle; a player-ability
+  check on launching from a block whose meaning was not found; `/give` with firework data is not checked.
 - **Damage pipeline (built 2026-11-08, not yet tested in game):** every hurt of a player (melee, arrows, falls,
   fire, the void, explosions, starving, Thorns) is a `Hit`: a base and lists of parts (bonuses: melee enchantments,
   Strength and Weakness, critical hit, damage scale; reductions: damage scale, helmet, armour, toughness, Breach,
