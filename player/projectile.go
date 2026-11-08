@@ -1040,6 +1040,10 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
+		// The client disconnects on a teleport without its cause (see teleportFeet). BDS's
+		// projectile teleport (sub_714F4B0) sends cause Projectile with the projectile's
+		// actor type as the source; that number is not looked up yet, so the source is 0.
+		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: packet.TeleportCauseProjectile}),
 	})
 	p.flush()
 	p.s.game.sys.Hurt(p, pearlDamage, DamageSource{Cause: DamageFall})

@@ -358,6 +358,10 @@ func (p *Player) teleportFeet(feet mgl32.Vec3, rot world.Rotation) {
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
+		// A teleport always carries its cause: the client (1.26.60, sub_DC17774) rejects one
+		// without and disconnects with BadPacket. BDS's dimension transfer builds it with
+		// cause and source 0 (sub_CDE8520 into sub_85B0F00).
+		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: packet.TeleportCauseUnknown}),
 	})
 	p.flush()
 }
