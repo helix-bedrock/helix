@@ -63,8 +63,8 @@ type Region struct {
 	// Owned by the region's tick, and by the dimension while it does not
 	// tick.
 	chunks map[mcdb.ChunkPos]*Chunk
-	// sky is SkyLight's working space, made when first needed.
-	sky          *skySearch
+	// light is the working space for relighting.
+	light        *lightWork
 	holds        map[mcdb.ChunkPos]int
 	sectionHolds map[sectionPos]int
 	loading      map[mcdb.ChunkPos]bool
@@ -216,6 +216,8 @@ func (r *Region) holdsLiquid(block, liquid uint32) bool {
 
 // set changes the block at pos on layer and queues its update.
 func (r *Region) set(c *Chunk, pos cube.Pos, layer uint8, block uint32) {
+	old := c.col.Chunk.Block(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer) //nolint:gosec // masked and range-checked
+	r.lightChanged(c, pos, old, block)
 	c.col.Chunk.SetBlock(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer, block) //nolint:gosec // masked and range-checked
 	r.updateBlock(pos, layer, block)
 	c.dirty, c.net = true, nil
@@ -290,6 +292,7 @@ func (r *Region) tick() {
 		rt.BeforeBlockTicks(r)
 	}
 	r.tickBlocks()
+	r.flushLight()
 	r.sendChunkPackets()
 	r.updateVisibility()
 	r.sendMovement()
@@ -300,6 +303,7 @@ func (r *Region) tick() {
 		}
 	}
 	r.saveChanged(false)
+	r.flushLight()
 	r.handOff()
 }
 
@@ -387,17 +391,18 @@ func (r *Region) requestMissing() {
 }
 
 // arrive takes a chunk a worker loaded.
-func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool) {
+func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool, light *chunkLight) {
 	delete(r.loading, pos)
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
 	}
-	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1}
+	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1, light: light}
 	c.ticks.load(col.ScheduledBlocks, col.Tick)
 	c.ticks.rebase(r.d.sched.CurrentTick())
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)
 	col.ScheduledBlocks, col.RandomTicks = nil, nil
 	r.chunks[pos] = c
+	r.joinLight(c)
 	c.savedLive = r.loadEntities(c)
 	r.loadBlockEntities(c)
 	if fns, ok := r.awaiting[pos]; ok {

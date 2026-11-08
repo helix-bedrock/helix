@@ -53,6 +53,11 @@ type Config struct {
 	// Scheduler ticks the dimension's regions. If nil, the dimension starts
 	// its own with one goroutine per CPU and stops it on Close.
 	Scheduler *Scheduler
+	// Light says how blocks give and take light. If nil, the registry's values,
+	// which are BDS's (RegistryLight). Read when the dimension is made.
+	Light LightRules
+	// Sky says whether the dimension has sky light: by default the overworld only.
+	Sky SkyMode
 	// SectionShift sets the size of a section, 1<<SectionShift chunks a
 	// side, at most 10.
 	SectionShift uint
@@ -107,6 +112,7 @@ type Dimension struct {
 	r        cube.Range
 	pool     *pool
 	cache    *netCache
+	light    *lightTable
 	sched    *Scheduler
 	ownSched bool
 
@@ -172,6 +178,8 @@ type Chunk struct {
 	tickingEntities []cube.Pos
 	// tickedAt is the world tick the chunk last ticked in.
 	tickedAt int64
+	// light is the chunk's sky and block light and its height map, worked out on load.
+	light *chunkLight
 }
 
 // New opens a dimension. Call Close to save and stop it.
@@ -201,6 +209,7 @@ func New(conf Config) (*Dimension, error) {
 		sections: map[sectionPos]*Region{}, pending: map[mcdb.ChunkPos]bool{}, waiters: map[mcdb.ChunkPos][]*Viewer{},
 		viewers: map[*Viewer]struct{}{},
 	}
+	d.light = newLightTable(conf)
 	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
 		return nil, err
 	}
@@ -390,7 +399,8 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	}
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
-	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard) })
+	light := d.lightColumn(col.Chunk)
+	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light) })
 }
 
 // generate fills a new column with the dimension's generator, recovering a panic in it so one

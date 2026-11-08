@@ -267,7 +267,7 @@ func vanillaBlocks(s *Setup) error {
 			LightEmission: p.LightEmission.At(i), LightDampening: p.LightDampening.At(i),
 			FlameOdds: p.FlameOdds.At(i), BurnOdds: p.BurnOdds.At(i), LavaFlammable: p.LavaFlammable.At(i) == 1, Translucency: transl[st.Name],
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
-			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name],
+			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name], HalfSlab: halfSlab(st.Name),
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
@@ -420,4 +420,11 @@ func vanillaHumid(name string, downfall float32) bool {
 		}
 	}
 	return downfall > humidDownfall
+}
+
+// halfSlab reports whether name is a single slab: BDS's slab block gives the half slab
+// flag to every slab but the double ones, which vanilla names "..._double_slab" or
+// "..._double_cut_copper_slab".
+func halfSlab(name string) bool {
+	return strings.HasSuffix(name, "_slab") && !strings.Contains(name, "double_")
 }

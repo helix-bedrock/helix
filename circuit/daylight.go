@@ -19,14 +19,10 @@ const daylightInterval = 20
 // they give no power.
 func (t *Ticker) SetClock(c *daytime.Clock) { t.clock = c }
 
-// daylightEntity is a daylight sensor's block entity: what makes it read the sky. It remembers
-// the sky light until a block changes nearby, since finding it can mean a search.
+// daylightEntity is a daylight sensor's block entity: what makes it read the sky.
 type daylightEntity struct {
-	t       *Ticker
-	saved   map[string]any
-	sky     uint8
-	version uint64
-	known   bool
+	t     *Ticker
+	saved map[string]any
 }
 
 // ensureDaylight gives the sensor at pos its block entity if the world holds none.
@@ -63,11 +59,8 @@ func (e *daylightEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	if !ok || t.kind(block) != kindDaylight {
 		return
 	}
-	if v := r.NearbyVersion(pos); !e.known || v != e.version {
-		e.sky, e.version, e.known = r.SkyLight(pos), v, true
-	}
 	time, cycle := t.clock.Time(), t.clock.Cycle()
-	power := daytime.SensorSignal(e.sky, daytime.SunAngle(time, cycle), daytime.SkyDarken(time, cycle), t.blocks.Name(block) == nameDaylightInverted)
+	power := daytime.SensorSignal(r.SkyLight(pos), daytime.SunAngle(time, cycle), daytime.SkyDarken(time, cycle), t.blocks.Name(block) == nameDaylightInverted)
 	if next := t.with(block, stateSignal, power); next != block && r.SetBlock(pos, 0, next) {
 		r.UpdateNeighbours(pos)
 	}

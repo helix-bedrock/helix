@@ -69,6 +69,9 @@ type Properties struct {
 	PushesOut bool
 	// Stairs is BDS's flag for stairs, which push them out more slowly.
 	Stairs bool
+	// HalfSlab is BDS's half slab flag (its slab block sets it for single slabs only).
+	// It stops full sunlight in a column like a block that dampens light.
+	HalfSlab bool
 	// SolidMaterial is set when the block's material is solid.
 	SolidMaterial bool
 	// LiquidReaction is what a liquid flowing into the block does.
