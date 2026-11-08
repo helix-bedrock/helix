@@ -35,6 +35,7 @@ func (p *Player) play() {
 // world spawn.
 func (p *Player) spawnPoint() (spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) {
 	spawn, worldSpawn = p.worldSpawn()
+	p.dim = p.s.overworld
 	if pos, r, ok := p.load(); ok {
 		spawn, rot = pos, r
 	}
@@ -83,7 +84,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 	}
 	p.send(s.reg.JigsawStructures, s.reg.VoxelShapes, &packet.StartGame{
 		Time:           dayTime,
-		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: spawn,
+		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: spawn, Dimension: p.s.dimensionID(p.dim),
 		Pitch: rot.Pitch, Yaw: rot.Yaw,
 		WorldSeed: lv.Seed, Generator: lv.Generator, WorldGameMode: lv.GameMode, Difficulty: lv.Difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
@@ -149,29 +150,18 @@ func (p *Player) startFlusher(done <-chan struct{}) {
 	}
 }
 
-// enterWorld adds the player's viewer and entity to the overworld. The
-// returned leave takes them out and saves the player where its region
-// last had it.
+// enterWorld adds the player's viewer and entity to the dimension it was saved in.
+// The returned leave takes them out and saves the player where its region last had
+// it.
 func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) (leave func()) {
 	s := p.s
 	p.zone.pos = spawn
-	p.viewer = s.overworld.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
-	type last struct {
-		pos mgl32.Vec3
-		rot world.Rotation
-	}
-	removed := make(chan last, 1)
+	p.viewer = p.dim.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
+	removed := make(chan lastPlace, 1)
+	p.removed = removed
 	// Until its first tick, others see where it spawns.
 	p.seen.store(PlayerState{Position: spawn.Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: rot, GameMode: p.gameMode, Level: p.Level()})
-	p.entity = s.overworld.AddEntity(world.EntityConfig{
-		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: spawn, Rot: rot, Viewer: p.viewer, Owner: p,
-		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,
-		Removed: func(e *world.Entity) {
-			p.StopSleeping()
-			p.leaveChest(nil, false)
-			removed <- last{e.Position(), e.Rotation()}
-		},
-	})
+	p.entity = p.dim.AddEntity(p.entityConfig(spawn, rot))
 	return func() {
 		pos := spawn
 		p.entity.Remove()
@@ -182,8 +172,41 @@ func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) (leave func())
 			s.log.Warn("player entity not removed in time; saving the last position read", "name", p.name)
 		}
 		p.save(pos, rot)
-		p.viewer.Close()
+		p.currentViewer().Close()
 	}
+}
+
+// lastPlace is where the player's entity was when its region took it out.
+type lastPlace struct {
+	pos mgl32.Vec3
+	rot world.Rotation
+}
+
+// entityConfig is the player's entity at pos. Its removal either finishes a move to
+// another dimension or, when the player leaves, hands back where it was.
+func (p *Player) entityConfig(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+	return world.EntityConfig{
+		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: pos, Rot: rot, Viewer: p.viewer, Owner: p,
+		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,
+		Removed: func(e *world.Entity) {
+			p.StopSleeping()
+			p.leaveChest(nil, false)
+			if mv := p.moving; mv != nil {
+				p.moving = nil
+				p.arrive(mv)
+				return
+			}
+			p.removed <- lastPlace{e.Position(), e.Rotation()}
+		},
+	}
+}
+
+// currentViewer is the player's viewer; it changes when the player changes
+// dimension. Runs: anywhere.
+func (p *Player) currentViewer() *world.Viewer {
+	p.zone.mu.Lock()
+	defer p.zone.mu.Unlock()
+	return p.viewer
 }
 
 // readLoop reads the player's packets until the connection closes. Packets
@@ -219,7 +242,7 @@ func (p *Player) readLoop(done <-chan struct{}) {
 				go p.spawnWhenReady(done)
 			}
 		case *packet.SubChunkRequest:
-			p.send(p.viewer.SubChunks(pk))
+			p.send(p.currentViewer().SubChunks(pk))
 			p.flush()
 		case *packet.SetLocalPlayerAsInitialised:
 			s.log.Info("Player spawned", "name", p.name)
@@ -231,7 +254,7 @@ func (p *Player) readLoop(done <-chan struct{}) {
 // player are sent, as BDS lets the client in.
 func (p *Player) spawnWhenReady(done <-chan struct{}) {
 	select {
-	case <-p.viewer.Ready():
+	case <-p.currentViewer().Ready():
 		p.send(&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn})
 		p.flush()
 	case <-done:

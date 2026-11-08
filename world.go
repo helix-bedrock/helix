@@ -17,6 +17,7 @@ import (
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
+	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/world/cube"
@@ -130,6 +131,9 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
 	conf.EntityViewRadius2 = s.conf.EntityViewRadius2
 	conf.Scheduler, conf.RandomTickSpeed = s.ticker, randomTickSpeed
+	if err := s.openPortals(); err != nil {
+		return err
+	}
 	conf.Ticker = s.conf.BlockTicker
 	if conf.Ticker == nil {
 		table, err := connect.New(s.reg.Blocks)
@@ -142,7 +146,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		}
 		rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
 		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, liquid.New(s.reg.Blocks))
-		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, s.fire))))
+		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.fire)))))
 		if err != nil {
 			return err
 		}
@@ -181,6 +185,60 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		return err
 	}
 	s.overworld = d
+	return s.openOtherDimensions(conf, typeName, seed)
+}
+
+// openPortals loads the portal records from the world's portals key.
+func (s *Server) openPortals() error {
+	blocks, err := portal.NewBlocks(s.reg.Blocks)
+	if err != nil {
+		return err
+	}
+	value, err := s.worldStore.LoadLevel(mcdb.LevelKeyPortals)
+	if err != nil && !errors.Is(err, mcdb.ErrNotFound) {
+		return fmt.Errorf("helix: load portals: %w", err)
+	}
+	store := s.worldStore
+	records, err := portal.LoadRecords(value, func(v []byte) {
+		if err := store.StoreLevel(mcdb.LevelKeyPortals, v); err != nil {
+			s.log.Error("save portal records", "err", err)
+		}
+	})
+	if err != nil {
+		s.log.Warn("portal records unreadable; starting without them", "err", err)
+	}
+	s.portals = &portal.Portals{Blocks: blocks, Records: records}
+	return nil
+}
+
+// openOtherDimensions opens the Nether and the End beside the overworld, with the
+// overworld's settings. They get vanilla terrain whatever the overworld's type, as a
+// BDS flat world still has a normal Nether and End; a void world's are void too.
+func (s *Server) openOtherDimensions(conf world.Config, typeName string, seed int64) error {
+	for _, dim := range []mcdb.Dimension{mcdb.Nether, mcdb.End} {
+		r, _ := dim.Range()
+		var gen world.Generator = world.Empty{}
+		if typeName != generator.NameVoid {
+			g, err := generator.Default()[generator.NameVanilla].New(generator.Context{
+				Registry: s.reg, Seed: seed, Dimension: dim, Range: r, Log: s.log,
+			})
+			if err != nil {
+				return err
+			}
+			gen = g
+		}
+		conf.Dim, conf.Generator = dim, gen
+		conf.Log = s.log.With("part", "world", "dimension", dim.String())
+		d, err := world.New(conf)
+		if err != nil {
+			return err
+		}
+		if dim == mcdb.Nether {
+			s.nether = d
+		} else {
+			s.end, s.endGen = d, gen
+		}
+	}
 	return nil
 }
 
@@ -188,8 +246,10 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 // the server owns every store it was given.
 func (s *Server) closeWorld() error {
 	var errs []error
-	if s.overworld != nil {
-		errs = append(errs, s.overworld.Close())
+	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
+		if d != nil {
+			errs = append(errs, d.Close())
+		}
 	}
 	if s.ticker != nil {
 		// level.dat keeps the world's tick, which saved tick times count in.

@@ -161,11 +161,22 @@ func handleRespawn(p *Player, pk *packet.Respawn) {
 // handlePlayerAction is vanilla's PlayerAction handler. Only the respawn is
 // built: BDS takes it from a dead player whose spawn was found.
 func handlePlayerAction(p *Player, pk *packet.PlayerAction) {
+	if pk.ActionType == protocol.PlayerActionDimensionChangeDone {
+		p.portal.changing = false
+		return
+	}
 	if pk.ActionType == protocol.PlayerActionStopSleeping && pk.EntityRuntimeID == p.runtimeID {
 		p.StopSleeping()
 		return
 	}
 	if pk.ActionType != protocol.PlayerActionRespawn || pk.EntityRuntimeID != p.runtimeID || p.respawn != respawnWaitAction || !p.dead() {
+		return
+	}
+	if p.dim != p.s.overworld && p.s.overworld != nil {
+		// Death outside the overworld respawns there: the body resets where it is,
+		// then the player moves across.
+		p.s.game.sys.Respawn(p, p.entity.Position())
+		p.toOverworldSpawn(true)
 		return
 	}
 	p.s.game.sys.Respawn(p, p.respawnPoint())

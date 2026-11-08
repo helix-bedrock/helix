@@ -117,6 +117,13 @@ sibling library folders, so unreleased library changes are used.
   is worldgen's 1.26.60 overworld built over the registry's own states
   (`blocks.New`), so its indices are Helix state IDs; block tags and
   translucency come from the registry (`Blocks.Tags`, `Properties.Translucency`).
+  `Nether` and `End` (dimensions.go) are worldgen's Nether and End the same way;
+  `End.ExitPortal` hands the engine the podium shape, which generation never places.
+- `portal`: nether portal frames (BDS's PortalShape), lighting and breaking (`Ticker`
+  wraps the fire ticker for neighbour changes), the `portals` level key records, finding
+  or building an arrival portal (`Portals.Find`, `Make`), the End's arrival platform and
+  the end portal frame ring. `end.go` (root) builds the End's exit portal on the first
+  arrival.
 - `properties.go`: `Config.LoadProperties`, the server settings file in
   BDS's server.properties format (`level-type`, `level-type-options` are
   Helix's own keys); cmd/helix reads it (`-config`), flags given on the
@@ -236,7 +243,7 @@ sibling library folders, so unreleased library changes are used.
   FoodTick, Attack, AttackParts, Knockback, UseItem, FoodOf, Eat), with events `OnHit`,
   `OnItemUse`, `OnItemEat`. `hit.go`: every hurt is a `Hit` of parts (Bonuses, Reductions, After; each
   `Off` or `Scale`d, plus `PartCustom`), built by AttackParts/HitParts, changed in one `OnHit`, resolved in
-  BDS's order; `Player.EditEnchantment` gives one player its own copy of an enchantment. `elytra.go`: gliding (`Systems.StartGlide`, `GlideTick`, `GlideCrash`, `OnGlide`): BDS's start and stop rules, elytra wear, wall crashes. `firework.go`: firework rockets (`FireworkRocket`, `Host.LaunchFirework`, `Systems.Firework`, `OnFirework`): use while gliding (glide boost by `MovementEffect`), use on a block, dispensers, the explosion's particles and damage. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
+  BDS's order; `Player.EditEnchantment` gives one player its own copy of an enchantment. `elytra.go`: gliding (`Systems.StartGlide`, `GlideTick`, `GlideCrash`, `OnGlide`): BDS's start and stop rules, elytra wear, wall crashes. `firework.go`: firework rockets (`FireworkRocket`, `Host.LaunchFirework`, `Systems.Firework`, `OnFirework`): use while gliding (glide boost by `MovementEffect`), use on a block, dispensers, the explosion's particles and damage. `portal.go`: the player's portal time and cooldowns, moving between dimensions (ChangeDimension), arriving at a found or built portal, eyes of ender in end portal frames, lighting nether portals. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
   player's own (`Player.SetTuning`, `ClearTuning`, `ClearAllTuning`; not saved), the server's while running (the same on `Host`
   and `Server`), the default (vanilla's, or `Setup.SetTuning`). Vanilla's systems read `Player.Tuning` instead of constants; a new
   number of these systems gets a Tune too. `-testcmds` adds /tune. `death.go`: BDS's death (`Die`: items thrown unless

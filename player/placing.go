@@ -149,6 +149,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == nameFireworkRocket {
 		return p.useFireworkOn(r, clicked, click, held)
 	}
+	if held.Name == nameEnderEye {
+		return p.useEnderEye(r, clicked)
+	}
 	if _, ok := bucketLiquids[held.Name]; ok {
 		return p.pourBucket(clicked, face, held)
 	}

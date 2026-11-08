@@ -23,6 +23,7 @@ import (
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
+	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/nethernet"
@@ -210,6 +211,12 @@ type Server struct {
 	level       player.Level
 	ticker      *world.Scheduler
 	overworld   *world.Dimension
+	nether, end *world.Dimension
+	portals     *portal.Portals
+	// endGen is the End's generator; endPodium is set once its exit portal was
+	// looked at this run.
+	endGen    world.Generator
+	endPodium atomic.Bool
 
 	// setup is the frozen-at-Run player setup; players runs them once the
 	// world is open.
@@ -303,7 +310,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		}
 	}
 	host, err := player.NewHost(player.HostConfig{
-		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Store: s.playerStore,
+		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Nether: s.nether, End: s.end, Portals: s.portals, OnEnterEnd: s.enterEnd, Store: s.playerStore,
 		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone,
 	}, s.setup)
 	if err != nil {
@@ -322,7 +329,9 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		host.SetCircuitHooks(player.CircuitHooks{
 			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, JukeboxPower: s.circuits.SetJukeboxPower, RingBell: s.circuits.RingBell, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers, CartOnRail: s.circuits.CartOnRail, HitTarget: s.circuits.HitTarget,
 		})
-		s.overworld.SetBlockEntities(s.circuits.Entities(s.overworld.BlockEntityMaker()))
+		for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
+			d.SetBlockEntities(s.circuits.Entities(d.BlockEntityMaker()))
+		}
 	}
 	defer host.Close(packet.DisconnectReasonShutdown)
 	stopPeriodic := s.startPeriodic(host)

@@ -103,9 +103,14 @@ func ForLevel(level int32) string {
 // newVanilla builds [Vanilla] for the overworld, with the worldgen JSON file
 // named by the options. Its packs are found next to the file.
 func newVanilla(ctx Context) (world.Generator, error) {
-	if ctx.Dimension != mcdb.Overworld {
-		// worldgen makes all three dimensions; Helix opens only the overworld so far.
-		return nil, fmt.Errorf("generator: vanilla: Helix hooks up only the overworld so far, not %v", ctx.Dimension)
+	switch ctx.Dimension {
+	case mcdb.Nether:
+		return NewNether(ctx.Registry, ctx.Seed)
+	case mcdb.End:
+		return NewEnd(ctx.Registry, ctx.Seed)
+	case mcdb.Overworld:
+	default:
+		return nil, fmt.Errorf("generator: vanilla: no vanilla terrain for %v", ctx.Dimension)
 	}
 	var conf *overworld.Config
 	if ctx.Options != "" {

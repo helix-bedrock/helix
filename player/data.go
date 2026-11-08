@@ -18,6 +18,11 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 		return pos, rot, false
 	}
 	p.saved = data
+	if id, isInt := data["DimensionId"].(int32); isInt {
+		if d := p.s.dimension(mcdb.Dimension(id)); d != nil {
+			p.dim = d
+		}
+	}
 	p.reseatTicks = cushionReseatTicks
 	if mode, isInt := data["PlayerGameMode"].(int32); isInt {
 		p.gameMode = mode
@@ -75,7 +80,7 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	}
 	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
-	data["DimensionId"] = int32(mcdb.Overworld)
+	data["DimensionId"] = int32(p.s.dimensionID(p.dim))
 	data["UniqueID"] = p.uniqueID
 	data["PlayerGameMode"] = p.gameMode
 	p.abilities.save(data)

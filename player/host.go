@@ -19,6 +19,7 @@ import (
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
+	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -60,8 +61,15 @@ type HostConfig struct {
 	Log       *slog.Logger
 	Registry  *registry.Registry
 	Overworld *world.Dimension
-	Store     mcdb.PlayerStore
-	Level     Level
+	// Nether and End are the other two dimensions; nil leaves them closed.
+	Nether, End *world.Dimension
+	// Portals are the server's portal blocks and records; nil turns portals off.
+	Portals *portal.Portals
+	// OnEnterEnd runs when a player arrives in the End through a portal, on its
+	// region: the server builds the exit portal the first time.
+	OnEnterEnd func()
+	Store      mcdb.PlayerStore
+	Level      Level
 	// ViewDistance is the largest view radius in chunks a player gets.
 	ViewDistance int32
 	// MaxPlayers is how many players may be online at once.
@@ -82,6 +90,9 @@ type Host struct {
 	reg          *registry.Registry
 	recipes      crafting.Book
 	overworld    *world.Dimension
+	nether, end  *world.Dimension
+	portals      *portal.Portals
+	onEnterEnd   func()
 	playerStore  mcdb.PlayerStore
 	level        Level
 	viewDistance int32
@@ -165,7 +176,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	h := &Host{
 		redstone: conf.Redstone,
 		drops:    drops, foods: foodTable(conf.Registry.Items),
-		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, playerStore: conf.Store, level: conf.Level,
+		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, nether: conf.Nether, end: conf.End, portals: conf.Portals, onEnterEnd: conf.OnEnterEnd, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests, discs: discs,
 		furnaces: furnaces, commands: setup.h.commands,

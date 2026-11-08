@@ -12,7 +12,7 @@ const nameSoulFire = "minecraft:soul_fire"
 // lightFire is BDS's FlintAndSteelItem: always on the block beside the clicked face. If that
 // block is air it plays the ignite sound and sets fire there (the fire turns to soul fire on
 // soul sand or soul soil by itself). Either way the item wears by one, as BDS's code does.
-// Lighting a nether portal is not ported.
+// Fire lit inside an empty obsidian frame makes a nether portal instead (trySpawnPortal).
 func (p *Player) lightFire(r *world.Region, clicked cube.Pos, face int32, held ItemStack) bool {
 	if face < 0 || face > int32(cube.FaceEast) || !p.inReach(clicked) {
 		return false
@@ -21,8 +21,10 @@ func (p *Player) lightFire(r *world.Region, clicked cube.Pos, face int32, held I
 	blocks := p.s.reg.Blocks
 	if b, ok := r.Block(pos, 0); ok && b == blocks.Air() {
 		playSound(r, pos, soundEvent{name: packet.SoundEventIgnite, pos: blockCenter(pos), extra: -1}, nil)
-		if fire, ok := blocks.Block(nameFire); ok && p.mayPlaceFire(pos, fire) && r.SetBlock(pos, 0, fire) {
-			r.UpdateNeighbours(pos)
+		if !p.lightPortal(r, pos) {
+			if fire, ok := blocks.Block(nameFire); ok && p.mayPlaceFire(pos, fire) && r.SetBlock(pos, 0, fire) {
+				r.UpdateNeighbours(pos)
+			}
 		}
 	}
 	if !p.creative() {

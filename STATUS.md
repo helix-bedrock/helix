@@ -58,6 +58,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - 🧪 Experience orbs and levels
 - ✅ Bows and arrows
 - 🟡 Snowballs, eggs, ender pearls: built, but not working in game yet
+- 🧪 Nether and End, nether and end portals, moving between dimensions
 - ⬜ Potions, milk, crossbows, tridents, mace, fishing
 
 ## Blocks
@@ -164,9 +165,9 @@ commits.
   block tick BDS's spring feature leaves pending (one tick after generation, on the chunk's queue), so
   they pour out of cave walls in Helix's own liquid ticks. Unchanged
   generated chunks are not saved, as BDS. Players start on the ground of the spawn column
-  (`world.Spawner`): BDS's spawn search is not ported. worldgen makes the Nether and the End too;
-  Helix does not open those dimensions or move players between them yet, so only the overworld's
-  generator is hooked up. Text seeds are refused: how BDS turns text into a number
+  (`world.Spawner`): BDS's spawn search is not ported. The Nether and the End open beside the
+  overworld with worldgen's vanilla terrain (also in a flat world, as BDS; a void world's stay void);
+  the End crystals worldgen asks for are not spawned (no End crystal entity yet). Text seeds are refused: how BDS turns text into a number
   is not read. Vanilla terrain through Helix's registry is not yet compared block for block with a
   BDS world of the same seed; a check of 64 chunks gave real terrain at about 25 ms a chunk.
 - **Chunks:** each player's simulation zone (tick-distance) stays loaded and changed chunks are
@@ -331,7 +332,7 @@ commits.
   placed or flows), tries ten blocks around it and sets fire next to the first lava-flammable one (BDS's own flag per block, now in helix-data's `block_properties.json`
   as `lava_flammable`; it is not the flame odds). Flint and steel sets fire on the clicked face and
   wears; starting to break a block puts out fire on the clicked face. Not done: rain putting fire out
-  (no weather yet), nether portals, fire charges, mobs burning (there are no mobs yet), bees in a
+  (no weather yet), fire charges, mobs burning (there are no mobs yet), bees in a
   burning hive.
 - **Burning (not yet tested in game):** from BDS 1.26.60 (`player/burn.go`). Fire and lava hurt a
   player inside them each tick (1, soul fire 2, as `death.attack.inFire`) and set it on fire for 8
@@ -348,10 +349,30 @@ commits.
 - **Creative inventory:** items can be taken from the creative menu (the client's results
   message after a creative take is accepted).
 
+- **Portals and dimensions (built 2026-11-08 from BDS 1.26.60's code, not tested in game):** the
+  Nether and the End are open and players move between them (`player/portal.go`, the `portal`
+  package, `end.go`). Nether portals: flint and steel inside an empty obsidian frame (2 to 21 wide, 3 to
+  21 tall, corners not needed) fills it with portal blocks; a frame that breaks or loses a portal block
+  breaks the portal. A survival or adventure player goes through after standing 80 ticks in it, a
+  creative one at once, with BDS's cooldowns (10 ticks, 300 after a trip) and the time falling by 4 a
+  tick outside. x and z are divided or multiplied by 8 (y kept, within 32 million); the arrival takes
+  the nearest recorded portal within 128 blocks, else builds one the way BDS does (the nearest spot within
+  16 blocks with room for it, else in the open at y 70 or more on an obsidian platform with BDS's
+  netherrack ledge). Portals are recorded in the world's `portals` key (field names BDS's; not compared
+  byte for byte with a BDS world). End portals: an eye of ender goes into a frame (sound, used up outside
+  creative); a ring of twelve frames with eyes opens the 3 by 3 end portal. Into the End you land on
+  BDS's 5 by 5 obsidian platform at 100, 50, 0; the first arrival builds the exit portal (podium) closed,
+  as BDS's dragon fight does, and keeps where it is in the End's level key. Out of the End you go to
+  your bed or the world spawn. Dying in the Nether or the End respawns you in the overworld. The
+  player's dimension is saved. **Not built:** the credits on leaving the End, the dragon and opening the
+  exit portal, frames facing inward (any facing counts), fire charges and spreading fire lighting
+  portals, mobs, items and other entities going through portals, the yaw turn when the portal's axis
+  differs, zombified piglins from portals, and the level-setting check BDS makes before lighting.
+
 ### What is left
 
-- **World generation:** the Nether and the End, BDS's spawn search, filling structure chests from
-  their loot tables, text seeds, and the mobs structures spawn.
+- **World generation:** BDS's spawn search, filling structure chests from their loot tables when
+  first opened (the engine's job, not worldgen's), text seeds, and the mobs structures spawn.
 - **Block behaviour:** water and lava are the only blocks with behaviour so far. Lava does not set
   fire, blocks liquids replace drop nothing, stairs and slabs let water out on every side (BDS
   decides by their shape), and placing a waterloggable block into water does not keep the water.

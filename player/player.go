@@ -55,6 +55,12 @@ type Player struct {
 	// Entity: the player's body in the world.
 	entity *world.Entity
 	viewer *world.Viewer
+	// dim is the dimension the player is in; moving is the move to another dimension
+	// waiting for the region to take the entity out, and removed hands its last place
+	// to leave.
+	dim     *world.Dimension
+	moving  *dimMove
+	removed chan lastPlace
 	// input carries world packets from the network goroutine to the
 	// region's tick.
 	input inputQueue
@@ -93,6 +99,8 @@ type Player struct {
 	food     foodState
 	hurt     hurtState
 	glide    glideState
+	// portal is the player's time in portals and its cooldown.
+	portal portalState
 	// burn is the player's on-fire timer.
 	burn   burnState
 	shield shieldState

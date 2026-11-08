@@ -64,6 +64,9 @@ func (p *Player) handleInput(*world.Entity) {
 		run[i] = nil
 	}
 	p.runQueued()
+	if p.entity != nil {
+		p.tickPortal()
+	}
 	if !p.dead() {
 		p.s.game.sys.GlideTick(p)
 	}
@@ -132,6 +135,10 @@ func vanillaHandlers(s *Setup) error {
 // before movement, as BDS does, then the movement states and jump, the
 // movement, and the fall and exhaustion that follow it.
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
+	if p.portal.changing || p.moving != nil {
+		// Input from before a dimension change is for the old dimension.
+		return
+	}
 	sys := p.s.game.sys
 	if !p.dead() {
 		if actions, ok := pk.BlockActions.Value(); ok {
