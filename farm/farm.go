@@ -200,6 +200,8 @@ type Ticker struct {
 	composterKit *composterKit
 	// foliageKit holds what flowers and grass stand on.
 	foliageKit *foliageKit
+	// support says which block faces hold things; nil for none.
+	support atomic.Pointer[SupportFunc]
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.

@@ -117,12 +117,20 @@ func (s *placeState) top() int {
 	return 0
 }
 
+// bambooItem places a bamboo sapling where one may stand, else bamboo.
+const bambooItem = "minecraft:bamboo"
+
 // vanillaPlaceState is BDS's getPlacementBlock: a block behaviour's rule
 // first, else the block's rule and traits from BDS's table.
 func vanillaPlaceState(pl *Placement) (uint32, bool) {
 	p := pl.Player
 	blocks := p.s.reg.Blocks
 	name := blocks.Name(pl.Block)
+	if f, r := p.s.farm, p.entity.Region(); f != nil && r != nil && pl.Item.Name == bambooItem {
+		if sapling, ok := f.BambooPlacement(r, pl.Pos); ok {
+			return sapling, true
+		}
+	}
 	if s, ok := p.s.game.blocks[name].(PlacementStater); ok {
 		return s.PlacementState(pl)
 	}

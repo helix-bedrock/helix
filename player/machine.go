@@ -607,10 +607,11 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	if c.machine.dropper && c.pushOne(r, front, slot) {
 		return
 	}
-	if c.machine.dropper && s.farm != nil {
+	if c.machine.dropper && face == cube.FaceDown && s.farm != nil {
 		if b, ok := r.Block(front, 0); ok && s.farm.IsComposter(b) {
-			// BDS's dropper (0xD40C260) puts one item into a composter in front and drops
-			// nothing, whether or not the composter took it.
+			// BDS's dropper (0xD40C260) facing down puts one item into a composter under it
+			// and drops nothing, whether or not the composter took it. Facing any other way
+			// it throws the item out as usual.
 			if s.farm.Compost(r, front, it.Name, 1) == 1 {
 				it.Count--
 				c.Inventory(r).SetItem(slot, it)

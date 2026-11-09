@@ -401,3 +401,14 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 	}
 	t.BlockTicker.Placed(r, pos, block, layer)
 }
+
+// BambooPlacement is BambooItem's useOn (BDS 0xC9CFC00): the bamboo item puts a bamboo sapling
+// at pos when a sapling may stand there (no water or lava, and its ground), and false
+// otherwise, when bamboo is placed as its block. Runs: owner of the chunk.
+func (t *Ticker) BambooPlacement(r *world.Region, pos cube.Pos) (uint32, bool) {
+	sapling := t.bambooKit.sapling[0]
+	if sapling == 0 || !t.bambooSurvives(r, pos, stateInfo{kind: kindBambooSapling}) {
+		return 0, false
+	}
+	return sapling, true
+}

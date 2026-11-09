@@ -26,8 +26,16 @@ import (
 //   - flower beds (leaf litter, pink petals, wildflowers; 0xCB03000): no water or lava in the
 //     block and a block tagged dirt under it.
 //
-// Not ported: mushrooms (light), lily pads, propagules, coral, sea pickles, dripleaf, shelf
-// mushrooms and cactus flowers.
+//   - mushrooms (0xD541A40, 0xD5419E0): no liquid in the block and a block under it whose top
+//     holds things (canProvideSupport, taken as the attach table's top face). Light only
+//     matters to their spreading.
+//   - lily pads (0xD49FE30): a water source under it, or ice.
+//   - mangrove propagules (0xD562FF0): hanging ones mangrove leaves above, others soil or clay.
+//   - sea pickles (0xD51DA50): a decorated pot or a block whose top holds things under it.
+//   - cactus flowers (0xCB88580): soil, cactus, or a block whose top holds things.
+//
+// Not ported: coral fans and wall fans, shelf mushrooms (held from the side) and small
+// dripleaf (two halves and water).
 
 // foliageRule is what a foliage block stands on.
 type foliageRule uint8
@@ -41,6 +49,11 @@ const (
 	ruleAzalea
 	ruleDouble
 	ruleBed
+	ruleMushroom
+	ruleLily
+	rulePropagule
+	rulePickle
+	ruleCactusFlower
 )
 
 // foliageRules are the foliage blocks by their rule.
@@ -62,7 +75,18 @@ var foliageRules = map[string]foliageRule{
 	"minecraft:peony": ruleDouble, "minecraft:tall_grass": ruleDouble, "minecraft:large_fern": ruleDouble,
 	"minecraft:pitcher_plant": ruleDouble,
 	"minecraft:leaf_litter":   ruleBed, "minecraft:pink_petals": ruleBed, "minecraft:wildflowers": ruleBed,
+	"minecraft:brown_mushroom": ruleMushroom, "minecraft:red_mushroom": ruleMushroom,
+	"minecraft:waterlily":          ruleLily,
+	"minecraft:mangrove_propagule": rulePropagule,
+	"minecraft:sea_pickle":         rulePickle,
+	"minecraft:cactus_flower":      ruleCactusFlower,
 }
+
+// The materials foliage rules read (BDS's MaterialType).
+const (
+	materialIce    = 13
+	materialCactus = 15
+)
 
 // stateUpperBit is a double plant's half.
 const stateUpperBit = "upper_block_bit"
@@ -70,7 +94,8 @@ const stateUpperBit = "upper_block_bit"
 // foliageKit holds the blocks foliage rules name besides the soils.
 type foliageKit struct {
 	nether, wither, dry, terracotta map[uint32]bool
-	hardenedClay, clay              uint32
+	hardenedClay, clay, pot, leaves uint32
+	water                           uint32
 	// upper is each lower double plant half's upper half.
 	upper map[uint32]uint32
 }
@@ -94,6 +119,9 @@ func (t *Ticker) newFoliageKit() *foliageKit {
 	}
 	k.hardenedClay, _ = b.Block("minecraft:hardened_clay")
 	k.clay, _ = b.Block("minecraft:clay")
+	k.pot, _ = b.Block("minecraft:decorated_pot")
+	k.leaves, _ = b.Block("minecraft:mangrove_leaves")
+	k.water, _ = b.Block("minecraft:water")
 	for id := range uint32(len(t.info)) { //nolint:gosec // the registry's block count fits uint32
 		rule, ok := foliageRules[b.Name(id)]
 		if !ok {
@@ -147,8 +175,66 @@ func (t *Ticker) foliageSurvives(r *world.Region, pos cube.Pos, block, below uin
 			}
 		}
 		return t.hasTag(below, tagDirt)
+	case ruleMushroom:
+		return !t.liquidAt(r, pos) && t.topHolds(below)
+	case ruleLily:
+		return t.waterSourceAt(r, pos.Side(cube.FaceDown)) || t.blocks.Properties(below).Material == materialIce
+	case rulePropagule:
+		if v, _ := t.blocks.States(block)["hanging"].(uint8); v != 0 {
+			above, ok := r.Block(pos.Side(cube.FaceUp), 0)
+			return !ok || t.blocks.Name(above) == t.blocks.Name(k.leaves)
+		}
+		return soils[below] || below == k.clay
+	case rulePickle:
+		return below == k.pot || t.topHolds(below)
+	case ruleCactusFlower:
+		return soils[below] || t.blocks.Properties(below).Material == materialCactus || t.topHolds(below)
 	}
 	return soils[below]
+}
+
+// liquidAt reports whether water or lava is in the block at pos.
+func (t *Ticker) liquidAt(r *world.Region, pos cube.Pos) bool {
+	for layer := range uint8(2) {
+		if b, ok := r.Block(pos, layer); ok {
+			if m := t.blocks.Properties(b).Material; m == registry.MaterialWater || m == registry.MaterialLava {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// waterSourceAt reports whether a water source is in the block at pos, in either layer.
+func (t *Ticker) waterSourceAt(r *world.Region, pos cube.Pos) bool {
+	for layer := range uint8(2) {
+		if b, ok := r.Block(pos, layer); ok && t.blocks.Name(b) == t.blocks.Name(t.foliageKit.water) {
+			if d, _ := t.blocks.States(b)["liquid_depth"].(int32); d == 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// topHolds reports whether block's top face holds what stands on it (SetSupport's answer).
+func (t *Ticker) topHolds(block uint32) bool {
+	f := t.support.Load()
+	return f != nil && (*f)(block, cube.FaceUp)
+}
+
+// SupportFunc reports whether a block's face holds what is attached to it.
+type SupportFunc func(block uint32, face cube.Face) bool
+
+// SetSupport sets what says a block's face holds things (the attach table), which mushrooms,
+// sea pickles and cactus flowers stand on. Without it they stand on nothing but their lists.
+// Runs: any goroutine.
+func (t *Ticker) SetSupport(f SupportFunc) {
+	if f == nil {
+		t.support.Store(nil)
+		return
+	}
+	t.support.Store(&f)
 }
 
 // hasTag reports whether block carries tag.

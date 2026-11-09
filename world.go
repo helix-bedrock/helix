@@ -161,6 +161,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		liquids := liquid.New(s.reg.Blocks)
 		liquids.SetDrops(s.popBlock)
 		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
+		s.farm.SetSupport(attached.Supports)
 		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
 		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire)))))
 		if err != nil {
