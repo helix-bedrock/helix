@@ -248,6 +248,17 @@ func (s *Host) FallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	}
 }
 
+// PopBlock throws out the drops of block at pos without removing it, playing nothing: BDS's
+// spawnResources with a chance of 1, as water popping a crop or a torch does. Runs: owner of
+// the chunk.
+func (s *Host) PopBlock(r *world.Region, pos cube.Pos, block uint32) {
+	items, _ := s.game.sys.Drops(s, block, &loot.Context{})
+	for _, it := range items {
+		d := NewBlockDrop(pos, it)
+		s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+	}
+}
+
 // throwDrops puts the drops in the world.
 func (s *Host) throwDrops(r *world.Region, drops []BlockDrop) {
 	for _, d := range drops {

@@ -260,11 +260,13 @@ func (l *Liquids) blocking(r *world.Region, pos, from cube.Pos) bool {
 	return l.blocks.Properties(b).LiquidReaction == registry.LiquidBlocking
 }
 
-// spreadTo is BDS's trySpreadTo: liquid k of depth flows into pos unless
-// liquid of its kind or lava is there or the block stops it. Lava makes a
-// block it flows into fizz; other liquids replace the block or, if it
-// takes liquid in its second layer, go there. The liquid is ticked again
-// after its delay.
+// spreadTo is BDS's trySpreadTo (0xD55BDE0): liquid k of depth flows into
+// pos unless liquid of its kind or lava is there or the block stops it.
+// Lava makes a block it flows into fizz; water pops a block whose reaction
+// is popped (its drops thrown out, with no sound or particles, as BDS's
+// spawnResources) and replaces it, replaces a broken one, and goes in the
+// second layer of one with no reaction. A popped block in the second layer
+// drops too. The liquid is ticked again after its delay.
 func (l *Liquids) spreadTo(r *world.Region, pos, from cube.Pos, k Kind, depth int) {
 	if pos[1] < r.Dimension().Range()[0] {
 		return
@@ -278,11 +280,16 @@ func (l *Liquids) spreadTo(r *world.Region, pos, from cube.Pos, k Kind, depth in
 	}
 	layer := uint8(0)
 	if b0, _ := r.Block(pos, 0); b0 != l.blocks.Air() {
-		switch {
+		switch reaction := l.blocks.Properties(b0).LiquidReaction; {
 		case k == Lava:
 			l.fizz(r, pos)
-		case l.blocks.Properties(b0).LiquidReaction == registry.LiquidNoReaction:
+		case reaction == registry.LiquidPopped:
+			l.pop(r, pos, b0)
+		case reaction == registry.LiquidNoReaction:
 			layer = 1
+		}
+		if b1, ok := r.Block(pos, 1); ok && b1 != l.blocks.Air() && l.blocks.Properties(b1).LiquidReaction == registry.LiquidPopped {
+			l.pop(r, pos, b1)
 		}
 	}
 	b, ok := l.Block(k, depth)
@@ -290,6 +297,13 @@ func (l *Liquids) spreadTo(r *world.Region, pos, from cube.Pos, k Kind, depth in
 		return
 	}
 	r.ScheduleTick(pos, l.liq[k].states[0], l.TickDelay(k), 0)
+}
+
+// pop throws out the drops of a block a liquid replaces.
+func (l *Liquids) pop(r *world.Region, pos cube.Pos, block uint32) {
+	if l.drops != nil {
+		l.drops(r, pos, block)
+	}
 }
 
 // solidifyAround checks lava at pos against its neighbours to the south,

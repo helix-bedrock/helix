@@ -55,7 +55,7 @@ sibling library folders, so unreleased library changes are used.
   `Config.BlockTicker`): the tick (depth from the neighbours, infinite
   water, falling, spreading along the shortest way down), lava solidifying,
   and the old `flowing_*` names turning into water and lava. Not ported:
-  lava fire, drops of blocks liquids replace, stair and slab shape rules.
+  lava fire, stair and slab shape rules.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.

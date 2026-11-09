@@ -197,7 +197,7 @@ func (c *Chest) moveItems(r *world.Region, pos, front cube.Pos, conf *circuit.Ho
 	size := c.halfSize()
 	result := hopperIdle
 	for range conf.ItemsPerMove {
-		if c.emptySlots(size) || !c.pushTo(r, front) {
+		if c.emptySlots(size) || !c.pushTo(r, front) && !(front == pos.Side(cube.FaceDown) && c.compostOne(r, front)) {
 			break
 		}
 		result = hopperMoved
@@ -230,6 +230,9 @@ const (
 // cart above, or items in the box above unless the block above is a container.
 func (c *Chest) pullOrCollect(r *world.Region, pos cube.Pos, conf *circuit.HopperConfig) hopperResult {
 	above := pos.Side(cube.FaceUp)
+	if c.pullBoneMeal(r, above) {
+		return hopperMoved
+	}
 	if c.pullFrom(r, above) {
 		return hopperMoved
 	}
@@ -240,6 +243,39 @@ func (c *Chest) pullOrCollect(r *world.Region, pos cube.Pos, conf *circuit.Hoppe
 		return hopperPickedUp
 	}
 	return hopperIdle
+}
+
+// compostOne is a hopper facing down onto a composter with no container there (BDS's
+// hopper, 0xBFC6FA0): one item of its first filled slot goes into the composter, used up
+// whether or not it raised the level. False if the composter took none.
+func (c *Chest) compostOne(r *world.Region, at cube.Pos) bool {
+	f := c.s.farm
+	if f == nil {
+		return false
+	}
+	for i := range c.halfSize() {
+		s := c.items[i]
+		if s.Empty() {
+			continue
+		}
+		if f.Compost(r, at, s.Name, 1) == 0 {
+			return false
+		}
+		s.Count--
+		c.Inventory(r).SetItem(i, s)
+		return true
+	}
+	return false
+}
+
+// pullBoneMeal takes the bone meal of a full composter above (BDS's hopper, 0xBFC7AB0): the
+// composter empties first, so with no room for it the bone meal is lost, as in BDS.
+func (c *Chest) pullBoneMeal(r *world.Region, above cube.Pos) bool {
+	f := c.s.farm
+	if f == nil || !f.EmptyComposter(r, above) {
+		return false
+	}
+	return c.takeOne(r, ItemStack{Name: nameBoneMeal, Count: 1})
 }
 
 // containerBlock reports whether the block is one BDS's block class calls a container:
@@ -570,6 +606,17 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 	it := c.items[slot]
 	if c.machine.dropper && c.pushOne(r, front, slot) {
 		return
+	}
+	if c.machine.dropper && s.farm != nil {
+		if b, ok := r.Block(front, 0); ok && s.farm.IsComposter(b) {
+			// BDS's dropper (0xD40C260) puts one item into a composter in front and drops
+			// nothing, whether or not the composter took it.
+			if s.farm.Compost(r, front, it.Name, 1) == 1 {
+				it.Count--
+				c.Inventory(r).SetItem(slot, it)
+			}
+			return
+		}
 	}
 	dir := faceVec(face)
 	at := center.Add(dir.Mul(ejectReach))

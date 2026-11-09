@@ -81,7 +81,16 @@ type Liquids struct {
 	// spreads further and faster there.
 	UltraWarm                                          bool
 	stone, cobble, obsidian, basalt, blueIce, soulSoil uint32
+	// drops throws out the drops of a block a liquid pops; nil for none.
+	drops DropFunc
 }
+
+// DropFunc throws out the drops of block, which was at pos, without removing it.
+type DropFunc func(r *world.Region, pos cube.Pos, block uint32)
+
+// SetDrops sets what throws out the drops of blocks water pops (crops, flowers, torches).
+// Call it before the world ticks.
+func (l *Liquids) SetDrops(f DropFunc) { l.drops = f }
 
 // local is the per-region working state of Liquids.
 type local struct {

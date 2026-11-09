@@ -101,11 +101,11 @@ func (p *Player) fillBucket(clicked cube.Pos) bool {
 // in the clicked block if it can be built over, else in its neighbour on
 // the clicked face if that can. There, water goes in the second layer of a
 // block that can hold it; otherwise the liquid replaces air or a block
-// whose material is not solid. Neighbours are told, the liquid is ticked
+// whose material is not solid, a block whose liquid reaction is popped
+// throwing out its drops first (0xC99EC80). Neighbours are told, the liquid is ticked
 // after its delay, the empty sound plays and the bucket becomes an empty
 // bucket outside creative. Not yet read from BDS: how the block is picked
-// (the built-over rule above is Helix's), items a replaced block drops, the
-// nether's rule for water, and buckets of fish and powder snow. False if
+// (the built-over rule above is Helix's), the nether's rule for water, and buckets of fish and powder snow. False if
 // nothing was poured.
 func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 	liq, ok := bucketLiquids[held.Name]
@@ -133,6 +133,8 @@ func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 		layer = 1
 	case target != blocks.Air() && tp.SolidMaterial:
 		return false
+	case target != blocks.Air() && tp.LiquidReaction == registry.LiquidPopped:
+		p.s.PopBlock(r, pos, target)
 	}
 	if !r.SetBlock(pos, layer, block) {
 		return false

@@ -122,6 +122,8 @@ const (
 	kindFarmland
 	kindCrop
 	kindStem
+	// kindComposter is the composter, not a plant; age is its fill level.
+	kindComposter
 	kindWart
 	kindBerry
 	kindCocoa
@@ -192,6 +194,8 @@ type Ticker struct {
 	bambooKit *bambooKit
 	// saplingKit holds the saplings and their trees.
 	saplingKit *saplingKit
+	// composterKit holds the composter.
+	composterKit *composterKit
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -271,6 +275,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.plantKit = t.newPlantKit()
 	t.bambooKit = t.newBambooKit()
 	t.saplingKit = t.newSaplingKit()
+	t.composterKit = t.newComposterKit()
 	return t
 }
 
@@ -330,7 +335,7 @@ func (t *Ticker) skyDarken() uint8 {
 // RandomTicks takes farmland's, crops' and stems' random ticks and the next ticker's.
 func (t *Ticker) RandomTicks(block uint32, layer uint8) bool {
 	k := t.state(block).kind
-	return layer == 0 && k != kindNone && k != kindKelp || t.BlockTicker.RandomTicks(block, layer)
+	return layer == 0 && k != kindNone && k != kindKelp && k != kindComposter || t.BlockTicker.RandomTicks(block, layer)
 }
 
 // RandomTick runs farmland's, a crop's or a stem's random tick, and the next ticker's for
@@ -371,6 +376,8 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		if now, ok := r.Block(pos, 0); ok && t.state(now).kind == kindKelp {
 			t.kelpTick(r, pos, t.state(now))
 		}
+	case kindComposter:
+		t.composterTick(r, pos)
 	default:
 		if s := t.state(block); s.kind.plant() {
 			if now, ok := r.Block(pos, 0); ok && t.state(now).kind == s.kind && !t.plantSurvives(r, pos, t.state(now)) && t.fall != nil {

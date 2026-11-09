@@ -152,7 +152,7 @@ func bedDrops(r *world.Region, pos cube.Pos, items []ItemStack) []ItemStack {
 // blockEntityDrops adds what a block's block entity gives what it drops: a shulker box's
 // items, a bed's colour, a banner's patterns. Call it before the block goes.
 func (s *Host) blockEntityDrops(r *world.Region, pos cube.Pos, items []ItemStack) []ItemStack {
-	return bannerDrops(r, pos, bedDrops(r, pos, s.shulkerDrops(r, pos, items)))
+	return s.composterDrops(r, pos, bannerDrops(r, pos, bedDrops(r, pos, s.shulkerDrops(r, pos, items))))
 }
 
 // isBedItem reports whether an item places a bed.

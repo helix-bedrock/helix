@@ -158,7 +158,9 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			return err
 		}
 		rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
-		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquid.New(s.reg.Blocks))
+		liquids := liquid.New(s.reg.Blocks)
+		liquids.SetDrops(s.popBlock)
+		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
 		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
 		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire)))))
 		if err != nil {
@@ -347,6 +349,13 @@ func (s *Server) Farm() *farm.Ticker { return s.farm }
 func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	if host := s.players.Load(); host != nil {
 		host.FallBlock(r, pos, block)
+	}
+}
+
+// popBlock throws out the drops of a block a liquid replaced.
+func (s *Server) popBlock(r *world.Region, pos cube.Pos, block uint32) {
+	if host := s.players.Load(); host != nil {
+		host.PopBlock(r, pos, block)
 	}
 }
 

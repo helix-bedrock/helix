@@ -135,3 +135,63 @@ func (p *Player) trample(r *world.Region, feet mgl32.Vec3, distance float32) {
 	pos := vecPos(feet.Sub(mgl32.Vec3{0, trampleDrop, 0}))
 	f.Trample(r, pos, distance, playerVolume, p.abilities.Flag(AbilityMine))
 }
+
+// useComposter is ComposterBlock's use (0xCB26D40): a full composter gives a bone meal
+// (thrown out as a block's drop, 0xCB27920) and empties; one at 7 does not take the click;
+// otherwise one of the held item is composted (farm.Ticker.Compost), and if it was used the
+// growth particles show a little above the composter's corner and one is used up outside
+// creative. False if the click was not taken, so the item is used instead.
+func (p *Player) useComposter(r *world.Region, u *BlockUse) bool {
+	f := p.s.farm
+	if f == nil {
+		return false
+	}
+	lvl, ok := f.ComposterLevel(u.Block)
+	if !ok {
+		return false
+	}
+	if f.EmptyComposter(r, u.Pos) {
+		p.s.dropComposterBoneMeal(r, u.Pos)
+		return true
+	}
+	if lvl >= composterReady || u.Item.Empty() || f.Compost(r, u.Pos, u.Item.Name, 1) != 1 {
+		return false
+	}
+	levelEvent(r, u.Pos, blockVec(u.Pos).Add(mgl32.Vec3{0, composterParticleUp, 0}), packet.LevelEventParticleCropGrowth, 0)
+	p.useUpHeld()
+	p.flush()
+	return true
+}
+
+// The composter's numbers the player side reads.
+const (
+	composterReady = 7
+	// composterParticleUp is how far above the block's corner BDS shows the particles.
+	composterParticleUp = 0.75
+)
+
+// dropComposterBoneMeal throws out the bone meal of a full composter at pos, as BDS's
+// composter spawns it (0.15 to 0.85 into the block on each axis, picked up after 10 ticks,
+// as a block's drop).
+func (s *Host) dropComposterBoneMeal(r *world.Region, pos cube.Pos) {
+	d := NewBlockDrop(pos, ItemStack{Name: nameBoneMeal, Count: 1})
+	s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+}
+
+// composterDrops adds a full composter's bone meal to what breaking it drops (BDS's
+// composter gives it when the block goes, 0xCB27E40).
+func (s *Host) composterDrops(r *world.Region, pos cube.Pos, items []ItemStack) []ItemStack {
+	f := s.farm
+	if f == nil {
+		return items
+	}
+	if b, ok := r.Block(pos, 0); ok {
+		if lvl, ok := f.ComposterLevel(b); ok && lvl == composterFull {
+			items = append(items, ItemStack{Name: nameBoneMeal, Count: 1})
+		}
+	}
+	return items
+}
+
+// composterFull is a composter holding bone meal.
+const composterFull = 8
