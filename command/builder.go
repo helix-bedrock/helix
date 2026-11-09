@@ -68,6 +68,9 @@ func (a Args) String(name string) string {
 // Position is a Position argument.
 func (a Args) Position(name string) Position { v, _ := a[name].(Position); return v }
 
+// RelativeFloat is a RelativeFloat argument.
+func (a Args) RelativeFloat(name string) RelativeFloat { v, _ := a[name].(RelativeFloat); return v }
+
 // BlockPosition is a BlockPosition argument.
 func (a Args) BlockPosition(name string) BlockPosition {
 	v, _ := a[name].(BlockPosition)

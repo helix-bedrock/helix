@@ -55,6 +55,21 @@ func localOffset(at mgl32.Vec3, yaw, pitch float32, left, up, forward float64) m
 	return at.Add(lft.Mul(float32(left))).Add(upv.Mul(float32(up))).Add(fwd.Mul(float32(forward)))
 }
 
+// RelativeFloat is one number that may be relative with ~, such as a rotation: BDS's
+// RelativeFloat, sent as its "value" argument type.
+type RelativeFloat struct {
+	Value    float64
+	Relative bool
+}
+
+// Resolve is the number from a starting value: itself, or from plus it for ~.
+func (f RelativeFloat) Resolve(from float32) float32 {
+	if f.Relative {
+		return from + float32(f.Value)
+	}
+	return float32(f.Value)
+}
+
 // BlockPosition is three whole coordinates, a block.
 type BlockPosition struct{ X, Y, Z Coord }
 
@@ -133,6 +148,7 @@ const (
 	kindText
 	kindPosition
 	kindBlockPosition
+	kindRelativeFloat
 	kindTargets
 	kindLiteral
 	kindEnum
@@ -163,6 +179,7 @@ var (
 	typePosition      = reflect.TypeFor[Position]()
 	typeBlockPosition = reflect.TypeFor[BlockPosition]()
 	typeTargets       = reflect.TypeFor[Targets]()
+	typeRelativeFloat = reflect.TypeFor[RelativeFloat]()
 	typeEnum          = reflect.TypeFor[Enum]()
 	typeOptional      = reflect.TypeFor[optionalField]()
 )
@@ -193,6 +210,8 @@ func paramOf(name string, t reflect.Type, literal string) (param, error) {
 		p.kind = kindBlockPosition
 	case t == typeTargets:
 		p.kind = kindTargets
+	case t == typeRelativeFloat:
+		p.kind = kindRelativeFloat
 	case t.Kind() == reflect.String && t.Implements(typeEnum):
 		e, _ := reflect.Zero(t).Interface().(Enum)
 		if e.Type() == "" {

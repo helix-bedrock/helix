@@ -269,6 +269,12 @@ func (m *matcher) read(sc *scanner, p param) (reflect.Value, *parseError) {
 			return reflect.ValueOf(BlockPosition(pos)), nil
 		}
 		return reflect.ValueOf(pos), nil
+	case kindRelativeFloat:
+		c, start, ok := sc.coord()
+		if !ok || c.Local {
+			return reflect.Value{}, sc.syntaxAt(start)
+		}
+		return reflect.ValueOf(RelativeFloat{Value: c.Value, Relative: c.Relative}), nil
 	case kindTargets:
 		sel, start, err := sc.selector()
 		if err != nil {

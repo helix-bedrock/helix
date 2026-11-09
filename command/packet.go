@@ -55,6 +55,7 @@ var argTypes = map[kind]uint32{
 	kindInt: protocol.CommandArgTypeInt, kindFloat: protocol.CommandArgTypeFloat, kindString: protocol.CommandArgTypeString,
 	kindText: protocol.CommandArgTypeMessage, kindPosition: protocol.CommandArgTypePosition,
 	kindBlockPosition: protocol.CommandArgTypeBlockPosition, kindTargets: protocol.CommandArgTypeTarget,
+	kindRelativeFloat: protocol.CommandArgTypeRValue,
 }
 
 // param is the protocol's form of an argument.

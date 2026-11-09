@@ -21,7 +21,7 @@ import (
 // normal tick (0xBD55D40) brings its integrity back, and entities/boat.json and
 // chest_boat.json give their seats and sizes. A boat someone steers is predicted by that
 // player's client, as BDS's are, and Helix takes its place from the client as it takes the
-// player's. Not built yet: an empty boat's own movement (buoyancy, gravity, friction), lava
+// player's; one no one steers moves by itself (boatphysics.go). Not built yet: lava
 // damage, pulling mobs in, dispensers placing boats, and the paddles other players see.
 const (
 	nameBoat      = "minecraft:boat"
@@ -109,6 +109,8 @@ type Boat struct {
 	moved              mgl32.Vec3
 	hurtTime, hurtSide int32
 	integrity          int32
+	// motion is its own movement while no one steers it (boatphysics.go).
+	motion boatMotion
 
 	// chest is a chest boat's slots, a [Chest] with no block behind it.
 	chest *Chest
@@ -242,7 +244,11 @@ func (b *Boat) tick(e *world.Entity) {
 	settleRiders(b)
 	b.dropGoneViewers(r)
 	if b.Driver() == nil {
-		b.moved = mgl32.Vec3{}
+		from := e.Position()
+		b.physics(r, e)
+		b.moved = e.Position().Sub(from)
+	} else {
+		b.motion.vel = mgl32.Vec3{}
 	}
 	changed := false
 	if b.hurtTime > 0 {
@@ -359,8 +365,8 @@ func (b *Boat) BlastHit(damage float32, _ DamageSource) {
 	}
 }
 
-// BlastPush does nothing yet: the boat has no movement of its own.
-func (b *Boat) BlastPush(mgl32.Vec3) {}
+// BlastPush adds an explosion's push to an empty boat's movement.
+func (b *Boat) BlastPush(push mgl32.Vec3) { b.motion.vel = b.motion.vel.Add(push) }
 
 // boatBox is the boat's box at pos, its feet.
 func boatBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
