@@ -129,7 +129,21 @@ func (s *Host) boatFloat(r *world.Region, at cube.Pos, y float32) (floats, resur
 	if s.boatWater(r, at.Add(cube.Pos{0, 1, 0})) {
 		return false, true
 	}
-	return s.liquidTop(r, at) > y, false
+	return s.liquidHeight(r, at) > y, false
+}
+
+// liquidHeight is BlockUtils::getLiquidBlockHeight (1.26.60 0xB656EF0) of the liquid at
+// pos: the top of the block less a ninth per level of depth, a source and falling liquid
+// (depth 8 and up) reaching the top. It is higher than liquidTop by a ninth.
+func (s *Host) liquidHeight(r *world.Region, pos cube.Pos) float32 {
+	depth := int32(0)
+	if b, ok := r.Block(pos, 0); ok {
+		depth, _ = s.reg.Blocks.States(b)["liquid_depth"].(int32)
+	}
+	if depth >= liquidFalling {
+		depth = 0
+	}
+	return float32(pos[1]) + 1 - float32(depth)/liquidLevels
 }
 
 // boatWater reports whether the block at pos is one of the boat's liquid_blocks: water.
