@@ -34,8 +34,12 @@ import (
 //   - sea pickles (0xD51DA50): a decorated pot or a block whose top holds things under it.
 //   - cactus flowers (0xCB88580): soil, cactus, or a block whose top holds things.
 //
-// Not ported: coral fans and wall fans, shelf mushrooms (held from the side) and small
-// dripleaf (two halves and water).
+//   - coral fans (0xCB32E30): a block under them whose top holds things.
+//   - wall coral fans (0xCB33650) and shelf mushrooms (0xD49F6F0): the block behind them must
+//     hold things on the face they point out of.
+//
+// Not ported: coral blocks' and fans' dying out of water and coral plants (one tick with both),
+// and small dripleaf (its two halves and water).
 
 // foliageRule is what a foliage block stands on.
 type foliageRule uint8
@@ -54,6 +58,9 @@ const (
 	rulePropagule
 	rulePickle
 	ruleCactusFlower
+	ruleCoralFan
+	ruleWallFan
+	ruleShelf
 )
 
 // foliageRules are the foliage blocks by their rule.
@@ -80,7 +87,17 @@ var foliageRules = map[string]foliageRule{
 	"minecraft:mangrove_propagule": rulePropagule,
 	"minecraft:sea_pickle":         rulePickle,
 	"minecraft:cactus_flower":      ruleCactusFlower,
+	"minecraft:shelf_mushroom":     ruleShelf,
 }
+
+// coralColours are the coral kinds, each with a fan, a wall fan and their dead forms.
+var coralColours = [...]string{"tube", "brain", "bubble", "fire", "horn"}
+
+// wallFanFace is the face a wall coral fan's coral_direction points to (0xCB33650).
+var wallFanFace = [...]cube.Face{cube.FaceWest, cube.FaceEast, cube.FaceNorth, cube.FaceSouth}
+
+// shelfFace is the face a shelf mushroom's cardinal_direction points to (0xD49F6F0).
+var shelfFace = map[string]cube.Face{"south": cube.FaceSouth, "west": cube.FaceWest, "north": cube.FaceNorth, "east": cube.FaceEast}
 
 // The materials foliage rules read (BDS's MaterialType).
 const (
@@ -122,8 +139,15 @@ func (t *Ticker) newFoliageKit() *foliageKit {
 	k.pot, _ = b.Block("minecraft:decorated_pot")
 	k.leaves, _ = b.Block("minecraft:mangrove_leaves")
 	k.water, _ = b.Block("minecraft:water")
+	rules := maps.Clone(foliageRules)
+	for _, c := range coralColours {
+		for _, dead := range [...]string{"", "dead_"} {
+			rules["minecraft:"+dead+c+"_coral_fan"] = ruleCoralFan
+			rules["minecraft:"+dead+c+"_coral_wall_fan"] = ruleWallFan
+		}
+	}
 	for id := range uint32(len(t.info)) { //nolint:gosec // the registry's block count fits uint32
-		rule, ok := foliageRules[b.Name(id)]
+		rule, ok := rules[b.Name(id)]
 		if !ok {
 			continue
 		}
@@ -187,6 +211,18 @@ func (t *Ticker) foliageSurvives(r *world.Region, pos cube.Pos, block, below uin
 		return soils[below] || below == k.clay
 	case rulePickle:
 		return below == k.pot || t.topHolds(below)
+	case ruleCoralFan:
+		return t.topHolds(below)
+	case ruleWallFan:
+		d, _ := t.blocks.States(block)["coral_direction"].(int32)
+		if d < 0 || int(d) >= len(wallFanFace) {
+			return true
+		}
+		return t.heldFrom(r, pos, wallFanFace[d])
+	case ruleShelf:
+		d, _ := t.blocks.States(block)["minecraft:cardinal_direction"].(string)
+		f, ok := shelfFace[d]
+		return !ok || t.heldFrom(r, pos, f)
 	case ruleCactusFlower:
 		return soils[below] || t.blocks.Properties(below).Material == materialCactus || t.topHolds(below)
 	}
@@ -215,6 +251,16 @@ func (t *Ticker) waterSourceAt(r *world.Region, pos cube.Pos) bool {
 		}
 	}
 	return false
+}
+
+// heldFrom reports whether the block behind pos, opposite to f, holds things on its face f.
+func (t *Ticker) heldFrom(r *world.Region, pos cube.Pos, f cube.Face) bool {
+	behind, ok := r.Block(pos.Side(f.Opposite()), 0)
+	if !ok {
+		return true
+	}
+	h := t.support.Load()
+	return h != nil && (*h)(behind, f)
 }
 
 // topHolds reports whether block's top face holds what stands on it (SetSupport's answer).
