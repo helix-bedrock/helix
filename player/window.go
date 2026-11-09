@@ -29,8 +29,9 @@ type windowState struct {
 	// pos is the block the window is at; dim its dimension.
 	pos cube.Pos
 	dim *world.Dimension
-	// cart is the minecart whose slots are open, if a cart's are.
+	// cart is the minecart whose slots are open, if a cart's are; boat the chest boat's.
 	cart *Minecart
+	boat *Boat
 }
 
 // nextID moves to the next window ID.
@@ -57,9 +58,11 @@ type ContainerOpenEvent struct {
 	// Inventory is the slots the window shows, nil for a screen. For the player's own
 	// inventory it is that inventory.
 	Inventory *Inventory
-	// Chest is the block holding the slots, nil if none does. Cart is the cart's.
+	// Chest is the block holding the slots, nil if none does. Cart is the cart's, Boat the
+	// chest boat's.
 	Chest   *Chest
 	Cart    *Minecart
+	Boat    *Boat
 	Blocked bool
 }
 
@@ -95,13 +98,14 @@ type windowOpening struct {
 	inv     *Inventory
 	chest   *Chest
 	cart    *Minecart
+	boat    *Boat
 	blocked bool
 }
 
 // mayOpen runs ContainerOpenEvent on a window about to open; false keeps it shut.
 func (p *Player) mayOpen(r *world.Region, o *windowOpening) bool {
 	if g := p.s.game; g.containerOpenEv.Has() {
-		e := ContainerOpenEvent{Player: p, Region: r, Kind: o.kind, Pos: o.pos, Inventory: o.inv, Chest: o.chest, Cart: o.cart, Blocked: o.blocked}
+		e := ContainerOpenEvent{Player: p, Region: r, Kind: o.kind, Pos: o.pos, Inventory: o.inv, Chest: o.chest, Cart: o.cart, Boat: o.boat, Blocked: o.blocked}
 		g.containerOpenEv.fire(p.s.log, &e)
 		o.blocked = e.Blocked || e.Cancelled()
 	}
@@ -113,7 +117,7 @@ func (p *Player) mayOpen(r *world.Region, o *windowOpening) bool {
 func (p *Player) showWindow(r *world.Region, o *windowOpening) {
 	w := &p.window
 	w.nextID()
-	w.open, w.kind, w.inv, w.pos, w.cart = true, o.kind, o.inv, o.pos, o.cart
+	w.open, w.kind, w.inv, w.pos, w.cart, w.boat = true, o.kind, o.inv, o.pos, o.cart, o.boat
 	if r != nil {
 		w.dim = r.Dimension()
 	}
@@ -132,7 +136,7 @@ func (p *Player) showWindow(r *world.Region, o *windowOpening) {
 func (p *Player) closeWindow(r *world.Region, serverSide bool) {
 	w := &p.window
 	was := *w
-	w.open, w.kind, w.inv, w.cart = false, ContainerNone, nil, nil
+	w.open, w.kind, w.inv, w.cart, w.boat = false, ContainerNone, nil, nil, nil
 	p.inventory.open = nil
 	if serverSide {
 		p.sendNow(&packet.ContainerClose{WindowID: w.id, ContainerType: containerTypeNone, ServerSide: true})
@@ -185,6 +189,11 @@ func handleInteract(p *Player, pk *packet.Interact) {
 	// The client asks this way to open a chest or hopper minecart.
 	if m := p.cartInReach(pk.TargetEntityRuntimeID); m != nil && m.chest != nil {
 		p.openCart(m)
+		return
+	}
+	// So does a chest boat's rider, and one looking at it.
+	if b := p.boatInReach(pk.TargetEntityRuntimeID); b != nil && b.chest != nil {
+		p.openBoat(b)
 		return
 	}
 	// A rider names what it sits on: a vehicle with no slots of its own opens the
@@ -248,9 +257,10 @@ type ContainerItemEvent struct {
 	Kind   ContainerKind
 	// Inventory is the container's slots: for an ender chest, the player's own.
 	Inventory *Inventory
-	// Chest is the block holding them, Cart the cart; one of them is nil.
+	// Chest is the block holding them, Cart the cart, Boat the chest boat; only one is set.
 	Chest *Chest
 	Cart  *Minecart
+	Boat  *Boat
 	// Slot is the window's slot: on a double chest, 0 to 53, the lead's half first.
 	Slot   int
 	Change ItemChange
@@ -339,9 +349,12 @@ func (p *Player) fireChestItems() bool {
 			Player: p, Region: r, Kind: inv.kind, Inventory: inv, Slot: i, Change: chestChange(old, work[i]),
 			Old: old, New: work[i], Cursor: st.work.ui[cursorSlot], InventorySlots: changed,
 		}
-		if c.cart != nil {
+		switch {
+		case c.cart != nil:
 			e.Cart = c.cart
-		} else {
+		case c.boat != nil:
+			e.Boat = c.boat
+		default:
 			e.Chest = c
 		}
 		g.containerItemEv.fire(p.s.log, &e)

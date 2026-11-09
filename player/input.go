@@ -163,6 +163,15 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		from = p.entity.Position()
 	}
 	pos := pk.Position
+	if b, ok := p.vehicle.(*Boat); ok {
+		// The driver's client predicts the boat, as in BDS; Helix takes its place as it
+		// takes the player's.
+		yaw := b.entity.Rotation().Yaw
+		if rot, has := pk.VehicleRotation.Value(); has {
+			yaw = rot[1]
+		}
+		b.drive(p, pk.Position, yaw)
+	}
 	if p.vehicle != nil {
 		pos = p.seatPosition()
 	}

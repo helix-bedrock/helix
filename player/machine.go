@@ -429,6 +429,9 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	case *Minecart:
 		lo, hi = cartBox(at)
 		return lo, hi, false, true
+	case *Boat:
+		lo, hi = boatBox(at)
+		return lo, hi, false, true
 	}
 	return lo, hi, false, false
 }

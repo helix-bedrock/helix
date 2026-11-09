@@ -164,6 +164,9 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	if IsCartItem(id) {
 		return s.loadCart(r, at, saved, id)
 	}
+	if id == nameBoat || id == nameChestBoat {
+		return s.loadBoat(r, at, saved, id)
+	}
 	if id == cushionID {
 		return s.loadCushion(r, at, saved)
 	}

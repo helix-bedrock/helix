@@ -45,6 +45,8 @@ const (
 	ContainerGrindstone
 	ContainerEnchantingTable
 	ContainerLoom
+	// ContainerChestBoat is a chest boat's slots.
+	ContainerChestBoat
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

@@ -157,8 +157,9 @@ type Chest struct {
 	s     *Host
 	pos   cube.Pos
 	ender bool
-	// cart is the minecart holding these slots, if no block does.
+	// cart is the minecart holding these slots, if no block does; boat the chest boat.
 	cart *Minecart
+	boat *Boat
 	// shulker says this is a shulker box: a chest that never pairs, whose lid opens
 	// towards facing and whose items leave with the dropped box.
 	shulker bool
@@ -266,6 +267,8 @@ func (c *Chest) Kind() ContainerKind {
 		return ContainerHopperMinecart
 	case c.cart != nil:
 		return ContainerChestMinecart
+	case c.boat != nil:
+		return ContainerChestBoat
 	case c.machine == nil:
 		return ContainerChest
 	case c.machine.hopper:
@@ -722,7 +725,7 @@ func (c *Chest) lidSound(r *world.Region, sound string) {
 
 // blockEvent tells the players near how the lid stands.
 func (c *Chest) blockEvent(r *world.Region) {
-	if c.cart != nil {
+	if c.cart != nil || c.boat != nil {
 		return
 	}
 	if c.machine != nil {
@@ -871,8 +874,14 @@ func (p *Player) leaveChest(r *world.Region, serverSide bool) {
 		return
 	}
 	pos, dim := w.pos, w.dim
-	cart := w.cart
+	cart, boat := w.cart, w.boat
 	p.closeWindow(r, serverSide)
+	if boat != nil {
+		if cr := boat.entity.Region(); boat.chest != nil && cr != nil && (r == nil || cr == r) {
+			boat.chest.removeViewer(cr, p)
+		}
+		return
+	}
 	if cart != nil {
 		if cart.chest != nil {
 			if cr := cart.entity.Region(); cr != nil && (r == nil || cr == r) {
@@ -921,6 +930,9 @@ func (p *Player) tickChest() {
 		at := p.window.pos
 		if m := p.window.cart; m != nil {
 			at = floorPos(m.entity.Position())
+		}
+		if b := p.window.boat; b != nil {
+			at = floorPos(b.entity.Position())
 		}
 		d := p.entity.Position().Sub(blockVec(at).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
 		gone = d.Dot(d) > chestViewRange*chestViewRange

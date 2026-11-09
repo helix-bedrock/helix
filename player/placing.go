@@ -176,6 +176,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if IsCartItem(held.Name) {
 		return p.placeCart(r, clicked, held.Name)
 	}
+	if IsBoatItem(held.Name) {
+		return p.placeBoat(r, clicked, face, click, held)
+	}
 	block, ok := p.itemBlock(held)
 	if !ok {
 		return false

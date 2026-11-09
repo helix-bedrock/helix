@@ -1079,6 +1079,12 @@ func (p *Player) windowChest(r *world.Region) *Chest {
 		}
 		return m.chest
 	}
+	if b := p.window.boat; b != nil {
+		if b.gone || b.entity.Region() != r {
+			return nil
+		}
+		return b.chest
+	}
 	return p.s.chestAt(r, p.window.pos)
 }
 
