@@ -386,6 +386,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		becomes, wear = e.Becomes, e.Wear
 	}
 	p.s.brokenTNT(r, pos, b.Block, p)
+	p.breakDoublePlantLower(r, pos, b.Block)
 	if destroy := p.s.circuits.Destroy; destroy != nil {
 		destroy(r, pos, b.Block, p.inventory.main[p.inventory.held].Name)
 	}
@@ -401,6 +402,26 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	p.s.SpawnExperience(r, blockVec(pos), xp)
 	p.brk.broken++
 	return true
+}
+
+// breakDoublePlantLower is a double plant's playerWillDestroy (BDS 0xCB1AEB0): a creative
+// player breaking the upper half takes the lower one with it, with its break particles and no
+// drops. Otherwise the other half breaks a tick later, with its drops, as it can no longer
+// stand.
+func (p *Player) breakDoublePlantLower(r *world.Region, pos cube.Pos, block uint32) {
+	f := p.s.farm
+	if f == nil || !p.creative() || !f.DoublePlantUpper(block) {
+		return
+	}
+	at := pos.Side(cube.FaceDown)
+	lower, ok := r.Block(at, 0)
+	if !ok || p.s.reg.Blocks.Name(lower) != p.s.reg.Blocks.Name(block) || f.DoublePlantUpper(lower) {
+		return
+	}
+	levelEvent(r, at, blockCenter(at), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(lower))) //nolint:gosec // hashes are sent as int32
+	if r.SetBlock(at, 0, p.s.reg.Blocks.Air()) {
+		r.UpdateNeighbours(at)
+	}
 }
 
 // resendAround is BDS's answer to a destroy the client predicted but the

@@ -304,6 +304,12 @@ func (t *Ticker) plantSurvives(r *world.Region, pos cube.Pos, s stateInfo) bool 
 		return true
 	}
 	switch s.kind {
+	case kindFoliage:
+		block, _ := r.Block(pos, 0)
+		return t.foliageSurvives(r, pos, block, below, s)
+	case kindSapling:
+		// SaplingBlock's mayPlaceOn is the plant soil list (0xCB03DE0).
+		return t.grassKit.soils[below]
 	case kindWart:
 		return below == k.soulSand
 	case kindBerry:

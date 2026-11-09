@@ -134,6 +134,8 @@ const (
 	kindBambooSapling
 	kindKelp
 	kindSapling
+	// kindFoliage is a flower, grass or other foliage of foliage.go; crop is its rule.
+	kindFoliage
 )
 
 // plant reports whether k is one of the plants in plants.go.
@@ -196,6 +198,8 @@ type Ticker struct {
 	saplingKit *saplingKit
 	// composterKit holds the composter.
 	composterKit *composterKit
+	// foliageKit holds what flowers and grass stand on.
+	foliageKit *foliageKit
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -276,6 +280,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.bambooKit = t.newBambooKit()
 	t.saplingKit = t.newSaplingKit()
 	t.composterKit = t.newComposterKit()
+	t.foliageKit = t.newFoliageKit()
 	return t
 }
 
@@ -335,7 +340,7 @@ func (t *Ticker) skyDarken() uint8 {
 // RandomTicks takes farmland's, crops' and stems' random ticks and the next ticker's.
 func (t *Ticker) RandomTicks(block uint32, layer uint8) bool {
 	k := t.state(block).kind
-	return layer == 0 && k != kindNone && k != kindKelp && k != kindComposter || t.BlockTicker.RandomTicks(block, layer)
+	return layer == 0 && k != kindNone && k != kindKelp && k != kindComposter && k != kindFoliage || t.BlockTicker.RandomTicks(block, layer)
 }
 
 // RandomTick runs farmland's, a crop's or a stem's random tick, and the next ticker's for
@@ -426,6 +431,9 @@ func (t *Ticker) MayPlace(r *world.Region, pos cube.Pos, block uint32) bool {
 		return t.farmlandSurvives(r, pos)
 	case kindCrop, kindStem:
 		return t.survives(r, pos, block)
+	}
+	if s := t.state(block); s.kind == kindFoliage && foliageRule(s.crop) == ruleDouble {
+		return s.facing == 1 || t.doublePlantMayPlace(r, pos)
 	}
 	if s := t.state(block); s.kind.plant() {
 		return t.plantSurvives(r, pos, s)
