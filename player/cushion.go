@@ -40,13 +40,6 @@ const (
 	cushionDropDelay = 10
 	// The keys BDS saves a cushion's colour and riders under.
 	cushionVariantTag = "Variant"
-	linksTag          = "LinksTag"
-	linkEntityTag     = "entityID"
-	linkIDTag         = "LinkID"
-	// reseatTicks is how long a joining player looks for the cushion it sat on.
-	cushionReseatTicks = 100
-	// cushionReseat is how near a returning player must be to the cushion it sat on.
-	cushionReseat = 2
 )
 
 // dyeColors are the colours in dye order (black first), the order a cushion's variant is
@@ -80,8 +73,8 @@ type Cushion struct {
 	name   string
 	seats  *ride.Vehicle
 	gone   bool
-	// away are riders who left the game while sitting: their seat waits for them.
-	away []int64
+	// awayIDs are riders who left the game while sitting: their seat waits for them.
+	awayIDs []int64
 	// check is the ticks to its next look at what it rests on.
 	check int32
 	saved map[string]any
@@ -159,7 +152,7 @@ func (c *Cushion) tick(e *world.Entity) {
 	if c.s.checkVoid(e); c.gone {
 		return
 	}
-	c.settleRiders()
+	keepSeats(c)
 	if b, ok := r.Block(floorPos(e.Position()), 0); ok && c.s.lavaBlock(b) {
 		c.Break(r, true)
 		return
@@ -214,24 +207,10 @@ func (c *Cushion) resting(r *world.Region) bool {
 	return !c.s.solidBlock(first) || !c.s.solidBlock(last)
 }
 
-// settleRiders lets go of riders who died; one who left the game keeps its seat.
-func (c *Cushion) settleRiders() {
-	e := c.entity
-	all := c.seats.Riders()
-	for i := len(all) - 1; i >= 0; i-- {
-		p, ok := all[i].(*Player)
-		if !ok || p.entity != nil && !p.dead() && p.entity.Region() == e.Region() {
-			continue
-		}
-		c.seats.Remove(p)
-		p.vehicle, p.riding = nil, false
-		if !p.dead() && (p.entity == nil || p.entity.Region() == nil) {
-			c.away = append(c.away, p.uniqueID)
-			continue
-		}
-		e.Send(&packet.SetActorLink{EntityLink: ride.Link(e.UniqueID(), p.uniqueID, protocol.EntityLinkRemove)})
-	}
-}
+// away and keeperGone make it a seatKeeper.
+func (c *Cushion) away() *[]int64 { return &c.awayIDs }
+
+func (c *Cushion) keeperGone() bool { return c.gone }
 
 // riders, rideEntity, rideMoved and rideTop make it a vehicle.
 func (c *Cushion) riders() *ride.Vehicle { return c.seats }
@@ -244,7 +223,7 @@ func (c *Cushion) rideTop() float32 { return c.entity.Position()[1] + cushionHei
 
 // use is a player using it: sit down, unless someone holds the seat.
 func (c *Cushion) use(p *Player) {
-	if len(c.away) > 0 {
+	if seatsHeld(c) {
 		return
 	}
 	mount(c, p)
@@ -386,41 +365,6 @@ func (p *Player) useOnCushion(d *protocol.UseItemOnEntityTransactionData) bool {
 	return true
 }
 
-// reseat puts a player who left the game sitting on a cushion back on it, for its first
-// cushionReseatTicks ticks back, while the chunks around it load.
-func (p *Player) reseat() {
-	if p.reseatTicks <= 0 || p.entity == nil {
-		return
-	}
-	p.reseatTicks--
-	r := p.entity.Region()
-	if r == nil || p.vehicle != nil {
-		return
-	}
-	pos := p.entity.Position()
-	p.touching = r.AppendEntitiesIn(p.touching[:0], pos[0]-cushionReseat, pos[2]-cushionReseat, pos[0]+cushionReseat, pos[2]+cushionReseat)
-	for _, e := range p.touching {
-		c, ok := e.Owner().(*Cushion)
-		if !ok || c.gone {
-			continue
-		}
-		i := slices.Index(c.away, p.uniqueID)
-		if i < 0 {
-			continue
-		}
-		c.away = slices.Delete(c.away, i, i+1)
-		p.reseatTicks = 0
-		if !c.seats.Add(p) {
-			return
-		}
-		p.vehicle = c
-		e.Send(&packet.SetActorLink{EntityLink: ride.Link(e.UniqueID(), p.uniqueID, protocol.EntityLinkRider)})
-		p.showSeat(true)
-		applyMovement(p, moveTo(p.seatPosition(), p.entity.Rotation(), p.entity.Tick()))
-		return
-	}
-}
-
 // saveEntity saves it as BDS does, with whoever sits on it or waits for its seat as links.
 func (c *Cushion) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	if c.gone {
@@ -438,18 +382,7 @@ func (c *Cushion) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	if c.name != "" {
 		data["CustomName"] = c.name
 	}
-	links := []any{}
-	for i, r := range c.seats.Riders() {
-		links = append(links, map[string]any{linkEntityTag: r.RideID(), linkIDTag: int32(i)}) //nolint:gosec // one seat
-	}
-	for _, id := range c.away {
-		links = append(links, map[string]any{linkEntityTag: id, linkIDTag: int32(len(links))}) //nolint:gosec // one seat
-	}
-	if len(links) > 0 {
-		data[linksTag] = links
-	} else {
-		delete(data, linksTag)
-	}
+	saveLinks(data, c)
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
@@ -463,11 +396,7 @@ func (s *Host) loadCushion(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity
 	c := s.newCushion(uint8(color & 0xf)) //nolint:gosec // masked to a colour
 	c.saved = maps.Clone(saved.Data)
 	c.name, _ = saved.Data["CustomName"].(string)
-	for _, l := range compounds(saved.Data[linksTag]) {
-		if id, isID := l[linkEntityTag].(int64); isID {
-			c.away = append(c.away, id)
-		}
-	}
+	c.awayIDs = loadLinks(saved.Data)
 	var rot world.Rotation
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
 		rot = world.Rotation{Yaw: v[0], Pitch: v[1], HeadYaw: v[0]}

@@ -23,7 +23,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 			p.dim = d
 		}
 	}
-	p.reseatTicks = cushionReseatTicks
+	p.reseatTicks = reseatTicks
 	if mode, isInt := data["PlayerGameMode"].(int32); isInt {
 		p.gameMode = mode
 	}

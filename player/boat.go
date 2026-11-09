@@ -58,6 +58,10 @@ const (
 	// woodBamboo is the raft, whose seats differ.
 	woodBamboo = 7
 
+	// boatTraceTicks is how long an empty boat's movement is logged at debug level after
+	// its driver gets out.
+	boatTraceTicks = 40
+
 	boatKeyVariant = "Variant"
 	boatKeyItems   = "Items"
 )
@@ -115,6 +119,13 @@ type Boat struct {
 	integrity          int32
 	// motion is its own movement while no one steers it (boatphysics.go).
 	motion boatMotion
+	// lastEyes is where the driver's client last said it was; traceTicks counts down the
+	// ticks logged at debug level after the driver got out.
+	lastEyes   mgl32.Vec3
+	traceTicks int32
+	driven     bool
+	// awayIDs are riders who left the game in it: their seats wait for them.
+	awayIDs []int64
 
 	// chest is a chest boat's slots, a [Chest] with no block behind it.
 	chest *Chest
@@ -247,13 +258,22 @@ func (b *Boat) tick(e *world.Entity) {
 	if b.s.checkVoid(e); b.gone {
 		return
 	}
-	settleRiders(b)
+	keepSeats(b)
 	b.dropGoneViewers(r)
 	if b.Driver() == nil {
+		if b.driven {
+			b.driven, b.traceTicks = false, boatTraceTicks
+			b.s.log.Debug("boat left", "eyes", b.lastEyes, "boat", e.Position())
+		}
 		from := e.Position()
 		b.physics(r, e)
 		b.moved = e.Position().Sub(from)
+		if b.traceTicks > 0 {
+			b.traceTicks--
+			b.s.log.Debug("boat after", "pos", e.Position(), "vel", b.motion.vel)
+		}
 	} else {
+		b.driven = true
 		b.motion.vel = mgl32.Vec3{}
 	}
 	changed := false
@@ -277,6 +297,7 @@ func (b *Boat) drive(p *Player, eyes mgl32.Vec3, yaw float32) {
 		return
 	}
 	e := b.entity
+	b.lastEyes = eyes
 	off := b.seats.SeatOffset(p)
 	sin, cos := math.Sincos(float64(yaw) * -math.Pi / 180)
 	s, c := float32(sin), float32(cos)
@@ -388,6 +409,11 @@ func (b *Boat) rideEntity() *world.Entity { return b.entity }
 
 func (b *Boat) rideMoved() mgl32.Vec3 { return b.moved }
 
+// away and keeperGone make it a seatKeeper.
+func (b *Boat) away() *[]int64 { return &b.awayIDs }
+
+func (b *Boat) keeperGone() bool { return b.gone }
+
 func (b *Boat) rideTop() float32 { return b.entity.Position()[1] - boatHeightOffset + boatHeight }
 
 // use is a player using the boat: get in, or with a chest boat while crouching (which
@@ -395,6 +421,9 @@ func (b *Boat) rideTop() float32 { return b.entity.Position()[1] - boatHeightOff
 func (b *Boat) use(p *Player) {
 	if b.chest != nil && p.Moving(MoveSneaking) {
 		p.openBoat(b)
+		return
+	}
+	if seatsHeld(b) {
 		return
 	}
 	mount(b, p)
@@ -550,6 +579,7 @@ func (b *Boat) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 		}
 		data[boatKeyItems] = items
 	}
+	saveLinks(data, b)
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
@@ -563,6 +593,7 @@ func (s *Host) loadBoat(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, i
 	b := s.newBoat(wood, id == nameChestBoat)
 	b.saved = maps.Clone(saved.Data)
 	b.name, _ = saved.Data["CustomName"].(string)
+	b.awayIDs = loadLinks(saved.Data)
 	var rot world.Rotation
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
 		rot = world.Rotation{Yaw: v[0], Pitch: v[1], HeadYaw: v[0]}
