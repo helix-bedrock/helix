@@ -15,7 +15,7 @@
 //     rooted dirt 0xD53DCC0) and the hoe's on_tool_used (0xC981EA0).
 //
 // The other farmable plants (torchflowers, pitcher crops, nether wart, sweet berries, cocoa,
-// sugar cane, cactus) are in plants.go. Not ported: bamboo, kelp, saplings, mobs trampling
+// sugar cane, cactus) are in plants.go. Bamboo and kelp are in bamboo.go. Not ported: saplings, mobs trampling
 // (only players do in Helix), and raids eating crops (minecraft:on_raided).
 package farm
 
@@ -128,6 +128,9 @@ const (
 	kindCane
 	kindCactus
 	kindPitcher
+	kindBamboo
+	kindBambooSapling
+	kindKelp
 )
 
 // plant reports whether k is one of the plants in plants.go.
@@ -184,6 +187,8 @@ type Ticker struct {
 	grassKit *grassKit
 	// plantKit holds the plants of plants.go.
 	plantKit *plantKit
+	// bambooKit holds bamboo and kelp.
+	bambooKit *bambooKit
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -261,6 +266,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.tills = t.tillTable()
 	t.grassKit = newGrassKit(reg)
 	t.plantKit = t.newPlantKit()
+	t.bambooKit = t.newBambooKit()
 	return t
 }
 
@@ -319,7 +325,8 @@ func (t *Ticker) skyDarken() uint8 {
 
 // RandomTicks takes farmland's, crops' and stems' random ticks and the next ticker's.
 func (t *Ticker) RandomTicks(block uint32, layer uint8) bool {
-	return layer == 0 && t.state(block).kind != kindNone || t.BlockTicker.RandomTicks(block, layer)
+	k := t.state(block).kind
+	return layer == 0 && k != kindNone && k != kindKelp || t.BlockTicker.RandomTicks(block, layer)
 }
 
 // RandomTick runs farmland's, a crop's or a stem's random tick, and the next ticker's for
@@ -355,6 +362,10 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 	case kindCrop, kindStem:
 		if now, ok := r.Block(pos, 0); ok && t.state(now).kind == t.state(block).kind && !t.survives(r, pos, now) && t.fall != nil {
 			t.fall(r, pos, now)
+		}
+	case kindKelp:
+		if now, ok := r.Block(pos, 0); ok && t.state(now).kind == kindKelp {
+			t.kelpTick(r, pos, t.state(now))
 		}
 	default:
 		if s := t.state(block); s.kind.plant() {

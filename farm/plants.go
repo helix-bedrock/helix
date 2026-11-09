@@ -186,6 +186,8 @@ func (t *Ticker) plantTick(r *world.Region, pos cube.Pos, s stateInfo) {
 		t.columnTick(r, pos, s, k.cane[:])
 	case kindCactus:
 		t.columnTick(r, pos, s, k.cactus[:])
+	case kindBamboo, kindBambooSapling:
+		t.bambooTick(r, pos, s)
 	case kindPitcher:
 		if s.facing != pitcherLower || r.Brightness(pos, t.skyDarken()) < DefaultCrop().GrowLight {
 			return
@@ -288,6 +290,12 @@ func (t *Ticker) growPitcher(r *world.Region, pos cube.Pos, s stateInfo, full bo
 
 // plantSurvives is the canSurvive of a plant in this file at pos.
 func (t *Ticker) plantSurvives(r *world.Region, pos cube.Pos, s stateInfo) bool {
+	switch s.kind {
+	case kindBamboo, kindBambooSapling:
+		return t.bambooSurvives(r, pos, s)
+	case kindKelp:
+		return t.kelpSurvives(r, pos)
+	}
 	k := t.plantKit
 	below, ok := r.Block(pos.Side(cube.FaceDown), 0)
 	if !ok {
@@ -328,7 +336,7 @@ func (t *Ticker) caneSurvives(r *world.Region, pos cube.Pos, below uint32) bool 
 	if t.state(below).kind == kindCane {
 		return true
 	}
-	if !t.info[below].fruitSoil && !t.plantKit.sand[below] {
+	if !t.dirtSoil(below) && !t.plantKit.sand[below] {
 		return false
 	}
 	under := pos.Side(cube.FaceDown)
@@ -385,6 +393,10 @@ func (t *Ticker) fertilizePlant(r *world.Region, pos cube.Pos, s stateInfo, crea
 			return false
 		}
 		return t.growPitcher(r, pos, s, rapid)
+	case kindBamboo, kindBambooSapling:
+		return t.fertilizeBamboo(r, pos, s)
+	case kindKelp:
+		return t.fertilizeKelp(r, pos)
 	}
 	return false
 }
