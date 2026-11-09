@@ -585,6 +585,17 @@ func (s *Server) SetTime(time int32) {
 	}
 }
 
+// SetRandomTickSpeed changes the randomtickspeed game rule in every dimension from the next
+// tick on. level.dat keeps its own value, so a restart goes back to it. Valid once the world is
+// open. Safe from any goroutine.
+func (s *Server) SetRandomTickSpeed(speed int32) {
+	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
+		if d != nil {
+			d.SetRandomTickSpeed(speed)
+		}
+	}
+}
+
 // levelSaveInterval is how often level.dat is written while running, so being killed loses little.
 const levelSaveInterval = 30 * time.Second
 

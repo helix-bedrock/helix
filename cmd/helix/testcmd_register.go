@@ -176,7 +176,13 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			p.SetPermission(player.PermissionOperator)
 			return "You are an operator now."
 		}},
-		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
+		{tickSpeedCommand, "Sets the random tick speed until the server stops (BDS's default is 1).", nil, func(_ *player.Player, args []string) string {
+			if !registry() {
+				return ""
+			}
+			return tickSpeed(srv.Load(), args)
+		}},
+		{timeCommand,"Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""
 			}

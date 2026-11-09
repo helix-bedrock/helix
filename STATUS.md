@@ -27,6 +27,7 @@ The full notes for each part (API names, what is assumed, what differs from BDS)
 - ✅ Registry: blocks, items, biomes, entities, creative items and recipes, byte for byte BDS's
 - 🟡 Block ticks: random and scheduled ticks run; many blocks' tick behaviour is added, not all
 - 🧪 World time and the day cycle (`/time` with `-testcmds`)
+- 🧪 Random tick speed while running (`/tickspeed` with `-testcmds`, `Server.SetRandomTickSpeed`)
 - 🧪 Sky light and block light, kept per block as BDS keeps them (torches, lanterns, lava and every block that gives off light)
 - ⬜ Weather
 - 🧪 The void (damage below the world, items removed)
