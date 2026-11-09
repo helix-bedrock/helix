@@ -16,6 +16,8 @@ github.com/helix-bedrock/helix-data v0.0.0-20261106155253-6e3f1a99a38f h1:23PIXQ
 github.com/helix-bedrock/helix-data v0.0.0-20261106155253-6e3f1a99a38f/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261109221643-e813b8014461 h1:7uQw9ZHlVbVTEiZsJ4UAaPJEq6EWVTQ5JeAH+0iFZ/Q=
 github.com/helix-bedrock/helix-data v0.0.0-20261109221643-e813b8014461/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
+github.com/helix-bedrock/helix-data v0.0.0-20261109224058-b6d7ec83c1af h1:0mmcfUAwwtwUiAo9moFNNbuxQFROnrlD9AtqSQQTuYE=
+github.com/helix-bedrock/helix-data v0.0.0-20261109224058-b6d7ec83c1af/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/nethernet v0.0.0-20261105043613-c2b197a2afcc h1:tPg+wjeDMR8+7gy4OgLgRKbpDmkKJQ/uusI1ABWKb4U=
 github.com/helix-bedrock/nethernet v0.0.0-20261105043613-c2b197a2afcc/go.mod h1:VnXHxKcm+E0FTmpjyXwTMPweBUqZ/QNDRABUVjSwRRE=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41 h1:XTa1sWqYUCqhxDdAGL9+vldnHfNIR5/VascyZWb9qYg=

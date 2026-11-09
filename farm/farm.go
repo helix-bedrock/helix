@@ -124,6 +124,8 @@ const (
 	kindStem
 	// kindComposter is the composter, not a plant; age is its fill level.
 	kindComposter
+	// kindGrassBlock is the grass block, which dies and spreads.
+	kindGrassBlock
 	kindWart
 	kindBerry
 	kindCocoa
@@ -200,6 +202,8 @@ type Ticker struct {
 	composterKit *composterKit
 	// foliageKit holds what flowers and grass stand on.
 	foliageKit *foliageKit
+	// grassBlockKit holds what grass blocks need.
+	grassBlockKit *grassBlockKit
 	// support says which block faces hold things; nil for none.
 	support atomic.Pointer[SupportFunc]
 }
@@ -283,6 +287,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.saplingKit = t.newSaplingKit()
 	t.composterKit = t.newComposterKit()
 	t.foliageKit = t.newFoliageKit()
+	t.grassBlockKit = t.newGrassBlockKit()
 	return t
 }
 
@@ -356,6 +361,8 @@ func (t *Ticker) RandomTick(r *world.Region, pos cube.Pos, block uint32, layer u
 			t.cropTick(r, pos, block, s)
 		case kindStem:
 			t.stemTick(r, pos, block, s)
+		case kindGrassBlock:
+			t.grassTick(r, pos)
 		default:
 			if s.kind.plant() {
 				t.plantTick(r, pos, s)
