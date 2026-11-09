@@ -1,6 +1,7 @@
 package player
 
 import (
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,13 +27,16 @@ type global struct {
 
 	list atomic.Pointer[[]*Player]
 
+	// panicked is told of a panic in the loop, which it recovers.
+	panicked func(v any, stack []byte)
+
 	// tick runs on the global goroutine every tick after the queued work, if set before the
 	// first player joins.
 	tick func()
 }
 
-func newGlobal() *global {
-	g := &global{stop: make(chan struct{}), done: make(chan struct{}), players: map[uuid.UUID]*Player{}}
+func newGlobal(panicked func(v any, stack []byte)) *global {
+	g := &global{panicked: panicked, stop: make(chan struct{}), done: make(chan struct{}), players: map[uuid.UUID]*Player{}}
 	g.list.Store(&[]*Player{})
 	go g.loop()
 	return g
@@ -64,6 +68,11 @@ func (g *global) close() {
 
 func (g *global) loop() {
 	defer close(g.done)
+	defer func() {
+		if v := recover(); v != nil {
+			g.panicked(v, debug.Stack())
+		}
+	}()
 	t := time.NewTicker(world.TickDuration)
 	defer t.Stop()
 	var in []func()

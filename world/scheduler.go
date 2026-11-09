@@ -2,7 +2,9 @@ package world
 
 import (
 	"container/heap"
+	"log/slog"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,6 +25,38 @@ type Scheduler struct {
 	seq   atomic.Uint64
 	// clock is the world's tick clock: a tick count and when it was set.
 	clock atomic.Pointer[tickClock]
+	// panicked is told of a panic in a tick or a chunk job (SetPanicHandler).
+	panicked atomic.Pointer[PanicHandler]
+}
+
+// PanicHandler is told of a panic the world recovered: what was panicked with and the stack.
+// The panicking region stops ticking, so the server should stop. Runs: the goroutine that
+// panicked.
+type PanicHandler func(v any, stack []byte)
+
+// SetPanicHandler sets what is told when a region's tick or a chunk job panics; nil only logs.
+// Safe from any goroutine.
+func (s *Scheduler) SetPanicHandler(fn PanicHandler) {
+	if fn == nil {
+		s.panicked.Store(nil)
+		return
+	}
+	s.panicked.Store(&fn)
+}
+
+// recovered is deferred around ticks and jobs: it recovers a panic and passes it on, so one
+// goroutine's panic does not kill the process before the players are told.
+func (s *Scheduler) recovered(log *slog.Logger) {
+	v := recover()
+	if v == nil {
+		return
+	}
+	stack := debug.Stack()
+	if fn := s.panicked.Load(); fn != nil {
+		(*fn)(v, stack)
+		return
+	}
+	log.Error("World goroutine panicked", "panic", v, "stack", string(stack))
 }
 
 type tickClock struct {
@@ -59,7 +93,7 @@ func NewScheduler(n int) *Scheduler {
 		go func() {
 			defer s.wg.Done()
 			for r := range s.work {
-				r.d.runTick(r)
+				r.d.tickSafely(r)
 			}
 		}()
 	}

@@ -374,7 +374,10 @@ func (d *Dimension) encodedUnloaded(c *Chunk, nc *NetChunk, version uint64) {
 }
 
 func (d *Dimension) poolLoad(pos mcdb.ChunkPos) {
-	d.pool.do(pos, func() { d.load(pos) })
+	d.pool.do(pos, func() {
+		defer d.sched.recovered(d.log)
+		d.load(pos)
+	})
 }
 
 // load runs on a worker: it reads the chunk, or generates it, encodes it
@@ -404,6 +407,12 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light) })
+}
+
+// tickSafely is runTick with a panic recovered and passed to the scheduler's handler.
+func (d *Dimension) tickSafely(r *Region) {
+	defer d.sched.recovered(d.log)
+	d.runTick(r)
 }
 
 // generate fills a new column with the dimension's generator, recovering a panic in it so one

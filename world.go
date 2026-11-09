@@ -91,6 +91,7 @@ func (s *Server) openWorld() error {
 		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
+	s.ticker.SetPanicHandler(s.panicked)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
 	s.clock = daytime.NewClock(s.ticker.CurrentTick, int32(min(ldat.Time, math.MaxInt32)), ldat.DoDayLightCycle) //nolint:gosec // capped
 	if err := s.openOverworld(worldType, gt, ldat.RandomSeed, ldat.FlatWorldLayers, ldat.RandomTickSpeed, ldat.DoFireTick); err != nil {

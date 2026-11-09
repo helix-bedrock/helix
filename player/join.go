@@ -135,6 +135,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 func (p *Player) startFlusher(done <-chan struct{}) {
 	kick := make(chan struct{}, 1)
 	go func() {
+		defer p.s.recovered()
 		for {
 			select {
 			case <-done:
@@ -256,6 +257,7 @@ func (p *Player) readLoop(done <-chan struct{}) {
 // spawnWhenReady sends PlayStatus PlayerSpawn once the chunks around the
 // player are sent, as BDS lets the client in.
 func (p *Player) spawnWhenReady(done <-chan struct{}) {
+	defer p.s.recovered()
 	select {
 	case <-p.currentViewer().Ready():
 		p.send(&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn})

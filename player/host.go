@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 
@@ -83,6 +84,9 @@ type HostConfig struct {
 	Farm *farm.Ticker
 	// Fire is fire's ticker, which lightning asks where fire may go. Nil: lightning sets none.
 	Fire *fire.Ticker
+	// OnPanic is told of a panic in a player's or the global goroutine, recovered so the
+	// server can tell everyone and stop. Nil only logs it.
+	OnPanic func(v any, stack []byte)
 }
 
 // Host runs the players of one server: it admits them, owns the player
@@ -94,6 +98,7 @@ type Host struct {
 	// soundHandles numbers the sounds that are stopped later.
 	soundHandles atomic.Uint64
 	log          *slog.Logger
+	onPanic      func(v any, stack []byte)
 	reg          *registry.Registry
 	recipes      crafting.Book
 	overworld    *world.Dimension
@@ -191,9 +196,11 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		drops:    drops, foods: foodTable(conf.Registry.Items),
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, nether: conf.Nether, end: conf.End, portals: conf.Portals, onEnterEnd: conf.OnEnterEnd, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, farm: conf.Farm, fire: conf.Fire, chests: chests, discs: discs,
+		handlers: setup.freeze(), game: g, global: nil, connections: connections, attach: attached, farm: conf.Farm, fire: conf.Fire, chests: chests, discs: discs,
 		furnaces: furnaces, commands: setup.h.commands,
 	}
+	h.onPanic = conf.OnPanic
+	h.global = newGlobal(h.panicked)
 	h.setUpCommands()
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()
@@ -241,6 +248,7 @@ func (h *Host) Admit(c *network.Conn, changed func()) {
 	h.wg.Add(1)
 	go func() {
 		defer h.wg.Done()
+		defer h.recovered()
 		p.play()
 		h.global.call(func() {
 			h.global.remove(p)
@@ -286,12 +294,35 @@ func (h *Host) Broadcast(pk packet.Packet) {
 	}
 }
 
-// Close disconnects every player with reason, waits for them to be saved
-// and stops the global owner.
-func (h *Host) Close(reason int32) {
+// Kick sends every player online a disconnect with reason and closes their connections at
+// once, without waiting for anything to tick. Runs: anywhere.
+func (h *Host) Kick(reason int32) {
 	for _, p := range h.global.online() {
 		h.refuse(p.conn, reason)
 	}
+}
+
+// recovered is deferred in the player goroutines: it recovers a panic and passes it on, so
+// the server can tell every player before it stops.
+func (h *Host) recovered() {
+	if v := recover(); v != nil {
+		h.panicked(v, debug.Stack())
+	}
+}
+
+// panicked passes a recovered panic to OnPanic, or logs it.
+func (h *Host) panicked(v any, stack []byte) {
+	if h.onPanic != nil {
+		h.onPanic(v, stack)
+		return
+	}
+	h.log.Error("Player goroutine panicked", "panic", v, "stack", string(stack))
+}
+
+// Close disconnects every player with reason, waits for them to be saved
+// and stops the global owner.
+func (h *Host) Close(reason int32) {
+	h.Kick(reason)
 	h.wg.Wait()
 	h.global.close()
 }

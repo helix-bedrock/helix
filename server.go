@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -228,6 +230,9 @@ type Server struct {
 	// world is open.
 	setup   *player.Setup
 	players atomic.Pointer[player.Host]
+	// crash is set by the first recovered panic: Run stops and returns it.
+	crash     atomic.Pointer[crashError]
+	crashOnce sync.Once
 }
 
 // New returns a Server. It listens on nothing until [Server.Run].
@@ -296,6 +301,14 @@ func (s *Server) SetRedstone(c circuit.Config) { s.redstone.Set(c) }
 // cancelled or a transport fails to open. It closes every connection, then
 // saves and closes the world, before it returns.
 func (s *Server) Run(ctx context.Context) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			s.panicked(v, debug.Stack())
+		}
+		if c := s.crash.Load(); c != nil {
+			err = errors.Join(err, c)
+		}
+	}()
 	if err := s.openWorld(); err != nil {
 		_ = s.listener.Close()
 		return err
@@ -318,6 +331,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	host, err := player.NewHost(player.HostConfig{
 		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Nether: s.nether, End: s.end, Portals: s.portals, OnEnterEnd: s.enterEnd, Store: s.playerStore,
 		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone, Farm: s.farm, Fire: s.fire,
+		OnPanic: s.panicked,
 	}, s.setup)
 	if err != nil {
 		_ = s.listener.Close()
@@ -601,6 +615,27 @@ func (s *Server) SetRandomTickSpeed(speed int32) {
 	}
 }
 
+// crashError is a panic the server recovered and stopped for.
+type crashError struct{ v any }
+
+func (c *crashError) Error() string { return fmt.Sprintf("helix: crashed: %v", c.v) }
+
+// panicked is a panic recovered anywhere in the server. Helix's own choice, as BDS sends
+// nothing when it crashes: every player is told the server shut down at once, without
+// waiting for a tick, then Run stops and saves what it can. Runs: the goroutine that panicked.
+func (s *Server) panicked(v any, stack []byte) {
+	s.log.Error("Server crashed; stopping", "panic", v, "stack", string(stack))
+	s.crashOnce.Do(func() {
+		s.crash.Store(&crashError{v: v})
+		if h := s.players.Load(); h != nil {
+			h.Kick(packet.DisconnectReasonShutdown)
+		}
+		if s.listener != nil {
+			_ = s.listener.Close()
+		}
+	})
+}
+
 // levelSaveInterval is how often level.dat is written while running, so being killed loses little.
 const levelSaveInterval = 30 * time.Second
 
@@ -610,6 +645,11 @@ func (s *Server) startPeriodic(host *player.Host) (stop func()) {
 	quit, done := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(done)
+		defer func() {
+			if v := recover(); v != nil {
+				s.panicked(v, debug.Stack())
+			}
+		}()
 		clocks := time.NewTicker(clockSyncTicks * world.TickDuration)
 		defer clocks.Stop()
 		saves := time.NewTicker(levelSaveInterval)

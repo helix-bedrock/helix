@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/helix-bedrock/helix"
 )
@@ -31,8 +32,14 @@ func main() {
 		level = slog.LevelDebug
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	// Ctrl-C, and on Windows Ctrl-Break and closing the window (SIGTERM), stop the server:
+	// everyone is told it shut down and the world is saved. A second one kills it at once.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 
 	conf := helix.DefaultConfig()
 	conf.Log = log
