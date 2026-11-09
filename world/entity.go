@@ -147,6 +147,13 @@ func (e *Entity) EachSeer(fn func(player *Entity)) {
 	}
 }
 
+// Sees reports whether the player, given as its entity, has been shown other. Runs:
+// owner of both (one region).
+func (e *Entity) Sees(other *Entity) bool {
+	_, ok := e.known[other]
+	return ok
+}
+
 // Respawn shows the entity again to the players who see it, for a change only
 // a spawn carries. Runs: owner.
 func (e *Entity) Respawn() {

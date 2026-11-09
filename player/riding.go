@@ -97,6 +97,9 @@ func letOff(v vehicle, p *Player) {
 		return
 	}
 	at := ride.Exit(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), e.Position(), v.rideMoved(), seat, v.rideTop())
+	if seats.Rules().ExitAbove {
+		at = ride.ExitAbove(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), seat, v.rideTop())
+	}
 	if seats.Rules().Dismount == ride.DismountOnTopCenter {
 		pos := e.Position()
 		at = mgl32.Vec3{pos[0], v.rideTop() + p.RideBody().HeightOffset + rideExitUp, pos[2]}

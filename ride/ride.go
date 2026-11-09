@@ -63,6 +63,10 @@ type Rules struct {
 	Seats []Seat
 	// Dismount is how riders get off.
 	Dismount DismountMode
+	// ExitAbove is the upward one of the three searches ExitVehicleSystemImpl picks from
+	// (1.26.60 0xBFA8F80, against the eight places around of 0xBFA89D0): the rider gets up
+	// where it sat, standing on the vehicle. Boats land riders this way in BDS.
+	ExitAbove bool
 }
 
 // Body is what riding needs to know of a rider.
@@ -290,6 +294,37 @@ func Exit(b Blocks, body Body, pos, moved, seat mgl32.Vec3, top float32) mgl32.V
 		}
 	}
 	return mgl32.Vec3{pos[0], top + body.HeightOffset + exitUp, pos[2]}
+}
+
+// ExitAbove is where a rider of a vehicle with Rules.ExitAbove lands: over its seat,
+// standing on top, the vehicle's top or one or two blocks higher, the first with room for
+// the rider. With room nowhere it stands on top anyway.
+func ExitAbove(b Blocks, body Body, seat mgl32.Vec3, top float32) mgl32.Vec3 {
+	half := min(body.Width, 1) * 0.5
+	for up := range 3 {
+		feet := top + float32(up)
+		lo := mgl32.Vec3{seat[0] - half, feet, seat[2] - half}
+		hi := mgl32.Vec3{seat[0] + half, feet + body.Height, seat[2] + half}
+		if room(b, lo, hi) {
+			return mgl32.Vec3{seat[0], feet + body.HeightOffset + exitUp, seat[2]}
+		}
+	}
+	return mgl32.Vec3{seat[0], top + body.HeightOffset + exitUp, seat[2]}
+}
+
+// room reports whether no block's box cuts into lo to hi.
+func room(b Blocks, lo, hi mgl32.Vec3) bool {
+	from, to := blockAt(lo), blockAt(hi)
+	for x := from[0]; x <= to[0]; x++ {
+		for y := from[1]; y <= to[1]; y++ {
+			for z := from[2]; z <= to[2]; z++ {
+				if blocked(b, cube.Pos{x, y, z}, lo, hi) {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }
 
 // directions is calculateVehicleDirections: the way it moves along its main axis, and the

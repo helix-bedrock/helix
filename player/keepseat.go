@@ -79,6 +79,12 @@ func (p *Player) reseat() {
 		if i < 0 {
 			continue
 		}
+		// The link must reach the client after the vehicle's AddActor: a client that
+		// learns it rides only from AddActor's links does not drive (predict) the boat, and
+		// the boat then sat a seat's height under the position it reports.
+		if !p.entity.Sees(e) {
+			return
+		}
 		*held = slices.Delete(*held, i, i+1)
 		p.reseatTicks = 0
 		if !v.riders().Add(p) {

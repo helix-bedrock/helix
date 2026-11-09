@@ -124,6 +124,8 @@ type Boat struct {
 	lastEyes   mgl32.Vec3
 	traceTicks int32
 	driven     bool
+	// predicted is whether the driver's client said last it predicts the boat.
+	predicted bool
 	// awayIDs are riders who left the game in it: their seats wait for them.
 	awayIDs []int64
 
@@ -188,12 +190,12 @@ func boatRideRules(wood int32, chest bool) *ride.Rules {
 	}
 	if chest {
 		return &ride.Rules{
-			SeatCount: 1, CrouchingSkipInteract: true, PullIn: true, MaxWidth: boatMaxWidth,
+			SeatCount: 1, CrouchingSkipInteract: true, PullIn: true, MaxWidth: boatMaxWidth, ExitAbove: true,
 			Seats: []ride.Seat{seat(boatSeatFront, 0, 1)},
 		}
 	}
 	return &ride.Rules{
-		SeatCount: boatSeatsCount, CrouchingSkipInteract: true, PullIn: true, MaxWidth: boatMaxWidth,
+		SeatCount: boatSeatsCount, CrouchingSkipInteract: true, PullIn: true, MaxWidth: boatMaxWidth, ExitAbove: true,
 		Seats: []ride.Seat{seat(0, 0, 1), seat(boatSeatFront, 2, 2), seat(boatSeatBack, 2, 2)},
 	}
 }
@@ -299,6 +301,10 @@ func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
 	}
 	e := b.entity
 	b.lastEyes = pos
+	if predicted != b.predicted {
+		b.predicted = predicted
+		b.s.log.Debug("boat prediction", "predicted", predicted, "pos", pos, "boat", e.Position())
+	}
 	if !predicted {
 		off := b.seats.SeatOffset(p)
 		sin, cos := math.Sincos(float64(yaw) * -math.Pi / 180)
