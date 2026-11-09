@@ -381,6 +381,10 @@ func (s *Server) saveClock() error {
 // Weather returns the world's weather. Valid once the world is open. Safe from any goroutine.
 func (s *Server) Weather() *weather.Weather { return s.weather }
 
+// ChunkWeather returns the overworld's lightning, ice and snow, nil before the overworld opens.
+// Safe from any goroutine once the server runs.
+func (s *Server) ChunkWeather() *weather.Ticker { return s.chunkWeather }
+
 // broadcastLevelEvent sends a level event to everyone online, once players can join.
 func (s *Server) broadcastLevelEvent(event, data int32) {
 	if h := s.players.Load(); h != nil {

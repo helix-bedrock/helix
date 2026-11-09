@@ -62,6 +62,17 @@ func (s *Host) Strike(r *world.Region, pos mgl32.Vec3) *LightningBolt {
 	return b
 }
 
+// StrikePlayer makes a lightning bolt at p's feet. Runs: anywhere; the bolt is made on p's
+// region.
+func (s *Host) StrikePlayer(p *Player) bool {
+	return p.Run(func(p *Player) {
+		if r := p.entity.Region(); r != nil {
+			at := p.entity.Position()
+			s.Strike(r, mgl32.Vec3{at[0], at[1] - eyeHeight, at[2]})
+		}
+	})
+}
+
 // MobsIn appends the feet of the players in the chunk at pos to dst, what lightning may
 // strike. Runs: owner of the region.
 func (s *Host) MobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl32.Vec3) []mgl32.Vec3 {

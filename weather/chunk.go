@@ -2,6 +2,7 @@ package weather
 
 import (
 	"math/rand/v2"
+	"sync/atomic"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
@@ -108,7 +109,13 @@ type Ticker struct {
 	snow, covered [maxSnowHeight + 1]uint32
 	// info is per state: what the weather reads of it.
 	info []blockInfo
+	// odds replaces lightningOdds when above 0 (SetLightningOdds).
+	odds atomic.Int32
 }
+
+// SetLightningOdds makes lightning strike a stormy chunk one tick in n instead of BDS's one in
+// 100000; 0 or less goes back to BDS's. For testing. Safe from any goroutine.
+func (t *Ticker) SetLightningOdds(n int32) { t.odds.Store(n) }
 
 // blockInfo is what the weather reads of a state.
 type blockInfo struct {
@@ -182,7 +189,11 @@ func (t *Ticker) ChunkWeather(r *world.Region, pos mcdb.ChunkPos, speed int32) {
 		return
 	}
 	s := t.region(r)
-	if w.Rain()*w.Thunder() > stormLevel && s.rng.IntN(lightningOdds) == 0 {
+	odds := int(t.odds.Load())
+	if odds <= 0 {
+		odds = lightningOdds
+	}
+	if w.Rain()*w.Thunder() > stormLevel && s.rng.IntN(odds) == 0 {
 		t.lightning(r, s, pos)
 	}
 	for range speed {

@@ -182,6 +182,12 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return tickSpeed(srv.Load(), args)
 		}},
+		{lightningCommand, "Strikes you with lightning, or sets the odds: odds <n> (BDS: 100000), reset.", nil, func(p *player.Player, args []string) string {
+			if !registry() {
+				return ""
+			}
+			return lightning(srv.Load(), p, args)
+		}},
 		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""
