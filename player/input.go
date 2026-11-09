@@ -170,7 +170,14 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		if rot, has := pk.VehicleRotation.Value(); has {
 			yaw = rot[1]
 		}
-		b.drive(p, pk.Position, yaw)
+		// A client predicting its vehicle sends the vehicle's own position: the boat floats
+		// at the y it reports (checked in game with the -debug boat trace), not a seat
+		// below it.
+		predicted := false
+		if id, has := pk.ClientPredictedVehicle.Value(); has && id == b.entity.UniqueID() {
+			predicted = true
+		}
+		b.drive(p, pk.Position, yaw, predicted)
 	}
 	if p.vehicle != nil {
 		pos = p.seatPosition()

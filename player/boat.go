@@ -119,7 +119,7 @@ type Boat struct {
 	integrity          int32
 	// motion is its own movement while no one steers it (boatphysics.go).
 	motion boatMotion
-	// lastEyes is where the driver's client last said it was; traceTicks counts down the
+	// lastEyes is the position the driver's client last sent; traceTicks counts down the
 	// ticks logged at debug level after the driver got out.
 	lastEyes   mgl32.Vec3
 	traceTicks int32
@@ -290,18 +290,21 @@ func (b *Boat) tick(e *world.Entity) {
 	}
 }
 
-// drive moves the boat where its driver's client put it: the rider at eyes in its seat,
-// the boat turned to yaw. Region tick of the driver.
-func (b *Boat) drive(p *Player, eyes mgl32.Vec3, yaw float32) {
+// drive moves the boat where its driver's client put it, turned to yaw: at pos itself when
+// the client predicts the boat, else so that the rider at pos (its eyes) is in its seat.
+// Region tick of the driver.
+func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
 	if b.gone || b.Driver() != p {
 		return
 	}
 	e := b.entity
-	b.lastEyes = eyes
-	off := b.seats.SeatOffset(p)
-	sin, cos := math.Sincos(float64(yaw) * -math.Pi / 180)
-	s, c := float32(sin), float32(cos)
-	pos := mgl32.Vec3{eyes[0] - off[0]*c - off[2]*s, eyes[1] - off[1], eyes[2] - off[2]*c + off[0]*s}
+	b.lastEyes = pos
+	if !predicted {
+		off := b.seats.SeatOffset(p)
+		sin, cos := math.Sincos(float64(yaw) * -math.Pi / 180)
+		s, c := float32(sin), float32(cos)
+		pos = mgl32.Vec3{pos[0] - off[0]*c - off[2]*s, pos[1] - off[1], pos[2] - off[2]*c + off[0]*s}
+	}
 	from := e.Position()
 	if e.Apply(world.Movement{Pos: pos, Rot: world.Rotation{Yaw: yaw, HeadYaw: yaw}, Tick: e.Tick()}) {
 		b.moved = pos.Sub(from)
