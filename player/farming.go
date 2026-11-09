@@ -81,6 +81,26 @@ func (p *Player) useBoneMeal(r *world.Region, clicked cube.Pos, click mgl32.Vec3
 	return true
 }
 
+// dispenseBoneMeal is BoneMealItem's dispense (0xC988490): the block in front is fertilized
+// as by a player in survival; if it grew, a click, the growth particles and one bone meal
+// used up, else a failed click and nothing used. Either way the dispenser smokes, as BDS's
+// does when an item's dispense returns true, which bone meal's always does.
+func (s *Host) dispenseBoneMeal(r *world.Region, c *Chest, slot int, front cube.Pos, at mgl32.Vec3) {
+	f := s.farm
+	if f == nil || !f.Fertilize(r, front, false, false) {
+		playSound(r, front, soundEvent{name: packet.SoundEventBlockClickFail, pos: at, extra: dispenseBoneMealFail}, nil)
+		return
+	}
+	playSound(r, front, soundEvent{name: packet.SoundEventBlockClick, pos: at, extra: -1}, nil)
+	levelEvent(r, front, blockVec(front), packet.LevelEventParticleCropGrowth, 0)
+	it := c.items[slot]
+	it.Count--
+	c.Inventory(r).SetItem(slot, it)
+}
+
+// dispenseBoneMealFail is the data of BDS's failed click when bone meal grows nothing.
+const dispenseBoneMealFail = 1000
+
 // trample is FarmBlock's fall-on for the player landing after falling distance: the
 // farmland it lands on may turn to dirt. BDS lets a player trample with the mine ability.
 func (p *Player) trample(r *world.Region, feet mgl32.Vec3, distance float32) {

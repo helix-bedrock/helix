@@ -206,7 +206,8 @@ func facingFace(f int) cube.Face {
 	return cube.FaceEast
 }
 
-// Fertilize is bone meal on the block at pos (the block's onFertilized). A crop grows
+// Fertilize is bone meal on the block at pos (the block's onFertilized). A grass block grows
+// grass and flowers around it, and short grass or a fern grows tall (see bonemeal.go). A crop grows
 // BoneMealMin to BoneMealMax stages, or to the end when full (BDS: a creative player, or rapid
 // fertilizer); the torchflower crop goes from 0 to 1, else to the end. A stem grows 2 to 4
 // stages, to the end only when rapid. True if it grew, false for a block that is fully grown
@@ -215,6 +216,12 @@ func (t *Ticker) Fertilize(r *world.Region, pos cube.Pos, creative, rapid bool) 
 	b, ok := r.Block(pos, 0)
 	if !ok {
 		return false
+	}
+	switch k := t.grassKit; b {
+	case k.grass:
+		return t.fertilizeGrass(r, pos)
+	case k.short, k.fern:
+		return t.growTall(r, pos, b)
 	}
 	s := t.state(b)
 	switch s.kind {
@@ -253,6 +260,10 @@ func (t *Ticker) Fertilize(r *world.Region, pos cube.Pos, creative, rapid bool) 
 
 // Fertilizable reports whether bone meal works on block at all (BDS's canBeFertilized).
 func (t *Ticker) Fertilizable(block uint32) bool {
+	switch k := t.grassKit; block {
+	case k.grass, k.short, k.fern:
+		return true
+	}
 	k := t.state(block).kind
 	return k == kindCrop || k == kindStem
 }

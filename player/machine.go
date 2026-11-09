@@ -585,6 +585,11 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 		playSound(r, pos, soundEvent{name: packet.SoundEventBlockClick, pos: center, extra: -1}, nil)
 		return
 	}
+	if !c.machine.dropper && it.Name == nameBoneMeal {
+		s.dispenseBoneMeal(r, c, slot, front, at)
+		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
+		return
+	}
 	if !c.machine.dropper && s.dispenseFirework(r, pos, face, at, it) {
 		it.Count--
 		c.Inventory(r).SetItem(slot, it)

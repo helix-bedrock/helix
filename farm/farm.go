@@ -170,6 +170,8 @@ type Ticker struct {
 	moisture [maxMoisture + 1]uint32
 	dirt     uint32
 	tills    map[uint32]Till
+	// grassKit is what bone meal on grass, short grass and ferns needs.
+	grassKit *grassKit
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -245,6 +247,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 		}
 	}
 	t.tills = t.tillTable()
+	t.grassKit = newGrassKit(reg)
 	return t
 }
 
