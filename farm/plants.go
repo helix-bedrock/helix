@@ -188,6 +188,8 @@ func (t *Ticker) plantTick(r *world.Region, pos cube.Pos, s stateInfo) {
 		t.columnTick(r, pos, s, k.cactus[:])
 	case kindBamboo, kindBambooSapling:
 		t.bambooTick(r, pos, s)
+	case kindSapling:
+		t.saplingTick(r, pos, s)
 	case kindPitcher:
 		if s.facing != pitcherLower || r.Brightness(pos, t.skyDarken()) < DefaultCrop().GrowLight {
 			return
@@ -374,6 +376,8 @@ func (t *Ticker) cactusSurvives(r *world.Region, pos cube.Pos, below uint32) boo
 func (t *Ticker) fertilizePlant(r *world.Region, pos cube.Pos, s stateInfo, creative, rapid bool) bool {
 	k := t.plantKit
 	switch s.kind {
+	case kindSapling:
+		return t.fertilizeSapling(r, pos, s, creative, rapid)
 	case kindBerry:
 		return t.growBerry(r, pos, s, creative || rapid)
 	case kindCocoa:

@@ -131,6 +131,7 @@ const (
 	kindBamboo
 	kindBambooSapling
 	kindKelp
+	kindSapling
 )
 
 // plant reports whether k is one of the plants in plants.go.
@@ -189,6 +190,8 @@ type Ticker struct {
 	plantKit *plantKit
 	// bambooKit holds bamboo and kelp.
 	bambooKit *bambooKit
+	// saplingKit holds the saplings and their trees.
+	saplingKit *saplingKit
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -267,6 +270,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.grassKit = newGrassKit(reg)
 	t.plantKit = t.newPlantKit()
 	t.bambooKit = t.newBambooKit()
+	t.saplingKit = t.newSaplingKit()
 	return t
 }
 

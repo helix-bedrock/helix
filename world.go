@@ -194,6 +194,13 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			s.level.Surface = g.SpawnHeight(sp[0], sp[2])
 		}
 	}
+	if s.farm != nil {
+		if v, ok := conf.Generator.(*generator.Vanilla); ok {
+			s.farm.SetTrees(v)
+		} else {
+			s.farm.SetTrees(generator.NewBackgroundTrees(s.reg, seed, s.log))
+		}
+	}
 	climate, _ := conf.Generator.(weather.Climate)
 	s.chunkWeather = weather.NewTicker(weather.Config{Registry: s.reg, Weather: s.weather, Climate: climate, Strike: s.strike, Mobs: s.mobsIn})
 	conf.Weather = s.chunkWeather

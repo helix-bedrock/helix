@@ -281,7 +281,7 @@ func (t *Ticker) Fertilizable(block uint32) bool {
 	}
 	s := t.state(block)
 	switch s.kind {
-	case kindCrop, kindStem, kindBerry, kindCocoa, kindCane, kindBamboo, kindBambooSapling, kindKelp:
+	case kindCrop, kindStem, kindBerry, kindCocoa, kindCane, kindBamboo, kindBambooSapling, kindKelp, kindSapling:
 		return true
 	case kindPitcher:
 		return s.facing == pitcherLower
