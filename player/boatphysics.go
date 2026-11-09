@@ -43,6 +43,16 @@ const (
 	boatFloatSpeed  = 0.05
 	boatWaterDrag   = 0.9
 	boatStillSpeed2 = 1e-8
+
+	// The legacy_boat preset of entities/boat.json's pushable_by_entity: strength_multiplier
+	// 0.1, min_distance 0.55 and push_scale_self 0.5 (the player has no pushable_by_entity,
+	// so push_scale_other never pushes it back). boatPushReach is how far Mob::pushActors
+	// grows the pusher's box on x and z; boatPushScan how far to look for pushers.
+	boatPushStrength = 0.1
+	boatPushMin      = 0.55
+	boatPushSelf     = 0.5
+	boatPushReach    = 0.2
+	boatPushScan     = 2
 )
 
 // boatBuoyancyData is the boat's buoyant component as BDS 1.26.60 hands it to clients in
@@ -67,6 +77,7 @@ type boatMotion struct {
 func (b *Boat) physics(r *world.Region, e *world.Entity) {
 	m := &b.motion
 	pos := e.Position()
+	b.pushedByPlayers(r, e, pos)
 	m.timer += float64((float32(math.Sqrt(float64(m.vel[0]*m.vel[0]+m.vel[2]*m.vel[2])))*boatTimerSpeed + 1) * b.bigWave() * boatTimerStep)
 	at := floorPos(pos)
 	floats, resurface := b.s.boatFloat(r, at, pos[1])
@@ -108,6 +119,47 @@ func (b *Boat) physics(r *world.Region, e *world.Entity) {
 	}
 	if !e.Apply(world.Movement{Pos: pos, Rot: e.Rotation(), OnGround: onGround, Tick: e.Tick()}) {
 		m.vel = mgl32.Vec3{}
+	}
+}
+
+// pushedByPlayers is BDS 1.26.60's Mob::pushActors (0xBFEE7F0) from each player's side
+// against an empty boat: a player whose box, grown by 0.2 on x and z, touches the boat
+// pushes it away along the line between them with the legacy_boat push (0x7516F70,
+// 0x7517D90), min(1, 1/d) * 0.1 * 0.5 over the unit direction, d at least 0.55. A sneaking
+// player does not push, nor one riding, nor the one who just got off it until they part
+// (0x7517560). The push is added to the boat's speed before its own movement; where
+// PushActorsSystem runs against the boat's buoyancy systems is not read yet. Region tick.
+func (b *Boat) pushedByPlayers(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
+	lo, hi := boatBox(pos)
+	grow := mgl32.Vec3{boatPushReach, 0, boatPushReach}
+	b.near = r.AppendEntitiesIn(b.near[:0], pos[0]-boatPushScan, pos[2]-boatPushScan, pos[0]+boatPushScan, pos[2]+boatPushScan)
+	for _, o := range b.near {
+		p, ok := o.Owner().(*Player)
+		if !ok || p.vehicle != nil || p.dead() || p.gameMode == GameModeSpectator {
+			continue
+		}
+		pLo, pHi, _, ok := b.s.EntityBox(o)
+		if !ok {
+			continue
+		}
+		if !overlaps(lo, hi, pLo.Sub(grow), pHi.Add(grow)) {
+			if p.leftVehicle == e {
+				p.leftVehicle = nil
+			}
+			continue
+		}
+		if p.leftVehicle == e || p.Moving(MoveSneaking) {
+			continue
+		}
+		at := o.Position()
+		dx, dz := at[0]-pos[0], at[2]-pos[2]
+		d := float32(math.Sqrt(float64(dx*dx + dz*dz)))
+		if d < boatPushMin {
+			continue
+		}
+		g := min(1, 1/d) * boatPushStrength * boatPushSelf / d
+		b.motion.vel[0] -= dx * g
+		b.motion.vel[2] -= dz * g
 	}
 }
 

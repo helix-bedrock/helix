@@ -119,6 +119,8 @@ type Boat struct {
 	integrity          int32
 	// motion is its own movement while no one steers it (boatphysics.go).
 	motion boatMotion
+	// near is scratch space for the players that push it.
+	near []*world.Entity
 	// lastEyes is the position the driver's client last sent; traceTicks counts down the
 	// ticks logged at debug level after the driver got out.
 	lastEyes   mgl32.Vec3

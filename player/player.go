@@ -93,6 +93,9 @@ type Player struct {
 	// vehicle is what the player sits on, riding whether others see it so.
 	vehicle vehicle
 	riding  bool
+	// leftVehicle is the vehicle the player last got off while it still touches it: BDS's
+	// previous vehicle, which neither pushes the other until they part.
+	leftVehicle *world.Entity
 	// sleep is where the player is with sleeping, spawn its own respawn point (a bed).
 	sleep sleepState
 	spawn spawnPointState

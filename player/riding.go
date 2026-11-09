@@ -85,6 +85,7 @@ func letOff(v vehicle, p *Player) {
 	}
 	seats.Remove(p)
 	p.vehicle = nil
+	p.leftVehicle = e
 	p.move.forward = 0
 	e.Send(&packet.SetActorLink{EntityLink: ride.Link(e.UniqueID(), p.uniqueID, protocol.EntityLinkRemove)})
 	if p.entity == nil {
