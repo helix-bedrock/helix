@@ -53,7 +53,7 @@ func vanillaDie(p *Player, src DamageSource) {
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventDeath), nil)
 	}
-	if key := deathMessage(src.Cause); key != "" {
+	if key := deathMessage(src); key != "" {
 		params := []string{p.name}
 		if src.Attacker != nil {
 			params = append(params, src.Attacker.name)
@@ -72,8 +72,8 @@ func vanillaDie(p *Player, src DamageSource) {
 // deathMessage is the translation key BDS picks for a cause, for the causes
 // Helix deals; empty for any other. BDS also has a second key for some falls,
 // whose condition is not read yet.
-func deathMessage(cause DamageCause) string {
-	switch cause {
+func deathMessage(src DamageSource) string {
+	switch src.Cause {
 	case DamageFall:
 		return "death.attack.fall"
 	case DamageEntityAttack:
@@ -86,6 +86,11 @@ func deathMessage(cause DamageCause) string {
 		return "death.attack.onFire"
 	case DamageLava:
 		return "death.attack.lava"
+	case DamageContact:
+		if src.Block == nameBerryBush {
+			return "death.attack.sweetBerry"
+		}
+		return "death.attack.cactus"
 	}
 	return ""
 }

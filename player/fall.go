@@ -36,6 +36,8 @@ type DamageSource struct {
 	// Knockback pushes the player away from Attacker; Extra adds to the push.
 	Knockback bool
 	Extra     float32
+	// Block is the name of the block that hurt, for contact damage.
+	Block string
 }
 
 // fallBigDamage is the damage from which BDS plays the big fall sound; fallFree is

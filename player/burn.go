@@ -59,6 +59,8 @@ type burnContact struct {
 	// lava is set when it is in lava; lavaBurn when it is deep enough in lava for lava's
 	// entityInside, which needs the lava's surface above the bottom of the box.
 	lava, lavaBurn bool
+	// contact is the block touched that hurts by contact, cactus first.
+	contact contactBlock
 }
 
 // burning reports whether c touches anything that sets on fire.
@@ -79,6 +81,9 @@ func (s *Host) touching(r *world.Region, lo, hi mgl32.Vec3) burnContact {
 				b, ok := r.Block(pos, 0)
 				if !ok {
 					continue
+				}
+				if k := s.contactOf(b); k != contactNone && (c.contact == contactNone || k == contactCactus) {
+					c.contact = k
 				}
 				switch blocks.Name(b) {
 				case nameFire:
@@ -188,9 +193,12 @@ func (p *Player) tickBurning() {
 	}
 	at := p.entity.Position()
 	feet := at[1] - eyeHeight
-	lo := mgl32.Vec3{at[0] - playerHalfWidth, feet, at[2] - playerHalfWidth}
-	hi := mgl32.Vec3{at[0] + playerHalfWidth, feet + playerHeight, at[2] + playerHalfWidth}
+	lo, hi := playerBox(at)
 	c := p.s.touching(r, lo, hi)
+	p.tickContact(c)
+	if p.dead() {
+		return
+	}
 	immune := p.fireImmune()
 	if !immune {
 		if c.fire > 0 {
@@ -244,6 +252,9 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 	at := e.Position()
 	half := mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
 	c := i.s.touching(r, at.Sub(half), at.Add(half))
+	if i.tickContact(e, c); i.taken {
+		return
+	}
 	immune := i.s.game != nil && i.s.game.fireResistant[i.stack.Name]
 	// BDS's item tick fizzes in lava; the lead heard the same in fire on BDS, which the code read so
 	// far does not show.
@@ -252,10 +263,10 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 	}
 	if !immune && c.burning() {
 		if c.fire > 0 {
-			i.burnHurt(e, c.fire)
+			i.loseHealth(e, c.fire)
 		}
 		if !i.taken && c.lavaBurn {
-			i.burnHurt(e, fireBlockDamage)
+			i.loseHealth(e, fireBlockDamage)
 		}
 		if !i.taken {
 			i.burnTicks = max(i.burnTicks, burnSeconds*ticksPerSec)
@@ -273,7 +284,7 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 		i.burnTicks -= immuneBurnOut
 	default:
 		if i.burnTicks%burnEvery == 0 {
-			i.burnHurt(e, burnDamage)
+			i.loseHealth(e, burnDamage)
 		}
 		i.burnTicks--
 	}
@@ -282,8 +293,8 @@ func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) 
 	}
 }
 
-// burnHurt takes fire damage from the item's health; it is gone at none left.
-func (i *ItemActor) burnHurt(e *world.Entity, damage float32) {
+// loseHealth takes damage from the item's health; it is gone at none left.
+func (i *ItemActor) loseHealth(e *world.Entity, damage float32) {
 	i.health -= int32(damage)
 	if i.health <= 0 {
 		i.taken = true
