@@ -363,7 +363,12 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 	s.updateStatus()
 
-	stop := context.AfterFunc(ctx, func() { _ = s.listener.Close() })
+	// Players are told first: closing the listener closes the transports, and with them the
+	// sockets the players' connections run over, so a disconnect sent after it never arrives.
+	stop := context.AfterFunc(ctx, func() {
+		host.Kick(packet.DisconnectReasonShutdown)
+		_ = s.listener.Close()
+	})
 	defer stop()
 	for {
 		c, err := s.listener.Accept()

@@ -27,6 +27,7 @@ import (
 	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/conn"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -294,12 +295,16 @@ func (h *Host) Broadcast(pk packet.Packet) {
 	}
 }
 
-// Kick sends every player online a disconnect with reason and closes their connections at
-// once, without waiting for anything to tick. Runs: anywhere.
+// Kick sends every player online a disconnect with reason and closes their connections,
+// without waiting for anything to tick. It returns once each disconnect was delivered or its
+// connection gave up waiting (a NetherNet close waits for the client to acknowledge it), all
+// players at the same time. Runs: anywhere.
 func (h *Host) Kick(reason int32) {
+	var wg sync.WaitGroup
 	for _, p := range h.global.online() {
-		h.refuse(p.conn, reason)
+		wg.Go(func() { h.refuse(p.conn, reason) })
 	}
+	wg.Wait()
 }
 
 // recovered is deferred in the player goroutines: it recovers a panic and passes it on, so
@@ -329,5 +334,5 @@ func (h *Host) Close(reason int32) {
 
 // isClosed reports whether err only says the connection was closed.
 func isClosed(err error) bool {
-	return errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
+	return errors.Is(err, net.ErrClosed) || errors.Is(err, conn.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
 }
