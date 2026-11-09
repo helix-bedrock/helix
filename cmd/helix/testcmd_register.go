@@ -158,7 +158,7 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			var darken uint8
 			if server := srv.Load(); server != nil && server.Clock() != nil {
 				c := server.Clock()
-				darken = uint8(min(max(daytime.SkyDarken(c.Time(), c.Cycle()), 0), 15)) //nolint:gosec // 0 to 15
+				darken = uint8(min(max(daytime.SkyDarken(c.Time(), c.Cycle(), server.Weather().Rain(), server.Weather().Thunder()), 0), 15)) //nolint:gosec // 0 to 15
 			}
 			return lightTest(p, darken)
 		}},
@@ -182,7 +182,7 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return tickSpeed(srv.Load(), args)
 		}},
-		{timeCommand,"Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
+		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""
 			}

@@ -14,7 +14,7 @@
 //   - The dirt blocks' use with a hoe (dirt 0xCB13A00, grass 0xCAE3220, dirt path 0xD54D360,
 //     rooted dirt 0xD53DCC0) and the hoe's on_tool_used (0xC981EA0).
 //
-// Not ported: rain wetting farmland (Helix has no weather), the torchflower crop turning
+// Not ported: the torchflower crop turning
 // into a torchflower, pitcher crops, mobs trampling (only players do in Helix), and raids
 // eating crops (minecraft:on_raided).
 package farm
@@ -25,6 +25,7 @@ import (
 
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -158,10 +159,13 @@ type Ticker struct {
 	blocks *registry.Blocks
 	fall   FallFunc
 	clock  atomic.Pointer[daytime.Clock]
-	info   []stateInfo
-	crops  []cropKind
-	defs   atomic.Pointer[[]Crop]
-	stems  []stemKind
+	// weather and rain are the world's weather and what says where it rains; nil for none.
+	weather atomic.Pointer[weather.Weather]
+	rain    atomic.Pointer[weather.Ticker]
+	info    []stateInfo
+	crops   []cropKind
+	defs    atomic.Pointer[[]Crop]
+	stems   []stemKind
 	// moisture holds farmland at each moisture; dirt is the block it dries or is trampled to.
 	moisture [maxMoisture + 1]uint32
 	dirt     uint32
@@ -275,13 +279,26 @@ func (t *Ticker) crop(i uint8) Crop {
 	return c
 }
 
-// skyDarken is how much the time of day takes off sky light now.
+// SetWeather sets the weather that dims the sky and wets farmland. Call it before any player
+// joins.
+func (t *Ticker) SetWeather(w *weather.Weather, chunks *weather.Ticker) {
+	t.weather.Store(w)
+	t.rain.Store(chunks)
+}
+
+// raining reports whether it rains at pos.
+func (t *Ticker) raining(r *world.Region, pos cube.Pos) bool {
+	c := t.rain.Load()
+	return c != nil && c.RainingAt(r, pos)
+}
+
+// skyDarken is how much the time of day and the weather take off sky light now.
 func (t *Ticker) skyDarken() uint8 {
-	c := t.clock.Load()
+	c, w := t.clock.Load(), t.weather.Load()
 	if c == nil {
 		return 0
 	}
-	return uint8(min(max(daytime.SkyDarken(c.Time(), c.Cycle()), 0), world.MaxLight)) //nolint:gosec // 0 to 15
+	return uint8(min(max(daytime.SkyDarken(c.Time(), c.Cycle(), w.Rain(), w.Thunder()), 0), world.MaxLight)) //nolint:gosec // 0 to 15
 }
 
 // RandomTicks takes farmland's, crops' and stems' random ticks and the next ticker's.

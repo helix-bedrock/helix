@@ -42,6 +42,10 @@ func (t *Ticker) tick(r *world.Region, pos cube.Pos, block uint32) {
 	belowPos := pos.Side(cube.FaceDown)
 	below, _ := r.Block(belowPos, 0)
 	forever := t.is(below, infiniburn)
+	if !forever && t.rainedOn(r, pos) {
+		t.remove(r, pos)
+		return
+	}
 	age := t.age(block)
 	if !forever && age < maxAge {
 		if older := min(age+rng.IntN(3)/2, maxAge); older != age {
@@ -138,7 +142,7 @@ func (t *Ticker) spread(r *world.Region, pos cube.Pos, block uint32, age int, ru
 				if humid {
 					odds *= 0.5
 				}
-				if odds > 0 && odds >= against*rng.Float32() {
+				if odds > 0 && odds >= against*rng.Float32() && !t.raining(r, p) {
 					t.set(r, p, block)
 				}
 			}
@@ -175,7 +179,7 @@ func (t *Ticker) burn(r *world.Region, pos cube.Pos, odds, age int, rng *rand.Ra
 		return
 	}
 	camp, explosive := t.is(b, isCampfire), t.is(b, isTNT)
-	if rng.IntN(age+keepFire) > keepMax {
+	if rng.IntN(age+keepFire) > keepMax || t.raining(r, pos) {
 		switch {
 		case camp:
 			t.lightCampfire(r, pos, b)

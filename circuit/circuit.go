@@ -14,6 +14,7 @@ import (
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/redstone"
@@ -236,6 +237,8 @@ type Ticker struct {
 	isArrow  func(e *world.Entity) bool
 	// clock is what daylight sensors read. Set before any player joins.
 	clock *daytime.Clock
+	// weather dims the sky daylight sensors read. Set before any player joins.
+	weather *weather.Weather
 	// entityPush is how pistons move entities. Set before any player joins.
 	entityPush EntityPushFunc
 	// powerTNT is what power reaching a TNT block does.

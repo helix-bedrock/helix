@@ -78,6 +78,9 @@ type Config struct {
 	// Ticker gives blocks their random and queued ticks. Nil ticks nothing,
 	// though scheduled ticks are still kept and saved.
 	Ticker BlockTicker
+	// Weather runs on every ticking chunk before its random ticks, as BDS's chunk tick runs
+	// lightning, freezing and snow. Nil has no weather.
+	Weather WeatherTicker
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its

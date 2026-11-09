@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -74,6 +75,9 @@ type Properties struct {
 	HalfSlab bool
 	// SolidMaterial is set when the block's material is solid.
 	SolidMaterial bool
+	// Precipitation is what rain and snow do at the block (BDS's precipitation behaviour):
+	// fall through, stop, settle as snow on top or snowlog it.
+	Precipitation data.Precipitation
 	// LiquidReaction is what a liquid flowing into the block does.
 	LiquidReaction LiquidReaction
 	// LavaBlocking is set when the block stops lava flowing into it. Lava

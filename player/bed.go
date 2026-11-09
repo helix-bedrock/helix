@@ -378,7 +378,7 @@ func (p *Player) startSleep(r *world.Region, head cube.Pos, setSpawn bool) int {
 		p.tell("tile.bed.respawnSet")
 	}
 	if p.s.clock != nil {
-		if daytime.SkyDarken(p.s.clock.Time(), p.s.clock.Cycle()) < minSkyDarken {
+		if daytime.SkyDarken(p.s.clock.Time(), p.s.clock.Cycle(), p.s.weather.Rain(), p.s.weather.Thunder()) < minSkyDarken {
 			return sleepNotNow
 		}
 	}
@@ -646,6 +646,9 @@ func (s *Host) sleepTick() {
 		t := s.clock.Time()
 		s.clock.Set(dayTicks * ((t + dayTicks) / dayTicks))
 		s.SyncClocks()
+	}
+	if s.weather != nil {
+		s.weather.Stop()
 	}
 	for _, p := range g.order {
 		if p.sleep.info.Load()&sleepAsleep == 0 {

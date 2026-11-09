@@ -182,3 +182,9 @@ func (v *Vanilla) SpawnHeight(x, z int32) int32 {
 	}
 	return overworld.SeaLevel + 1
 }
+
+// Temperature is BDS's biome temperature at a block, the same worldgen freezes water and lays
+// snow by, for the weather. Runs: any goroutine.
+func (v *Vanilla) Temperature(biome uint32, x, y, z int32) float32 {
+	return v.gen.Temperature(biome, x, y, z)
+}

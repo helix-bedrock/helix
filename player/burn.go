@@ -175,7 +175,8 @@ func (p *Player) burnHurt(damage float32, cause DamageCause) {
 }
 
 // tickBurning is a player's tick of fire: what it stands in hurts it and sets it on fire, lava
-// hurts it, and the fire it is on burns down, hurting once a second, or goes out in water.
+// hurts it, and the fire it is on burns down, hurting once a second, or goes out in water or
+// rain.
 // Runs: the player's region, once a tick.
 func (p *Player) tickBurning() {
 	if p.entity == nil || p.dead() {
@@ -207,7 +208,7 @@ func (p *Player) tickBurning() {
 	if p.burn.ticks <= 0 || p.dead() {
 		return
 	}
-	if !immune && p.move.inWater && !c.lava {
+	if !immune && (p.move.inWater || p.s.inRain(r, mgl32.Vec3{at[0], feet + playerHeight, at[2]})) && !c.lava {
 		p.Extinguish()
 		fizzOut(r, lo, hi)
 		return

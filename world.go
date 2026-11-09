@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/circuit"
@@ -19,6 +21,7 @@ import (
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/portal"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/world/cube"
@@ -60,6 +63,11 @@ func (s *Server) openWorld() error {
 			ldat.RandomSeed = *s.conf.Seed
 		}
 	}
+	if isNew {
+		ldat.RainTime, ldat.LightningTime = weather.NewTimes(uint64(ldat.RandomSeed)) //nolint:gosec // a seed
+	}
+	s.weather = weather.New(weather.Levels{Rain: ldat.RainLevel, Thunder: ldat.LightningLevel, RainTime: ldat.RainTime, ThunderTime: ldat.LightningTime},
+		ldat.DoWeatherCycle, uint64(ldat.RandomSeed)^uint64(time.Now().UnixNano()), s.broadcastLevelEvent) //nolint:gosec // a seed
 	worldType, gt, err := s.worldType(ldat.Generator, isNew)
 	if err != nil {
 		_ = db.Close()
@@ -185,11 +193,24 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			s.level.Surface = g.SpawnHeight(sp[0], sp[2])
 		}
 	}
+	climate, _ := conf.Generator.(weather.Climate)
+	s.chunkWeather = weather.NewTicker(weather.Config{Registry: s.reg, Weather: s.weather, Climate: climate, Strike: s.strike, Mobs: s.mobsIn})
+	conf.Weather = s.chunkWeather
+	if s.fire != nil {
+		s.fire.SetWeather(s.chunkWeather)
+	}
+	if s.farm != nil {
+		s.farm.SetWeather(s.weather, s.chunkWeather)
+	}
+	if s.circuits != nil {
+		s.circuits.SetWeather(s.weather)
+	}
 	d, err := world.New(conf)
 	if err != nil {
 		return err
 	}
 	s.overworld = d
+	conf.Weather = nil
 	return s.openOtherDimensions(conf, typeName, seed)
 }
 
@@ -327,6 +348,10 @@ func (s *Server) saveLevel() error {
 		return nil
 	}
 	s.db.LevelDat().CurrentTick = s.ticker.CurrentTick()
+	if s.weather != nil {
+		l, ldat := s.weather.Saved(), s.db.LevelDat()
+		ldat.RainLevel, ldat.LightningLevel, ldat.RainTime, ldat.LightningTime = l.Rain, l.Thunder, l.RainTime, l.ThunderTime
+	}
 	if err := s.saveClock(); err != nil {
 		return err
 	}
@@ -351,4 +376,29 @@ func (s *Server) saveClock() error {
 		return fmt.Errorf("helix: encode world clocks: %w", err)
 	}
 	return s.db.StoreLevel(mcdb.LevelKeyWorldClocks, value)
+}
+
+// Weather returns the world's weather. Valid once the world is open. Safe from any goroutine.
+func (s *Server) Weather() *weather.Weather { return s.weather }
+
+// broadcastLevelEvent sends a level event to everyone online, once players can join.
+func (s *Server) broadcastLevelEvent(event, data int32) {
+	if h := s.players.Load(); h != nil {
+		h.BroadcastLevelEvent(event, data)
+	}
+}
+
+// strike makes lightning, once players can join.
+func (s *Server) strike(r *world.Region, pos mgl32.Vec3) {
+	if h := s.players.Load(); h != nil {
+		h.Strike(r, pos)
+	}
+}
+
+// mobsIn finds what lightning may strike in a chunk.
+func (s *Server) mobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl32.Vec3) []mgl32.Vec3 {
+	if h := s.players.Load(); h != nil {
+		return h.MobsIn(r, pos, dst)
+	}
+	return dst
 }

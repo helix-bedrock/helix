@@ -53,6 +53,11 @@ func vanillaBiomes(s *Setup) error {
 			Depth: d.Depth, Scale: d.Scale, MapWaterColour: d.MapWaterColour, Rain: d.Rain, gen: d.ChunkGeneration,
 		}
 		b.Humid = vanillaHumid(name, d.Downfall)
+		if g, ok := d.ChunkGeneration.Value(); ok {
+			if c, ok := g.Climate.Value(); ok {
+				b.SnowAccumulation = c.SnowAccumulationMax
+			}
+		}
 		if tags, ok := d.Tags.Value(); ok {
 			b.hasTags = true
 			for _, t := range tags {
@@ -206,6 +211,10 @@ func vanillaBlocks(s *Setup) error {
 	for _, n := range climb {
 		climbable[n] = true
 	}
+	precip, err := data.BlockPrecipitation()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
 	materials, err := data.BlockMaterials()
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
@@ -269,6 +278,7 @@ func vanillaBlocks(s *Setup) error {
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name], HalfSlab: halfSlab(st.Name),
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
+			Precipitation: precip[st.Name],
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
 		if err != nil {

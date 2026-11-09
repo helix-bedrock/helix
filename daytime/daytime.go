@@ -113,14 +113,22 @@ func SunAngle(time int32, cycle bool) float32 {
 	return ((((tableCos(pi32*x)+1)*-0.5 + 1) - x) / 3) + x
 }
 
-// SkyDarken is how much the sky takes off sky light, 0 at noon and 11 at midnight. Weather is
-// left out: Helix has none yet, and BDS's terms for it take nothing off without rain.
-func SkyDarken(time int32, cycle bool) int32 {
+// SkyDarken is how much the sky takes off sky light, 0 at noon and 11 at midnight, with rain
+// and thunder at their levels (0 to 1, see the weather package) dimming the day further, as
+// BDS's Dimension tick works it out (sub_CF18C60): rain and thunder each take off up to 5/16 of
+// the brightness. Pass 0 for both where there is no weather.
+func SkyDarken(time int32, cycle bool, rain, thunder float32) int32 {
 	a := SunAngle(time, cycle)
 	c := tableCos(a*pi32 + a*pi32)
 	bright := 1 - min(1, max(0, 1-(c+c+0.5)))
+	bright *= 1 - rain*weatherDim/16
+	bright *= 1 - thunder*weatherDim/16
 	return int32((1 - bright) * 11)
 }
+
+// weatherDim is how many sixteenths of the brightness full rain, and again full thunder,
+// take off.
+const weatherDim = 5
 
 // SensorSignal is the power of a daylight sensor with sky light at it. An inverted one gives
 // what the sky lacks. The other follows the sun, its angle pulled a fifth of the way to noon.

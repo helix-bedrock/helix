@@ -51,6 +51,14 @@ type RegionTicker interface {
 	RegionSplit(r, n *Region, in func(pos mcdb.ChunkPos) bool)
 }
 
+// WeatherTicker is weather's part of a chunk's tick (BDS's LevelChunk tick before its random
+// ticks: lightning, then freezing and snow, randomtickspeed times). Runs: owner of the region.
+type WeatherTicker interface {
+	// ChunkWeather runs on the chunk at pos once per world tick, before its random ticks,
+	// with the dimension's random tick speed.
+	ChunkWeather(r *Region, pos mcdb.ChunkPos, speed int32)
+}
+
 const (
 	// maxQueuedTicks is how many due ticks one queue runs per tick; the
 	// rest wait for the next.
@@ -356,6 +364,12 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 		return
 	}
 	c.tickedAt = now
+	if w := r.d.conf.Weather; w != nil {
+		w.ChunkWeather(r, pos, speed)
+		if c, ok = r.chunks[pos]; !ok {
+			return
+		}
+	}
 	r.randomTicks(c, speed)
 	r.runQueue(c, &c.ticks, now)
 	r.runQueue(c, &c.randomTicks, c.randomTicks.clock+int64(speed))
@@ -485,4 +499,34 @@ func subEmpty(sub *chunk.SubChunk, air uint32) bool {
 		}
 	}
 	return true
+}
+
+// ColumnTop walks the column x, z down from the top of its highest sub chunk holding a block
+// and returns the Y above the first cell for which stop, given the cell's two layers, is true;
+// the bottom of the world if none is. BDS's rain height map is found this way. false if the
+// chunk is not loaded in this region. Runs: owner.
+func (r *Region) ColumnTop(x, z int, stop func(layer0, layer1 uint32) bool) (int, bool) {
+	c, ok := r.chunks[mcdb.ChunkPos{int32(x >> 4), int32(z >> 4)}] //nolint:gosec // block X and Z fit int32 chunks
+	if !ok {
+		return 0, false
+	}
+	air := r.d.conf.Blocks.Air()
+	subs := c.col.Chunk.Sub()
+	bx, bz := byte(x&15), byte(z&15) //nolint:gosec // 0 to 15
+	for i := len(subs) - 1; i >= 0; i-- {
+		if subEmpty(subs[i], air) {
+			continue
+		}
+		layers := subs[i].Layers()
+		for y := 15; y >= 0; y-- {
+			b0, b1 := layers[0].At(bx, byte(y), bz), air //nolint:gosec // 0 to 15
+			if len(layers) > 1 {
+				b1 = layers[1].At(bx, byte(y), bz) //nolint:gosec // 0 to 15
+			}
+			if stop(b0, b1) {
+				return i<<4 + y + 1 + r.d.r[0], true
+			}
+		}
+	}
+	return r.d.r[0], true
 }

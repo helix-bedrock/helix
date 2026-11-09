@@ -4,6 +4,7 @@ import (
 	"maps"
 
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/redstone"
 	"github.com/helix-bedrock/world/cube"
@@ -18,6 +19,10 @@ const daylightInterval = 20
 // SetClock sets the clock daylight sensors read. Call it before any player joins. Without one
 // they give no power.
 func (t *Ticker) SetClock(c *daytime.Clock) { t.clock = c }
+
+// SetWeather sets the weather that dims what daylight sensors read. Call it before any player
+// joins.
+func (t *Ticker) SetWeather(w *weather.Weather) { t.weather = w }
 
 // daylightEntity is a daylight sensor's block entity: what makes it read the sky.
 type daylightEntity struct {
@@ -60,7 +65,7 @@ func (e *daylightEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		return
 	}
 	time, cycle := t.clock.Time(), t.clock.Cycle()
-	power := daytime.SensorSignal(r.SkyLight(pos), daytime.SunAngle(time, cycle), daytime.SkyDarken(time, cycle), t.blocks.Name(block) == nameDaylightInverted)
+	power := daytime.SensorSignal(r.SkyLight(pos), daytime.SunAngle(time, cycle), daytime.SkyDarken(time, cycle, t.weather.Rain(), t.weather.Thunder()), t.blocks.Name(block) == nameDaylightInverted)
 	if next := t.with(block, stateSignal, power); next != block && r.SetBlock(pos, 0, next) {
 		r.UpdateNeighbours(pos)
 	}

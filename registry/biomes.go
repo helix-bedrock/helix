@@ -32,6 +32,9 @@ type Biome struct {
 	MapWaterColour int32
 	// Rain is false for dry biomes.
 	Rain bool
+	// SnowAccumulation is the most snow that settles in the biome, a layer per 0.125
+	// (minecraft:climate's snow_accumulation maximum); 0 sets no limit.
+	SnowAccumulation float32
 	// Humid halves how readily fire spreads in the biome. Vanilla biomes take it from their
 	// minecraft:humidity component and, without one, from Downfall above 0.85, as BDS does.
 	Humid bool

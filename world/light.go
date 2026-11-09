@@ -677,6 +677,21 @@ func (r *Region) Light(pos cube.Pos) (sky, block uint8, ok bool) {
 	return sky, block, true
 }
 
+// Height is BDS's height map at column x, z: the Y above the highest block that stops
+// sunlight (dampens light, or is a half slab), with false if its chunk is not loaded in this
+// region. Runs: owner.
+func (r *Region) Height(x, z int) (int, bool) {
+	if !r.ticking.Load() {
+		return 0, false
+	}
+	c, ok := r.chunks[mcdb.ChunkPos{int32(x >> 4), int32(z >> 4)}] //nolint:gosec // block X and Z fit int32 chunks
+	if !ok || c.light == nil {
+		return 0, false
+	}
+	r.flushLight()
+	return int(c.light.height[x&15|(z&15)<<4]), true
+}
+
 // SkyLight returns the sky light at pos, 0 to 15, before the time of day takes
 // anything off; 0 where its chunk is not loaded in this region. Runs: owner.
 func (r *Region) SkyLight(pos cube.Pos) uint8 {

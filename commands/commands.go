@@ -18,6 +18,9 @@ const Owner = "minecraft"
 var all = []command.Spec{
 	give,
 	teleport,
+	weatherSpec,
+	toggleDownfall,
+	fog,
 }
 
 // Register puts every built-in command on a Setup.

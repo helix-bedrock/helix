@@ -26,6 +26,7 @@ import (
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/nethernet"
 	"github.com/helix-bedrock/protocol/auth"
@@ -203,6 +204,9 @@ type Server struct {
 	// fire is the vanilla fire ticker, nil when the config gave a BlockTicker.
 	fire *fire.Ticker
 	farm *farm.Ticker
+	// weather is the world's weather, chunkWeather the overworld's lightning, ice and snow.
+	weather      *weather.Weather
+	chunkWeather *weather.Ticker
 	// clock is the world's time, set when the world opens.
 	clock    *daytime.Clock
 	redstone *circuit.Settings
@@ -313,13 +317,14 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 	host, err := player.NewHost(player.HostConfig{
 		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Nether: s.nether, End: s.end, Portals: s.portals, OnEnterEnd: s.enterEnd, Store: s.playerStore,
-		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone, Farm: s.farm,
+		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone, Farm: s.farm, Fire: s.fire,
 	}, s.setup)
 	if err != nil {
 		_ = s.listener.Close()
 		return err
 	}
 	host.SetClock(s.clock)
+	host.SetWeather(s.weather, s.chunkWeather)
 	s.players.Store(host)
 	if s.circuits != nil {
 		s.circuits.SetDispense(host.Dispense)

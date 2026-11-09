@@ -92,6 +92,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 		WorldName: lv.Name, PlayerMovementSettings: protocol.PlayerMovementSettings{RewindHistorySize: 40, ServerAuthoritativeBlockBreaking: true},
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0, Blocks: s.reg.Blocks.Definitions(),
+		RainLevel: s.weather.Rain(), LightningLevel: s.weather.Thunder(),
 	})
 	p.send(s.reg.Items.RegistryPacket())
 
@@ -101,6 +102,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 	if s.clock != nil {
 		p.send(s.clockRegistry())
 	}
+	p.sendWeather()
 	p.send(&packet.SetDifficulty{Difficulty: uint32(lv.Difficulty)}, //nolint:gosec // difficulties are small
 		&packet.SetCommandsEnabled{Enabled: true})
 	adventure := &packet.UpdateAdventureSettings{AutoJump: true}

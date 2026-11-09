@@ -18,10 +18,12 @@ import (
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/farm"
+	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -79,6 +81,8 @@ type HostConfig struct {
 	Redstone *circuit.Settings
 	// Farm is farming: bone meal, hoes, trampling and where crops may go. Nil turns them off.
 	Farm *farm.Ticker
+	// Fire is fire's ticker, which lightning asks where fire may go. Nil: lightning sets none.
+	Fire *fire.Ticker
 }
 
 // Host runs the players of one server: it admits them, owns the player
@@ -119,6 +123,11 @@ type Host struct {
 	circuits CircuitHooks
 	// clock is the world's time. Set before any player joins.
 	clock *daytime.Clock
+	// weather is the world's weather and chunkWeather what says where it rains; nil for none.
+	weather      *weather.Weather
+	chunkWeather *weather.Ticker
+	// fire is fire's ticker, which lightning asks where fire may go; nil sets none.
+	fire *fire.Ticker
 	// chests holds which blocks are chests and what lets them open.
 	chests *chestTable
 	// furnaces are BDS's fuel, experience and cook times.
@@ -182,7 +191,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		drops:    drops, foods: foodTable(conf.Registry.Items),
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, nether: conf.Nether, end: conf.End, portals: conf.Portals, onEnterEnd: conf.OnEnterEnd, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, farm: conf.Farm, chests: chests, discs: discs,
+		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, farm: conf.Farm, fire: conf.Fire, chests: chests, discs: discs,
 		furnaces: furnaces, commands: setup.h.commands,
 	}
 	h.setUpCommands()
@@ -190,7 +199,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	h.ClearAllTuning()
 	conf.Overworld.SetEntityLoader(h.loadEntity)
 	conf.Overworld.SetBlockEntities(chestEntities{s: h})
-	h.global.run(func() { h.global.tick = h.sleepTick })
+	h.global.run(func() { h.global.tick = h.globalTick })
 	return h, nil
 }
 

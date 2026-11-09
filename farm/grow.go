@@ -6,10 +6,10 @@ import (
 )
 
 // farmlandTick is FarmBlock's random tick: water within four blocks on x and z, at its level
-// or one up, wets it fully; otherwise it dries a step, and dry farmland with nothing growing
+// or one up, or rain on the block above, wets it fully; otherwise it dries a step, and dry farmland with nothing growing
 // on it turns to dirt.
 func (t *Ticker) farmlandTick(r *world.Region, pos cube.Pos, s stateInfo) {
-	if t.nearWater(r, pos) {
+	if t.nearWater(r, pos) || t.raining(r, pos.Side(cube.FaceUp)) {
 		if s.age != maxMoisture {
 			t.set(r, pos, t.moisture[maxMoisture])
 		}

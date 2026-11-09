@@ -31,6 +31,8 @@ import (
 // anywhere), the entity in the world (owned by its region) and the profile
 // (server-wide facts, owned by the global owner).
 type Player struct {
+	// fogs is the player's /fog stack, oldest first.
+	fogs []fogEntry
 	s    *Host
 	conn *network.Conn
 

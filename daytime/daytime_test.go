@@ -12,7 +12,7 @@ func TestDarkenAndSignal(t *testing.T) {
 		{"noon", 6000, 0, 15, 0},
 		{"midnight", 18000, 11, 0, 11},
 	} {
-		a, d := SunAngle(c.time, false), SkyDarken(c.time, false)
+		a, d := SunAngle(c.time, false), SkyDarken(c.time, false, 0, 0)
 		if d != c.darken {
 			t.Errorf("%s: darken %d, want %d", c.name, d, c.darken)
 		}

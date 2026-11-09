@@ -3,8 +3,7 @@
 // Ported from BDS's FireBlock, SoulFireBlock and lava's random tick; the research note is
 // private.
 //
-// Not ported: rain putting fire out and stopping it spreading (Helix has no weather yet),
-// nether portals lit by fire, and bees in a burning hive.
+// Not ported: nether portals lit by fire, and bees in a burning hive.
 package fire
 
 import (
@@ -13,6 +12,7 @@ import (
 
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -113,7 +113,9 @@ type Ticker struct {
 	support *attach.Table
 	prime   PrimeFunc
 	rules   atomic.Pointer[Rules]
-	info    []info
+	// rain says where it rains; nil for never.
+	rain atomic.Pointer[weather.Ticker]
+	info []info
 	// fire holds the default fire state (no connections) of each age, soulFire the soul fire
 	// block.
 	fire [maxAge + 1]uint32
@@ -179,6 +181,29 @@ func NewTicker(reg *registry.Registry, support *attach.Table, rules Rules, prime
 
 // SetRules changes the rules fire reads. Runs: any goroutine.
 func (t *Ticker) SetRules(r Rules) { t.rules.Store(&r) }
+
+// SetWeather sets what says where it rains, which puts fire out and stops it spreading. Call
+// it before any player joins; without it, it never rains on fire.
+func (t *Ticker) SetWeather(chunks *weather.Ticker) { t.rain.Store(chunks) }
+
+// raining reports whether it rains at pos.
+func (t *Ticker) raining(r *world.Region, pos cube.Pos) bool {
+	c := t.rain.Load()
+	return c != nil && c.RainingAt(r, pos)
+}
+
+// rainedOn reports whether it rains at pos or on any of its four sides.
+func (t *Ticker) rainedOn(r *world.Region, pos cube.Pos) bool {
+	if t.raining(r, pos) {
+		return true
+	}
+	for _, f := range [...]cube.Face{cube.FaceWest, cube.FaceEast, cube.FaceNorth, cube.FaceSouth} {
+		if t.raining(r, pos.Side(f)) {
+			return true
+		}
+	}
+	return false
+}
 
 // Rules returns the rules fire reads. Runs: any goroutine.
 func (t *Ticker) Rules() Rules { return *t.rules.Load() }
@@ -304,6 +329,10 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }
+
+// MayPlace reports whether fire may be put at pos (FireBlock's canSurvive), as lightning asks
+// before setting it. Runs: owner of the region.
+func (t *Ticker) MayPlace(r *world.Region, pos cube.Pos) bool { return t.survives(r, pos) }
 
 // survives is fire's canSurvive: not on a campfire, and on a block whose top holds it or
 // next to a block that burns.
