@@ -13,6 +13,7 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
@@ -92,6 +93,9 @@ func (s *Server) openWorld() error {
 	if s.circuits != nil {
 		s.circuits.SetClock(s.clock)
 	}
+	if s.farm != nil {
+		s.farm.SetClock(s.clock)
+	}
 	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew, "type", worldType, "seed", ldat.RandomSeed)
 	return nil
 }
@@ -145,7 +149,8 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			return err
 		}
 		rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
-		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, liquid.New(s.reg.Blocks))
+		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquid.New(s.reg.Blocks))
+		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
 		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire)))))
 		if err != nil {
 			return err
@@ -304,6 +309,10 @@ func (s *Server) primeTNT(r *world.Region, pos cube.Pos) {
 // Fire is the vanilla fire ticker: fire, soul fire and lava lighting fire. Nil when the
 // server was given its own BlockTicker.
 func (s *Server) Fire() *fire.Ticker { return s.fire }
+
+// Farm is the vanilla farming ticker: farmland, crops, stems, bone meal and tilling. Nil when
+// the server was given its own BlockTicker.
+func (s *Server) Farm() *farm.Ticker { return s.farm }
 
 // fallBlock breaks a block that lost what held it, once players can be served.
 func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {

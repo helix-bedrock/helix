@@ -66,6 +66,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if b, ok := p.s.game.blocks[blocks.Name(u.Block)].(Usable); ok {
 		return b.Use(u)
 	}
+	if p.tillWithHoe(r, u) {
+		return true
+	}
 	if lightLevel(blocks.Name(u.Block)) >= 0 && lightLevel(u.Item.Name) >= 0 {
 		return p.useLightBlock(r, u)
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/commands"
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/network"
@@ -201,6 +202,7 @@ type Server struct {
 	circuits *circuit.Ticker
 	// fire is the vanilla fire ticker, nil when the config gave a BlockTicker.
 	fire *fire.Ticker
+	farm *farm.Ticker
 	// clock is the world's time, set when the world opens.
 	clock    *daytime.Clock
 	redstone *circuit.Settings
@@ -311,7 +313,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 	host, err := player.NewHost(player.HostConfig{
 		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Nether: s.nether, End: s.end, Portals: s.portals, OnEnterEnd: s.enterEnd, Store: s.playerStore,
-		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone,
+		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone, Farm: s.farm,
 	}, s.setup)
 	if err != nil {
 		_ = s.listener.Close()

@@ -115,8 +115,10 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 			return false
 		}
 	}
-	// A player sneaking with something in hand uses the item, not the block.
-	if (held.Empty() || !p.Moving(MoveSneaking)) && p.lastUse != useItem {
+	// A player sneaking with something in hand uses the item, not the block, except a hoe:
+	// BDS's GameMode::useItemOn (0xCA46800) lets an item tagged minecraft:is_hoe use the
+	// block while sneaking, so it tills.
+	if (held.Empty() || !p.Moving(MoveSneaking) || p.holdsHoe(held)) && p.lastUse != useItem {
 		u := &BlockUse{Player: p, Pos: clicked, Block: target, Face: face, ClickPos: click, Item: held}
 		if g.sys.UseBlock(u) {
 			if p.lastUse == useNothing {
@@ -151,6 +153,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	}
 	if held.Name == nameEnderEye {
 		return p.useEnderEye(r, clicked)
+	}
+	if held.Name == nameBoneMeal {
+		return p.useBoneMeal(r, clicked, click, held)
 	}
 	if _, ok := bucketLiquids[held.Name]; ok {
 		return p.pourBucket(clicked, face, held)
@@ -270,6 +275,9 @@ func vanillaPlaceCheck(pl *Placement) bool {
 		return false
 	}
 	if !p.s.attach.MayPlace(r, pl.Pos, pl.Block, cube.Face(pl.Face)) {
+		return false
+	}
+	if f := p.s.farm; f != nil && !f.MayPlace(r, pl.Pos, pl.Block) {
 		return false
 	}
 	// BDS tests the state it would place, not the item's: only a block with a

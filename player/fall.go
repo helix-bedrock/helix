@@ -92,6 +92,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 	damage := float32(math.Ceil(float64(distance-p.Tuning(TuneFallFree)-boost))) * p.Tuning(TuneFallDamageScale)
 	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
 	pos := vecPos(feet)
+	p.trample(r, feet, distance)
 	if damage > 0 && !p.invulnerable() {
 		sound := packet.SoundEventFallSmall
 		if damage >= fallBigDamage {

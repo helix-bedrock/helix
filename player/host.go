@@ -17,6 +17,7 @@ import (
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/portal"
@@ -76,6 +77,8 @@ type HostConfig struct {
 	MaxPlayers int
 	// Redstone is the numbers redstone runs by. Nil means BDS's.
 	Redstone *circuit.Settings
+	// Farm is farming: bone meal, hoes, trampling and where crops may go. Nil turns them off.
+	Farm *farm.Ticker
 }
 
 // Host runs the players of one server: it admits them, owns the player
@@ -92,6 +95,7 @@ type Host struct {
 	overworld    *world.Dimension
 	nether, end  *world.Dimension
 	portals      *portal.Portals
+	farm         *farm.Ticker
 	onEnterEnd   func()
 	playerStore  mcdb.PlayerStore
 	level        Level
@@ -178,7 +182,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		drops:    drops, foods: foodTable(conf.Registry.Items),
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, nether: conf.Nether, end: conf.End, portals: conf.Portals, onEnterEnd: conf.OnEnterEnd, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, chests: chests, discs: discs,
+		handlers: setup.freeze(), game: g, global: newGlobal(), connections: connections, attach: attached, farm: conf.Farm, chests: chests, discs: discs,
 		furnaces: furnaces, commands: setup.h.commands,
 	}
 	h.setUpCommands()
