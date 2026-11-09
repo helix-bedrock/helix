@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -79,7 +80,8 @@ type Config struct {
 	// Hooks run for every connection: packet logging and metrics attach
 	// here. May be nil.
 	Hooks *conn.Hooks
-	// Packs are the resource packs sent to every player.
+	// Packs are the resource packs sent to every player. New copies the slice;
+	// the packs themselves must not change after New.
 	Packs []Pack
 	// PacksRequired makes players accept the packs to join.
 	PacksRequired bool
@@ -140,6 +142,11 @@ func New(conf Config) (*Listener, error) {
 	if conf.HandshakeKey.Curve != elliptic.P384() {
 		return nil, errors.New("network: handshake key must be P-384")
 	}
+	// Logins read the packs and experiments later on their own goroutines, so
+	// the Listener keeps its own copies: a caller changing its slices after New
+	// changes nothing.
+	conf.Packs = slices.Clone(conf.Packs)
+	conf.Experiments = slices.Clone(conf.Experiments)
 	steps := conf.Steps
 	if steps == nil {
 		steps = DefaultSteps()
