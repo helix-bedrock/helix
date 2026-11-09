@@ -1,6 +1,8 @@
 package farm
 
 import (
+	"math"
+
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -100,7 +102,7 @@ func (t *Ticker) cropTick(r *world.Region, pos cube.Pos, block uint32, s stateIn
 	}
 	speed := t.growthSpeed(r, pos, block)
 	if t.rng(r).IntN(int(c.GrowthBase/speed)+1) == 0 {
-		t.set(r, pos, t.crops[s.crop].stages[s.age+1])
+		t.setCrop(r, pos, s.crop, int(s.age)+1)
 	}
 }
 
@@ -242,7 +244,7 @@ func (t *Ticker) Fertilize(r *world.Region, pos cube.Pos, creative, rapid bool) 
 		default:
 			age = min(age+c.BoneMealMin+t.rng(r).IntN(c.BoneMealMax-c.BoneMealMin+1), c.MaxAge)
 		}
-		t.set(r, pos, t.crops[s.crop].stages[age])
+		t.setCrop(r, pos, s.crop, age)
 		return true
 	case kindStem:
 		if s.age >= maxStemAge {
@@ -255,7 +257,20 @@ func (t *Ticker) Fertilize(r *world.Region, pos cube.Pos, creative, rapid bool) 
 		t.set(r, pos, t.stems[s.crop].stages[age][s.facing])
 		return true
 	}
+	if s.kind.plant() {
+		return t.fertilizePlant(r, pos, s, creative, rapid)
+	}
 	return false
+}
+
+// setCrop puts the crop of kind i at pos at age; the torchflower crop past age 6 becomes a
+// torchflower (TorchflowerCropBlock's stage for an age, 0xD46D860).
+func (t *Ticker) setCrop(r *world.Region, pos cube.Pos, i uint8, age int) {
+	if t.blocks.Name(t.crops[i].stages[0]) == torchflowerCro && age >= torchflowerGrownAge && t.plantKit.torch != math.MaxUint32 {
+		t.set(r, pos, t.plantKit.torch)
+		return
+	}
+	t.set(r, pos, t.crops[i].stages[age])
 }
 
 // Fertilizable reports whether bone meal works on block at all (BDS's canBeFertilized).
@@ -264,6 +279,12 @@ func (t *Ticker) Fertilizable(block uint32) bool {
 	case k.grass, k.short, k.fern:
 		return true
 	}
-	k := t.state(block).kind
-	return k == kindCrop || k == kindStem
+	s := t.state(block)
+	switch s.kind {
+	case kindCrop, kindStem, kindBerry, kindCocoa, kindCane:
+		return true
+	case kindPitcher:
+		return s.facing == pitcherLower
+	}
+	return false
 }

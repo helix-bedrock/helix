@@ -14,9 +14,9 @@
 //   - The dirt blocks' use with a hoe (dirt 0xCB13A00, grass 0xCAE3220, dirt path 0xD54D360,
 //     rooted dirt 0xD53DCC0) and the hoe's on_tool_used (0xC981EA0).
 //
-// Not ported: the torchflower crop turning
-// into a torchflower, pitcher crops, mobs trampling (only players do in Helix), and raids
-// eating crops (minecraft:on_raided).
+// The other farmable plants (torchflowers, pitcher crops, nether wart, sweet berries, cocoa,
+// sugar cane, cactus) are in plants.go. Not ported: bamboo, kelp, saplings, mobs trampling
+// (only players do in Helix), and raids eating crops (minecraft:on_raided).
 package farm
 
 import (
@@ -122,14 +122,24 @@ const (
 	kindFarmland
 	kindCrop
 	kindStem
+	kindWart
+	kindBerry
+	kindCocoa
+	kindCane
+	kindCactus
+	kindPitcher
 )
+
+// plant reports whether k is one of the plants in plants.go.
+func (k kind) plant() bool { return k >= kindWart }
 
 // stateInfo is one block state's part in farming.
 type stateInfo struct {
 	kind kind
 	// age is a crop's or stem's growth stage, or farmland's moisture.
 	age int8
-	// facing is a stem's facing_direction, 0 when no fruit hangs on it.
+	// facing is a stem's facing_direction, 0 when no fruit hangs on it; a cocoa pod's
+	// direction; a pitcher crop's half, 1 for the upper.
 	facing int8
 	// crop is the index of a crop's definition; for a stem, of its fruit.
 	crop uint8
@@ -172,6 +182,8 @@ type Ticker struct {
 	tills    map[uint32]Till
 	// grassKit is what bone meal on grass, short grass and ferns needs.
 	grassKit *grassKit
+	// plantKit holds the plants of plants.go.
+	plantKit *plantKit
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -248,6 +260,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	}
 	t.tills = t.tillTable()
 	t.grassKit = newGrassKit(reg)
+	t.plantKit = t.newPlantKit()
 	return t
 }
 
@@ -320,6 +333,10 @@ func (t *Ticker) RandomTick(r *world.Region, pos cube.Pos, block uint32, layer u
 			t.cropTick(r, pos, block, s)
 		case kindStem:
 			t.stemTick(r, pos, block, s)
+		default:
+			if s.kind.plant() {
+				t.plantTick(r, pos, s)
+			}
 		}
 	}
 	if t.BlockTicker.RandomTicks(block, layer) {
@@ -340,6 +357,12 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 			t.fall(r, pos, now)
 		}
 	default:
+		if s := t.state(block); s.kind.plant() {
+			if now, ok := r.Block(pos, 0); ok && t.state(now).kind == s.kind && !t.plantSurvives(r, pos, t.state(now)) && t.fall != nil {
+				t.fall(r, pos, now)
+			}
+			return
+		}
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
 }
@@ -363,6 +386,10 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 				r.ScheduleTick(pos, block, surviveDelay, 0)
 			}
 			t.letGoOfFruit(r, pos, from, s)
+		default:
+			if s.kind.plant() && !t.plantSurvives(r, pos, s) {
+				r.ScheduleTick(pos, block, surviveDelay, 0)
+			}
 		}
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
@@ -377,6 +404,9 @@ func (t *Ticker) MayPlace(r *world.Region, pos cube.Pos, block uint32) bool {
 		return t.farmlandSurvives(r, pos)
 	case kindCrop, kindStem:
 		return t.survives(r, pos, block)
+	}
+	if s := t.state(block); s.kind.plant() {
+		return t.plantSurvives(r, pos, s)
 	}
 	return true
 }

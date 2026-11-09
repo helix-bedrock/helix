@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -100,6 +101,29 @@ func (s *Host) dispenseBoneMeal(r *world.Region, c *Chest, slot int, front cube.
 
 // dispenseBoneMealFail is the data of BDS's failed click when bone meal grows nothing.
 const dispenseBoneMealFail = 1000
+
+// pickBerries is a sweet berry bush's use (BDS 0xD4DF790 and 0xD4E0390): from growth 2 the
+// bush drops its drops (the berries by its growth), plays the pick sound and goes back to
+// growth 1. With bone meal in hand a bush that is not fully grown takes the bone meal instead.
+// False if the click was not taken.
+func (p *Player) pickBerries(r *world.Region, u *BlockUse) bool {
+	f := p.s.farm
+	if f == nil {
+		return false
+	}
+	bush, grown := f.BerryBush(u.Block)
+	if !bush || u.Item.Name == nameBoneMeal && !grown {
+		return false
+	}
+	return f.PickBerries(r, u.Pos, func(block uint32) {
+		items, _ := p.s.game.sys.Drops(p.s, block, &loot.Context{})
+		for _, it := range items {
+			d := NewBlockDrop(u.Pos, it)
+			p.s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+		}
+		playSound(r, u.Pos, soundEvent{name: packet.SoundEventSweetBerryBushPick, pos: blockCenter(u.Pos), extra: -1}, nil)
+	})
+}
 
 // trample is FarmBlock's fall-on for the player landing after falling distance: the
 // farmland it lands on may turn to dirt. BDS lets a player trample with the mine ability.
