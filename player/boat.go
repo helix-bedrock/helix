@@ -30,6 +30,10 @@ const (
 	// boatWidth and boatHeight are collision_box.
 	boatWidth  = 1.4
 	boatHeight = 0.455
+	// boatHeightOffset is Boat::reloadHardcoded's height offset (1.26.60 0xBD54040): the
+	// boat's position, which BDS sends, saves and runs its physics on, is this far above
+	// the bottom of its box. Actor::moveTo adds it to where a boat is put.
+	boatHeightOffset = 0.375
 	// boatIntegrity is what the boat starts with and comes back to, a point a tick.
 	boatIntegrity = 40
 	// boatHitScale is how much integrity a point of damage takes (1.26.60; 1.21.3 took one).
@@ -132,10 +136,11 @@ func (b *Boat) Driver() *Player {
 	return p
 }
 
-// SpawnBoat adds a boat of wood, with a chest or not, at pos facing yaw. Runs: any
-// goroutine.
-func (s *Host) SpawnBoat(d *world.Dimension, wood int32, chest bool, pos mgl32.Vec3, yaw float32) *Boat {
+// SpawnBoat adds a boat of wood, with a chest or not, with the bottom of its box at feet,
+// facing yaw. Runs: any goroutine.
+func (s *Host) SpawnBoat(d *world.Dimension, wood int32, chest bool, feet mgl32.Vec3, yaw float32) *Boat {
 	b := s.newBoat(wood, chest)
+	pos := feet.Add(mgl32.Vec3{0, boatHeightOffset, 0})
 	b.entity = d.AddEntity(b.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: yaw, HeadYaw: yaw})) //nolint:gosec // an entity ID, not a secret
 	return b
 }
@@ -204,6 +209,7 @@ func (b *Boat) spawnPackets(e *world.Entity) []packet.Packet {
 		protocol.EntityDataKeyWidth:   float32(boatWidth), protocol.EntityDataKeyHeight: float32(boatHeight),
 		protocol.EntityDataKeyScale:               float32(1),
 		protocol.EntityDataKeyStructuralIntegrity: b.integrity,
+		protocol.EntityDataKeyBuoyancyData:        boatBuoyancyData,
 	}
 	if b.chest != nil {
 		meta[protocol.EntityDataKeyContainerType] = b.chest.machine.window
@@ -368,10 +374,11 @@ func (b *Boat) BlastHit(damage float32, _ DamageSource) {
 // BlastPush adds an explosion's push to an empty boat's movement.
 func (b *Boat) BlastPush(push mgl32.Vec3) { b.motion.vel = b.motion.vel.Add(push) }
 
-// boatBox is the boat's box at pos, its feet.
+// boatBox is the boat's box at pos, its position (boatHeightOffset above the bottom).
 func boatBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
 	half := float32(boatWidth / 2)
-	return mgl32.Vec3{pos[0] - half, pos[1], pos[2] - half}, mgl32.Vec3{pos[0] + half, pos[1] + boatHeight, pos[2] + half}
+	y := pos[1] - boatHeightOffset
+	return mgl32.Vec3{pos[0] - half, y, pos[2] - half}, mgl32.Vec3{pos[0] + half, y + boatHeight, pos[2] + half}
 }
 
 // riders, rideEntity, rideMoved and rideTop make the boat a vehicle.
@@ -381,7 +388,7 @@ func (b *Boat) rideEntity() *world.Entity { return b.entity }
 
 func (b *Boat) rideMoved() mgl32.Vec3 { return b.moved }
 
-func (b *Boat) rideTop() float32 { return b.entity.Position()[1] + boatHeight }
+func (b *Boat) rideTop() float32 { return b.entity.Position()[1] - boatHeightOffset + boatHeight }
 
 // use is a player using the boat: get in, or with a chest boat while crouching (which
 // rideable skips) open its chest.

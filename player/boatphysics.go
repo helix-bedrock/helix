@@ -45,6 +45,17 @@ const (
 	boatStillSpeed2 = 1e-8
 )
 
+// boatBuoyancyData is the boat's buoyant component as BDS 1.26.60 hands it to clients in
+// actor data 121 (BuoyancyComponent setup 0xC3DDDA0, written by 0x7375900 with JsonCpp's
+// FastWriter: keys in order, no spaces, a closing newline). The client floats a boat it
+// steers, and shows one it does not, by these; without them a boat sinks.
+var boatBuoyancyData = `{"apply_gravity":true,"base_buoyancy":1.0,"big_wave_probability":0.029999999329447746,` +
+	`"big_wave_speed":10.0,"can_auto_step_from_liquid":false,"drag_down_on_buoyancy_removed":0.0,` +
+	`"liquid_blocks":["minecraft:water","minecraft:flowing_water"],"movement_type":"waves"}` + newline
+
+// newline ends JsonCpp's FastWriter output.
+const newline = "\n"
+
 // boatMotion is what moves an empty boat: its velocity (StateVectorComponent's position
 // delta) and the buoyancy timer.
 type boatMotion struct {
