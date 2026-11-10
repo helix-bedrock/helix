@@ -37,7 +37,9 @@ type ItemLoadEvent struct {
 // SetVisibility decides which players see the item; nil is everyone in range.
 // A player the rule refuses is sent nothing about the item and cannot pick it
 // up. The rule runs each tick for each player in range, so it may change its
-// answer. Runs: owner of the item's entity, or in an [ItemDropEvent].
+// answer. In a crowded region it runs for several players at once on different
+// goroutines, so it must only read. Runs: owner of the item's entity, or in an
+// [ItemDropEvent].
 func (i *ItemActor) SetVisibility(rule func(p *Player) bool) {
 	i.rule = rule
 	if i.entity != nil {
@@ -47,7 +49,8 @@ func (i *ItemActor) SetVisibility(rule func(p *Player) bool) {
 
 // SetView sets what each player is shown of the item, called once a second for
 // each player who sees it and when it is shown to one; nil shows the real item.
-// Runs: owner of the item's entity, or in an [ItemDropEvent].
+// When it shows the item to players it may run for several at once on different
+// goroutines, so it must only read and fill v. Runs: owner of the item's entity, or in an [ItemDropEvent].
 func (i *ItemActor) SetView(view func(p *Player, v *ItemView)) {
 	i.view = view
 	if i.entity != nil {

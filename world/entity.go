@@ -42,9 +42,18 @@ type Entity struct {
 	// known are the entities this player was shown, and whether the last
 	// scan saw them. Players only.
 	known map[*Entity]known
-	// spawn caches the spawn packets for the tick they were built in.
+	// spawn caches the spawn packets for the tick they were built in. spawnMu guards it:
+	// players see entities in parallel (updateVisibility).
+	spawnMu   sync.Mutex
 	spawn     []packet.Packet
 	spawnTick uint64
+}
+
+// outItem is a packet the movement phase sends: to the players who see from, or to the
+// player to alone.
+type outItem struct {
+	from, to *Entity
+	pk       packet.Packet
 }
 
 type known struct {
@@ -80,7 +89,10 @@ type EntityConfig struct {
 	// [Region.AppendEntitiesIn].
 	Owner any
 	// Spawn returns the packets that show the entity to a player seeing it
-	// for the first time. Built once per tick and shared by every player.
+	// for the first time. Built once per tick and shared by every player. In a
+	// crowded region players are shown entities in parallel, so Spawn, SpawnFor,
+	// VisibleTo and StaySeen may run while other entities' do; they must only
+	// read, and Spawn is never run twice at once for one entity.
 	Spawn func(e *Entity) []packet.Packet
 	// Move returns the packet that moves the entity for the players who see
 	// it, built once per tick it moved; nil sends nothing.
@@ -127,15 +139,24 @@ func (e *Entity) SetSpawnFor(fn func(player *Entity) []packet.Packet) { e.conf.S
 // Send sends pk to the players who see the entity, and no one else. Runs:
 // owner.
 func (e *Entity) Send(pk packet.Packet) {
+	if r := e.region; r != nil && r.fanout {
+		r.outbox = append(r.outbox, outItem{from: e, pk: pk})
+		return
+	}
 	e.EachSeer(func(p *Entity) { p.conf.Viewer.sendEntity(pk) })
 }
 
 // SendTo sends pk to one player, given as its entity. Runs: owner of that
 // entity.
 func (e *Entity) SendTo(pk packet.Packet) {
-	if e.conf.Viewer != nil {
-		e.conf.Viewer.sendEntity(pk)
+	if e.conf.Viewer == nil {
+		return
 	}
+	if r := e.region; r != nil && r.fanout {
+		r.outbox = append(r.outbox, outItem{to: e, pk: pk})
+		return
+	}
+	e.conf.Viewer.sendEntity(pk)
 }
 
 // EachSeer runs fn for each player who sees the entity. Regions keep further
@@ -516,43 +537,63 @@ func (r *Region) updateVisibility() {
 	for (n+1)*(n+1) <= r2 {
 		n++
 	}
+	r.visR2, r.visN = r2, n
+	r.collectSeers()
+	if r.visFn == nil {
+		r.visFn = r.visibility
+	}
+	// Each player's scan only changes what that player knows and sends to that player, so a
+	// crowded region scans its players on several cores.
+	r.Parallel(len(r.seers), r.visFn)
+	clear(r.seers)
+}
+
+// collectSeers lists the players in the region (the entities that are shown others).
+func (r *Region) collectSeers() {
+	r.seers = r.seers[:0]
 	for _, p := range r.entities {
-		if p.known == nil {
-			continue
+		if p.known != nil {
+			r.seers = append(r.seers, p)
 		}
-		for dx := -n; dx <= n; dx++ {
-			for dz := -n; dz <= n; dz++ {
-				if dx*dx+dz*dz > r2 {
-					continue
-				}
-				for _, o := range r.byChunk[mcdb.ChunkPos{p.chunk[0] + dx, p.chunk[1] + dz}] {
-					if o == p || o.conf.VisibleTo != nil && !o.conf.VisibleTo(p) {
-						continue
-					}
-					if k, ok := p.known[o]; ok {
-						k.seen = true
-						p.known[o] = k
-						continue
-					}
-					p.known[o] = known{id: o.conf.UniqueID, seen: true}
-					for _, pk := range r.spawnPacketsFor(o, p) {
-						p.conf.Viewer.sendEntity(pk)
-					}
-				}
-			}
-		}
-		for o, k := range p.known {
-			if !k.seen {
-				if o.conf.StaySeen != nil && o.region == r && o.conf.StaySeen(p) {
-					continue
-				}
-				delete(p.known, o)
-				p.conf.Viewer.sendEntity(&packet.RemoveActor{EntityUniqueID: k.id})
+	}
+}
+
+// visibility is one player's part of updateVisibility. VisibleTo, StaySeen, Spawn and SpawnFor
+// run here, maybe for several players at once.
+func (r *Region) visibility(i int) {
+	p, r2, n := r.seers[i], r.visR2, r.visN
+	for dx := -n; dx <= n; dx++ {
+		for dz := -n; dz <= n; dz++ {
+			if dx*dx+dz*dz > r2 {
 				continue
 			}
-			k.seen = false
-			p.known[o] = k
+			for _, o := range r.byChunk[mcdb.ChunkPos{p.chunk[0] + dx, p.chunk[1] + dz}] {
+				if o == p || o.conf.VisibleTo != nil && !o.conf.VisibleTo(p) {
+					continue
+				}
+				if k, ok := p.known[o]; ok {
+					k.seen = true
+					p.known[o] = k
+					continue
+				}
+				p.known[o] = known{id: o.conf.UniqueID, seen: true}
+				for _, pk := range r.spawnPacketsFor(o, p) {
+					p.conf.Viewer.sendEntity(pk)
+				}
+			}
 		}
+	}
+	for o, k := range p.known {
+		if !k.seen {
+			if o.conf.StaySeen != nil && o.region == r && o.conf.StaySeen(p) {
+				continue
+			}
+			delete(p.known, o)
+			p.conf.Viewer.sendEntity(&packet.RemoveActor{EntityUniqueID: k.id})
+			continue
+		}
+		k.seen = false
+		p.known[o] = k
 	}
 }
 
@@ -570,6 +611,8 @@ func (r *Region) spawnPackets(o *Entity) []packet.Packet {
 	if o.conf.Spawn == nil {
 		return nil
 	}
+	o.spawnMu.Lock()
+	defer o.spawnMu.Unlock()
 	if o.spawn == nil || o.spawnTick != r.ticks {
 		o.spawn, o.spawnTick = o.conf.Spawn(o), r.ticks
 	}
@@ -579,6 +622,11 @@ func (r *Region) spawnPackets(o *Entity) []packet.Packet {
 // sendMovement sends each entity that moved this tick to the players who
 // see it: one packet per entity, shared by all of them.
 func (r *Region) sendMovement() {
+	// The moves are built in runtime ID order on the region's goroutine; what they send is
+	// kept in one ordered list, then every player takes its share of it, in parallel when
+	// the region is crowded. Each player gets the same packets in the same order as when
+	// sent one by one.
+	r.fanout = true
 	for _, e := range r.entities {
 		if !e.moved {
 			continue
@@ -587,14 +635,36 @@ func (r *Region) sendMovement() {
 		if e.conf.Move == nil {
 			continue
 		}
-		pk := e.conf.Move(e)
-		if pk == nil {
+		if pk := e.conf.Move(e); pk != nil {
+			r.outbox = append(r.outbox, outItem{from: e, pk: pk})
+		}
+	}
+	r.fanout = false
+	if len(r.outbox) == 0 {
+		return
+	}
+	r.collectSeers()
+	if r.fanFn == nil {
+		r.fanFn = r.fanOut
+	}
+	r.Parallel(len(r.seers), r.fanFn)
+	clear(r.seers)
+	clear(r.outbox)
+	r.outbox = r.outbox[:0]
+}
+
+// fanOut sends one player the movement phase's packets meant for it.
+func (r *Region) fanOut(i int) {
+	p := r.seers[i]
+	for _, it := range r.outbox {
+		if it.to != nil {
+			if it.to == p {
+				p.conf.Viewer.sendEntity(it.pk)
+			}
 			continue
 		}
-		for _, p := range r.entities {
-			if _, ok := p.known[e]; ok {
-				p.conf.Viewer.sendEntity(pk)
-			}
+		if _, ok := p.known[it.from]; ok {
+			p.conf.Viewer.sendEntity(it.pk)
 		}
 	}
 }

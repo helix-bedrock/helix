@@ -190,7 +190,7 @@ type lastPlace struct {
 func (p *Player) entityConfig(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: pos, Rot: rot, Viewer: p.viewer, Owner: p,
-		Spawn: p.spawnPackets, Move: p.movePacket, Input: p.handleInput,
+		Spawn: p.spawnPackets, Move: p.movePacket, Think: p.think, Input: p.handleInput,
 		Removed: func(e *world.Entity) {
 			p.StopSleeping()
 			p.leaveChest(nil, false)

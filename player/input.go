@@ -46,6 +46,44 @@ func (q *inputQueue) take() []packet.Packet {
 	return q.run
 }
 
+// think is the player's think step (world.EntityConfig.Think): it takes this tick's packets
+// and runs the Setup's think steps on them, maybe on another core while other players and
+// mobs think too.
+func (p *Player) think(*world.Entity) {
+	p.batch = p.input.take()
+	p.thought = true
+	for _, t := range p.s.handlers.think {
+		p.runThink(t, p.batch)
+	}
+}
+
+// runThink runs one think step; a panic in it is plugin code failing, logged with its owner,
+// and the player goes on.
+func (p *Player) runThink(t thinkEntry, input []packet.Packet) {
+	defer func() {
+		if v := recover(); v != nil {
+			p.s.log.Error("player think step panicked", "owner", t.owner, "player", p.name, "panic", v)
+		}
+	}()
+	t.fn(p, input)
+}
+
+// Local returns the value kept on the player under key, made with newFn the first time: state
+// a think step works out for the handlers of the same tick, such as an anti-cheat's movement
+// simulation. It is not saved. Runs: the player's think step and its region's tick, never
+// for another player's think step.
+func (p *Player) Local(key any, newFn func() any) any {
+	if v, ok := p.locals[key]; ok {
+		return v
+	}
+	if p.locals == nil {
+		p.locals = map[any]any{}
+	}
+	v := newFn()
+	p.locals[key] = v
+	return v
+}
+
 // handleInput runs the player's queued world packets through the frozen
 // handlers, in order, on its region's tick (world.EntityConfig.Input).
 func (p *Player) handleInput(*world.Entity) {
@@ -56,7 +94,12 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickShield()
 	p.tickSleep()
 	p.reseat()
-	run := p.input.take()
+	// The packets the think step took, so its handlers saw the same ones.
+	run := p.batch
+	if !p.thought {
+		run = p.input.take()
+	}
+	p.batch, p.thought = nil, false
 	for i, pk := range run {
 		if h := p.s.handlers.handler(pk.ID()); h != nil {
 			h(p, pk)

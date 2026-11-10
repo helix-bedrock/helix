@@ -74,6 +74,11 @@ type Player struct {
 	// input carries world packets from the network goroutine to the
 	// region's tick.
 	input inputQueue
+	// batch is the packets think took for this tick's handleInput; thought is set when it
+	// did. locals is the state Local keeps.
+	batch   []packet.Packet
+	thought bool
+	locals  map[any]any
 	// flush sends what was queued for the client. Runs: anywhere.
 	flush func()
 	zone  zoneState

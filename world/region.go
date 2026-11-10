@@ -47,6 +47,15 @@ type Region struct {
 	// the phase allocates nothing).
 	thinkers []*Entity
 	thinkFn  func(i int)
+	// seers are the players for the visibility and movement phases, visR2 and visN the view
+	// disc, visFn and fanFn those phases' per-player parts.
+	seers        []*Entity
+	visR2, visN  int32
+	visFn, fanFn func(i int)
+	// fanout is set while the movement phase builds moves: Send and SendTo then queue in
+	// outbox, sent to each player after.
+	fanout bool
+	outbox []outItem
 
 	// Guarded by d.mu. sections, added, reshaped and contested are also
 	// changed by the region's own tick, under d.mu.

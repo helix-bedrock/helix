@@ -25,6 +25,7 @@ type handlerState struct {
 	frozen   bool
 	packets  map[uint32]handlerEntry
 	movement movementEntry
+	think    []thinkEntry
 	game     *gameState
 	commands *command.Manager
 }
@@ -44,6 +45,33 @@ type handlerEntry struct {
 type movementEntry struct {
 	owner string
 	fn    MovementHandler
+}
+
+// ThinkHandler is a player's think step: it sees the packets the player sent since the last
+// tick before any packet handler runs, and works out what it needs from them, such as a
+// server-side simulation of the player's movement for an anti-cheat. In a crowded region it
+// runs for many players at once on different goroutines, at the same time as mobs think.
+// So it may only read the world, the player and other entities, and keep what it works out
+// in the player's Local state, for packet and movement handlers to use on the region tick.
+// It must not change the player or the world, send packets, or keep the packets past its
+// return.
+type ThinkHandler func(p *Player, input []packet.Packet)
+
+type thinkEntry struct {
+	owner string
+	fn    ThinkHandler
+}
+
+// Think adds a think step that runs on every player each tick (ThinkHandler). Steps run in
+// the order they were added. Vanilla adds none.
+func (s *Setup) Think(fn ThinkHandler) error {
+	if s.h.frozen {
+		return registry.ErrFrozen
+	}
+	if fn != nil {
+		s.h.think = append(s.h.think, thinkEntry{owner: s.owner, fn: fn})
+	}
+	return nil
 }
 
 // NewSetup returns a Setup with vanilla's handlers and systems registered.
@@ -138,6 +166,7 @@ func (s *Setup) WrapMovement(fn func(p *Player, m world.Movement, next MovementH
 type handlers struct {
 	packets  []func(p *Player, pk packet.Packet)
 	movement MovementHandler
+	think    []thinkEntry
 }
 
 // freeze ends the handler part of the Setup.
@@ -147,7 +176,7 @@ func (s *Setup) freeze() handlers {
 	for id := range s.h.packets {
 		top = max(top, id)
 	}
-	h := handlers{packets: make([]func(*Player, packet.Packet), top+1), movement: s.h.movement.fn}
+	h := handlers{packets: make([]func(*Player, packet.Packet), top+1), movement: s.h.movement.fn, think: s.h.think}
 	for id, e := range s.h.packets {
 		h.packets[id] = e.fn
 	}
