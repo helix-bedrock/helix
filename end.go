@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
-	"github.com/helix-bedrock/worldgen/1.26.60/end"
+	"github.com/helix-bedrock/worldgen/end"
 )
 
 // The End's level key fields Helix reads and writes for the dragon fight. BDS keeps

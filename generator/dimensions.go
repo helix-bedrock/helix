@@ -9,9 +9,9 @@ import (
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
-	"github.com/helix-bedrock/worldgen/1.26.60/end"
-	"github.com/helix-bedrock/worldgen/1.26.60/nether"
-	"github.com/helix-bedrock/worldgen/1.26.60/structure"
+	"github.com/helix-bedrock/worldgen/end"
+	"github.com/helix-bedrock/worldgen/nether"
+	"github.com/helix-bedrock/worldgen/structure"
 )
 
 // Nether is BDS 1.26.60's Nether from the worldgen library: terrain, biomes,

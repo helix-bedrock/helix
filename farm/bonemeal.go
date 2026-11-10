@@ -9,8 +9,8 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
-	"github.com/helix-bedrock/worldgen/1.26.60/noise"
-	wgrand "github.com/helix-bedrock/worldgen/1.26.60/rand"
+	"github.com/helix-bedrock/worldgen/noise"
+	wgrand "github.com/helix-bedrock/worldgen/rand"
 )
 
 // Bone meal on grass blocks, short grass and ferns, from BDS 1.26.60:

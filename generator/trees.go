@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
-	wgrand "github.com/helix-bedrock/worldgen/1.26.60/rand"
+	wgrand "github.com/helix-bedrock/worldgen/rand"
 )
 
 // GrowFeature places worldgen's feature (a tree, for a growing sapling) at pos into the running

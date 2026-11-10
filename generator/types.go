@@ -12,7 +12,7 @@ import (
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
-	"github.com/helix-bedrock/worldgen/1.26.60/overworld"
+	"github.com/helix-bedrock/worldgen/overworld"
 )
 
 // Names of the built-in world types.

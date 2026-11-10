@@ -13,8 +13,8 @@ import (
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
-	"github.com/helix-bedrock/worldgen/1.26.60/blocks"
-	"github.com/helix-bedrock/worldgen/1.26.60/overworld"
+	"github.com/helix-bedrock/worldgen/blocks"
+	"github.com/helix-bedrock/worldgen/overworld"
 )
 
 // cacheChunks is how many chunks of undecorated terrain and structure
