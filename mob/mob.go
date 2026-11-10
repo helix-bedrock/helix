@@ -3,7 +3,7 @@
 // ticked in BDS's order. Nothing here knows any mob by name: a zombie and a cow differ only
 // in their definition, as in BDS.
 //
-// Sensors and event components run (sensors.go); mob state components other than despawning,
+// Sensors and event components run (sensors.go), and the mob state components (state.go);
 // loot and saving are not hooked up yet. The player package's Mob actor owns the entity, packets and damage.
 package mob
 
@@ -95,8 +95,12 @@ type Hooks interface {
 	Swing(m *Mob)
 	// Sound plays a level sound event at p.
 	Sound(m *Mob, sound int, p behavior.Vec3)
-	// FlagsChanged tells those who see the mob that its actor flags changed.
+	// FlagsChanged tells those who see the mob that its actor flags or air changed.
 	FlagsChanged(m *Mob)
+	// ActorEvent sends an actor event about the mob.
+	ActorEvent(m *Mob, id int)
+	// Hurt hurts the mob through the engine's hurt (its packets included) with no attacker.
+	Hurt(m *Mob, amount float32, cause int)
 }
 
 // Mob is one mob: its definition state, goals, navigation and body. It is used only from its
@@ -138,11 +142,16 @@ type Mob struct {
 	lastCause                       int
 	deathTime                       int32
 	persistent                      bool
-	// despawn is minecraft:despawn, nil without one; stateEnv is what it runs with, made
-	// once. despawned is set when it removed the mob.
-	despawn   *state.Despawn
-	stateEnv  state.Env
-	despawned bool
+	// states are the definition's state components (state.go), stateEnv what they run with,
+	// stateComps the components they were read from. despawned is set when the mob despawned.
+	states     *state.Set
+	stateEnv   state.Env
+	stateComps definition.Group
+	despawned  bool
+	// fireTicks is how long the mob still burns, burnTicks how long it has burned; air and
+	// maxAir its air supply.
+	fireTicks, burnTicks int32
+	air, maxAir          int16
 	// sensors are the definition's sensors and event components (sensors.go), sensorEnv what
 	// they run with, sensorComps the components they were read from.
 	sensors      *sensor.Set
@@ -268,7 +277,7 @@ func (m *Mob) think() (remove bool) {
 		m.deathTime++
 		return m.deathTime >= deathTicks
 	}
-	if m.despawnTick() {
+	if m.stateTick() {
 		return true
 	}
 	m.sensorTick()
@@ -316,7 +325,7 @@ func (m *Mob) refresh() {
 			m.hasMove = false
 		}
 		ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
-		m.readDespawn(ctx, comps)
+		m.readStates(ctx, comps)
 		m.readSensors(ctx, comps)
 		goals, warnings := m.rt.Goals.Build(ctx, order, comps)
 		for _, w := range warnings {

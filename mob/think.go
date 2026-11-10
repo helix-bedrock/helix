@@ -27,6 +27,8 @@ const (
 	opParticle
 	opSetMobTarget
 	opMobEvent
+	opActorEvent
+	opHurt
 )
 
 // op is one queued change. Only the fields its kind uses are set.
@@ -40,6 +42,7 @@ type op struct {
 	name   string
 	placed behavior.PlacedBlock
 	then   behavior.AttackResult
+	amount float32
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -120,6 +123,14 @@ func (m *Mob) run(o op) {
 		if t := env.Mob(r, o.id); t != nil {
 			t.SetTarget(o.other)
 			t.snapshot()
+		}
+	case opActorEvent:
+		if m.hooks != nil {
+			m.hooks.ActorEvent(m, int(o.n))
+		}
+	case opHurt:
+		if m.hooks != nil {
+			m.hooks.Hurt(m, o.amount, int(o.n))
 		}
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {

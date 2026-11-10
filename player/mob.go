@@ -25,9 +25,6 @@ import (
 // spawning is in naturalspawn.go, despawning in mob/despawn.go), drop no loot or experience, and are hurt outside the Hit pipeline (no armour,
 // no HitEvent).
 
-// mobAir is the air supply BDS shows for a mob that breathes air.
-const mobAir = 300
-
 // setUpMobs reads every entity definition the mob runtime can run, at boot.
 func (s *Host) setUpMobs() {
 	s.mobs = mob.NewRuntime(mob.NewBlocks(s.reg.Blocks), s, s.log)
@@ -126,12 +123,13 @@ func mglVec(p behavior.Vec3) mgl32.Vec3 { return mgl32.Vec3{p.X, p.Y, p.Z} }
 func (m *Mob) metadata() protocol.EntityMetadata {
 	f := m.m.Flags()
 	w, h := m.m.Size()
+	air, maxAir := m.m.Air()
 	return protocol.EntityMetadata{
 		protocol.EntityDataKeyFlags:    int64(f[0]), //nolint:gosec // a bit set sent as int64
 		protocol.EntityDataKeyFlagsTwo: int64(f[1]), //nolint:gosec // a bit set sent as int64
 		protocol.EntityDataKeyWidth:    w, protocol.EntityDataKeyHeight: h,
 		protocol.EntityDataKeyScale:     float32(1),
-		protocol.EntityDataKeyAirSupply: int16(mobAir), protocol.EntityDataKeyAirSupplyMax: int16(mobAir),
+		protocol.EntityDataKeyAirSupply: air, protocol.EntityDataKeyAirSupplyMax: maxAir,
 	}
 }
 
@@ -268,6 +266,22 @@ func (m *Mob) Swing(*mob.Mob) {
 // Sound plays nothing yet: goals name sounds by number and there is no table to
 // LevelSoundEvent names.
 func (m *Mob) Sound(*mob.Mob, int, behavior.Vec3) {}
+
+// ActorEvent sends an actor event about the mob to those who see it.
+func (m *Mob) ActorEvent(_ *mob.Mob, id int) {
+	if m.entity == nil || m.entity.Region() == nil || id < 0 || id > math.MaxUint8 {
+		return
+	}
+	m.entity.Send(actorEvent(m.entity.RuntimeID(), uint8(id)))
+}
+
+// Hurt is damage the mob's own state deals it (drowning, burning, hurt_on_condition).
+func (m *Mob) Hurt(_ *mob.Mob, amount float32, cause int) {
+	if m.entity == nil {
+		return
+	}
+	m.hurt(amount, nil, DamageCause(cause))
+}
 
 // FlagsChanged sends the mob's new actor data.
 func (m *Mob) FlagsChanged(*mob.Mob) {
