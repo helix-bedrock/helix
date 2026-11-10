@@ -14,7 +14,10 @@ import (
 
 // Env is what the mob runtime asks the rest of the engine: the parts of the world that are
 // not blocks (other entities, players, game rules, the clock) and the actions a goal takes in
-// it. The player package's Host implements it. Every call runs on the region that owns r.
+// it. The player package's Host implements it. Every call runs on the region that owns r; the
+// read-only ones (Boxes, Actor, Entities, Players and the level settings) also run while many
+// mobs think at once (world.Region.Parallel), and must then return snapshots of mobs, never
+// the *Mob itself, and keep no shared scratch state.
 type Env interface {
 	// Boxes are the collision boxes of block b at pos, inside the block (doors and the other
 	// computed shapes included).
@@ -44,6 +47,9 @@ type Env interface {
 	SetBlock(r *world.Region, p behavior.Pos, b behavior.PlacedBlock, by behavior.ID)
 	// Particle spawns a named particle effect.
 	Particle(r *world.Region, name string, p behavior.Vec3)
+	// Mob is the mob with the unique ID in r, nil when there is none. It is only called
+	// outside the think phase.
+	Mob(r *world.Region, id behavior.ID) *Mob
 }
 
 // view is one region seen by the mob runtime. It is filled for each mob tick and never kept.
@@ -52,6 +58,7 @@ type view struct {
 	blocks *Blocks
 	env    Env
 	rnd    *Random
+	m      *Mob
 	// boxes is a scratch list for collision queries.
 	boxes []registry.Box
 }
@@ -321,14 +328,18 @@ func (w goalWorld) HeightMap(x, z int32) int32 {
 func (w goalWorld) MinHeight() int32  { return int32(w.r.Dimension().Range()[0]) } //nolint:gosec // world heights fit
 func (w goalWorld) MobGriefing() bool { return w.env.MobGriefing() }
 func (w goalWorld) LevelEvent(id int32, p behavior.Vec3, block string) {
-	w.env.LevelEvent(w.r, id, p, block)
+	w.m.do(op{kind: opLevelEvent, n: id, at: p, name: block})
 }
-func (w goalWorld) BreakBlock(p behavior.Pos, by behavior.ID) { w.env.BreakBlock(w.r, p, by) }
+func (w goalWorld) BreakBlock(p behavior.Pos, by behavior.ID) {
+	w.m.do(op{kind: opBreakBlock, pos: p, id: by})
+}
 func (w goalWorld) Passable(p behavior.Pos, _ behavior.ID) bool {
 	return !w.blocks.Goal(w.block(p, 0)).BlocksMotion
 }
-func (w goalWorld) Particle(name string, p behavior.Vec3) { w.env.Particle(w.r, name, p) }
-func (w goalWorld) SeaLevel() int32                       { return 63 }
+func (w goalWorld) Particle(name string, p behavior.Vec3) {
+	w.m.do(op{kind: opParticle, name: name, at: p})
+}
+func (w goalWorld) SeaLevel() int32 { return 63 }
 func (w goalWorld) BuiltOver(p behavior.Pos) bool {
 	g := w.blocks.Goal(w.block(p, 0))
 	return g.Material == materialAir || g.Liquid
@@ -347,12 +358,18 @@ func (w goalWorld) BlockState(p behavior.Pos, state string) (int32, bool) {
 func (w goalWorld) ChestOpen(behavior.Pos) bool { return false }
 func (w goalWorld) ThunderLevel() float32       { return w.env.Rain(w.r) * w.env.Thunder(w.r) }
 func (w goalWorld) SetBlock(p behavior.Pos, b behavior.PlacedBlock, by behavior.ID) {
-	w.env.SetBlock(w.r, p, b, by)
+	w.m.do(op{kind: opSetBlock, pos: p, placed: b, id: by})
+}
+func (w goalWorld) SetMobTarget(id, target behavior.ID) {
+	w.m.do(op{kind: opSetMobTarget, id: id, other: target})
+}
+func (w goalWorld) MobEvent(id behavior.ID, event string, other behavior.ID) {
+	w.m.do(op{kind: opMobEvent, id: id, name: event, other: other})
 }
 func (w goalWorld) GriefAllowed(behavior.Pos, behavior.ID) bool { return w.env.MobGriefing() }
 func (w goalWorld) BaseGameAtLeast(int, int, int) bool          { return true }
 
-// Random is a region's random for the mob runtime: Java's nextGaussian pairing over a
+// Random is a mob's own random: Java's nextGaussian pairing over a
 // seeded generator. BDS draws from MT19937 streams; the numbers differ, the distributions
 // match.
 type Random struct {

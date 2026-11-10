@@ -39,6 +39,14 @@ type Region struct {
 	seq uint64
 	// ticking is set while the region's tick runs, for owner checks.
 	ticking atomic.Bool
+	// parallel is set while a Parallel phase runs, when reads must not write; job is that
+	// phase, reused.
+	parallel atomic.Bool
+	job      parallelJob
+	// thinkers are the entities with a Think this tick, and thinkFn runs one (made once, so
+	// the phase allocates nothing).
+	thinkers []*Entity
+	thinkFn  func(i int)
 
 	// Guarded by d.mu. sections, added, reshaped and contested are also
 	// changed by the region's own tick, under d.mu.

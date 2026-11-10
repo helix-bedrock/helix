@@ -81,6 +81,12 @@ type Config struct {
 	// Weather runs on every ticking chunk before its random ticks, as BDS's chunk tick runs
 	// lightning, freezing and snow. Nil has no weather.
 	Weather WeatherTicker
+	// ParallelMin is how many items a phase of Region.Parallel (mob AI and the like) needs
+	// before a crowded region spreads it over idle cores; 0 means DefaultParallelMin.
+	ParallelMin int
+	// ParallelHelpers is how many goroutines at most help one region's phase besides its
+	// own; 0 means DefaultParallelHelpers and below 0 keeps every region on one core.
+	ParallelHelpers int
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
@@ -135,6 +141,10 @@ type Dimension struct {
 	ticketSeq uint64
 	ticking   int
 	closing   bool
+
+	// parallelMin and parallelHelpers are SetParallel's settings.
+	parallelMin     atomic.Int64
+	parallelHelpers atomic.Int64
 
 	// loadMu guards the players waiting for encoded chunks.
 	loadMu  sync.Mutex
@@ -217,6 +227,14 @@ func New(conf Config) (*Dimension, error) {
 		return nil, err
 	}
 	d.SetRandomTickSpeed(conf.RandomTickSpeed)
+	pmin, helpers := conf.ParallelMin, conf.ParallelHelpers
+	if pmin <= 0 {
+		pmin = DefaultParallelMin
+	}
+	if helpers == 0 {
+		helpers = DefaultParallelHelpers
+	}
+	d.SetParallel(pmin, helpers)
 	d.idle = sync.NewCond(&d.mu)
 	if d.sched == nil {
 		d.sched, d.ownSched = NewScheduler(0), true

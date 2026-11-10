@@ -66,9 +66,7 @@ func (m *Mob) SetFlag(n int, on bool) {
 		return
 	}
 	m.flags.Set(n, on)
-	if m.hooks != nil && m.v.r != nil {
-		m.hooks.FlagsChanged(m)
-	}
+	m.flagsChanged()
 }
 
 // WalkTargetValue is PathfinderMob's: 0 everywhere in the minimal hookup (animals preferring
@@ -93,15 +91,15 @@ func (m *Mob) LastDamageCause() int              { return m.lastCause }
 
 // PlaySound plays a sound at the mob's eyes.
 func (m *Mob) PlaySound(sound int) {
-	if sound != behavior.NoSound && m.hooks != nil {
-		m.hooks.Sound(m, sound, m.Eyes())
+	if sound != behavior.NoSound {
+		m.do(op{kind: opSound, n: int32(sound), at: m.Eyes()}) //nolint:gosec // sound IDs fit
 	}
 }
 
 // PlaySoundAt plays a sound at p.
 func (m *Mob) PlaySoundAt(sound int, p behavior.Vec3) {
-	if sound != behavior.NoSound && m.hooks != nil {
-		m.hooks.Sound(m, sound, p)
+	if sound != behavior.NoSound {
+		m.do(op{kind: opSound, n: int32(sound), at: p}) //nolint:gosec // sound IDs fit
 	}
 }
 
@@ -221,24 +219,12 @@ func (m *Mob) PlayersTargetable() bool { return true }
 // --- Attacker ---
 
 // Swing swings the mob's arm.
-func (m *Mob) Swing() {
-	if m.hooks != nil {
-		m.hooks.Swing(m)
-	}
-}
+func (m *Mob) Swing() { m.do(op{kind: opSwing}) }
 
-// Attack hits a with the mob's attack.
-func (m *Mob) Attack(a behavior.Actor) (hit, killed bool) {
-	if m.hooks == nil {
-		return false, false
-	}
-	hit, killed = m.hooks.Attack(m, a)
-	if hit {
-		m.lastHurtMob = a.ID()
-		m.lastHurtStamp++
-		m.noActionTime = 0
-	}
-	return hit, killed
+// Attack hits a with the mob's attack, in Apply when the mob is thinking; then hears the
+// result there.
+func (m *Mob) Attack(a behavior.Actor, then behavior.AttackResult) {
+	m.do(op{kind: opAttack, id: a.ID(), then: then})
 }
 
 // --- Creeper ---

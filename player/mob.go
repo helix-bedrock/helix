@@ -3,6 +3,7 @@ package player
 import (
 	"math"
 	"math/rand/v2"
+	"sync"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
@@ -53,6 +54,8 @@ type Mob struct {
 	// died is set once the death event went out.
 	died bool
 	gone bool
+	// ended is set by think when the mob's death has run its course; apply removes it.
+	ended bool
 }
 
 // Entity returns the mob's entity.
@@ -84,7 +87,7 @@ func (s *Host) SpawnMob(d *world.Dimension, typ string, pos mgl32.Vec3, yaw floa
 	o.moves.head = true
 	o.entity = d.AddEntity(world.EntityConfig{
 		UniqueID: uid, RuntimeID: rid, Pos: pos, Rot: rot,
-		Owner: o, Spawn: o.spawnPackets, Move: o.movePacket, Input: o.tick,
+		Owner: o, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply,
 	})
 	return o, true
 }
@@ -127,20 +130,28 @@ func (m *Mob) movePacket(e *world.Entity) packet.Packet {
 	return nil
 }
 
-// tick runs the mob: the void check, then its AI and movement, applied to the entity.
-func (m *Mob) tick(e *world.Entity) {
+// think runs the mob's AI and movement: the think phase, maybe on another core while other
+// mobs think too. It changes only the mob; the rest waits for apply.
+func (m *Mob) think(e *world.Entity) {
 	r := e.Region()
 	if r == nil || m.gone {
 		return
 	}
-	if m.s.checkVoid(e); m.gone || e.Region() == nil {
+	m.ended = m.m.Tick(r)
+}
+
+// apply does what the mob decided this tick, in the region's runtime ID order: its queued
+// effects, the void check and the move of its entity.
+func (m *Mob) apply(e *world.Entity) {
+	if e.Region() == nil || m.gone {
 		return
 	}
-	if m.m.Tick(r) {
+	m.m.Apply()
+	if m.ended {
 		m.remove(e)
 		return
 	}
-	if m.m.Dead() {
+	if m.s.checkVoid(e); m.gone || e.Region() == nil || m.m.Dead() {
 		return
 	}
 	b := m.m.Body()
@@ -198,12 +209,15 @@ func (p *Player) feet() mgl32.Vec3 {
 // Attack is the mob's melee hit on a player: its attack damage through the TakeHit
 // system, then a push away from the mob. BDS's difficulty scaling of mob damage and hits
 // on other mobs are not built yet.
-func (m *Mob) Attack(_ *mob.Mob, a behavior.Actor) (hit, killed bool) {
-	pa, ok := a.(playerActor)
-	if !ok || pa.p.dead() {
+func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
+	r := m.entity.Region()
+	if r == nil {
 		return false, false
 	}
-	p := pa.p
+	p, ok := m.s.entityByID(r, target).(*Player)
+	if !ok || p.entity == nil || p.dead() {
+		return false, false
+	}
 	h := NewHit(p, m.m.AttackDamage(), DamageSource{Cause: DamageEntityAttack})
 	if !p.s.game.sys.TakeHit(h) {
 		return false, false
@@ -310,20 +324,29 @@ func (p *Player) mobNear(id uint64) *Mob {
 
 // --- mob.Env ---
 
-// mobScratch is a region's buffer for entity scans of the mob runtime.
-type mobScratch struct{ list []*world.Entity }
-
-type mobScratchKey struct{}
-
-func scratch(r *world.Region) *mobScratch {
-	v, _ := r.Local(mobScratchKey{}, func() any { return &mobScratch{} }).(*mobScratch)
-	if v == nil {
-		return &mobScratch{}
-	}
-	return v
+// mobScratch is a buffer for entity scans of the mob runtime. Scans run while many mobs
+// think at once, so each takes its own from the Host's pool and gives it back.
+type mobScratch struct {
+	list []*world.Entity
+	pool *sync.Pool
 }
 
-// actorOf is the entity as the mob runtime sees it: players and mobs, nil for the rest.
+func (s *Host) scratch() *mobScratch {
+	if sc, ok := s.mobScratch.Get().(*mobScratch); ok {
+		return sc
+	}
+	return &mobScratch{pool: &s.mobScratch}
+}
+
+func (sc *mobScratch) done() {
+	clear(sc.list)
+	sc.list = sc.list[:0]
+	sc.pool.Put(sc)
+}
+
+// actorOf is the entity as the mob runtime sees it: players and mobs, nil for the rest. A
+// mob is its snapshot, since it may be thinking on another core; players do not change
+// while mobs think.
 func actorOf(e *world.Entity) behavior.Actor {
 	switch o := e.Owner().(type) {
 	case *Player:
@@ -332,8 +355,33 @@ func actorOf(e *world.Entity) behavior.Actor {
 		}
 	case *Mob:
 		if !o.gone {
-			return o.m
+			return o.m.Snapshot()
 		}
+	}
+	return nil
+}
+
+// entityByID is the owner of the entity with the unique ID in r, nil when there is none. It
+// scans the region: a per-region index is still to come.
+func (s *Host) entityByID(r *world.Region, id behavior.ID) any {
+	if id == behavior.NoID {
+		return nil
+	}
+	sc := s.scratch()
+	defer sc.done()
+	sc.list = r.AppendEntities(sc.list)
+	for _, e := range sc.list {
+		if behavior.ID(e.UniqueID()) == id {
+			return e.Owner()
+		}
+	}
+	return nil
+}
+
+// Mob is the mob with the unique ID in r, for the changes mobs make to each other.
+func (s *Host) Mob(r *world.Region, id behavior.ID) *mob.Mob {
+	if o, ok := s.entityByID(r, id).(*Mob); ok && !o.gone {
+		return o.m
 	}
 	return nil
 }
@@ -349,9 +397,9 @@ func (s *Host) Actor(r *world.Region, id behavior.ID) behavior.Actor {
 	if id == behavior.NoID {
 		return nil
 	}
-	sc := scratch(r)
-	sc.list = r.AppendEntities(sc.list[:0])
-	defer clear(sc.list)
+	sc := s.scratch()
+	defer sc.done()
+	sc.list = r.AppendEntities(sc.list)
 	for _, e := range sc.list {
 		if behavior.ID(e.UniqueID()) == id {
 			return actorOf(e)
@@ -362,10 +410,10 @@ func (s *Host) Actor(r *world.Region, id behavior.ID) behavior.Actor {
 
 // Entities appends the players and mobs whose boxes touch b.
 func (s *Host) Entities(r *world.Region, dst []behavior.Actor, self behavior.ID, b behavior.Box) []behavior.Actor {
-	sc := scratch(r)
+	sc := s.scratch()
+	defer sc.done()
 	// Look a little wider than b: entity positions are their feet or eyes, not their box.
-	sc.list = r.AppendEntitiesIn(sc.list[:0], b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
-	defer clear(sc.list)
+	sc.list = r.AppendEntitiesIn(sc.list, b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
 	for _, e := range sc.list {
 		a := actorOf(e)
 		if a == nil || a.ID() == self {
@@ -382,9 +430,9 @@ func (s *Host) Entities(r *world.Region, dst []behavior.Actor, self behavior.ID,
 // Players appends the players in r. Players in other regions of the dimension are too far
 // for any goal to reach.
 func (s *Host) Players(r *world.Region, dst []behavior.Actor) []behavior.Actor {
-	sc := scratch(r)
-	sc.list = r.AppendEntities(sc.list[:0])
-	defer clear(sc.list)
+	sc := s.scratch()
+	defer sc.done()
+	sc.list = r.AppendEntities(sc.list)
 	for _, e := range sc.list {
 		if p, ok := e.Owner().(*Player); ok && p.entity != nil {
 			dst = append(dst, playerActor{p})

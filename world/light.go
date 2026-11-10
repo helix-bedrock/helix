@@ -398,6 +398,13 @@ func (r *Region) lightChunk(pos cube.Pos) *Chunk {
 		return nil
 	}
 	cp := mcdb.ChunkPos{int32(pos[0] >> 4), int32(pos[2] >> 4)} //nolint:gosec // block X and Z fit int32 chunks
+	if r.parallel.Load() {
+		// Many goroutines read at once: no cache.
+		if c := r.chunks[cp]; c != nil && c.light != nil {
+			return c
+		}
+		return nil
+	}
 	w := r.light
 	if w.lastChunk != nil && w.lastPos == cp {
 		return w.lastChunk
@@ -667,8 +674,10 @@ func (r *Region) Light(pos cube.Pos) (sky, block uint8, ok bool) {
 	case pos[1] < r.d.r[0]:
 		return 0, 0, true
 	}
-	r.flushLight()
-	r.light.lastChunk = nil
+	if !r.parallel.Load() {
+		r.flushLight()
+		r.light.lastChunk = nil
+	}
 	sky, ok = r.lightAt(true, pos)
 	if !ok {
 		return 0, 0, false
@@ -688,7 +697,9 @@ func (r *Region) Height(x, z int) (int, bool) {
 	if !ok || c.light == nil {
 		return 0, false
 	}
-	r.flushLight()
+	if !r.parallel.Load() {
+		r.flushLight()
+	}
 	return int(c.light.height[x&15|(z&15)<<4]), true
 }
 

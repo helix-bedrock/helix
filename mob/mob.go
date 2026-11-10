@@ -83,10 +83,12 @@ func (rt *Runtime) Parse(typ string, raw json.RawMessage) error {
 // Has reports a parsed definition for typ.
 func (rt *Runtime) Has(typ string) bool { _, ok := rt.defs[typ]; return ok }
 
-// Hooks are what the engine does for one mob: its packets and its effects on others.
+// Hooks are what the engine does for one mob: its packets and its effects on others. They
+// run on the region's goroutine, never while mobs think.
 type Hooks interface {
-	// Attack is a melee hit on a; it reports a hit and whether a died.
-	Attack(m *Mob, a behavior.Actor) (hit, killed bool)
+	// Attack is a melee hit on the entity with the ID; it reports a hit and whether the
+	// entity died. It runs in the mob's Apply.
+	Attack(m *Mob, target behavior.ID) (hit, killed bool)
 	// Swing swings the mob's arm for those who see it.
 	Swing(m *Mob)
 	// Sound plays a level sound event at p.
@@ -96,7 +98,7 @@ type Hooks interface {
 }
 
 // Mob is one mob: its definition state, goals, navigation and body. It is used only from its
-// entity's tick.
+// entity's tick: Tick in the think phase, the rest on the region's goroutine.
 type Mob struct {
 	rt    *Runtime
 	hooks Hooks
@@ -137,6 +139,15 @@ type Mob struct {
 	swellDir                        int32
 	noActionTime                    int32
 
+	// rnd is the mob's own random, seeded from its ID, so what it draws does not depend on
+	// which mobs think on which core.
+	rnd *Random
+	// thinking is set during Tick: ops queue instead of running, flag changes wait for Apply.
+	thinking   bool
+	flagsDirty bool
+	ops        []op
+	snap       Snapshot
+
 	v view
 }
 
@@ -154,7 +165,8 @@ func (rt *Runtime) New(typ string, uniqueID int64, runtimeID uint64, pos behavio
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,
 	}
-	m.v = view{blocks: rt.Blocks, env: rt.Env}
+	m.rnd = NewRandom(uint64(uniqueID)) //nolint:gosec // the bits of the ID seed the random
+	m.v = view{blocks: rt.Blocks, env: rt.Env, rnd: m.rnd, m: m}
 	m.navigate.m = m
 	m.body = physics.Body{Pos: pos, PrevPos: pos, Yaw: yaw, SwimSpeed: 1, MaxAutoStep: defaultMaxAutoStep, AirSpeed: defaultAirSpeed, HasPhysics: true, JumpBoost: -1, Levitation: -1}
 	m.flags.Set(FlagHasGravity, true)
@@ -163,6 +175,7 @@ func (rt *Runtime) New(typ string, uniqueID int64, runtimeID uint64, pos behavio
 	m.flags.Set(FlagCanClimb, true)
 	m.inst = definition.New(def, m, method, "")
 	m.setSize(0.6, 1.8)
+	m.snapshot()
 	return m, nil
 }
 
@@ -210,13 +223,20 @@ func boxAt(p path.Vec3, w, h float32) path.Box {
 	return path.Box{Min: path.Vec3{X: p.X - w/2, Y: p.Y, Z: p.Z - w/2}, Max: path.Vec3{X: p.X + w/2, Y: p.Y + h, Z: p.Z + w/2}}
 }
 
-// Tick runs one tick of the mob on region r, in BDS's system order: the definition's pending
-// changes, the goal selector, navigation, the move control, the jump and look controls, the
-// movement pipeline and the body control. It reports whether the mob's death has ended and
-// it should be removed.
+// Tick runs the thinking half of one tick of the mob on region r, in BDS's system order: the
+// definition's pending changes, the goal selector, navigation, the move control, the jump and
+// look controls, the movement pipeline and the body control. It may run at the same time as
+// other mobs' Tick (see think.go); call Apply after it. It reports whether the mob's death has
+// ended and it should be removed.
 func (m *Mob) Tick(r *world.Region) (remove bool) {
 	m.v.r = r
-	m.v.rnd = regionRandom(r)
+	m.thinking = true
+	remove = m.think()
+	m.thinking = false
+	return remove
+}
+
+func (m *Mob) think() (remove bool) {
 	if m.inst.Changed() || m.inst.Components() == nil {
 		m.refresh()
 	}
@@ -276,7 +296,7 @@ func (m *Mob) refresh() {
 		}
 		goals.Apply(&m.sel)
 	})
-	m.hooks.FlagsChanged(m)
+	m.flagsChanged()
 }
 
 // readAttributes reads the attribute components the minimal hookup uses.
@@ -505,6 +525,7 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 		m.lastHurtBy, m.lastHurtTick = by, tick
 	}
 	m.noActionTime = 0
+	m.snapshot()
 	return dealt
 }
 
@@ -515,6 +536,9 @@ func (m *Mob) Knock(v behavior.Vec3) { m.body.Vel = v }
 func (m *Mob) SetPos(p behavior.Vec3) {
 	m.body.Pos, m.body.PrevPos = p, p
 	m.body.Box = boxAt(p, m.body.Width, m.body.Height)
+	if !m.thinking {
+		m.snapshot()
+	}
 }
 
 // Event runs a definition event on the mob.

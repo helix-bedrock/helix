@@ -85,6 +85,11 @@ type EntityConfig struct {
 	// Move returns the packet that moves the entity for the players who see
 	// it, built once per tick it moved; nil sends nothing.
 	Move func(e *Entity) packet.Packet
+	// Think runs every tick just before the input phase, for every entity at once: a crowded
+	// region spreads the calls over idle cores (Region.Parallel), so Think may only read the
+	// region and other entities and change the entity's own state. What it does to anything
+	// else it queues for Input, which applies it in runtime ID order. Mob AI thinks here.
+	Think func(e *Entity)
 	// Input runs every tick in the region's player input phase, entities
 	// in runtime ID order: a player handles the packets it queued here.
 	Input func(e *Entity)
@@ -462,12 +467,31 @@ func (r *Region) tickEntities() {
 			return rem
 		})
 	}
+	r.thinkers = r.thinkers[:0]
+	for _, e := range r.entities {
+		if e.conf.Think != nil {
+			r.thinkers = append(r.thinkers, e)
+		}
+	}
+	if len(r.thinkers) > 0 {
+		if r.thinkFn == nil {
+			r.thinkFn = r.think
+		}
+		r.Parallel(len(r.thinkers), r.thinkFn)
+		clear(r.thinkers)
+	}
 	// Input may move entities between chunks, never add or remove them.
 	for _, e := range r.entities {
 		if e.conf.Input != nil {
 			e.conf.Input(e)
 		}
 	}
+}
+
+// think runs the Think of the i-th thinking entity.
+func (r *Region) think(i int) {
+	e := r.thinkers[i]
+	e.conf.Think(e)
 }
 
 // removeEntity takes e out of the world and tells the players who see it.

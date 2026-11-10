@@ -104,27 +104,43 @@ func (t tester) Test(test *definition.Test) (pass, resolved bool) {
 	if a == nil {
 		return false, false
 	}
+	// The mob itself is read live; another mob through its snapshot, as it may be thinking
+	// on another core.
 	m, _ := a.(*Mob)
+	s, _ := a.(*Snapshot)
+	if m != nil {
+		s = nil
+	}
 	switch test.Name {
 	case "is_family":
 		v := rawString(test.Value)
 		return definition.CompareBool(test.Operator, slices.Contains(families(a), v), true), true
 	case "has_component":
-		if m == nil {
+		var comps definition.Group
+		switch {
+		case m != nil:
+			comps = m.inst.Components()
+		case s != nil:
+			comps = s.comps
+		default:
 			return false, true
 		}
-		_, has := m.inst.Components()[ns(rawString(test.Value))]
+		_, has := comps[ns(rawString(test.Value))]
 		return definition.CompareBool(test.Operator, has, rawBool(test.Value, true)), true
 	case "in_water", "in_water_or_rain":
-		return definition.CompareBool(test.Operator, m != nil && m.InWater(), rawBool(test.Value, true)), true
+		v := m != nil && m.InWater() || s != nil && s.inWater
+		return definition.CompareBool(test.Operator, v, rawBool(test.Value, true)), true
 	case "is_underwater":
-		return definition.CompareBool(test.Operator, m != nil && m.UnderWater(), rawBool(test.Value, true)), true
+		v := m != nil && m.UnderWater() || s != nil && s.underWater
+		return definition.CompareBool(test.Operator, v, rawBool(test.Value, true)), true
 	case "in_lava":
-		return definition.CompareBool(test.Operator, m != nil && m.InLava(), rawBool(test.Value, true)), true
+		v := m != nil && m.InLava() || s != nil && s.inLava
+		return definition.CompareBool(test.Operator, v, rawBool(test.Value, true)), true
 	case "on_ground":
-		return definition.CompareBool(test.Operator, m != nil && m.OnGround(), rawBool(test.Value, true)), true
+		v := m != nil && m.OnGround() || s != nil && s.onGround
+		return definition.CompareBool(test.Operator, v, rawBool(test.Value, true)), true
 	case "has_target":
-		return definition.CompareBool(test.Operator, m != nil && m.target != behavior.NoID, rawBool(test.Value, true)), true
+		return definition.CompareBool(test.Operator, a.Target() != behavior.NoID, rawBool(test.Value, true)), true
 	case "is_baby":
 		return definition.CompareBool(test.Operator, a.Flag(behavior.FlagBaby), rawBool(test.Value, true)), true
 	case "is_daytime":
@@ -133,11 +149,15 @@ func (t tester) Test(test *definition.Test) (pass, resolved bool) {
 		want, ok := difficulties[rawString(test.Value)]
 		return ok && definition.Compare(test.Operator, t.m.rt.Env.Difficulty(), want), true
 	case "actor_health":
-		if m == nil {
-			return false, true
+		switch {
+		case m != nil:
+			return definition.Compare(test.Operator, m.health, rawFloat(test.Value)), true
+		case s != nil:
+			return definition.Compare(test.Operator, s.health, rawFloat(test.Value)), true
 		}
-		return definition.Compare(test.Operator, m.health, rawFloat(test.Value)), true
+		return false, true
 	case "bool_property", "enum_property", "int_property", "float_property":
+		// Another mob's properties are not in its snapshot yet: those tests fail.
 		return t.property(test, m)
 	}
 	return false, true
@@ -167,6 +187,9 @@ var difficulties = map[string]int32{"peaceful": 0, "easy": 1, "normal": 2, "hard
 func families(a behavior.Actor) []string {
 	if m, ok := a.(*Mob); ok {
 		return m.families
+	}
+	if s, ok := a.(*Snapshot); ok {
+		return s.families
 	}
 	if a.IsPlayer() {
 		return []string{"player", "mob"}

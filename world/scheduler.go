@@ -27,6 +27,10 @@ type Scheduler struct {
 	clock atomic.Pointer[tickClock]
 	// panicked is told of a panic in a tick or a chunk job (SetPanicHandler).
 	panicked atomic.Pointer[PanicHandler]
+	// help hands a region's parallel phase to idle helpers (Region.Parallel).
+	help     chan *parallelJob
+	helpWG   sync.WaitGroup
+	helpOnce sync.Once
 }
 
 // PanicHandler is told of a panic the world recovered: what was panicked with and the stack.
@@ -87,6 +91,7 @@ func NewScheduler(n int) *Scheduler {
 	}
 	s := &Scheduler{wake: make(chan struct{}, 1), work: make(chan *Region), stop: make(chan struct{})}
 	s.SetCurrentTick(0)
+	s.startHelpers(n)
 	s.wg.Add(n + 1)
 	go s.dispatch()
 	for range n {
@@ -104,6 +109,7 @@ func NewScheduler(n int) *Scheduler {
 func (s *Scheduler) Close() {
 	s.once.Do(func() { close(s.stop) })
 	s.wg.Wait()
+	s.helpOnce.Do(s.stopHelpers)
 }
 
 // schedule queues r for its tick at r.next.

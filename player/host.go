@@ -158,6 +158,8 @@ type Host struct {
 	itemLifetime atomic.Int32
 	// mobs runs every mob from its entity definition.
 	mobs *mob.Runtime
+	// mobScratch holds the mob runtime's entity scan buffers (mobScratch).
+	mobScratch sync.Pool
 	// tuning is the live value of every Tune.
 	tuning atomic.Pointer[tuneTable]
 	wg     sync.WaitGroup

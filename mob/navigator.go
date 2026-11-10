@@ -4,7 +4,6 @@ import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/nav"
 	"github.com/helix-bedrock/entity/path"
-	"github.com/helix-bedrock/helix/world"
 )
 
 // navigator is the goals' Navigator over the mob's navigation component.
@@ -108,18 +107,4 @@ func (n *navigator) SetSpeed(s float32) {
 		nm := m.navMob()
 		m.nv.Follow(pathWorld{&m.v}, &nm, p, s)
 	}
-}
-
-// randomKey keys each region's mob random.
-type randomKey struct{}
-
-// regionRandom is r's random for mobs, so results do not depend on which core runs which
-// region.
-func regionRandom(r *world.Region) *Random {
-	v := r.Local(randomKey{}, func() any { return NewRandom(r.ID()) })
-	rnd, ok := v.(*Random)
-	if !ok {
-		return NewRandom(0)
-	}
-	return rnd
 }
