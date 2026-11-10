@@ -82,6 +82,10 @@ type moveState struct {
 	fall    float32
 	// velocity is the player's last movement, as knockback starts from it.
 	velocity mgl32.Vec3
+	// moved is how far the last movement took the player, BDS's
+	// PostTickPositionDeltaComponent. velocity is not that: a client stuck in a berry
+	// bush or cobweb sends 0 there while it still moves.
+	moved mgl32.Vec3
 	// climbing, inWater and onGround are what the last movement found.
 	climbing, inWater, onGround bool
 }

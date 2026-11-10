@@ -52,9 +52,11 @@ func (s *Host) contactOf(b uint32) contactBlock {
 	return contactNone
 }
 
-// tickContact deals the player its contact damage for what its box touches this tick. The
-// movement BDS checks for berry bushes is its posDelta; Helix takes the client's delta from its
-// last input. Runs: the player's region, once a tick.
+// tickContact deals the player its contact damage for what its box touches this tick. For a
+// player BDS's berry bush check (0xD4E0C70) reads PostTickPositionDeltaComponent, how far
+// its last movement took it, not its velocity, which the client keeps at 0 while stuck in
+// the bush. The client plays the bush's scratch sound (block.sweet_berry_bush.hurt) itself on
+// each hurt; BDS sends no sound for it. Runs: the player's region, once a tick.
 func (p *Player) tickContact(c burnContact) {
 	if p.invulnerable() {
 		return
@@ -62,7 +64,7 @@ func (p *Player) tickContact(c burnContact) {
 	switch c.contact {
 	case contactCactus:
 	case contactBerry:
-		v := p.move.velocity
+		v := p.move.moved
 		if abs32(v[0]) <= berryMoveLimit && abs32(v[2]) <= berryMoveLimit {
 			return
 		}

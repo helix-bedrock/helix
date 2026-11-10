@@ -229,6 +229,9 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		Pos: pos, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
 		OnGround: collided, Tick: pk.Tick,
 	})
+	if p.entity != nil {
+		p.move.moved = p.entity.Position().Sub(from)
+	}
 	if !p.dead() {
 		p.afterMove(from, collided)
 		if p.Gliding() && pk.InputData.Load(packet.InputFlagHorizontalCollision) && p.entity != nil {
