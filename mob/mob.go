@@ -144,6 +144,9 @@ type Mob struct {
 	despawned    bool
 	swellDir     int32
 	noActionTime int32
+	// moveSpeed is the speed the move control last chose (BDS's Mob::mSpeed), kept between
+	// ticks so walking speeds up a tenth at a time.
+	moveSpeed float32
 
 	// rnd is the mob's own random, seeded from its ID, so what it draws does not depend on
 	// which mobs think on which core.
@@ -429,7 +432,23 @@ func (m *Mob) moveControl() {
 		Pitch: m.pitch, Yaw: m.yaw, BodyYaw: m.bodyYaw, HeadYaw: m.headYaw, Flags: m.flags,
 		OnGround: m.body.OnGround, WasInWater: m.body.WasInWater, InWater: m.body.WasInWater,
 		MovementSpeed: m.speed, AirSpeed: m.body.AirSpeed, MaxAutoStep: m.body.MaxAutoStep,
+		Speed: m.moveSpeed, MoveSpeed: m.moveSpeed,
 		LocalMove: m.body.Input, Jump: &m.jump, Look: &m.look,
+		Eye: path.Vec3{X: m.body.Pos.X, Y: m.body.Pos.Y + m.eyeHeight(), Z: m.body.Pos.Z},
+	}
+	// The walking controls speed up towards the end of the path the mob follows (BDS's
+	// Mob::mSpeed and the navigation's last node); without them the speed stays 0.
+	var end path.Pos
+	if m.nv != nil {
+		if p, _ := m.nv.Path(); p != nil && len(p.Points) > 0 {
+			end = p.Points[len(p.Points)-1].Pos
+			b.PathEnd = &end
+		}
+	}
+	var target path.Vec3
+	if t := m.rt.Env.Actor(m.v.r, m.target); t != nil {
+		target = t.Pos()
+		b.Target = &target
 	}
 	switch m.movement.Name {
 	case "minecraft:movement.generic", "minecraft:movement.amphibious":
@@ -444,6 +463,12 @@ func (m *Mob) moveControl() {
 		move.Basic(&b, &m.ctl)
 	}
 	m.yaw, m.bodyYaw, m.pitch = b.Yaw, b.BodyYaw, b.Pitch
+	// SetSpeed keeps the new speed in Speed; a control that stops clears MoveSpeed.
+	if m.moveSpeed != 0 && b.MoveSpeed == 0 {
+		m.moveSpeed = 0
+	} else {
+		m.moveSpeed = b.Speed
+	}
 	m.body.Input = b.LocalMove
 	m.body.Vel = b.Vel
 	m.flags = b.Flags
