@@ -260,6 +260,9 @@ type regionCircuit struct {
 	recheck bool
 	// moving and found are kept to look for entities without allocating.
 	moving, found []*world.Entity
+	// run is r.Parallel, made once: separate circuits evaluate on idle cores in a crowded
+	// region, with the same result as one after another.
+	run redstone.Runner
 }
 
 // NewTicker returns a Ticker with BDS's conductivity.
@@ -320,7 +323,7 @@ func (t *Ticker) kind(block uint32) kind {
 // circuitOf returns r's circuit state. Runs: owner of the region.
 func (t *Ticker) circuitOf(r *world.Region) *regionCircuit {
 	v := r.Local(localKey{}, func() any {
-		return &regionCircuit{t: t, r: r, sys: redstone.New()}
+		return &regionCircuit{t: t, r: r, sys: redstone.New(), run: r.Parallel}
 	})
 	c, _ := v.(*regionCircuit)
 	return c
@@ -346,7 +349,7 @@ func (t *Ticker) BeforeBlockTicks(r *world.Region) {
 	t.entitiesOnPlates(c)
 	c.sys.UpdateDependencies(c)
 	if c.sys.Tick() {
-		c.sys.Evaluate(c)
+		c.sys.EvaluateParallel(c, c.run)
 	}
 }
 
