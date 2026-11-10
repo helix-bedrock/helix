@@ -254,6 +254,17 @@ func (f *FallingBlock) remove(e *world.Entity) {
 	e.Remove()
 }
 
+// BuildBox is its box: a falling block keeps blocks from being placed where it is, as BDS's
+// FallingBlockActor sets its blocks-building flag. A placed one waiting to go does not.
+func (f *FallingBlock) BuildBox() (lo, hi mgl32.Vec3, ok bool) {
+	if f.gone || f.landed || f.entity == nil {
+		return lo, hi, false
+	}
+	at := f.entity.Position()
+	half := mgl32.Vec3{fallingHalf, fallingHalf, fallingHalf}
+	return at.Sub(half), at.Add(half), true
+}
+
 // OutOfWorld removes it in the void.
 func (f *FallingBlock) OutOfWorld(_ *Host, e *world.Entity) { f.remove(e) }
 

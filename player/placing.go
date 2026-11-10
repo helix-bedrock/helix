@@ -286,7 +286,40 @@ func vanillaPlaceCheck(pl *Placement) bool {
 	// BDS tests the state it would place, not the item's: only a block with a
 	// collision box can be in the player's way, so a torch goes where it stands.
 	state, ok := p.s.game.sys.PlaceState(pl)
-	return ok && !p.inside(pl.Pos, state)
+	return ok && !p.inside(pl.Pos, state) && !p.s.obstructed(r, pl.Pos, state)
+}
+
+// BuildBlocker is an entity owner that keeps blocks from being placed where it is: BDS's
+// actor flag that mayPlace (sub_CE5DEE0) reads (Actor+620), set by falling blocks.
+type BuildBlocker interface {
+	// BuildBox is its box, false if it does not block now.
+	BuildBox() (lo, hi mgl32.Vec3, ok bool)
+}
+
+// obstructed reports whether an entity that blocks building is inside a collision box block
+// would have at pos, as BDS's mayPlace checks before it places. Runs: owner of the region.
+func (s *Host) obstructed(r *world.Region, pos cube.Pos, block uint32) bool {
+	boxes := s.reg.Blocks.Properties(block).Collision
+	if len(boxes) == 0 {
+		return false
+	}
+	bx, by, bz := float32(pos[0]), float32(pos[1]), float32(pos[2])
+	for _, e := range r.AppendEntitiesIn(nil, bx-1, bz-1, bx+2, bz+2) {
+		bb, ok := e.Owner().(BuildBlocker)
+		if !ok {
+			continue
+		}
+		lo, hi, ok := bb.BuildBox()
+		if !ok {
+			continue
+		}
+		for _, b := range boxes {
+			if hi[0] > bx+b[0] && lo[0] < bx+b[3] && hi[1] > by+b[1] && lo[1] < by+b[4] && hi[2] > bz+b[2] && lo[2] < bz+b[5] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Player hitbox, from its eye position: 0.6 wide, 1.8 tall, eyes at 1.62.
