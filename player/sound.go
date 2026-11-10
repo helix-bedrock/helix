@@ -24,6 +24,28 @@ func (s soundEvent) packet() *packet.LevelSoundEvent {
 	return &packet.LevelSoundEvent{SoundType: s.name, Position: s.pos, ExtraData: s.extra, EntityType: s.entity}
 }
 
+// handleLevelSoundEvent is a sound the client made itself, such as a sweet berry bush
+// rustling as the player moves through it. BDS 1.26.60's handler (0x8CDBF50, through
+// 0xCDD91F0 with no player left out) plays it as sent to every player near its position,
+// the sender too: the client does not play these itself but waits for the server's copy.
+// A global one goes to every player. Runs: the player's region.
+func handleLevelSoundEvent(p *Player, pk *packet.LevelSoundEvent) {
+	if p.entity == nil {
+		return
+	}
+	out := &packet.LevelSoundEvent{
+		SoundType: pk.SoundType, Position: pk.Position, ExtraData: pk.ExtraData, EntityType: pk.EntityType,
+		BabyMob: pk.BabyMob, DisableRelativeVolume: pk.DisableRelativeVolume,
+	}
+	if pk.DisableRelativeVolume {
+		p.s.Broadcast(out)
+		return
+	}
+	if r := p.entity.Region(); r != nil {
+		r.Broadcast(floorPos(pk.Position), out, nil)
+	}
+}
+
 // playSound plays s to every player near at, except the one given. Runs: owner of the
 // region.
 func playSound(r *world.Region, at cube.Pos, s soundEvent, except *world.Viewer) {
