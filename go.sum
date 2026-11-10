@@ -42,6 +42,8 @@ github.com/helix-bedrock/worldgen v0.0.0-20261109215558-6d9510ccc9d5 h1:NBDmzaYQ
 github.com/helix-bedrock/worldgen v0.0.0-20261109215558-6d9510ccc9d5/go.mod h1:399AIOdahsjlyeQrBtw7DzP01MyYkpmTn+J6ODjgmHA=
 github.com/helix-bedrock/worldgen v0.0.0-20261110170624-4314a294b3f0 h1:cO7EqYC3/pEC9zIuCCeNABVItqwLQm+aZMxQGZAAyx0=
 github.com/helix-bedrock/worldgen v0.0.0-20261110170624-4314a294b3f0/go.mod h1:399AIOdahsjlyeQrBtw7DzP01MyYkpmTn+J6ODjgmHA=
+github.com/helix-bedrock/worldgen v0.0.0-20261110170902-1fa4e544eb60 h1:MDgbtZQoEh6eiyWoY8TI6QzuzO3YcaKn9cKvPmUUs04=
+github.com/helix-bedrock/worldgen v0.0.0-20261110170902-1fa4e544eb60/go.mod h1:399AIOdahsjlyeQrBtw7DzP01MyYkpmTn+J6ODjgmHA=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
 github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
