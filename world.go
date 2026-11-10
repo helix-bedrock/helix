@@ -16,6 +16,7 @@ import (
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/farm"
+	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
@@ -163,7 +164,12 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
 		s.farm.SetSupport(attached.Supports)
 		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
-		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire)))))
+		falls, err := fall.New(s.reg.Blocks, attached.Supports)
+		if err != nil {
+			return err
+		}
+		s.falling = falls
+		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, fall.NewTicker(falls, s.startFalling, s.destroySnow, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire))))))
 		if err != nil {
 			return err
 		}
@@ -350,6 +356,21 @@ func (s *Server) Farm() *farm.Ticker { return s.farm }
 func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	if host := s.players.Load(); host != nil {
 		host.FallBlock(r, pos, block)
+	}
+}
+
+// startFalling turns a block into a falling block.
+func (s *Server) startFalling(r *world.Region, pos cube.Pos, block uint32) bool {
+	if host := s.players.Load(); host != nil {
+		return host.StartFalling(r, pos, block)
+	}
+	return false
+}
+
+// destroySnow removes a snow layer with nothing to lie on.
+func (s *Server) destroySnow(r *world.Region, pos cube.Pos, block uint32) {
+	if host := s.players.Load(); host != nil {
+		host.DestroySnow(r, pos, block)
 	}
 }
 

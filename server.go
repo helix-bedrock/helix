@@ -22,6 +22,7 @@ import (
 	"github.com/helix-bedrock/helix/commands"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/farm"
+	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/network"
@@ -206,6 +207,8 @@ type Server struct {
 	// fire is the vanilla fire ticker, nil when the config gave a BlockTicker.
 	fire *fire.Ticker
 	farm *farm.Ticker
+	// falling is the vanilla falling block rules, nil when the config gave a BlockTicker.
+	falling *fall.Table
 	// weather is the world's weather, chunkWeather the overworld's lightning, ice and snow.
 	weather      *weather.Weather
 	chunkWeather *weather.Ticker
@@ -339,6 +342,9 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 	host.SetClock(s.clock)
 	host.SetWeather(s.weather, s.chunkWeather)
+	if s.falling != nil {
+		host.SetFalling(s.falling)
+	}
 	s.players.Store(host)
 	if s.circuits != nil {
 		s.circuits.SetDispense(host.Dispense)

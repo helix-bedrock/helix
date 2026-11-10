@@ -161,6 +161,9 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	if id == nameTNT {
 		return s.loadTNT(r, at, saved)
 	}
+	if id == fallingBlockID {
+		return s.loadFallingBlock(r, at, saved)
+	}
 	if IsCartItem(id) {
 		return s.loadCart(r, at, saved, id)
 	}

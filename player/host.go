@@ -19,6 +19,7 @@ import (
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/farm"
+	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/network"
@@ -132,6 +133,8 @@ type Host struct {
 	// weather is the world's weather and chunkWeather what says where it rains; nil for none.
 	weather      *weather.Weather
 	chunkWeather *weather.Ticker
+	// falling is how falling blocks land; nil lands nothing. Set before any player joins.
+	falling *fall.Table
 	// fire is fire's ticker, which lightning asks where fire may go; nil sets none.
 	fire *fire.Ticker
 	// chests holds which blocks are chests and what lets them open.

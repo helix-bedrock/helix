@@ -213,6 +213,7 @@ type gameplay struct {
 	loomEv           listeners[LoomEvent]
 	shieldBannerEv   listeners[ShieldBannerEvent]
 	craftRepairEv    listeners[CraftRepairEvent]
+	blockFallEv      listeners[BlockFallEvent]
 	// banners is what banners and looms read.
 	banners *BannerTable
 	// motives are the paintings there are, in BDS's order.
@@ -271,6 +272,7 @@ type gameState struct {
 	loomEv           listeners[LoomEvent]
 	shieldBannerEv   listeners[ShieldBannerEvent]
 	craftRepairEv    listeners[CraftRepairEvent]
+	blockFallEv      listeners[BlockFallEvent]
 	// banners is what banners and looms read.
 	banners *BannerTable
 	// motives are the paintings there are, in BDS's order.
@@ -514,7 +516,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, glideEv: gs.glideEv, fireworkEv: gs.fireworkEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, banners: gs.banners, motives: slices.Clone(gs.motives),
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, tntPrimeEv: gs.tntPrimeEv, glideEv: gs.glideEv, fireworkEv: gs.fireworkEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, blockFallEv: gs.blockFallEv, banners: gs.banners, motives: slices.Clone(gs.motives),
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -557,6 +559,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.loomEv.freeze()
 	g.shieldBannerEv.freeze()
 	g.craftRepairEv.freeze()
+	g.blockFallEv.freeze()
 	g.chestPairEv.freeze()
 	g.chestSpillEv.freeze()
 	g.dropsEv.freeze()
