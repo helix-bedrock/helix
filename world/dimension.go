@@ -81,6 +81,9 @@ type Config struct {
 	// Weather runs on every ticking chunk before its random ticks, as BDS's chunk tick runs
 	// lightning, freezing and snow. Nil has no weather.
 	Weather WeatherTicker
+	// Spawner runs on every ticking chunk after its block ticks: BDS's natural mob spawner,
+	// which BDS 1.26.60 runs once per ticking chunk per tick. Nil spawns nothing.
+	Spawner ChunkSpawner
 	// ParallelMin is how many items a phase of Region.Parallel (mob AI and the like) needs
 	// before a crowded region spreads it over idle cores; 0 means DefaultParallelMin.
 	ParallelMin int

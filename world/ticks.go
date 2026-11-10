@@ -51,6 +51,12 @@ type RegionTicker interface {
 	RegionSplit(r, n *Region, in func(pos mcdb.ChunkPos) bool)
 }
 
+// ChunkSpawner is the natural mob spawner's part of a chunk's tick. Runs: owner of the region.
+type ChunkSpawner interface {
+	// SpawnTick runs on the chunk at pos once per world tick, after its block ticks.
+	SpawnTick(r *Region, pos mcdb.ChunkPos)
+}
+
 // WeatherTicker is weather's part of a chunk's tick (BDS's LevelChunk tick before its random
 // ticks: lightning, then freezing and snow, randomtickspeed times). Runs: owner of the region.
 type WeatherTicker interface {
@@ -381,6 +387,21 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
 		rt.ChunkTicked(r, pos)
 	}
+	if sp := r.d.conf.Spawner; sp != nil {
+		if _, ok := r.chunks[pos]; ok {
+			sp.SpawnTick(r, pos)
+		}
+	}
+}
+
+// ChunkTickedAt returns the world tick the chunk at pos last ticked in (-1 if it has not
+// ticked since it loaded), and false if the region does not hold it. Runs: owner.
+func (r *Region) ChunkTickedAt(pos mcdb.ChunkPos) (int64, bool) {
+	c, ok := r.chunks[pos]
+	if !ok {
+		return 0, false
+	}
+	return c.tickedAt, true
 }
 
 // randomTicks gives random blocks of c a random tick: speed times 2.5 per

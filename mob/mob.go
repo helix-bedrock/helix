@@ -154,6 +154,12 @@ type Mob struct {
 // New makes a mob of the type at pos. method is how it came to be (spawned, born, loaded),
 // which picks the event its definition runs first.
 func (rt *Runtime) New(typ string, uniqueID int64, runtimeID uint64, pos behavior.Vec3, yaw float32, hooks Hooks, method definition.InitMethod) (*Mob, error) {
+	return rt.NewWithEvent(typ, uniqueID, runtimeID, pos, yaw, hooks, method, "")
+}
+
+// NewWithEvent is New with the event a mob starts with when method is
+// definition.InitEvent, as an identifier such as minecraft:pillager<event> asks.
+func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, pos behavior.Vec3, yaw float32, hooks Hooks, method definition.InitMethod, initEvent string) (*Mob, error) {
 	def, ok := rt.defs[typ]
 	if !ok {
 		return nil, fmt.Errorf("mob: no definition for %s", typ)
@@ -173,7 +179,7 @@ func (rt *Runtime) New(typ string, uniqueID int64, runtimeID uint64, pos behavio
 	m.flags.Set(FlagCollision, true)
 	m.flags.Set(FlagBreathing, true)
 	m.flags.Set(FlagCanClimb, true)
-	m.inst = definition.New(def, m, method, "")
+	m.inst = definition.New(def, m, method, initEvent)
 	m.setSize(0.6, 1.8)
 	m.snapshot()
 	return m, nil
@@ -539,6 +545,17 @@ func (m *Mob) SetPos(p behavior.Vec3) {
 	if !m.thinking {
 		m.snapshot()
 	}
+}
+
+// Ready builds the mob from its definition before it is in the world, so its size,
+// attributes and flags are known: the natural spawner checks them before adding it. r is the
+// region it will join. Runs: owner of r.
+func (m *Mob) Ready(r *world.Region) {
+	m.v.r = r
+	if m.inst.Components() == nil {
+		m.refresh()
+	}
+	m.snapshot()
 }
 
 // Event runs a definition event on the mob.

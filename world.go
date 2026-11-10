@@ -89,6 +89,7 @@ func (s *Server) openWorld() error {
 		PVP: ldat.PVP, NaturalRegeneration: ldat.NaturalRegeneration,
 		TNTExplodes: ldat.TNTExplodes, TNTExplosionDropDecay: ldat.TNTExplosionDropDecay, DoTileDrops: ldat.DoTileDrops, GameRules: gameRules(ldat),
 		RespawnBlocksExplode: ldat.RespawnBlocksExplode, DoDayLightCycle: ldat.DoDayLightCycle, DoEntityDrops: ldat.DoEntityDrops, MobGriefing: ldat.MobGriefing,
+		DoMobSpawning: ldat.DoMobSpawning,
 		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
@@ -213,6 +214,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	climate, _ := conf.Generator.(weather.Climate)
 	s.chunkWeather = weather.NewTicker(weather.Config{Registry: s.reg, Weather: s.weather, Climate: climate, Strike: s.strike, Mobs: s.mobsIn})
 	conf.Weather = s.chunkWeather
+	conf.Spawner = mobSpawner{s}
 	if s.fire != nil {
 		s.fire.SetWeather(s.chunkWeather)
 	}
@@ -435,6 +437,17 @@ func (s *Server) broadcastLevelEvent(event, data int32) {
 func (s *Server) strike(r *world.Region, pos mgl32.Vec3) {
 	if h := s.players.Load(); h != nil {
 		h.Strike(r, pos)
+	}
+}
+
+// mobSpawner runs the players' natural mob spawner on every ticking chunk of every
+// dimension, once the players' Host exists.
+type mobSpawner struct{ s *Server }
+
+// SpawnTick is world.ChunkSpawner's. Runs: owner of the region.
+func (m mobSpawner) SpawnTick(r *world.Region, pos mcdb.ChunkPos) {
+	if h := m.s.players.Load(); h != nil {
+		h.SpawnTick(r, pos)
 	}
 }
 

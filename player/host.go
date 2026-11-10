@@ -59,6 +59,8 @@ type Level struct {
 	RespawnBlocksExplode, DoDayLightCycle bool
 	// MobGriefing is whether mobs may change blocks.
 	MobGriefing bool
+	// DoMobSpawning is whether mobs spawn on their own.
+	DoMobSpawning bool
 	// DoEntityDrops is whether broken entities such as cushions leave their item.
 	DoEntityDrops             bool
 	PlayersSleepingPercentage int32
@@ -158,6 +160,8 @@ type Host struct {
 	itemLifetime atomic.Int32
 	// mobs runs every mob from its entity definition.
 	mobs *mob.Runtime
+	// spawning is the natural mob spawner; nil when its data did not load.
+	spawning *spawning
 	// mobScratch holds the mob runtime's entity scan buffers (mobScratch).
 	mobScratch sync.Pool
 	// tuning is the live value of every Tune.
