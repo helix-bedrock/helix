@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/helix-bedrock/helix-data/data"
-	files "github.com/helix-bedrock/helix-data/data/1.26.60"
+	files "github.com/helix-bedrock/helix-data/data/files"
 	"github.com/helix-bedrock/protocol/nbt"
 )
 

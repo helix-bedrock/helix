@@ -18,6 +18,8 @@ github.com/helix-bedrock/helix-data v0.0.0-20261109221643-e813b8014461 h1:7uQw9Z
 github.com/helix-bedrock/helix-data v0.0.0-20261109221643-e813b8014461/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261109224058-b6d7ec83c1af h1:0mmcfUAwwtwUiAo9moFNNbuxQFROnrlD9AtqSQQTuYE=
 github.com/helix-bedrock/helix-data v0.0.0-20261109224058-b6d7ec83c1af/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
+github.com/helix-bedrock/helix-data v0.0.0-20261110171137-8dbf6f6c7041 h1:m8YQdejDcO9xa1sKezQ94EukTLJazk0TEKIkmGV+lcg=
+github.com/helix-bedrock/helix-data v0.0.0-20261110171137-8dbf6f6c7041/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/nethernet v0.0.0-20261105043613-c2b197a2afcc h1:tPg+wjeDMR8+7gy4OgLgRKbpDmkKJQ/uusI1ABWKb4U=
 github.com/helix-bedrock/nethernet v0.0.0-20261105043613-c2b197a2afcc/go.mod h1:VnXHxKcm+E0FTmpjyXwTMPweBUqZ/QNDRABUVjSwRRE=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41 h1:XTa1sWqYUCqhxDdAGL9+vldnHfNIR5/VascyZWb9qYg=
@@ -44,6 +46,8 @@ github.com/helix-bedrock/worldgen v0.0.0-20261110170624-4314a294b3f0 h1:cO7EqYC3
 github.com/helix-bedrock/worldgen v0.0.0-20261110170624-4314a294b3f0/go.mod h1:399AIOdahsjlyeQrBtw7DzP01MyYkpmTn+J6ODjgmHA=
 github.com/helix-bedrock/worldgen v0.0.0-20261110170902-1fa4e544eb60 h1:MDgbtZQoEh6eiyWoY8TI6QzuzO3YcaKn9cKvPmUUs04=
 github.com/helix-bedrock/worldgen v0.0.0-20261110170902-1fa4e544eb60/go.mod h1:399AIOdahsjlyeQrBtw7DzP01MyYkpmTn+J6ODjgmHA=
+github.com/helix-bedrock/worldgen v0.0.0-20261110171248-d206f661b151 h1:HP/N7+R9LZiFk2P/zjYEWxEYGYr7xKICWbnNGulirtE=
+github.com/helix-bedrock/worldgen v0.0.0-20261110171248-d206f661b151/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
 github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
