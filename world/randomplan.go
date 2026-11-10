@@ -75,6 +75,7 @@ func randomTickCount(top int, speed int32) int32 {
 }
 
 // planRandomTicks plans the random ticks of the chunks tickBlocks will tick, in its order.
+// now is the region pass (Region.ticks).
 func (r *Region) planRandomTicks(now int64, speed int32) {
 	r.plans = r.plans[:0]
 	if r.d.conf.Ticker == nil || speed <= 0 {

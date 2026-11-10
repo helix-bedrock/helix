@@ -192,9 +192,12 @@ type Chunk struct {
 	// positions of those that tick, in the order they came.
 	blockEntities   map[cube.Pos]BlockEntity
 	tickingEntities []cube.Pos
-	// tickedAt is the world tick the chunk last ticked in.
+	// tickedAt is the region pass (Region.ticks) the chunk last ticked in, neverTicked if it
+	// has not ticked since it loaded. It counts the region's own ticks, not the world tick:
+	// the world tick follows the wall clock, so a region tick that runs late would skip a
+	// number and every chunk would look unticked. Rebased when the chunk changes region.
 	tickedAt int64
-	// plannedAt is the world tick its random ticks were last planned for, plan their index
+	// plannedAt is the region pass its random ticks were last planned for, plan their index
 	// in Region.plans (randomplan.go).
 	plannedAt int64
 	plan      int

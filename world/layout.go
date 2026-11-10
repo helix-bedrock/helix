@@ -208,6 +208,12 @@ func (d *Dimension) absorb(dst, src *Region) {
 		dst.sections[s] = struct{}{}
 	}
 	clear(src.sections)
+	// Chunk tick stamps count the region's own ticks: move src's onto dst's count.
+	shift := int64(dst.ticks) - int64(src.ticks) //nolint:gosec // tick counts
+	for _, c := range src.chunks {
+		c.tickedAt += shift
+		c.plannedAt = -1
+	}
 	maps.Copy(dst.chunks, src.chunks)
 	for pos, n := range src.holds {
 		dst.holds[pos] += n
@@ -301,6 +307,8 @@ func (d *Dimension) split(r *Region) {
 	}
 	for _, g := range groups[1:] {
 		n := d.newRegion(r.next)
+		// The chunks keep their tick stamps, so the new region counts on from r.
+		n.ticks = r.ticks
 		in := func(pos mcdb.ChunkPos) bool { _, ok := g[d.sectionOf(pos)]; return ok }
 		for s := range g {
 			d.sections[s] = n

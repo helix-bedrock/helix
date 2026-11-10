@@ -5,6 +5,7 @@ import (
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
+	"math"
 	"slices"
 )
 
@@ -347,15 +348,16 @@ func (r *Region) runQueue(c *Chunk, q *tickQueue, now int64) {
 // of the tickets.
 func (r *Region) tickBlocks() {
 	now := r.d.sched.CurrentTick()
+	pass := int64(r.ticks) //nolint:gosec // a tick count
 	speed := r.d.randomTickSpeed.Load()
-	r.planRandomTicks(now, speed)
+	r.planRandomTicks(pass, speed)
 	defer clear(r.plans)
 	for _, v := range r.viewers {
 		if v.lastRadius < 0 {
 			continue
 		}
 		for _, pos := range v.scratch {
-			r.tickChunk(pos, now, speed)
+			r.tickChunk(pos, now, pass, speed)
 		}
 	}
 	for _, h := range r.tickets {
@@ -363,18 +365,23 @@ func (r *Region) tickBlocks() {
 			continue
 		}
 		for _, pos := range h.chunks {
-			r.tickChunk(pos, now, speed)
+			r.tickChunk(pos, now, pass, speed)
 		}
 	}
 }
 
-// tickChunk gives the chunk at pos its block ticks, once per world tick.
-func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
+// neverTicked is a chunk's tickedAt before its first tick, far enough below any pass that
+// rebasing it between regions cannot make it look recent.
+const neverTicked = math.MinInt64 / 2
+
+// tickChunk gives the chunk at pos its block ticks, once per region pass. now is the world
+// tick the queues run by.
+func (r *Region) tickChunk(pos mcdb.ChunkPos, now, pass int64, speed int32) {
 	c, ok := r.chunks[pos]
-	if !ok || c.tickedAt == now {
+	if !ok || c.tickedAt == pass {
 		return
 	}
-	c.tickedAt = now
+	c.tickedAt = pass
 	if c.col.Finalisation == chunk.FinalisationNeedsPopulation {
 		// BDS's LevelChunk tick: a chunk that needs population gets the spawner's
 		// post-process spawn before anything else ticks, then counts as done.
@@ -393,7 +400,7 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 			return
 		}
 	}
-	if !r.runPlannedTicks(c, now, speed) {
+	if !r.runPlannedTicks(c, pass, speed) {
 		r.randomTicks(c, speed)
 	}
 	r.runQueue(c, &c.ticks, now)
@@ -409,14 +416,16 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 	}
 }
 
-// ChunkTickedAt returns the world tick the chunk at pos last ticked in (-1 if it has not
-// ticked since it loaded), and false if the region does not hold it. Runs: owner.
-func (r *Region) ChunkTickedAt(pos mcdb.ChunkPos) (int64, bool) {
+// ChunkTicked reports whether the chunk at pos ticked in this region's current or previous
+// tick (BDS's ticking chunk: anything that runs before the block ticks of this tick sees the
+// last tick's), and loaded false if the region does not hold it. It counts the region's own
+// ticks, so a late tick never makes chunks look unticked. Runs: owner, or a parallel think.
+func (r *Region) ChunkTicked(pos mcdb.ChunkPos) (recent, loaded bool) {
 	c, ok := r.chunks[pos]
 	if !ok {
-		return 0, false
+		return false, false
 	}
-	return c.tickedAt, true
+	return c.tickedAt >= int64(r.ticks)-1, true //nolint:gosec // a tick count
 }
 
 // randomTicks gives random blocks of c a random tick: speed times 2.5 per

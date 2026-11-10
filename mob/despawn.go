@@ -76,7 +76,7 @@ func (c despawnChunks) Loaded(p behavior.Pos, n int32) bool {
 	cx, cz := p.X>>4, p.Z>>4
 	for x := cx - n; x <= cx+n; x++ {
 		for z := cz - n; z <= cz+n; z++ {
-			if _, ok := r.ChunkTickedAt(mcdb.ChunkPos{x, z}); !ok {
+			if _, ok := r.ChunkTicked(mcdb.ChunkPos{x, z}); !ok {
 				return false
 			}
 		}
@@ -91,11 +91,10 @@ func (c despawnChunks) UntickedNeighbour(p behavior.Pos, n int32) bool {
 	if r == nil {
 		return false
 	}
-	now := r.CurrentTick()
 	cx, cz := p.X>>4, p.Z>>4
 	for x := cx - n; x <= cx+n; x++ {
 		for z := cz - n; z <= cz+n; z++ {
-			if at, ok := r.ChunkTickedAt(mcdb.ChunkPos{x, z}); !ok || at < now-1 {
+			if recent, _ := r.ChunkTicked(mcdb.ChunkPos{x, z}); !recent {
 				return true
 			}
 		}

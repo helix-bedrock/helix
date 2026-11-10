@@ -430,7 +430,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
 	}
-	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1, plannedAt: -1, light: light}
+	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: neverTicked, plannedAt: -1, light: light}
 	c.ticks.load(col.ScheduledBlocks, col.Tick)
 	c.ticks.rebase(r.d.sched.CurrentTick())
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)

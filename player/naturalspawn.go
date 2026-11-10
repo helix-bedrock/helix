@@ -127,7 +127,7 @@ func (s *Host) regionSpawn(r *world.Region) *regionSpawn {
 		return nil
 	}
 	rg := r.Dimension().Range()
-	rs.w = spawnWorld{s: s, sg: sg, r: r, d: r.Dimension(), now: now, minY: int32(rg[0]), maxY: int32(rg[1]) + 1, rnd: &rs.rnd, list: rs.w.list}
+	rs.w = spawnWorld{s: s, sg: sg, r: r, d: r.Dimension(), minY: int32(rg[0]), maxY: int32(rg[1]) + 1, rnd: &rs.rnd, list: rs.w.list}
 	return rs
 }
 
@@ -178,7 +178,6 @@ type spawnWorld struct {
 	sg         *spawning
 	r          *world.Region
 	d          *world.Dimension
-	now        int64
 	minY, maxY int32
 	rnd        *spawnRand
 	list       []*world.Entity
@@ -210,13 +209,13 @@ func (w *spawnWorld) Light(p path.Pos) (sky, block uint8) {
 }
 
 func (w *spawnWorld) Loaded(p path.Pos) bool {
-	_, ok := w.r.ChunkTickedAt(mcdb.ChunkPos{p.X >> 4, p.Z >> 4})
+	_, ok := w.r.ChunkTicked(mcdb.ChunkPos{p.X >> 4, p.Z >> 4})
 	return ok
 }
 
 func (w *spawnWorld) TickedRecently(cx, cz int32) bool {
-	at, ok := w.r.ChunkTickedAt(mcdb.ChunkPos{cx, cz})
-	return ok && at >= w.now-1
+	recent, _ := w.r.ChunkTicked(mcdb.ChunkPos{cx, cz})
+	return recent
 }
 
 // NearestPlayer finds the nearest player of the region, by its eye position as BDS keeps a
