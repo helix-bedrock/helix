@@ -532,22 +532,29 @@ func (s *Host) clipSweep(r *world.Region, lo, hi mgl32.Vec3, axis int, d float32
 	return d
 }
 
+// clipSkin is how far a box may overlap a block's box and still count as touching it.
+// Entities keep their centre, so the box worked out from it is off by float32 rounding:
+// TNT lit on a block with its top at y=64 has feet at 63.999996, inside the block,
+// which would then not stop it and it fell through.
+const clipSkin = 1e-3
+
 // clipBox shortens d if the box lo..hi moving along axis hits box, a block's
-// collision box at origin. A box it is already inside does not stop it.
+// collision box at origin. A box it is already inside, by more than clipSkin, does
+// not stop it.
 func clipBox(lo, hi, origin mgl32.Vec3, box registry.Box, axis int, d float32) float32 {
 	for n := range 3 {
-		if n != axis && (hi[n] <= origin[n]+box[n] || lo[n] >= origin[n]+box[n+3]) {
+		if n != axis && (hi[n] <= origin[n]+box[n]+clipSkin || lo[n] >= origin[n]+box[n+3]-clipSkin) {
 			return d
 		}
 	}
 	if d > 0 {
-		if gap := origin[axis] + box[axis] - hi[axis]; gap >= 0 && gap < d {
-			return gap
+		if gap := origin[axis] + box[axis] - hi[axis]; gap >= -clipSkin && gap < d {
+			return max(gap, 0)
 		}
 		return d
 	}
-	if gap := origin[axis] + box[axis+3] - lo[axis]; gap <= 0 && gap > d {
-		return gap
+	if gap := origin[axis] + box[axis+3] - lo[axis]; gap <= clipSkin && gap > d {
+		return min(gap, 0)
 	}
 	return d
 }
