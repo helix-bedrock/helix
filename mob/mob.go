@@ -175,6 +175,9 @@ type Mob struct {
 	sensorComps  definition.Group
 	swellDir     int32
 	noActionTime int32
+	// scale is minecraft:scale's value, the size the client draws the mob at (a rabbit 0.6,
+	// babies their group's own).
+	scale float32
 	// moveSpeed is the speed the move control last chose (BDS's Mob::mSpeed), kept between
 	// ticks so walking speeds up a tenth at a time.
 	moveSpeed float32
@@ -240,6 +243,14 @@ func (m *Mob) Flags() *path.ActorFlags { return &m.flags }
 // Rotation is the mob's pitch, yaw, head yaw and body yaw.
 func (m *Mob) Rotation() (pitch, yaw, headYaw, bodyYaw float32) {
 	return m.pitch, m.yaw, m.headYaw, m.bodyYaw
+}
+
+// Scale is the size the client draws the mob at, from minecraft:scale (1 without it).
+func (m *Mob) Scale() float32 {
+	if m.scale <= 0 {
+		return 1
+	}
+	return m.scale
 }
 
 // Size is the mob's collision width and height.
@@ -342,6 +353,10 @@ func (m *Mob) refresh() {
 		}
 		ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
 		m.readStates(ctx, comps)
+		m.scale = 1
+		if m.states != nil && m.states.Scale != nil {
+			m.scale = m.states.Scale.Value
+		}
 		m.readSensors(ctx, comps)
 		goals, warnings := m.rt.Goals.Build(ctx, order, comps)
 		for _, w := range warnings {

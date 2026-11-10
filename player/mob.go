@@ -128,7 +128,7 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyFlags:    int64(f[0]), //nolint:gosec // a bit set sent as int64
 		protocol.EntityDataKeyFlagsTwo: int64(f[1]), //nolint:gosec // a bit set sent as int64
 		protocol.EntityDataKeyWidth:    w, protocol.EntityDataKeyHeight: h,
-		protocol.EntityDataKeyScale:     float32(1),
+		protocol.EntityDataKeyScale:     m.m.Scale(),
 		protocol.EntityDataKeyAirSupply: air, protocol.EntityDataKeyAirSupplyMax: maxAir,
 	}
 }
