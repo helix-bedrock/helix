@@ -246,8 +246,9 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 		return t.hangingSignHeld(r, pos, block)
 	}
 	if isFrame(name) {
-		holder, ok := t.frameHolder(pos, block)
-		return ok && t.solidMaterial(r, holder)
+		// ItemFrameBlock's mayPlace reads the face clicked, not the state: the state handed
+		// in is still the item's default.
+		return t.solidMaterial(r, pos.Side(clicked.Opposite()))
 	}
 	if name == tripwireHook {
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
