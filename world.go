@@ -451,6 +451,13 @@ func (m mobSpawner) SpawnTick(r *world.Region, pos mcdb.ChunkPos) {
 	}
 }
 
+// PopulationSpawn is world.ChunkSpawner's. Runs: owner of the region.
+func (m mobSpawner) PopulationSpawn(r *world.Region, pos mcdb.ChunkPos) {
+	if h := m.s.players.Load(); h != nil {
+		h.PopulationSpawn(r, pos)
+	}
+}
+
 // mobsIn finds what lightning may strike in a chunk.
 func (s *Server) mobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl32.Vec3) []mgl32.Vec3 {
 	if h := s.players.Load(); h != nil {

@@ -89,16 +89,34 @@ type regionSpawnKey struct{}
 // SpawnTick runs the natural spawner on a ticking chunk, BDS's spawner tick for one chunk.
 // Runs: owner of the region.
 func (s *Host) SpawnTick(r *world.Region, pos mcdb.ChunkPos) {
+	if rs := s.regionSpawn(r); rs != nil {
+		rs.st.TickChunk(&rs.w, &rs.lv, &rs.rnd, pos[0], pos[1])
+		rs.done()
+	}
+}
+
+// PopulationSpawn gives a newly generated chunk its first herd, BDS's post-process spawn.
+// Runs: owner of the region.
+func (s *Host) PopulationSpawn(r *world.Region, pos mcdb.ChunkPos) {
+	if rs := s.regionSpawn(r); rs != nil {
+		rs.st.PostProcess(&rs.w, &rs.lv, &rs.rnd, pos[0], pos[1])
+		rs.done()
+	}
+}
+
+// regionSpawn readies the region's spawner state for one call this tick, nil when nothing
+// may spawn.
+func (s *Host) regionSpawn(r *world.Region) *regionSpawn {
 	sg := s.spawning
 	if sg == nil || s.mobs == nil {
-		return
+		return nil
 	}
 	rs, ok := r.Local(regionSpawnKey{}, func() any {
 		seed := uint64(s.level.Seed) ^ r.ID() //nolint:gosec // seed bits
 		return &regionSpawn{st: sg.sp.NewState(), rnd: spawnRand{rand.New(rand.NewPCG(seed, r.ID()))}, tick: -1}
 	}).(*regionSpawn)
 	if !ok {
-		return
+		return nil
 	}
 	now := r.CurrentTick()
 	if rs.tick != now {
@@ -106,11 +124,15 @@ func (s *Host) SpawnTick(r *world.Region, pos mcdb.ChunkPos) {
 		s.fillSpawnLevel(r, &rs.lv)
 	}
 	if !rs.lv.MobSpawning {
-		return
+		return nil
 	}
 	rg := r.Dimension().Range()
 	rs.w = spawnWorld{s: s, sg: sg, r: r, d: r.Dimension(), now: now, minY: int32(rg[0]), maxY: int32(rg[1]) + 1, rnd: &rs.rnd, list: rs.w.list}
-	rs.st.TickChunk(&rs.w, &rs.lv, &rs.rnd, pos[0], pos[1])
+	return rs
+}
+
+// done drops the entity pointers the call collected.
+func (rs *regionSpawn) done() {
 	clear(rs.w.list)
 	rs.w.list = rs.w.list[:0]
 }
@@ -123,6 +145,7 @@ func (s *Host) fillSpawnLevel(r *world.Region, lv *spawn.Level) {
 		Time:        r.CurrentTick(),
 		SkyDarken:   uint8(min(max(s.SkyDarken(r), 0), 15)), //nolint:gosec // clamped
 		Rain:        s.Rain(r), Thunder: s.Thunder(r),
+		TickRange: r.Dimension().SimulationDistance(),
 	}
 	if s.clock != nil {
 		lv.DayTime = int64(s.clock.Time())

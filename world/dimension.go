@@ -421,7 +421,9 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			d.log.Error("load chunk", "pos", pos, "err", err)
 		}
 		discard = !errors.Is(err, mcdb.ErrNotFound) || d.conf.DiscardGenerated
-		col = &chunk.Column{Chunk: chunk.New(d.conf.Blocks, d.r), Finalisation: chunk.DefaultFinalisation()}
+		// A generated chunk still needs its population (BDS's finalisation 1): its first tick
+		// gives it its first mobs, then marks it done.
+		col = &chunk.Column{Chunk: chunk.New(d.conf.Blocks, d.r), Finalisation: chunk.FinalisationNeedsPopulation}
 		if err := d.generate(pos, col); err != nil {
 			d.log.Error("generate chunk", "pos", pos, "err", err)
 		}

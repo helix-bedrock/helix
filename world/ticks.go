@@ -55,6 +55,9 @@ type RegionTicker interface {
 type ChunkSpawner interface {
 	// SpawnTick runs on the chunk at pos once per world tick, after its block ticks.
 	SpawnTick(r *Region, pos mcdb.ChunkPos)
+	// PopulationSpawn runs once on a newly generated chunk, on its first tick: the herd
+	// BDS's post-process spawn gives it.
+	PopulationSpawn(r *Region, pos mcdb.ChunkPos)
 }
 
 // WeatherTicker is weather's part of a chunk's tick (BDS's LevelChunk tick before its random
@@ -372,6 +375,18 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 		return
 	}
 	c.tickedAt = now
+	if c.col.Finalisation == chunk.FinalisationNeedsPopulation {
+		// BDS's LevelChunk tick: a chunk that needs population gets the spawner's
+		// post-process spawn before anything else ticks, then counts as done.
+		c.col.Finalisation = chunk.FinalisationDone
+		c.dirty = true
+		if sp := r.d.conf.Spawner; sp != nil {
+			sp.PopulationSpawn(r, pos)
+			if c, ok = r.chunks[pos]; !ok {
+				return
+			}
+		}
+	}
 	if w := r.d.conf.Weather; w != nil {
 		w.ChunkWeather(r, pos, speed)
 		if c, ok = r.chunks[pos]; !ok {
