@@ -61,11 +61,27 @@ type Runtime struct {
 	// parser reads definitions; parsed definitions are cached by type.
 	parser *definition.Parser
 	defs   map[string]*definition.Definition
+	// sounds are the level sound events' numbers by name (soundevents_gen.go).
+	sounds map[string]int
 }
 
 // NewRuntime returns a runtime with vanilla's goals.
 func NewRuntime(b *Blocks, env Env, log *slog.Logger) *Runtime {
-	return &Runtime{Blocks: b, Env: env, Goals: component.Vanilla(), Log: log, parser: definition.NewParser(), defs: map[string]*definition.Definition{}}
+	rt := &Runtime{Blocks: b, Env: env, Goals: component.Vanilla(), Log: log, parser: definition.NewParser(), defs: map[string]*definition.Definition{}, sounds: map[string]int{}}
+	for n, name := range soundEvents {
+		if name != "" {
+			rt.sounds[name] = n
+		}
+	}
+	return rt
+}
+
+// SoundName is the name of a level sound event number, "" for none.
+func SoundName(n int) string {
+	if n < 0 || n >= len(soundEvents) || n == behavior.NoSound {
+		return ""
+	}
+	return soundEvents[n]
 }
 
 // Parse reads and caches the definition of an entity type. Call it at boot for every type,

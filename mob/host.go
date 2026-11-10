@@ -3,6 +3,7 @@ package mob
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/helix-bedrock/entity/behavior"
@@ -38,16 +39,26 @@ func (m *Mob) Trigger(t *definition.Trigger, ctx definition.Tester, g *definitio
 	}
 }
 
-// Molang is not hooked up: property defaults written in Molang keep their type's zero.
-func (m *Mob) Molang(string, definition.Tester) (definition.Value, bool) {
-	return definition.Value{}, false
+// Molang answers only number constants: property defaults written as query expressions keep
+// their type's zero.
+func (m *Mob) Molang(expr string, _ definition.Tester) (definition.Value, bool) {
+	v, err := strconv.ParseFloat(strings.TrimSpace(expr), 32)
+	if err != nil {
+		return definition.Value{}, false
+	}
+	return definition.Value{Number: float32(v)}, true
 }
 
 // resolver is the component.Resolver of one mob.
 type resolver struct{ m *Mob }
 
-// Sound has no sound table yet: goals play no sounds.
-func (resolver) Sound(string) int { return behavior.NoSound }
+// Sound is a level sound event's number by name, as BDS 1.26.60 numbers them.
+func (r resolver) Sound(name string) int {
+	if n, ok := r.m.rt.sounds[strings.TrimPrefix(name, "minecraft:")]; ok {
+		return n
+	}
+	return behavior.NoSound
+}
 
 // DamageCause names BDS's actor damage causes the goals use.
 func (resolver) DamageCause(name string) (int, bool) {
@@ -74,10 +85,33 @@ func (r resolver) Tester(self, other behavior.Actor, pos *behavior.Pos) definiti
 	return t
 }
 
-// HoldsItem is not hooked up yet: tempt and the other item goals never see their item.
-func (resolver) HoldsItem(behavior.Actor, []string) bool { return false }
+// HoldsItem reports a player holding one of the items in its main hand or offhand, for tempt
+// and the other goals that follow an item. Mobs hold nothing yet.
+func (resolver) HoldsItem(a behavior.Actor, items []string) bool {
+	p, ok := a.(PlayerInfo)
+	if !ok {
+		return false
+	}
+	var buf [2]string
+	held := p.Equipment("main_hand", buf[:0])
+	held = p.Equipment("offhand", held)
+	for _, h := range held {
+		if slices.ContainsFunc(items, func(d string) bool { return ns(d) == h }) {
+			return true
+		}
+	}
+	return false
+}
 
-func (resolver) Molang(string) (func(behavior.Mob) float32, bool) { return nil, false }
+// Molang answers only number constants; query expressions are not hooked up.
+func (resolver) Molang(expr string) (func(behavior.Mob) float32, bool) {
+	v, err := strconv.ParseFloat(strings.TrimSpace(expr), 32)
+	if err != nil {
+		return nil, false
+	}
+	f := float32(v)
+	return func(behavior.Mob) float32 { return f }, true
+}
 
 func (m *Mob) tester(other behavior.Actor) tester { return tester{m: m, self: m, other: other} }
 

@@ -263,9 +263,14 @@ func (m *Mob) Swing(*mob.Mob) {
 	m.entity.Send(&packet.Animate{ActionType: packet.AnimateActionSwingArm, EntityRuntimeID: m.entity.RuntimeID()})
 }
 
-// Sound plays nothing yet: goals name sounds by number and there is no table to
-// LevelSoundEvent names.
-func (m *Mob) Sound(*mob.Mob, int, behavior.Vec3) {}
+// Sound plays a level sound event the mob made, for those who see it.
+func (m *Mob) Sound(_ *mob.Mob, n int, at behavior.Vec3) {
+	name := mob.SoundName(n)
+	if name == "" || m.entity == nil || m.entity.Region() == nil {
+		return
+	}
+	m.entity.Send(soundEvent{name: name, pos: mglVec(at), extra: -1, entity: m.m.Type()}.packet())
+}
 
 // ActorEvent sends an actor event about the mob to those who see it.
 func (m *Mob) ActorEvent(_ *mob.Mob, id int) {
