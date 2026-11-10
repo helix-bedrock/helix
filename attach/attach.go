@@ -245,6 +245,10 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	if isHangingSign(name) {
 		return t.hangingSignHeld(r, pos, block)
 	}
+	if isFrame(name) {
+		holder, ok := t.frameHolder(pos, block)
+		return ok && t.solidMaterial(r, holder)
+	}
 	if name == tripwireHook {
 		b, ok := r.Block(pos.Side(clicked.Opposite()), 0)
 		return ok && !direction.Vertical(clicked) && t.Supports(b, clicked)
@@ -414,6 +418,10 @@ func (t *Table) survives(r *world.Region, pos, from cube.Pos, block uint32) bool
 		holder, ok := t.bannerHolder(pos, block)
 		return from != holder || !loaded(r, holder) || (ok && t.solidMaterial(r, holder))
 	}
+	if isFrame(t.blocks.Name(block)) {
+		holder, ok := t.frameHolder(pos, block)
+		return !ok || from != holder || !loaded(r, holder) || t.solidMaterial(r, holder)
+	}
 	if isHangingSign(t.blocks.Name(block)) {
 		above := pos.Side(cube.FaceUp)
 		return from != above || !loaded(r, above) || t.hangingSignHeld(r, pos, block)
@@ -470,6 +478,20 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		return
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
+}
+
+// isFrame reports whether name is an item frame or a glow item frame.
+func isFrame(name string) bool { return name == "minecraft:frame" || name == "minecraft:glow_frame" }
+
+// frameHolder is the block an item frame hangs on, as ItemFrameBlock's mayPlace and
+// neighbourChanged find it: the one behind it, away from where it faces. It needs solid
+// material.
+func (t *Table) frameHolder(pos cube.Pos, block uint32) (cube.Pos, bool) {
+	f := stateInt(t.blocks.States(block), "facing_direction")
+	if f < int(cube.FaceDown) || f > int(cube.FaceEast) {
+		return cube.Pos{}, false
+	}
+	return pos.Side(cube.Face(f).Opposite()), true
 }
 
 // isSign reports whether name is a standing or wall sign, which SignBlock's canSurvive holds

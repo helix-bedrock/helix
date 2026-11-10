@@ -240,7 +240,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 // it. True if the block broke at once (creative, or a block with no break
 // time).
 func (p *Player) startBreak(r *world.Region, pos cube.Pos, face int32) bool {
-	if p.inReach(pos) && p.putOutFire(r, pos, face) {
+	if p.inReach(pos) && (p.putOutFire(r, pos, face) || p.punchFrame(r, pos)) {
 		p.stopBreak()
 		return false
 	}

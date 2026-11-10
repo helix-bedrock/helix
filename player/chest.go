@@ -302,6 +302,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if isBannerBlock(e.s.reg.Blocks.Name(block)) {
 		return &bannerEntity{}
 	}
+	if name := e.s.reg.Blocks.Name(block); isFrameBlock(name) {
+		return e.s.newFrame(name == glowFrameBlock)
+	}
 	if name := e.s.reg.Blocks.Name(block); isSignBlock(name) {
 		return newSignEntity(isHangingSignName(name))
 	}
@@ -327,6 +330,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == bannerEntityID {
 		return e.s.loadBanner(saved), true
+	}
+	if id == frameEntityID || id == glowFrameEntityID {
+		return e.s.loadFrame(saved, id == glowFrameEntityID), true
 	}
 	if id == signEntityID || id == hangingSignEntityID {
 		return loadSign(saved), true

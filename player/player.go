@@ -105,6 +105,8 @@ type Player struct {
 	reseatTicks int32
 	window      windowState
 	using       usingState
+	// cooldowns are the item cooldowns running: the tick each category ends.
+	cooldowns map[string]int64
 	// pearlReady is the tick the player may throw an ender pearl again.
 	pearlReady int64
 	// thrownAt is the tick the player last threw something.

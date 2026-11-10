@@ -187,6 +187,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 	if held.Name == nameFireworkRocket {
 		return p.useFirework(held)
 	}
+	if held.Name == nameGoatHorn {
+		return p.useGoatHorn(held)
+	}
 	if held.Name == nameBow {
 		if !p.mayDrawBow(held) {
 			return false

@@ -77,6 +77,9 @@ const (
 	signalDetectorRail
 	// signalEntity is what its block entity says.
 	signalEntity
+	// signalFrame is an item frame's block entity, read only when the frame faces the way the
+	// comparator reads.
+	signalFrame
 )
 
 // Sizes of the containers a comparator reads.
@@ -111,7 +114,9 @@ func signalOf(name string) signal {
 		return signalDetectorRail
 	case nameJukebox, nameCrafter:
 		return signalEntity
-	case "minecraft:lectern", "minecraft:frame", "minecraft:glow_frame",
+	case "minecraft:frame", "minecraft:glow_frame":
+		return signalFrame
+	case "minecraft:lectern",
 		"minecraft:command_block", "minecraft:chain_command_block",
 		"minecraft:repeating_command_block", "minecraft:creaking_heart",
 		"minecraft:chiseled_bookshelf", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
@@ -202,7 +207,7 @@ func (t *Ticker) readSignal(r *world.Region, pos cube.Pos, dir redstone.Face) (i
 		return 0, false
 	}
 	if t.hasSignal(b) {
-		return t.blockSignal(r, at, b), true
+		return t.facedSignal(r, at, b, dir), true
 	}
 	if !t.attach.Solid(b) || signalSource(t.blocks.Name(b)) {
 		return 0, false
@@ -212,7 +217,24 @@ func (t *Ticker) readSignal(r *world.Region, pos cube.Pos, dir redstone.Face) (i
 	if !ok || !t.hasSignal(b) {
 		return 0, false
 	}
-	return t.blockSignal(r, at, b), true
+	return t.facedSignal(r, at, b, dir), true
+}
+
+// facedSignal is blockSignal, except that an item frame gives its signal only when it faces
+// dir, the way the comparator reads, as BDS's ItemFrameBlock comparator signal checks.
+func (t *Ticker) facedSignal(r *world.Region, pos cube.Pos, block uint32, dir redstone.Face) int32 {
+	if t.signals[block] != signalFrame {
+		return t.blockSignal(r, pos, block)
+	}
+	if intState(t.blocks.States(block), "facing_direction") != int32(dir) {
+		return 0
+	}
+	if be, ok := r.BlockEntity(pos); ok {
+		if e, ok := be.(SignalEntity); ok {
+			return e.ComparatorSignal(r, pos)
+		}
+	}
+	return 0
 }
 
 // hasSignal is whether a comparator reads a state.
