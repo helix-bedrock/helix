@@ -352,22 +352,24 @@ func (p *Painting) tick(e *world.Entity) {
 		}
 	}
 	if !p.s.paintingFits(r, paintingWall(pos, p.dir, p.motive), pos, p.dir, p.motive, p, &p.near) {
-		p.Break(r, true)
+		p.Break(r, false)
 	}
 }
 
-// Hurt is HangingActor's hurt (0xBFC56B0): any hit takes it down, with its item unless a
-// creative player hit it. True if it broke.
-func (p *Painting) Hurt(r *world.Region, by *Player) bool {
+// Hurt is HangingActor's hurt (0xBFC56B0): any hit takes it down. It leaves no item: BDS
+// 1.26.60's drop (0xBFF6140) is gated by a check (0xB3CA270, 0xB3CA010) that, tested in game on
+// BDS by the lead (2026-11-10), lets no painting drop, even for a survival player. True if
+// it broke.
+func (p *Painting) Hurt(r *world.Region, _ *Player) bool {
 	if p.gone {
 		return false
 	}
-	p.Break(r, by == nil || !by.creative())
+	p.Break(r, false)
 	return true
 }
 
-// Break takes it down with BDS's sound and particles (0xBFF63A0), leaving its item if drops is
-// set and doentitydrops is on (0xBFF6140).
+// Break takes it down with BDS's sound and particles (0xBFF63A0). Vanilla passes drops false;
+// with drops set it leaves its item if doentitydrops is on.
 func (p *Painting) Break(r *world.Region, drops bool) {
 	if p.gone {
 		return
