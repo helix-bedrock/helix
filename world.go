@@ -88,7 +88,7 @@ func (s *Server) openWorld() error {
 		KeepInventory: ldat.KeepInventory, ShowDeathMessages: ldat.ShowDeathMessages,
 		PVP: ldat.PVP, NaturalRegeneration: ldat.NaturalRegeneration,
 		TNTExplodes: ldat.TNTExplodes, TNTExplosionDropDecay: ldat.TNTExplosionDropDecay, DoTileDrops: ldat.DoTileDrops, GameRules: gameRules(ldat),
-		RespawnBlocksExplode: ldat.RespawnBlocksExplode, DoDayLightCycle: ldat.DoDayLightCycle, DoEntityDrops: ldat.DoEntityDrops,
+		RespawnBlocksExplode: ldat.RespawnBlocksExplode, DoDayLightCycle: ldat.DoDayLightCycle, DoEntityDrops: ldat.DoEntityDrops, MobGriefing: ldat.MobGriefing,
 		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)

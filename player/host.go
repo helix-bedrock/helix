@@ -22,6 +22,7 @@ import (
 	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/loot"
+	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/registry"
@@ -56,6 +57,8 @@ type Level struct {
 	// RespawnBlocksExplode, DoDayLightCycle and PlayersSleepingPercentage are the game rules
 	// beds read.
 	RespawnBlocksExplode, DoDayLightCycle bool
+	// MobGriefing is whether mobs may change blocks.
+	MobGriefing bool
 	// DoEntityDrops is whether broken entities such as cushions leave their item.
 	DoEntityDrops             bool
 	PlayersSleepingPercentage int32
@@ -153,6 +156,8 @@ type Host struct {
 	stackIDs   atomic.Int32
 	// itemLifetime is the live age items vanish at; 0 is vanilla's.
 	itemLifetime atomic.Int32
+	// mobs runs every mob from its entity definition.
+	mobs *mob.Runtime
 	// tuning is the live value of every Tune.
 	tuning atomic.Pointer[tuneTable]
 	wg     sync.WaitGroup
@@ -206,6 +211,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	h.onPanic = conf.OnPanic
 	h.global = newGlobal(h.panicked)
 	h.setUpCommands()
+	h.setUpMobs()
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()
 	conf.Overworld.SetEntityLoader(h.loadEntity)

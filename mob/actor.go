@@ -1,0 +1,256 @@
+package mob
+
+import (
+	"slices"
+
+	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/entity/definition"
+	"github.com/helix-bedrock/entity/physics"
+)
+
+// The mob as the goals see it: behavior.Actor, Mob, Targeter, Attacker and Creeper. Parts the
+// minimal hookup does not have yet (riding, leashes, homes, effects, items) answer as a mob
+// without them.
+
+func (m *Mob) ID() behavior.ID     { return m.id }
+func (m *Mob) RuntimeID() uint64   { return m.rid }
+func (m *Mob) Pos() behavior.Vec3  { return m.body.Pos }
+func (m *Mob) Box() behavior.Box   { return m.body.Box }
+func (m *Mob) Eyes() behavior.Vec3 { p := m.body.Pos; p.Y += m.eyeHeight(); return p }
+func (m *Mob) Alive() bool         { return !m.Dead() }
+func (m *Mob) Removed() bool       { return false }
+func (m *Mob) Pickable() bool      { return !m.Dead() }
+func (m *Mob) IsMob() bool         { return true }
+func (m *Mob) IsPlayer() bool      { return false }
+func (m *Mob) Flag(n int) bool     { return m.flags.Has(n) }
+func (m *Mob) GameMode() int       { return -1 }
+
+func (m *Mob) Riders() []behavior.ID              { return nil }
+func (m *Mob) Vehicle() behavior.ID               { return behavior.NoID }
+func (m *Mob) Owner() behavior.ID                 { return behavior.NoID }
+func (m *Mob) Team() int                          { return 0 }
+func (m *Mob) HeadRotation() (pitch, yaw float32) { return m.pitch, m.headYaw }
+func (m *Mob) BodyYaw() float32                   { return m.bodyYaw }
+func (m *Mob) Invulnerable() bool                 { return false }
+func (m *Mob) HasHealth() bool                    { return true }
+func (m *Mob) Targetable() bool                   { return !m.flags.Has(behavior.FlagCannotTarget) }
+func (m *Mob) Monster() bool                      { return slices.Contains(m.families, "monster") }
+func (m *Mob) ArmourCoverage() float32            { return 0 }
+func (m *Mob) WearsHeadOf(string) bool            { return false }
+func (m *Mob) Target() behavior.ID                { return m.target }
+func (m *Mob) HijacksMount() bool                 { return false }
+func (m *Mob) LastHurtByMob() behavior.ID         { return m.lastHurtBy }
+func (m *Mob) LastHurtMob() (behavior.ID, int32)  { return m.lastHurtMob, m.lastHurtStamp }
+func (m *Mob) BlocksSpace() bool                  { return false }
+func (m *Mob) AttachPos(int) behavior.Vec3        { return m.Eyes() }
+
+// Dimension is the ID of the mob's dimension.
+func (m *Mob) Dimension() int {
+	if m.v.r == nil {
+		return 0
+	}
+	return int(m.rt.Env.DimensionID(m.v.r.Dimension()))
+}
+
+// Nav is the mob's navigation, nil without a navigation component.
+func (m *Mob) Nav() behavior.Navigator {
+	if m.nv == nil {
+		return nil
+	}
+	return &m.navigate
+}
+
+// SetFlag sets an actor flag and tells those who see the mob when it changed.
+func (m *Mob) SetFlag(n int, on bool) {
+	if m.flags.Has(n) == on {
+		return
+	}
+	m.flags.Set(n, on)
+	if m.hooks != nil && m.v.r != nil {
+		m.hooks.FlagsChanged(m)
+	}
+}
+
+// WalkTargetValue is PathfinderMob's: 0 everywhere in the minimal hookup (animals preferring
+// grass and monsters darkness is not ported yet).
+func (m *Mob) WalkTargetValue(behavior.Pos) float32 { return 0 }
+
+// LookAt points the look control at p unless a goal already did this tick.
+func (m *Mob) LookAt(p behavior.Vec3, yawMax, pitchMax float32) {
+	if m.lookSet {
+		return
+	}
+	m.lookSet = true
+	m.look.Has, m.look.Pos, m.look.YawSpeed, m.look.PitchSpeed = true, p, yawMax, pitchMax
+}
+
+func (m *Mob) LookBusy() bool                    { return m.lookSet }
+func (m *Mob) MaxHeadXRot() float32              { return 40 }
+func (m *Mob) SetTarget(id behavior.ID)          { m.target = id }
+func (m *Mob) LastHurtBy() (behavior.ID, uint64) { return m.lastHurtBy, m.lastHurtTick }
+func (m *Mob) ClearLastHurtBy()                  { m.lastHurtBy = behavior.NoID }
+func (m *Mob) LastDamageCause() int              { return m.lastCause }
+
+// PlaySound plays a sound at the mob's eyes.
+func (m *Mob) PlaySound(sound int) {
+	if sound != behavior.NoSound && m.hooks != nil {
+		m.hooks.Sound(m, sound, m.Eyes())
+	}
+}
+
+// PlaySoundAt plays a sound at p.
+func (m *Mob) PlaySoundAt(sound int, p behavior.Vec3) {
+	if sound != behavior.NoSound && m.hooks != nil {
+		m.hooks.Sound(m, sound, p)
+	}
+}
+
+// Event fires a definition event on the mob.
+func (m *Mob) Event(name string, other behavior.ID) {
+	var o behavior.Actor
+	if other != behavior.NoID && m.v.r != nil {
+		o = m.rt.Env.Actor(m.v.r, other)
+	}
+	m.inst.Execute(name, m.tester(o))
+}
+
+func (m *Mob) Teleport(p behavior.Vec3)              { m.SetPos(p) }
+func (m *Mob) Dwelling() (behavior.Pos, bool, bool)  { return behavior.Pos{}, false, false }
+func (m *Mob) Home() (behavior.Pos, int32, bool)     { return behavior.Pos{}, 0, false }
+func (m *Mob) Leash() (behavior.Vec3, float32, bool) { return behavior.Vec3{}, 0, false }
+func (m *Mob) InLava() bool                          { return m.body.Travel() == physics.TravelLava }
+func (m *Mob) InWater() bool                         { return m.body.WasInWater }
+func (m *Mob) UnderWater() bool                      { return m.body.HeadInWater }
+func (m *Mob) FloatJump()                            { m.jump.Jumping = true }
+func (m *Mob) DismountPassengers()                   {}
+func (m *Mob) HeardVibration() (uint64, bool)        { return 0, false }
+func (m *Mob) CanMate(behavior.Actor) bool           { return false }
+func (m *Mob) SetPersistent()                        { m.persistent = true }
+func (m *Mob) CanSit() bool                          { return false }
+func (m *Mob) OnGround() bool                        { return m.body.OnGround }
+func (m *Mob) OnFire() bool                          { return false }
+func (m *Mob) Velocity() behavior.Vec3               { return m.body.Vel }
+func (m *Mob) SetVelocity(v behavior.Vec3)           { m.body.Vel = v }
+func (m *Mob) HasEffect(int) bool                    { return false }
+func (m *Mob) SetHijackable(bool)                    {}
+func (m *Mob) NoActionTime() int32                   { return m.noActionTime }
+func (m *Mob) ResetFlock()                           {}
+func (m *Mob) LeashStretched() bool                  { return false }
+func (m *Mob) SetPersistSit(bool)                    {}
+func (m *Mob) HelmetEmpty() bool                     { return true }
+func (m *Mob) Speed() float32                        { return m.speed }
+func (m *Mob) UnderwaterSpeed() float32              { return m.underwaterSpeed }
+func (m *Mob) FollowRange() float32                  { return m.followRange }
+func (m *Mob) PrevRotation() (pitch, yaw float32)    { return m.prevPitch, m.prevYaw }
+func (m *Mob) SetYaw(yaw float32)                    { m.yaw = yaw }
+func (m *Mob) Breathable() bool                      { return true }
+func (m *Mob) AirSupply() int16                      { return 300 }
+func (m *Mob) VerticalCollision() bool               { return m.body.VerticalCollision }
+func (m *Mob) Persistent() bool                      { return m.persistent }
+
+// OverWater is in water, or water is the first non-air block below.
+func (m *Mob) OverWater() bool {
+	if m.body.WasInWater {
+		return true
+	}
+	if m.v.r == nil {
+		return false
+	}
+	p := behavior.Pos{X: floor32(m.body.Pos.X), Y: floor32(m.body.Pos.Y) - 1, Z: floor32(m.body.Pos.Z)}
+	w := goalWorld{&m.v}
+	for ; p.Y > w.MinHeight(); p.Y-- {
+		b := w.LiquidBlock(p)
+		if b.Material != materialAir {
+			return b.Material == materialWater
+		}
+	}
+	return false
+}
+
+// Move adds to the mob's move request.
+func (m *Mob) Move(v behavior.Vec3) {
+	m.body.Vel.X += v.X
+	m.body.Vel.Y += v.Y
+	m.body.Vel.Z += v.Z
+}
+
+// MoveWanted reports the move control's wanted position.
+func (m *Mob) MoveWanted() (wanted, ok bool) { return m.ctl.HasWanted, m.hasMove }
+
+func (m *Mob) SetMoveWanted(p behavior.Vec3, speed float32) {
+	if m.hasMove {
+		m.ctl.SetWantedPosition(p, speed)
+	}
+}
+
+func (m *Mob) ClearMoveWanted() {
+	if m.hasMove {
+		m.ctl.ClearWanted()
+	}
+}
+
+// --- Targeter ---
+
+// CanSee is a clear line from the mob's eyes to the other's eyes.
+func (m *Mob) CanSee(a behavior.Actor) bool {
+	if m.v.r == nil {
+		return false
+	}
+	return goalWorld{&m.v}.ClearLine(m.Eyes(), a.Eyes())
+}
+
+// CanAttack is Actor::canAttack as far as the hookup goes: alive, not itself, and not a player
+// in creative or spectator.
+func (m *Mob) CanAttack(a behavior.Actor) bool {
+	if a == nil || !a.Alive() || a.ID() == m.id {
+		return false
+	}
+	if a.IsPlayer() {
+		g := a.GameMode()
+		if g == behavior.GameModeDefault {
+			g = m.rt.Env.DefaultGameMode()
+		}
+		return g != behavior.GameModeCreative && g != behavior.GameModeSpectator && !a.Invulnerable()
+	}
+	return true
+}
+
+func (m *Mob) Admiring() bool          { return false }
+func (m *Mob) PlayersTargetable() bool { return true }
+
+// --- Attacker ---
+
+// Swing swings the mob's arm.
+func (m *Mob) Swing() {
+	if m.hooks != nil {
+		m.hooks.Swing(m)
+	}
+}
+
+// Attack hits a with the mob's attack.
+func (m *Mob) Attack(a behavior.Actor) (hit, killed bool) {
+	if m.hooks == nil {
+		return false, false
+	}
+	hit, killed = m.hooks.Attack(m, a)
+	if hit {
+		m.lastHurtMob = a.ID()
+		m.lastHurtStamp++
+		m.noActionTime = 0
+	}
+	return hit, killed
+}
+
+// --- Creeper ---
+
+func (m *Mob) SwellDir() int32     { return m.swellDir }
+func (m *Mob) SetSwellDir(d int32) { m.swellDir = d }
+
+// The parts of a mob the goals ask for at runtime; a missing method would silently drop
+// every goal that needs it.
+var (
+	_ behavior.Attacker = (*Mob)(nil)
+	_ behavior.Creeper  = (*Mob)(nil)
+	_ definition.Host   = (*Mob)(nil)
+	_ definition.Tester = tester{}
+)

@@ -21,6 +21,7 @@ var all = []command.Spec{
 	weatherSpec,
 	toggleDownfall,
 	fog,
+	summon,
 }
 
 // Register puts every built-in command on a Setup.

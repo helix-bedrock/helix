@@ -35,6 +35,8 @@ type actorMoves struct {
 	sentTo  map[*world.Entity]int64
 	dropped int32
 	far     float32
+	// head is set for mobs, whose moves carry the head yaw.
+	head bool
 }
 
 // start sets where the actor was spawned, which AddActor told its viewers, and how seldom
@@ -51,6 +53,9 @@ func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 	moved, speed := d.Dot(d), vel.Dot(vel)
 	turned := (abs32(float32(rotationByte(rot.Pitch))-float32(rotationByte(m.rot.Pitch))) +
 		abs32(float32(rotationByte(rot.Yaw))-float32(rotationByte(m.rot.Yaw)))) * actorDegreesPerByte
+	if m.head {
+		turned += abs32(float32(rotationByte(rot.HeadYaw))-float32(rotationByte(m.rot.HeadYaw))) * actorDegreesPerByte
+	}
 	if moved <= actorMoveMin && turned <= actorTurnMin && (moved <= actorRestMin || speed >= actorRestMin) {
 		return
 	}
@@ -58,7 +63,7 @@ func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 }
 
 // send is BDS's MoveActorDelta (0x8ce8c80): only the fields that changed since the last one,
-// and no head rotation, which only mobs have. What differs per player is how far they are
+// and the head rotation only for mobs. What differs per player is how far they are
 // (0x8ce9d60): further off they get it less often, and Ticks says how many ticks it is meant
 // to last. It is 0 near by, and 0 for all on the tick it lands or leaves the ground.
 func (m *actorMoves) send(e *world.Entity) {
@@ -79,6 +84,9 @@ func (m *actorMoves) send(e *world.Entity) {
 	}
 	if rotationByte(rot.Yaw) != rotationByte(m.rot.Yaw) {
 		pk.RotationY = protocol.Option(rot.Yaw)
+	}
+	if m.head && rotationByte(rot.HeadYaw) != rotationByte(m.rot.HeadYaw) {
+		pk.RotationYHead = protocol.Option(rot.HeadYaw)
 	}
 	same := ground == m.ground
 	m.pos, m.rot, m.ground = pos, rot, ground
