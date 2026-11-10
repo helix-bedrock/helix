@@ -24,26 +24,38 @@ func (s soundEvent) packet() *packet.LevelSoundEvent {
 	return &packet.LevelSoundEvent{SoundType: s.name, Position: s.pos, ExtraData: s.extra, EntityType: s.entity}
 }
 
-// handleLevelSoundEvent is a sound the client made itself, such as a sweet berry bush
+// handleLevelSoundEvent is a sound the client says it made, such as a sweet berry bush
 // rustling as the player moves through it. BDS 1.26.60's handler (0x8CDBF50, through
-// 0xCDD91F0 with no player left out) plays it as sent to every player near its position,
-// the sender too: the client does not play these itself but waits for the server's copy.
-// A global one goes to every player. Runs: the player's region.
+// 0xCDD91F0 with no player left out) plays whatever is sent, where it says, to every player
+// near it, the sender too; the client waits for that copy instead of playing these itself.
+//
+// Helix goes past BDS here (lead's decision, 2026-11-10): a client could fake any sound,
+// anywhere, as often as it likes, so the packet is only a request. Only sounds the server's
+// own state confirms are played, at the player's position, never the client's, with the
+// server's own data, at most once a tick each; anything else is dropped. Runs: the player's
+// region.
 func handleLevelSoundEvent(p *Player, pk *packet.LevelSoundEvent) {
-	if p.entity == nil {
+	if p.entity == nil || p.dead() {
 		return
 	}
-	out := &packet.LevelSoundEvent{
-		SoundType: pk.SoundType, Position: pk.Position, ExtraData: pk.ExtraData, EntityType: pk.EntityType,
-		BabyMob: pk.BabyMob, DisableRelativeVolume: pk.DisableRelativeVolume,
-	}
-	if pk.DisableRelativeVolume {
-		p.s.Broadcast(out)
+	r := p.entity.Region()
+	if r == nil {
 		return
 	}
-	if r := p.entity.Region(); r != nil {
-		r.Broadcast(floorPos(pk.Position), out, nil)
+	var s soundEvent
+	switch pk.SoundType {
+	case packet.SoundEventSweetBerryBushHurt:
+		// The bush scratching: only while the server finds the player in a grown bush.
+		if !p.move.inBerry || p.move.soundTick == p.entity.Tick() {
+			return
+		}
+		s = soundEvent{name: pk.SoundType, pos: p.entity.Position(), extra: -1}
+		p.move.soundTick = p.entity.Tick()
+	default:
+		p.s.log.Debug("client sound dropped", "player", p.name, "sound", pk.SoundType)
+		return
 	}
+	playSound(r, p.blockPos(), s, nil)
 }
 
 // playSound plays s to every player near at, except the one given. Runs: owner of the

@@ -86,6 +86,10 @@ type moveState struct {
 	// PostTickPositionDeltaComponent. velocity is not that: a client stuck in a berry
 	// bush or cobweb sends 0 there while it still moves.
 	moved mgl32.Vec3
+	// inBerry is whether the server last found the player inside a grown sweet berry bush;
+	// soundTick is the tick a client sound was last played for it.
+	inBerry   bool
+	soundTick uint64
 	// climbing, inWater and onGround are what the last movement found.
 	climbing, inWater, onGround bool
 }

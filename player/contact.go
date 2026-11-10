@@ -58,6 +58,7 @@ func (s *Host) contactOf(b uint32) contactBlock {
 // the bush. The client plays the bush's scratch sound (block.sweet_berry_bush.hurt) itself on
 // each hurt; BDS sends no sound for it. Runs: the player's region, once a tick.
 func (p *Player) tickContact(c burnContact) {
+	p.move.inBerry = c.contact == contactBerry
 	if p.invulnerable() {
 		return
 	}
