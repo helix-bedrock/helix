@@ -27,7 +27,7 @@ import (
 // Not done yet (the spawner skips or refuses these): structure spawn areas (witch huts,
 // monuments, fortresses, outposts) and ancient cities, villages (player_in_village_filter
 // never blocks), /mobevent (every mob event is on, BDS's default), custom spawn rules (only
-// vanilla's spawn_rules.json is read), and despawning. Players in other regions are not
+// vanilla's spawn_rules.json is read). Players in other regions are not
 // seen by the distance filter; regions are far enough apart that this rarely matters.
 
 // spawning is the spawner shared by every region, with the tables it reads.

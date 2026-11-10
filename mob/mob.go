@@ -21,6 +21,7 @@ import (
 	"github.com/helix-bedrock/entity/nav"
 	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/entity/physics"
+	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/world"
 )
 
@@ -136,8 +137,13 @@ type Mob struct {
 	lastCause                       int
 	deathTime                       int32
 	persistent                      bool
-	swellDir                        int32
-	noActionTime                    int32
+	// despawn is minecraft:despawn, nil without one; stateEnv is what it runs with, made
+	// once. despawned is set when it removed the mob.
+	despawn      *state.Despawn
+	stateEnv     state.Env
+	despawned    bool
+	swellDir     int32
+	noActionTime int32
 
 	// rnd is the mob's own random, seeded from its ID, so what it draws does not depend on
 	// which mobs think on which core.
@@ -253,6 +259,9 @@ func (m *Mob) think() (remove bool) {
 		m.deathTime++
 		return m.deathTime >= deathTicks
 	}
+	if m.despawnTick() {
+		return true
+	}
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw
 	m.lookSet = false
 	m.noActionTime++
@@ -296,7 +305,9 @@ func (m *Mob) refresh() {
 		} else {
 			m.hasMove = false
 		}
-		goals, warnings := m.rt.Goals.Build(component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}, order, comps)
+		ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
+		m.readDespawn(ctx, comps)
+		goals, warnings := m.rt.Goals.Build(ctx, order, comps)
 		for _, w := range warnings {
 			m.rt.Log.Debug("mob goal", "type", m.typ, "warning", w)
 		}

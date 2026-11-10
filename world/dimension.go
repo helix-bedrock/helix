@@ -275,6 +275,10 @@ func (d *Dimension) CurrentTick() int64 { return d.sched.CurrentTick() }
 // Range is the dimension's height range.
 func (d *Dimension) Range() cube.Range { return d.r }
 
+// SimulationDistance is the radius in chunks of each player's simulation zone (BDS's
+// tick-distance). Safe from any goroutine.
+func (d *Dimension) SimulationDistance() int32 { return d.conf.SimulationDistance }
+
 // Close stops the regions after their current tick, runs the work queued
 // for them, saves every changed chunk and waits for the store writes. The
 // store itself is left open.

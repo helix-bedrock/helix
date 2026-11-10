@@ -21,8 +21,8 @@ import (
 // is a mob's entity, its packets and the hits between mobs and players. What a mob does is
 // all in its definition, run by package mob.
 //
-// First hookup only: mobs are not saved (one whose chunk unloads is gone), never despawn
-// (natural spawning is in naturalspawn.go), drop no loot or experience, and are hurt outside the Hit pipeline (no armour,
+// First hookup only: mobs are not saved (one whose chunk unloads is gone; natural
+// spawning is in naturalspawn.go, despawning in mob/despawn.go), drop no loot or experience, and are hurt outside the Hit pipeline (no armour,
 // no HitEvent).
 
 // mobAir is the air supply BDS shows for a mob that breathes air.
