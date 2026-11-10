@@ -191,6 +191,10 @@ type Chunk struct {
 	tickingEntities []cube.Pos
 	// tickedAt is the world tick the chunk last ticked in.
 	tickedAt int64
+	// plannedAt is the world tick its random ticks were last planned for, plan their index
+	// in Region.plans (randomplan.go).
+	plannedAt int64
+	plan      int
 	// light is the chunk's sky and block light and its height map, worked out on load.
 	light *chunkLight
 }

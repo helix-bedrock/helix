@@ -481,9 +481,9 @@ func (r *Region) flushLight() {
 		}
 	}
 	if r.d.light.sky {
-		r.relight(true, w.dirty, w.columns)
+		r.relightAll(true, w.dirty, w.columns)
 	}
-	r.relight(false, w.dirty, nil)
+	r.relightAll(false, w.dirty, nil)
 	w.dirty = w.dirty[:0]
 }
 
@@ -513,8 +513,7 @@ func (r *Region) columnHeight(c *Chunk, x, z int) int16 {
 // relight takes the light of kind away from the changed cells and everything lit
 // through them, then fills it in again from what is left and from each cell's own
 // light, as BDS's subtractive and additive passes do.
-func (r *Region) relight(sky bool, changed, more []cube.Pos) {
-	w := r.light
+func (r *Region) relight(w *lightWork, sky bool, changed, more []cube.Pos) {
 	w.remove, w.removed = w.remove[:0], w.removed[:0]
 	for _, list := range [2][]cube.Pos{changed, more} {
 		for _, pos := range list {
@@ -554,13 +553,12 @@ func (r *Region) relight(sky bool, changed, more []cube.Pos) {
 			}
 		}
 	}
-	r.spreadLight(sky)
+	r.spreadLight(w, sky)
 }
 
 // spreadLight spreads the light of kind queued in the buckets through the region's
 // chunks, brightest first.
-func (r *Region) spreadLight(sky bool) {
-	w := r.light
+func (r *Region) spreadLight(w *lightWork, sky bool) {
 	for level := MaxLight; level >= 2; level-- {
 		for k := 0; k < len(w.buckets[level]); k++ {
 			pos := w.buckets[level][k]
@@ -641,7 +639,7 @@ func (r *Region) joinLight(c *Chunk) {
 			}
 		}
 		if queued {
-			r.spreadLight(sky)
+			r.spreadLight(w, sky)
 		}
 	}
 }

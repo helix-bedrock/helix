@@ -111,6 +111,8 @@ type Boat struct {
 	entity *world.Entity
 	wood   int32
 	name   string
+	// next is the move its think step worked out.
+	next thought
 
 	gone               bool
 	seats              *ride.Vehicle
@@ -212,7 +214,7 @@ func (b *Boat) id() string {
 func (b *Boat) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: b, Spawn: b.spawnPackets, Move: b.movePacket, Input: b.tick, Save: b.saveEntity,
+		Owner: b, Spawn: b.spawnPackets, Move: b.movePacket, Think: b.think, Input: b.tick, Save: b.saveEntity,
 	}
 }
 

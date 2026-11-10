@@ -74,7 +74,34 @@ type boatMotion struct {
 }
 
 // physics is one tick of an empty boat's movement. Region tick.
+// think works out a boat's move with nobody steering it (see think.go): players pushing it,
+// floating, friction and the collision.
+func (b *Boat) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || b.gone || b.Driver() != nil {
+		return
+	}
+	b.next = b.plan(r, e)
+}
+
+// physics moves a boat with nobody steering it as its think step worked out.
 func (b *Boat) physics(r *world.Region, e *world.Entity) {
+	if !b.next.ok {
+		b.next = b.plan(r, e)
+	}
+	st := b.next
+	b.next = thought{}
+	if st.rest {
+		return
+	}
+	// hitY carries whether it landed.
+	if !e.Apply(world.Movement{Pos: st.pos, Rot: e.Rotation(), OnGround: st.hitY, Tick: e.Tick()}) {
+		b.motion.vel = mgl32.Vec3{}
+	}
+}
+
+// plan is the boat's move from the blocks and players alone.
+func (b *Boat) plan(r *world.Region, e *world.Entity) thought {
 	m := &b.motion
 	pos := e.Position()
 	b.pushedByPlayers(r, e, pos)
@@ -97,7 +124,7 @@ func (b *Boat) physics(r *world.Region, e *world.Entity) {
 	m.vel[2] *= f
 	if m.vel.LenSqr() < boatStillSpeed2 && e.OnGround() {
 		m.vel = mgl32.Vec3{}
-		return
+		return thought{ok: true, rest: true}
 	}
 	lo, hi := boatBox(pos)
 	hitY := false
@@ -117,9 +144,7 @@ func (b *Boat) physics(r *world.Region, e *world.Entity) {
 	if hitY {
 		m.vel[1] = 0
 	}
-	if !e.Apply(world.Movement{Pos: pos, Rot: e.Rotation(), OnGround: onGround, Tick: e.Tick()}) {
-		m.vel = mgl32.Vec3{}
-	}
+	return thought{pos: pos, hitY: onGround, ok: true}
 }
 
 // pushedByPlayers is BDS 1.26.60's Mob::pushActors (0xBFEE7F0) from each player's side

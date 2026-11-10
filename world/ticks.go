@@ -339,6 +339,8 @@ func (r *Region) runQueue(c *Chunk, q *tickQueue, now int64) {
 func (r *Region) tickBlocks() {
 	now := r.d.sched.CurrentTick()
 	speed := r.d.randomTickSpeed.Load()
+	r.planRandomTicks(now, speed)
+	defer clear(r.plans)
 	for _, v := range r.viewers {
 		if v.lastRadius < 0 {
 			continue
@@ -370,7 +372,9 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now int64, speed int32) {
 			return
 		}
 	}
-	r.randomTicks(c, speed)
+	if !r.runPlannedTicks(c, now, speed) {
+		r.randomTicks(c, speed)
+	}
 	r.runQueue(c, &c.ticks, now)
 	r.runQueue(c, &c.randomTicks, c.randomTicks.clock+int64(speed))
 	r.tickBlockEntities(c)

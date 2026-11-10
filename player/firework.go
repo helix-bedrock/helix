@@ -57,6 +57,8 @@ type FireworkRocket struct {
 	entity *world.Entity
 	vel    mgl32.Vec3
 	dir    mgl32.Vec3
+	// next is the move its think step worked out.
+	next thought
 
 	// item is the rocket item it was made from; its tag holds the Fireworks compound the
 	// clients draw the explosion from.
@@ -153,7 +155,7 @@ func (s *Host) LaunchFirework(d *world.Dimension, pos, dir mgl32.Vec3, item Item
 	f.entity = d.AddEntity(world.EntityConfig{
 		UniqueID: itemUniqueIDBase | rand.Int64N(itemUniqueIDBase), RuntimeID: s.runtimeIDs.Add(1), //nolint:gosec // an ID, not a secret
 		Pos: pos, Rot: flightRotation(f.vel),
-		Owner: f, Spawn: f.spawnPackets, Move: f.movePacket, Input: f.tick,
+		Owner: f, Spawn: f.spawnPackets, Move: f.movePacket, Think: f.think, Input: f.tick,
 	})
 	return f
 }
@@ -217,14 +219,11 @@ func (f *FireworkRocket) tick(e *world.Entity) {
 // move is BDS's rocket movement (0x75ECFC0): attached, it is where the player is; free,
 // its speed grows by 1.05 and 0.03 along its direction, and it moves through the blocks'
 // collision boxes, turned along its flight.
-func (f *FireworkRocket) move(r *world.Region, e *world.Entity) {
-	if f.attached != nil {
-		pe := f.attached.entity
-		if pe == nil || pe.Region() != r || f.attached.dead() {
-			return
-		}
-		f.vel = f.attached.move.velocity
-		e.Apply(world.Movement{Pos: pe.Position(), Rot: flightRotation(f.vel), Tick: e.Tick()})
+// think works out a free rocket's flight through the blocks (see think.go); one on a gliding
+// player follows the player in Input.
+func (f *FireworkRocket) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || f.gone || f.attached != nil {
 		return
 	}
 	f.vel = f.vel.Mul(fireworkSpeedUp).Add(f.dir.Mul(fireworkThrust))
@@ -236,6 +235,24 @@ func (f *FireworkRocket) move(r *world.Region, e *world.Entity) {
 		}
 		pos[axis] += d
 	}
+	f.next = thought{pos: pos, ok: true}
+}
+
+func (f *FireworkRocket) move(r *world.Region, e *world.Entity) {
+	if f.attached != nil {
+		pe := f.attached.entity
+		if pe == nil || pe.Region() != r || f.attached.dead() {
+			return
+		}
+		f.vel = f.attached.move.velocity
+		e.Apply(world.Movement{Pos: pe.Position(), Rot: flightRotation(f.vel), Tick: e.Tick()})
+		return
+	}
+	if !f.next.ok {
+		f.think(e)
+	}
+	pos := f.next.pos
+	f.next = thought{}
 	if !e.Apply(world.Movement{Pos: pos, Rot: flightRotation(f.vel), Tick: e.Tick()}) {
 		f.vel = mgl32.Vec3{}
 	}

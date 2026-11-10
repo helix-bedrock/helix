@@ -56,6 +56,22 @@ type Region struct {
 	// outbox, sent to each player after.
 	fanout bool
 	outbox []outItem
+	// plans and planned are this tick's random tick plans (randomplan.go); planFn draws one.
+	plans   []chunkPlan
+	planned []plannedTick
+	planFn  func(i int)
+	// viewPlanFn is planViewer, made once.
+	viewPlanFn func(i int)
+	// lightClusters, lightCells and lightSky are the relight split up by distance
+	// (lightparallel.go); lightFn relights one cluster.
+	lightClusters []lightCluster
+	lightCells    map[[2]int32]int
+	lightOrder    [][2]int32
+	lightSky      bool
+	lightFn       func(i int)
+	// packetViewers are the players sendChunkPackets goes through, packetFn their part.
+	packetViewers []*Viewer
+	packetFn      func(i int)
 
 	// Guarded by d.mu. sections, added, reshaped and contested are also
 	// changed by the region's own tick, under d.mu.
@@ -304,6 +320,7 @@ func (r *Region) tick() {
 	r.ticks++
 	r.drain()
 	r.tickEntities()
+	r.planViewers()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
 	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
 		rt.BeforeBlockTicks(r)
@@ -413,7 +430,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
 	}
-	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1, light: light}
+	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: -1, plannedAt: -1, light: light}
 	c.ticks.load(col.ScheduledBlocks, col.Tick)
 	c.ticks.rebase(r.d.sched.CurrentTick())
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)

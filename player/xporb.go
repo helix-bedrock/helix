@@ -92,6 +92,8 @@ type XPOrb struct {
 	lastSeek   int32
 	taken      bool
 	saved      map[string]any
+	// next is the move its think step worked out.
+	next thought
 	// health is what explosions take from.
 	health int32
 }
@@ -171,7 +173,7 @@ func (s *Host) orbsNear(r *world.Region, pos mgl32.Vec3, skip *XPOrb) []*XPOrb {
 func (o *XPOrb) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: o, Spawn: o.spawnPackets, Move: o.body.movePacket, Input: o.tick, Save: o.saveEntity,
+		Owner: o, Spawn: o.spawnPackets, Move: o.body.movePacket, Think: o.think, Input: o.tick, Save: o.saveEntity,
 	}
 }
 
@@ -231,6 +233,30 @@ func (o *XPOrb) remove(e *world.Entity) {
 
 // tick is BDS's orb tick: age, joining orbs, gravity, lava, moving, drag, and the
 // nearest player's pull.
+// think works out the orb's move from the blocks alone (see think.go): gravity, lava's throw,
+// the push out of blocks and the collision.
+func (o *XPOrb) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || o.taken {
+		return
+	}
+	vel := &o.body.vel
+	vel[1] -= xpOrbGravity
+	st := thought{ok: true}
+	if m, _ := liquidAt(o.s.reg, r, floorPos(e.Position())); m == registry.MaterialLava {
+		vel[1] = xpOrbLavaUp
+		vel[0] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
+		vel[2] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
+		st.lava = true
+	}
+	// BDS gives an orb's position as it is, where it takes half the box off an item's.
+	o.body.thinking = true
+	o.body.pushOut(r, e, e.Position(), e.Position())
+	o.body.thinking = false
+	st.pos, st.hitY = o.body.collide(r, e.Position())
+	o.next = st
+}
+
 func (o *XPOrb) tick(e *world.Entity) {
 	r := e.Region()
 	if r == nil || o.taken {
@@ -247,17 +273,17 @@ func (o *XPOrb) tick(e *world.Entity) {
 	if o.age%xpOrbMergeEvery == xpOrbMergeTick {
 		o.merge(r, e.Position())
 	}
+	if !o.next.ok {
+		o.think(e)
+	}
+	st := o.next
+	o.next = thought{}
+	o.body.flagsDirty = false
 	vel := &o.body.vel
-	vel[1] -= xpOrbGravity
-	if m, _ := liquidAt(o.s.reg, r, floorPos(e.Position())); m == registry.MaterialLava {
-		vel[1] = xpOrbLavaUp
-		vel[0] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
-		vel[2] = (rand.Float32() - rand.Float32()) * xpOrbLavaSide //nolint:gosec // an orb's path, not a secret
+	if st.lava {
 		playSound(r, floorPos(e.Position()), soundEvent{name: packet.SoundEventFizz, pos: e.Position(), extra: 0}, nil)
 	}
-	// BDS gives an orb's position as it is, where it takes half the box off an item's.
-	o.body.pushOut(r, e, e.Position(), e.Position())
-	pos, hitY := o.body.collide(r, e.Position())
+	pos, hitY := st.pos, st.hitY
 	onGround := hitY && vel[1] < 0
 	if hitY {
 		vel[1] = 0

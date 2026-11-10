@@ -42,25 +42,40 @@ func chunkAt(pos cube.Pos) mcdb.ChunkPos {
 
 // sendChunkPackets sends the packets queued this tick: to the players of
 // this region now, to those of other regions on their next tick.
+// sendPacketsTo sends player i of packetViewers the block changes of chunks it has, or
+// queues them on its own region.
+func (r *Region) sendPacketsTo(i int) {
+	v := r.packetViewers[i]
+	list := r.packetsFor(v)
+	if len(list) == 0 {
+		return
+	}
+	if v.region == r {
+		sendAll(v, list)
+		return
+	}
+	if o := v.region; o != nil && o.state != stateDead {
+		o.post(entry{v: v, fn: func(*Region) { sendAll(v, list) }})
+	}
+}
+
 func (r *Region) sendChunkPackets() {
 	if len(r.chunkPackets) == 0 {
 		return
 	}
+	// Each player's share is found and sent on its own, on idle cores in a crowded region. d.mu
+	// is held throughout, so the players' regions stay put.
 	r.d.mu.Lock()
+	r.packetViewers = r.packetViewers[:0]
 	for v := range r.d.viewers {
-		list := r.packetsFor(v)
-		if len(list) == 0 {
-			continue
-		}
-		if v.region == r {
-			sendAll(v, list)
-			continue
-		}
-		if o := v.region; o != nil && o.state != stateDead {
-			o.post(entry{v: v, fn: func(*Region) { sendAll(v, list) }})
-		}
+		r.packetViewers = append(r.packetViewers, v)
 	}
+	if r.packetFn == nil {
+		r.packetFn = r.sendPacketsTo
+	}
+	r.Parallel(len(r.packetViewers), r.packetFn)
 	r.d.mu.Unlock()
+	clear(r.packetViewers)
 	clear(r.chunkPackets)
 	r.chunkPackets = r.chunkPackets[:0]
 }

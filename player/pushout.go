@@ -116,6 +116,10 @@ func (i *ItemActor) setNoClip(e *world.Entity, on bool) {
 		return
 	}
 	i.noClip = on
+	if i.thinking {
+		i.flagsDirty = true
+		return
+	}
 	// An item with a view keeps its flags with its name; an orb never sent any.
 	if i.entity != e || i.view != nil {
 		return

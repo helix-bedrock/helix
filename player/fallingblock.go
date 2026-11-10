@@ -57,6 +57,8 @@ type FallingBlock struct {
 	// noDrop is BDS's flag for one that vanishes instead of breaking into its item.
 	noDrop bool
 	gone   bool
+	// next is the move its think step worked out.
+	next thought
 	saved  map[string]any
 	// moves is what those who see it were last told of its movement.
 	moves actorMoves
@@ -130,7 +132,7 @@ func (f *FallingBlock) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, 
 	f.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: f, Spawn: f.spawnPackets, Move: f.movePacket, Input: f.tick, Save: f.saveEntity,
+		Owner: f, Spawn: f.spawnPackets, Move: f.movePacket, Think: f.think, Input: f.tick, Save: f.saveEntity,
 	}
 }
 
@@ -203,20 +205,23 @@ func (f *FallingBlock) tick(e *world.Entity) {
 
 // move applies gravity and moves through the blocks' collision boxes. It reports whether
 // it stands on something.
-func (f *FallingBlock) move(r *world.Region, e *world.Entity) bool {
-	f.vel[1] -= fallingGravity
-	pos, hitY := e.Position(), false
-	for _, axis := range [...]int{1, 0, 2} {
-		d := f.s.clipMove(r, pos, fallingHalf, axis, f.vel[axis])
-		if d != f.vel[axis] {
-			if axis == 1 {
-				hitY = true
-			} else {
-				f.vel[axis] = 0
-			}
-		}
-		pos[axis] += d
+// think works out the fall through the blocks (see think.go).
+func (f *FallingBlock) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || f.gone || f.landed {
+		return
 	}
+	f.vel[1] -= fallingGravity
+	pos, hitY := f.s.clipSteps(r, e.Position(), fallingHalf, &f.vel)
+	f.next = thought{pos: pos, hitY: hitY, ok: true}
+}
+
+func (f *FallingBlock) move(_ *world.Region, e *world.Entity) bool {
+	if !f.next.ok {
+		f.think(e)
+	}
+	pos, hitY := f.next.pos, f.next.hitY
+	f.next = thought{}
 	onGround := hitY && f.vel[1] < 0
 	if hitY {
 		f.vel[1] = 0

@@ -164,6 +164,8 @@ type Minecart struct {
 	spec   *cartSpec
 	entity *world.Entity
 	vel    mgl32.Vec3
+	// next is the move its think step worked out.
+	next thought
 
 	maxSpeed float32
 	onGround bool
@@ -248,7 +250,7 @@ func (s *Host) newCart(id string) *Minecart {
 func (m *Minecart) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: m, Spawn: m.spawnPackets, Move: m.movePacket, Input: m.tick, Save: m.saveEntity,
+		Owner: m, Spawn: m.spawnPackets, Move: m.movePacket, Think: m.think, Input: m.tick, Save: m.saveEntity,
 	}
 }
 
@@ -308,8 +310,12 @@ func (m *Minecart) tick(e *world.Entity) {
 	m.settleRiders()
 	m.dropGoneViewers(r)
 	start := e.Position()
-	m.preTick(r, e, start)
-	pos := m.move(r, start)
+	m.preTick(e)
+	if !m.next.ok {
+		m.think(e)
+	}
+	pos := m.next.pos
+	m.next = thought{}
 	m.moved = pos.Sub(start)
 	rot := m.turn(start, pos, e.Rotation())
 	if !e.Apply(world.Movement{Pos: pos, Rot: rot, OnGround: m.onGround, Tick: e.Tick()}) {
@@ -330,7 +336,20 @@ func (m *Minecart) tick(e *world.Entity) {
 }
 
 // preTick is BDS's preNormalTick: the hurt counters, gravity, and slowing down on a rail.
-func (m *Minecart) preTick(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
+// think works out the cart's move along the rails or through the blocks (see think.go):
+// gravity, the rail's slow down, speed and boost, and the collision. It reads its riders,
+// who do not change while entities think.
+func (m *Minecart) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || m.gone {
+		return
+	}
+	start := e.Position()
+	m.prePhysics(r, start)
+	m.next = thought{pos: m.move(r, start), ok: true}
+}
+
+func (m *Minecart) preTick(e *world.Entity) {
 	changed := false
 	if m.hurtTime > 0 {
 		m.hurtTime--
@@ -343,6 +362,10 @@ func (m *Minecart) preTick(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
 	if changed {
 		m.sendHurt(e)
 	}
+}
+
+// prePhysics is the start of the cart's move: gravity and the slow down on rails.
+func (m *Minecart) prePhysics(r *world.Region, pos mgl32.Vec3) {
 	m.vel[1] -= cartGravity
 	at := floorPos(pos)
 	if !m.s.railBlock(r, at) && m.s.railBlock(r, at.Side(cube.FaceDown)) {

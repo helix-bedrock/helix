@@ -79,7 +79,18 @@ sibling library folders, so unreleased library changes are used.
   unloaded with it (`EntityConfig.Unloaded`).
   Regions tick only the phases that exist so far (queued work, player
   input, chunk sending, block ticks, visibility, movement, one flush per
-  player, saving). Block ticks (`ticks.go`) are BDS 1.26.60's: each chunk
+  player, saving). Crowded regions spread their work over idle cores with
+  `Region.Parallel` (`parallel.go`; `Config.ParallelMin`, `ParallelHelpers`,
+  `Dimension.SetParallel`): every entity's `EntityConfig.Think` (mob AI,
+  players' `Setup.Think` steps, the physics of items, orbs, TNT, falling
+  blocks, projectiles, fireworks, carts and boats), each player's
+  visibility scan, movement fan-out, block change packets and zone
+  planning, random tick planning (`randomplan.go`), relighting changes far
+  apart (`lightparallel.go`) and redstone's separate circuits. A parallel
+  item only reads the region and changes its own state; everything else is
+  applied afterwards in a fixed order, so results are the same on one core
+  and many. Handlers that change blocks (queued ticks, random ticks
+  themselves, block entities, weather) still run in BDS's order. Block ticks (`ticks.go`) are BDS 1.26.60's: each chunk
   in a simulation zone ticks once per world tick, random ticks first
   (BDS's count and position generator, `RandomTickSpeed`), then its two
   queues (pending ticks and the random ticking queue, up to 100 each, in

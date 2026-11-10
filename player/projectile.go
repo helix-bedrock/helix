@@ -307,6 +307,11 @@ type Projectile struct {
 	vel    mgl32.Vec3
 	rot    world.Rotation
 
+	// plan is what its think step found along this tick's flight, when planned.
+	plan     projectileHit
+	planKind projectileHitKind
+	planned  bool
+
 	// waiting holds a new one still for its first tick. The players who see it are told
 	// after entities tick, so it would first show a whole tick's flight from where it started.
 	waiting bool
@@ -397,7 +402,7 @@ func (t *Projectile) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, ro
 	t.moves.start(pos, rot, t.spec.MoveDroppedTicks, t.spec.MoveFarDistance)
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Input: t.tick, Save: t.saveEntity,
+		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Think: t.think, Input: t.tick, Save: t.saveEntity,
 		StaySeen: t.staysSeen, Unloaded: t.unloaded,
 	}
 }
@@ -489,6 +494,7 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 		t.shake = 0
 	}
 	if t.stuck {
+		t.planned = false
 		t.tickStuck(r, e)
 		return
 	}
@@ -496,8 +502,12 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	t.age++
 	from := e.Position()
 	to := from.Add(t.vel)
-	t.checkSeparated(r, from, to)
-	hit, kind := t.firstHit(r, from, to)
+	hit, kind := t.plan, t.planKind
+	if !t.planned {
+		t.checkSeparated(r, from, to)
+		hit, kind = t.firstHit(r, from, to)
+	}
+	t.plan, t.planned = projectileHit{}, false
 	pos := to
 	if kind != projectileHitNone {
 		pos = hit.pos
@@ -599,6 +609,23 @@ func (s *Host) inWater(r *world.Region, pos mgl32.Vec3) bool {
 
 // checkSeparated is BDS's look for its owner: once its path grown by a block holds no part
 // of its owner, it may hit its owner.
+// think finds what this tick's flight hits first, the costly search through blocks and
+// players (see think.go). The hit itself is applied in Input.
+func (t *Projectile) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || t.gone || t.waiting || t.stuck {
+		return
+	}
+	from := e.Position()
+	to := from.Add(t.vel)
+	t.checkSeparated(r, from, to)
+	// Input counts the age up before the search, which reads it.
+	t.age++
+	t.plan, t.planKind = t.firstHit(r, from, to)
+	t.age--
+	t.planned = true
+}
+
 func (t *Projectile) checkSeparated(r *world.Region, from, to mgl32.Vec3) {
 	if t.separated {
 		return

@@ -57,6 +57,8 @@ type PrimedTNT struct {
 	lit      bool
 	onGround bool
 	gone     bool
+	// next is the move its think step worked out.
+	next thought
 	// power is the explosion's radius; fire whether it sets fires.
 	power float32
 	fire  bool
@@ -99,7 +101,7 @@ func (s *Host) SpawnTNT(d *world.Dimension, feet mgl32.Vec3, fuse int32, owner *
 func (t *PrimedTNT) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Input: t.tick, Save: t.saveEntity,
+		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Think: t.think, Input: t.tick, Save: t.saveEntity,
 	}
 }
 
@@ -169,20 +171,23 @@ func (t *PrimedTNT) explosion(e *world.Entity) *Explosion {
 }
 
 // move applies gravity, moves through the blocks' collision boxes and slows down.
-func (t *PrimedTNT) move(r *world.Region, e *world.Entity) {
-	t.vel[1] -= tntGravity
-	pos, hitY := e.Position(), false
-	for _, axis := range [...]int{1, 0, 2} {
-		d := t.s.clipMove(r, pos, tntHalfSize, axis, t.vel[axis])
-		if d != t.vel[axis] {
-			if axis == 1 {
-				hitY = true
-			} else {
-				t.vel[axis] = 0
-			}
-		}
-		pos[axis] += d
+// think works out the fall through the blocks (see think.go).
+func (t *PrimedTNT) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || t.gone {
+		return
 	}
+	t.vel[1] -= tntGravity
+	pos, hitY := t.s.clipSteps(r, e.Position(), tntHalfSize, &t.vel)
+	t.next = thought{pos: pos, hitY: hitY, ok: true}
+}
+
+func (t *PrimedTNT) move(_ *world.Region, e *world.Entity) {
+	if !t.next.ok {
+		t.think(e)
+	}
+	pos, hitY := t.next.pos, t.next.hitY
+	t.next = thought{}
 	t.onGround = hitY && t.vel[1] < 0
 	if hitY {
 		t.vel[1] = 0

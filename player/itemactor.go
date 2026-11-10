@@ -71,6 +71,10 @@ type ItemActor struct {
 	onGround, taken             bool
 	// noClip is its collision being off while it rises out of closed-in blocks.
 	noClip bool
+	// thinking is set in its think step, when a change of noClip waits for Input to be sent
+	// (flagsDirty); next is the move the step worked out.
+	thinking, flagsDirty bool
+	next                 thought
 	// saved keeps what BDS saved for the item that Helix does not use (its
 	// health, owner and the actor fields), written back as it was.
 	saved map[string]any
@@ -119,7 +123,7 @@ func (i *ItemActor) addTo(d *world.Dimension, pos mgl32.Vec3, rot world.Rotation
 func (i *ItemActor) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
-		Owner: i, Spawn: i.spawnPackets, Move: i.movePacket, Input: i.tick, Save: i.saveEntity,
+		Owner: i, Spawn: i.spawnPackets, Move: i.movePacket, Think: i.think, Input: i.tick, Save: i.saveEntity,
 		VisibleTo: i.visibleFunc(), SpawnFor: i.spawnForFunc(),
 	}
 }
@@ -279,9 +283,13 @@ func (i *ItemActor) tick(e *world.Entity) {
 	if i.throwTime > 0 {
 		i.throwTime--
 	}
-	i.applyFlow(r, e.Position())
-	gravity, inWater := i.liquidForces(r, e.Position())
-	if i.tickBurning(r, e, inWater); i.taken {
+	if !i.next.ok {
+		i.think(e)
+	}
+	st := i.next
+	i.next = thought{}
+	i.sendNoClip(e)
+	if i.tickBurning(r, e, st.inWater); i.taken {
 		return
 	}
 	if i.age > 0 && i.age%itemMergeInterval == 0 {
@@ -290,15 +298,8 @@ func (i *ItemActor) tick(e *world.Entity) {
 	if i.taken {
 		return
 	}
-	// BDS looks from the bottom of the box; its position is half the box above that.
-	centre := e.Position()
-	i.pushOut(r, e, mgl32.Vec3{centre[0], centre[1] - itemHalfSize, centre[2]}, centre)
-	rest := i.onGround && i.vel.Dot(i.vel) <= itemRestSpeed && !inWater && i.age%itemRestTicks != 0
-	if !rest {
-		if gravity {
-			i.vel[1] -= itemGravity
-		}
-		i.moveAndDrag(r, e)
+	if !st.rest {
+		i.place(r, e, st.pos, st.hitY)
 	}
 	i.sendViews(e)
 	i.age++
@@ -400,10 +401,53 @@ func (i *ItemActor) merge(o *ItemActor) bool {
 	return true
 }
 
+// think works out the item's move from the blocks alone (see think.go): the liquid's pull,
+// the push out of blocks, gravity and the collision. BDS does these after the item burns
+// and merges; neither changes the speed.
+func (i *ItemActor) think(e *world.Entity) {
+	r := e.Region()
+	if r == nil || i.taken {
+		return
+	}
+	i.thinking = true
+	pos := e.Position()
+	i.applyFlow(r, pos)
+	gravity, inWater := i.liquidForces(r, pos)
+	// BDS looks from the bottom of the box; its position is half the box above that.
+	i.pushOut(r, e, mgl32.Vec3{pos[0], pos[1] - itemHalfSize, pos[2]}, pos)
+	st := thought{ok: true, inWater: inWater}
+	st.rest = i.onGround && i.vel.Dot(i.vel) <= itemRestSpeed && !inWater && i.age%itemRestTicks != 0
+	if !st.rest {
+		if gravity {
+			i.vel[1] -= itemGravity
+		}
+		st.pos, st.hitY = i.collide(r, pos)
+	}
+	i.thinking = false
+	i.next = st
+}
+
+// sendNoClip tells those who see the item that its think step turned its collision on or off.
+func (i *ItemActor) sendNoClip(e *world.Entity) {
+	if !i.flagsDirty {
+		return
+	}
+	i.flagsDirty = false
+	// An item with a view keeps its flags with its name; an orb never sent any.
+	if i.entity == e && i.view == nil {
+		i.sendFlags(e)
+	}
+}
+
 // moveAndDrag moves the item by its velocity through the blocks' collision
 // boxes, then slows it by the air, or the block under it on the ground.
 func (i *ItemActor) moveAndDrag(r *world.Region, e *world.Entity) {
 	pos, hitY := i.collide(r, e.Position())
+	i.place(r, e, pos, hitY)
+}
+
+// place puts the item where its move took it and applies the drag.
+func (i *ItemActor) place(r *world.Region, e *world.Entity, pos mgl32.Vec3, hitY bool) {
 	onGround := hitY && i.vel[1] < 0
 	if hitY {
 		i.vel[1] = 0

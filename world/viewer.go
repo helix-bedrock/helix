@@ -56,6 +56,12 @@ type Viewer struct {
 	readyDone  bool
 	unflushed  bool
 	scratch    []mcdb.ChunkPos
+	// nextQueue and nextScratch are the zones planViewer worked out on an idle core for
+	// planCentre and planRadius, when planned; updateViewer takes them.
+	nextQueue, nextScratch []mcdb.ChunkPos
+	planCentre             mcdb.ChunkPos
+	planRadius             int32
+	planned                bool
 }
 
 // AddViewer adds a player's zones in a region of their own, which merges
@@ -138,6 +144,31 @@ func (v *Viewer) SubChunks(pk *packet.SubChunkRequest) *packet.SubChunk {
 
 // updateViewer runs every tick on the viewer's region; false once the
 // viewer was removed.
+// planViewers works out, on idle cores in a crowded region, the zones of the players who
+// moved to another chunk or changed their radius: the costly part of updateViewer that only
+// concerns each player.
+func (r *Region) planViewers() {
+	if r.viewPlanFn == nil {
+		r.viewPlanFn = r.planViewer
+	}
+	r.Parallel(len(r.viewers), r.viewPlanFn)
+}
+
+// planViewer is planViewers for one player. It only reads the region.
+func (r *Region) planViewer(i int) {
+	v := r.viewers[i]
+	v.planned = false
+	v.mu.Lock()
+	centre, radius, placed, removed := v.centre, v.radius, v.placed, v.removed
+	v.mu.Unlock()
+	if removed || !placed || centre == v.lastCentre && radius == v.lastRadius && v.queue != nil {
+		return
+	}
+	v.nextQueue = chunksInRadius(v.nextQueue, centre, radius)
+	v.nextScratch = chunksInRadius(v.nextScratch, centre, min(r.d.conf.SimulationDistance, radius))
+	v.planCentre, v.planRadius, v.planned = centre, radius, true
+}
+
 func (r *Region) updateViewer(v *Viewer) bool {
 	v.mu.Lock()
 	centre, radius, placed, removed := v.centre, v.radius, v.placed, v.removed
@@ -172,8 +203,13 @@ func (r *Region) updateViewer(v *Viewer) bool {
 			}
 		}
 		v.netMu.Unlock()
-		v.queue = chunksInRadius(v.queue, centre, radius)
-		v.scratch = chunksInRadius(v.scratch, centre, sim)
+		if v.planned && v.planCentre == centre && v.planRadius == radius {
+			v.queue, v.nextQueue = v.nextQueue, v.queue
+			v.scratch, v.nextScratch = v.nextScratch, v.scratch
+		} else {
+			v.queue = chunksInRadius(v.queue, centre, radius)
+			v.scratch = chunksInRadius(v.scratch, centre, sim)
+		}
 		inSim := make(map[mcdb.ChunkPos]bool, len(v.scratch))
 		for _, pos := range v.scratch {
 			inSim[pos] = true
@@ -189,6 +225,7 @@ func (r *Region) updateViewer(v *Viewer) bool {
 			}
 		}
 	}
+	v.planned = false
 	sent := 0
 	for n := 0; len(v.queue) > 0 && n < chunksPerTick && len(v.waiting) < maxWaiting; {
 		pos := v.queue[0]
