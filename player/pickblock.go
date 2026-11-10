@@ -130,8 +130,7 @@ func (inv *playerItems) pick(s ItemStack, creative bool) bool {
 
 // handleBlockPick is BDS's handler for picking a block. The hotbar slot and the request for the
 // block's data are not used: BDS reads the slot from the player, and a block's data on an item
-// is not built. BDS also sends GuiDataPickItem with the item's name, which needs names Helix
-// does not have; the client names the item it selects anyway.
+// is not built.
 func handleBlockPick(p *Player, pk *packet.BlockPickRequest) {
 	if p.entity == nil || p.dead() {
 		return
@@ -166,6 +165,12 @@ func handleBlockPick(p *Player, pk *packet.BlockPickRequest) {
 	if !inv.pick(stack, creative) {
 		return
 	}
+	// BDS sends GuiDataPickItem before the inventory; without it the client's hotbar on the HUD can
+	// keep showing the old item after a survival pick swaps the held slot. BDS's name is the item's
+	// localised hover name, which Helix does not have: only a custom name is sent.
+	display, _ := inv.main[inv.held].Tag["display"].(map[string]any)
+	name, _ := display["Name"].(string)
+	p.send(&packet.GUIDataPickItem{ItemName: name, HotBarSlot: int32(inv.held)})
 	p.Inventory().sendAll(p, false)
 	p.send(&packet.PlayerHotBar{SelectedHotBarSlot: uint32(inv.held), WindowID: protocol.WindowIDInventory, SelectHotBarSlot: true})
 	p.sendEquipment()
