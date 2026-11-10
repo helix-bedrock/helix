@@ -84,7 +84,6 @@ func (m *Mob) LookAt(p behavior.Vec3, yawMax, pitchMax float32) {
 
 func (m *Mob) LookBusy() bool                    { return m.lookSet }
 func (m *Mob) MaxHeadXRot() float32              { return 40 }
-func (m *Mob) SetTarget(id behavior.ID)          { m.target = id }
 func (m *Mob) LastHurtBy() (behavior.ID, uint64) { return m.lastHurtBy, m.lastHurtTick }
 func (m *Mob) ClearLastHurtBy()                  { m.lastHurtBy = behavior.NoID }
 func (m *Mob) LastDamageCause() int              { return m.lastCause }

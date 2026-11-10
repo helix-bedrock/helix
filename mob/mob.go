@@ -3,8 +3,8 @@
 // ticked in BDS's order. Nothing here knows any mob by name: a zombie and a cow differ only
 // in their definition, as in BDS.
 //
-// This is the first, minimal hookup: no sensors, mob state components, spawning rules, loot
-// or saving yet. The player package's Mob actor owns the entity, packets and damage.
+// Sensors and event components run (sensors.go); mob state components other than despawning,
+// loot and saving are not hooked up yet. The player package's Mob actor owns the entity, packets and damage.
 package mob
 
 import (
@@ -21,6 +21,7 @@ import (
 	"github.com/helix-bedrock/entity/nav"
 	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/entity/physics"
+	"github.com/helix-bedrock/entity/sensor"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/world"
 )
@@ -139,9 +140,14 @@ type Mob struct {
 	persistent                      bool
 	// despawn is minecraft:despawn, nil without one; stateEnv is what it runs with, made
 	// once. despawned is set when it removed the mob.
-	despawn      *state.Despawn
-	stateEnv     state.Env
-	despawned    bool
+	despawn   *state.Despawn
+	stateEnv  state.Env
+	despawned bool
+	// sensors are the definition's sensors and event components (sensors.go), sensorEnv what
+	// they run with, sensorComps the components they were read from.
+	sensors      *sensor.Set
+	sensorEnv    sensor.Env
+	sensorComps  definition.Group
 	swellDir     int32
 	noActionTime int32
 	// moveSpeed is the speed the move control last chose (BDS's Mob::mSpeed), kept between
@@ -265,6 +271,7 @@ func (m *Mob) think() (remove bool) {
 	if m.despawnTick() {
 		return true
 	}
+	m.sensorTick()
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw
 	m.lookSet = false
 	m.noActionTime++
@@ -310,6 +317,7 @@ func (m *Mob) refresh() {
 		}
 		ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
 		m.readDespawn(ctx, comps)
+		m.readSensors(ctx, comps)
 		goals, warnings := m.rt.Goals.Build(ctx, order, comps)
 		for _, w := range warnings {
 			m.rt.Log.Debug("mob goal", "type", m.typ, "warning", w)
@@ -551,6 +559,11 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 	if m.Dead() || amount <= 0 {
 		return 0
 	}
+	attacker := m.actor(by)
+	amount, ok := m.damageSensed(amount, cause, attacker)
+	if !ok || amount <= 0 {
+		return 0
+	}
 	dealt := amount
 	if m.hurtTime > 0 {
 		if amount <= m.lastHurtAmount {
@@ -567,6 +580,13 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 		m.lastHurtBy, m.lastHurtTick = by, tick
 	}
 	m.noActionTime = 0
+	m.fire(onHurt, attacker)
+	if attacker != nil && attacker.IsPlayer() {
+		m.fire(onHurtByPlayer, attacker)
+	}
+	if m.Dead() {
+		m.fire(onDeath, attacker)
+	}
 	m.snapshot()
 	return dealt
 }

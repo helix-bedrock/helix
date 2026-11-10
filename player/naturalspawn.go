@@ -36,6 +36,8 @@ type spawning struct {
 	blocks *mob.SpawnBlocks
 	// biomes maps a registry biome ID to the spawner's biome index, -1 for none.
 	biomes map[int16]uint32
+	// tags are each registry biome's tags, for the mob filter tests.
+	tags map[int16][]string
 }
 
 // setUpSpawning loads vanilla's spawn rules and biome tags. Without them mobs only come
@@ -57,7 +59,7 @@ func (s *Host) setUpSpawning() error {
 	if err != nil {
 		return err
 	}
-	sg := &spawning{blocks: blocks, biomes: map[int16]uint32{}}
+	sg := &spawning{blocks: blocks, biomes: map[int16]uint32{}, tags: map[int16][]string{}}
 	all := s.reg.Biomes.All()
 	infos := make([]spawn.BiomeInfo, 0, len(all))
 	for _, b := range all {
@@ -67,6 +69,7 @@ func (s *Host) setUpSpawning() error {
 			info = spawn.BiomeInfo{Tags: b.Tags}
 		}
 		sg.biomes[b.ID] = uint32(len(infos)) //nolint:gosec // a biome count
+		sg.tags[b.ID] = info.Tags
 		infos = append(infos, info)
 	}
 	sg.sp = spawn.New(rules, infos)

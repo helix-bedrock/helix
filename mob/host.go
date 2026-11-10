@@ -66,8 +66,12 @@ var damageCauses = map[string]int{
 	"sonic_boom": 31, "campfire": 32, "soul_campfire": 33, "mace_smash": 34, "all": 35,
 }
 
-func (r resolver) Tester(self, other behavior.Actor, _ *behavior.Pos) definition.Tester {
-	return tester{m: r.m, self: self, other: other}
+func (r resolver) Tester(self, other behavior.Actor, pos *behavior.Pos) definition.Tester {
+	t := tester{m: r.m, self: self, other: other}
+	if pos != nil {
+		t.pos, t.hasPos = *pos, true
+	}
+	return t
 }
 
 // HoldsItem is not hooked up yet: tempt and the other item goals never see their item.
@@ -77,11 +81,14 @@ func (resolver) Molang(string) (func(behavior.Mob) float32, bool) { return nil, 
 
 func (m *Mob) tester(other behavior.Actor) tester { return tester{m: m, self: m, other: other} }
 
-// tester runs the filter tests the minimal hookup knows. A test it does not know fails, as
-// if its subject could not answer; the audit will port the rest from BDS.
+// tester runs the filter tests (more in tests.go). A test it does not know fails, as if its
+// subject could not answer; the audit will port the rest from BDS.
 type tester struct {
 	m           *Mob
 	self, other behavior.Actor
+	// pos is the block subject, when hasPos is set.
+	pos    behavior.Pos
+	hasPos bool
 }
 
 func (t tester) subject(s definition.Subject) behavior.Actor {
@@ -90,6 +97,10 @@ func (t tester) subject(s definition.Subject) behavior.Actor {
 		return t.self
 	case definition.SubjectOther, definition.SubjectDamager:
 		return t.other
+	case definition.SubjectPlayer:
+		if t.other != nil && t.other.IsPlayer() {
+			return t.other
+		}
 	case definition.SubjectTarget:
 		if t.m.target != behavior.NoID && t.m.v.r != nil {
 			return t.m.rt.Env.Actor(t.m.v.r, t.m.target)
@@ -100,6 +111,9 @@ func (t tester) subject(s definition.Subject) behavior.Actor {
 
 // Test runs one filter test.
 func (t tester) Test(test *definition.Test) (pass, resolved bool) {
+	if test.Subject == definition.SubjectBlock {
+		return t.blockTest(test)
+	}
 	a := t.subject(test.Subject)
 	if a == nil {
 		return false, false
@@ -160,7 +174,7 @@ func (t tester) Test(test *definition.Test) (pass, resolved bool) {
 		// Another mob's properties are not in its snapshot yet: those tests fail.
 		return t.property(test, m)
 	}
-	return false, true
+	return t.more(test, a, m, s)
 }
 
 func (t tester) property(test *definition.Test, m *Mob) (bool, bool) {

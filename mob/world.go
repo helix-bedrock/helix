@@ -47,6 +47,14 @@ type Env interface {
 	SetBlock(r *world.Region, p behavior.Pos, b behavior.PlacedBlock, by behavior.ID)
 	// Particle spawns a named particle effect.
 	Particle(r *world.Region, name string, p behavior.Vec3)
+	// BiomeTags are the tags of the biome at pos, BiomeName its name; false where the chunk
+	// is not loaded.
+	BiomeTags(r *world.Region, pos cube.Pos) ([]string, bool)
+	BiomeName(r *world.Region, pos cube.Pos) (string, bool)
+	// DayTime is the overworld clock's time.
+	DayTime() int32
+	// GameRule is a boolean game rule by its lower case name; false if there is none.
+	GameRule(name string) (value, ok bool)
 	// Mob is the mob with the unique ID in r, nil when there is none. It is only called
 	// outside the think phase.
 	Mob(r *world.Region, id behavior.ID) *Mob
