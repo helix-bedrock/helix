@@ -73,7 +73,9 @@ sibling library folders, so unreleased library changes are used.
   through `SetEntityViewRadius2`, never wider than the gap between
   regions; spawn packets on entering, RemoveActor on leaving), and
   each entity's movement is built once per tick for everyone who sees it.
-  Other entities live in loaded chunks only: `Apply` refuses a move into
+  Other entities live in loaded chunks only, and think and take input only
+  while their chunk ticks, as BDS ticks actors (`EntityConfig.TickAnywhere`
+  lifts that): `Apply` refuses a move into
   an unloaded chunk, an entity that moved into another region's section
   is handed to it at the end of the tick, and one whose chunk unloads is
   unloaded with it (`EntityConfig.Unloaded`).
@@ -290,7 +292,7 @@ sibling library folders, so unreleased library changes are used.
 - `player/void.go`: the void as BDS's OutOfWorldSystem (below the dimension's min height minus 16; `Systems.OutOfWorld`, `Systems.Void`, `OnVoid`, `TuneVoidDamage`, `OutOfWorlder` for an owner's own answer). Every entity's tick calls `Host.checkVoid`; a new entity kind calls it too.
 - `player/explosion.go`: BDS's explosion as a struct anyone can run (`Explosion`, `Host.Explode`, `Systems.Explode`, `OnExplosionStart` (before anything), `OnExplosion` (once the blocks are known, `Keep`), `OnExplosionHit` (per entity reached), what set it off (`Kind`, `FromBlock`, `Block`, `BlockPos`, `Attacker`), block behaviour `Exploded`, entity owner `Blastable`). `player/primedtnt.go`: lit TNT (`PrimedTNT`, `Host.SpawnTNT`, `OnTNTPrime`, saved with its chunk) and vanilla's TNT block as a block behaviour.
 - `circuit/config.go`: `Config`, every number redstone runs by, BDS's by default (`DefaultConfig`), and `Settings`, which holds it for the regions to read while `Server.SetRedstone` swaps it. A new redstone number goes here, not in a constant. The circuit library's own numbers are `redstone.Rules`.
-- `player/projectile.go`: everything shot or thrown as one `Projectile` with a `ProjectileSpec` read from its definition (`Host.SpawnProjectile`); `throwItem`, `releaseBow` and `dispenseProjectile` start them. They hold the chunks ahead of them with a `Ticket` while flying and stay shown through `EntityConfig.StaySeen`; `ProjectileSpec.StayInLoaded` turns both off.
+- `player/projectile.go`: everything shot or thrown as one `Projectile` with a `ProjectileSpec` read from its definition (`Host.SpawnProjectile`); `throwItem`, `releaseBow` and `dispenseProjectile` start them. Like every entity that is not a player's, they stop where chunks do not tick, as BDS's do.
 - `circuit/target.go`: target blocks (`Ticker.HitTarget`, reached by `Host.HitTarget`); projectiles call it once they exist, and `-testcmds` adds /targettest.
 - `daytime`: the overworld clock (`Clock`, worked out from the world tick so any core reads it without a lock), BDS's sun angle and sky darkening, and what a daylight sensor reads. `world/light.go`: sky and block light as BDS 1.26.60's relighter and height map, kept per sub chunk (`Region.Light`, `SkyLight`, `BlockLight`, `Brightness`; `Config.Light` and `Config.Sky` replace the rules), worked out on the loading worker and relit at the end of the tick after block changes. `circuit/daylight.go`: daylight sensors' block entity. `circuit/button.go`: buttons breaking off and arrows on wood buttons. `player/clock.go`: SyncWorldClocks.
 - `player/furnace.go`: furnaces, blast furnaces and smokers, as a `Chest` with a `machineSpec` and a `Furnace` (tick, fuel, smelting, lit swap through `world.BlockEntityKeeper`, experience, hopper sides, window data); `crafting.Table.Smelt` finds their recipes.

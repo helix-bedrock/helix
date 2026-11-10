@@ -39,6 +39,9 @@ type Entity struct {
 	chunk    mcdb.ChunkPos
 	moved    bool
 	gone     bool
+	// frozen is set for this tick when the entity's chunk is not ticking: it neither thinks
+	// nor takes input (tickEntities).
+	frozen bool
 	// known are the entities this player was shown, and whether the last
 	// scan saw them. Players only.
 	known map[*Entity]known
@@ -105,6 +108,10 @@ type EntityConfig struct {
 	// Input runs every tick in the region's player input phase, entities
 	// in runtime ID order: a player handles the packets it queued here.
 	Input func(e *Entity)
+	// TickAnywhere runs Think and Input even while the entity's chunk is not ticking. Without
+	// it an entity that is not a player's stands still where no simulation zone or ticking
+	// ticket reaches, as BDS ticks actors only in ticking chunks; a player's always ticks.
+	TickAnywhere bool
 	// Removed runs once the entity was removed, with its last state.
 	Removed func(e *Entity)
 	// Unloaded runs when the chunk of an entity that is not a player's
@@ -490,7 +497,8 @@ func (r *Region) tickEntities() {
 	}
 	r.thinkers = r.thinkers[:0]
 	for _, e := range r.entities {
-		if e.conf.Think != nil {
+		e.frozen = !r.entityTicks(e)
+		if e.conf.Think != nil && !e.frozen {
 			r.thinkers = append(r.thinkers, e)
 		}
 	}
@@ -503,10 +511,20 @@ func (r *Region) tickEntities() {
 	}
 	// Input may move entities between chunks, never add or remove them.
 	for _, e := range r.entities {
-		if e.conf.Input != nil {
+		if e.conf.Input != nil && !e.frozen {
 			e.conf.Input(e)
 		}
 	}
+}
+
+// entityTicks reports whether e ticks this tick: a player's entity always, any other while
+// its chunk ticked last tick (BDS ticks actors only in ticking chunks) or with TickAnywhere.
+func (r *Region) entityTicks(e *Entity) bool {
+	if e.conf.Viewer != nil || e.conf.TickAnywhere {
+		return true
+	}
+	recent, _ := r.ChunkTicked(e.chunk)
+	return recent
 }
 
 // think runs the Think of the i-th thinking entity.

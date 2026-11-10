@@ -116,32 +116,12 @@ func TestArrowSticksThenFalls(t *testing.T) {
 	waitRegion(t, d, func(*world.Region) bool { return !arrow.stuck })
 }
 
-// An arrow keeps flying past the chunks that were loaded when it was shot, with its speed.
-func TestArrowFliesPastLoadedChunks(t *testing.T) {
+// As BDS's tick does, it waits at the edge of the loaded chunks with its speed.
+func TestArrowStaysInLoadedChunks(t *testing.T) {
 	p, d := machineWorld(t)
 	var y int
 	onRegion(d, func(r *world.Region) { y = surface(r, p.s.reg.Blocks.Air(), 3, 8) })
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
-	var arrow *Projectile
-	onRegion(d, func(r *world.Region) {
-		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 100, 8.5}, mgl32.Vec3{1, 0, 0}, spec.Power, nil)
-	})
-	waitRegion(t, d, func(*world.Region) bool { return arrow.Entity().Position()[0] > 120 })
-	if arrow.Velocity()[0] < 1 {
-		t.Errorf("it lost its speed: %v", arrow.Velocity())
-	}
-	if arrow.ahead == nil {
-		t.Error("it holds no chunks ahead of it")
-	}
-}
-
-// With StayInLoaded, as BDS's tick would, it waits at the edge with its speed.
-func TestArrowCanStayInLoadedChunks(t *testing.T) {
-	p, d := machineWorld(t)
-	var y int
-	onRegion(d, func(r *world.Region) { y = surface(r, p.s.reg.Blocks.Air(), 3, 8) })
-	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
-	spec.StayInLoaded = true
 	var arrow *Projectile
 	onRegion(d, func(r *world.Region) {
 		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 100, 8.5}, mgl32.Vec3{1, 0, 0}, spec.Power, nil)
