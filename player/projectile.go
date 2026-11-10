@@ -47,18 +47,9 @@ const (
 	// projectileLookAhead is how many ticks of flight ahead its chunks are kept loaded.
 	projectileLookAhead = 10
 	// projectileMoveDropped and projectileMoveFar are BDS's defaults for a definition's
-	// conditional bandwidth optimization, and projectileMoveTicksShare the part of its dropped
-	// ticks BDS uses.
-	projectileMoveDropped    = 10
-	projectileMoveFar        = 80
-	projectileMoveTicksShare = 0.75
-	// projectileMoveMin and projectileRestMin are squared distances, projectileTurnMin degrees:
-	// BDS's limits on when a move is worth sending.
-	projectileMoveMin = 0.0001
-	projectileRestMin = 1e-6
-	projectileTurnMin = 4
-	// projectileDegreesPerByte is one step of a rotation in a move.
-	projectileDegreesPerByte = 360.0 / 256
+	// conditional bandwidth optimization.
+	projectileMoveDropped = actorMoveDropped
+	projectileMoveFar     = actorMoveFar
 	// projectileTurn is how much of a turn its rotation makes each tick.
 	projectileTurn = 0.2
 	// projectileBounce is what is left of its speed, turned round, when it does no damage.
@@ -342,12 +333,8 @@ type Projectile struct {
 	ahead              *world.Ticket
 	aheadFrom, aheadTo mcdb.ChunkPos
 
-	// sentPos, sentRot and sentGround are the last move those who see it were told, and sentTo
-	// the tick each of them last got one.
-	sentPos    mgl32.Vec3
-	sentRot    world.Rotation
-	sentGround bool
-	sentTo     map[*world.Entity]int64
+	// moves is what those who see it were last told of its movement.
+	moves actorMoves
 	// stuckMoveDue is the move BDS always sends on the tick after it sticks.
 	stuckMoveDue bool
 	// ticked and shown count off its start: BDS makes every projectile invisible when it is
@@ -407,7 +394,7 @@ func (s *Host) SpawnProjectile(d *world.Dimension, spec ProjectileSpec, pos, dir
 }
 
 func (t *Projectile) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
-	t.sentPos, t.sentRot = pos, rot
+	t.moves.start(pos, rot, t.spec.MoveDroppedTicks, t.spec.MoveFarDistance)
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Input: t.tick, Save: t.saveEntity,
@@ -453,80 +440,15 @@ func rotationByte(deg float32) int8 {
 	return int8(int32((wrapped - 180) / 360 * 256))
 }
 
-// movePacket is BDS's check of whether a move is worth sending (0xb3c5260, 0x85a4be0): moved
-// more than a hundredth of a block, or turned more than 4 degrees, or come to rest. Nil if not.
+// movePacket sends its move as BDS's actor movement sync does. Nil: the sync sends its own.
 func (t *Projectile) movePacket(e *world.Entity) packet.Packet {
-	pos, rot := e.Position(), e.Rotation()
-	d := pos.Sub(t.sentPos)
-	moved, speed := d.Dot(d), t.vel.Dot(t.vel)
-	turned := (abs32(float32(rotationByte(rot.Pitch))-float32(rotationByte(t.sentRot.Pitch))) +
-		abs32(float32(rotationByte(rot.Yaw))-float32(rotationByte(t.sentRot.Yaw)))) * projectileDegreesPerByte
-	if moved <= projectileMoveMin && turned <= projectileTurnMin && (moved <= projectileRestMin || speed >= projectileRestMin) {
-		return nil
-	}
-	t.sendDelta(e)
+	t.moves.update(e, t.vel)
 	return nil
-}
-
-// sendDelta is BDS's MoveActorDelta (0x8ce8c80): only the fields that changed since the last
-// one, and no head rotation, which only mobs have. What differs per player is how far they are
-// (0x8ce9d60): further off they get it less often, and Ticks says how many ticks it is meant to
-// last. It is 0 near by, and 0 for all on the tick it lands or leaves the ground.
-func (t *Projectile) sendDelta(e *world.Entity) {
-	pos, rot := e.Position(), e.Rotation()
-	ground := e.OnGround()
-	pk := &packet.MoveActorDelta{EntityRuntimeID: e.RuntimeID(), OnGround: ground}
-	if pos[0] != t.sentPos[0] {
-		pk.PositionX = protocol.Option(pos[0])
-	}
-	if pos[1] != t.sentPos[1] {
-		pk.PositionY = protocol.Option(pos[1])
-	}
-	if pos[2] != t.sentPos[2] {
-		pk.PositionZ = protocol.Option(pos[2])
-	}
-	if rotationByte(rot.Pitch) != rotationByte(t.sentRot.Pitch) {
-		pk.RotationX = protocol.Option(rot.Pitch)
-	}
-	if rotationByte(rot.Yaw) != rotationByte(t.sentRot.Yaw) {
-		pk.RotationY = protocol.Option(rot.Yaw)
-	}
-	same := ground == t.sentGround
-	t.sentPos, t.sentRot, t.sentGround = pos, rot, ground
-	r := e.Region()
-	if r == nil {
-		return
-	}
-	now := r.CurrentTick()
-	e.EachSeer(func(p *world.Entity) {
-		var ticks int64
-		if same {
-			ticks = t.spec.moveTicks(pos.Sub(p.Position()).Len())
-		}
-		if last, ok := t.sentTo[p]; ok && now < last+ticks {
-			return
-		}
-		if t.sentTo == nil {
-			t.sentTo = make(map[*world.Entity]int64)
-		}
-		t.sentTo[p] = now
-		if ticks == 0 {
-			p.SendTo(pk)
-			return
-		}
-		far := *pk
-		far.Ticks = uint64(ticks)
-		p.SendTo(&far)
-	})
 }
 
 // moveTicks is BDS's count for a player dist away.
 func (s ProjectileSpec) moveTicks(dist float32) int64 {
-	share := float32(1)
-	if s.MoveFarDistance >= dist {
-		share = dist / s.MoveFarDistance
-	}
-	return int64(float32(s.MoveDroppedTicks) * projectileMoveTicksShare * share)
+	return moveTicks(s.MoveDroppedTicks, s.MoveFarDistance, dist)
 }
 
 // tick is BDS's projectile tick: if stuck, whether the block still holds it; if not, what
@@ -560,7 +482,7 @@ func (t *Projectile) tick(e *world.Entity) {
 func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	if t.stuckMoveDue {
 		t.stuckMoveDue = false
-		t.sendDelta(e)
+		t.moves.send(e)
 	}
 	if t.shake > 0 {
 		e.Send(actorEventData(e.RuntimeID(), actorEventArrowShake, t.shake))

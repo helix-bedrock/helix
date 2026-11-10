@@ -58,6 +58,8 @@ type FallingBlock struct {
 	noDrop bool
 	gone   bool
 	saved  map[string]any
+	// moves is what those who see it were last told of its movement.
+	moves actorMoves
 }
 
 // Entity returns its entity.
@@ -125,6 +127,7 @@ func (s *Host) SpawnFallingBlock(d *world.Dimension, pos mgl32.Vec3, block uint3
 }
 
 func (f *FallingBlock) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+	f.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: f, Spawn: f.spawnPackets, Move: f.movePacket, Input: f.tick, Save: f.saveEntity,
@@ -146,12 +149,12 @@ func (f *FallingBlock) spawnPackets(e *world.Entity) []packet.Packet {
 	}}
 }
 
+// movePacket sends its move as BDS's actor movement sync does: clients fall it themselves
+// from AddActor's velocity and their gravity, and get MoveActorDelta when it moved. Nil: the
+// sync sends its own.
 func (f *FallingBlock) movePacket(e *world.Entity) packet.Packet {
-	var flags byte
-	if e.OnGround() {
-		flags = packet.MoveFlagOnGround
-	}
-	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: e.Position()}
+	f.moves.update(e, f.vel)
+	return nil
 }
 
 // tick is BDS's falling block tick: once placed it waits two ticks and goes; otherwise it
