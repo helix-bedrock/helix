@@ -598,7 +598,7 @@ type projectileHitKind uint8
 const (
 	projectileHitNone projectileHitKind = iota
 	projectileHitBlock
-	projectileHitPlayer
+	projectileHitEntity
 )
 
 // projectileHit is where a flight hit something.
@@ -606,6 +606,8 @@ type projectileHit struct {
 	pos    mgl32.Vec3
 	block  cube.Pos
 	player *Player
+	// mob is the mob hit, when a mob and not a player was hit.
+	mob *Mob
 }
 
 // firstHit is the nearest thing along from to to.
@@ -621,18 +623,30 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 	t.found = r.AppendEntitiesIn(t.found[:0], lo[0]-projectileScan, lo[2]-projectileScan, hi[0]+projectileScan, hi[2]+projectileScan)
 	grow := mgl32.Vec3{reach, reach, reach}
 	for _, o := range t.found {
-		target, ok := o.Owner().(*Player)
-		if !ok || target.dead() || target == t.owner && !t.separated || target.gameMode == GameModeSpectator {
+		var hit projectileHit
+		switch target := o.Owner().(type) {
+		case *Player:
+			if target.dead() || target == t.owner && !t.separated || target.gameMode == GameModeSpectator {
+				continue
+			}
+			hit.player = target
+		case *Mob:
+			if target.Dead() {
+				continue
+			}
+			hit.mob = target
+		default:
 			continue
 		}
-		boxLo, boxHi, has := target.BlastBox()
+		boxLo, boxHi, has := o.Owner().(Living).BlastBox()
 		if !has {
 			continue
 		}
 		at, hits := segmentEntersBox(from, to, boxLo.Sub(grow), boxHi.Add(grow))
 		if hits && at < limit {
-			limit, kind = at, projectileHitPlayer
-			best = projectileHit{pos: from.Add(to.Sub(from).Mul(float32(at))), player: target}
+			limit, kind = at, projectileHitEntity
+			hit.pos = from.Add(to.Sub(from).Mul(float32(at)))
+			best = hit
 		}
 	}
 	return best, kind
@@ -739,8 +753,12 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 // apply is what a hit does, BDS's on hit subcomponents as far as built.
 func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, kind projectileHitKind) {
 	t.hitSound(r, hit.pos)
-	if kind == projectileHitPlayer {
-		t.hitPlayer(hit.player)
+	if kind == projectileHitEntity {
+		if hit.mob != nil {
+			t.hitMob(hit.mob)
+		} else {
+			t.hitPlayer(hit.player)
+		}
 		if t.spec.DestroyOnHit {
 			t.remove(e)
 		}
@@ -893,6 +911,22 @@ func (t *Projectile) hitPlayer(target *Player) {
 	}
 	if (hurt || damage <= 0) && t.spec.Knockback {
 		target.projectileKnockback(t.vel, t.punch)
+	}
+}
+
+// hitMob hurts a mob as hitPlayer hurts a player: the projectile's damage (a definition that
+// damages only one family damages only mobs of that family), with its shooter as the
+// attacker, which also pushes the mob away from the shooter. BDS's knockback along the flight
+// and Punch on mobs were not read; the hit's push stands in.
+func (t *Projectile) hitMob(target *Mob) {
+	var damage float32
+	if t.spec.DamageOnly == "" || target.hasFamily(t.spec.DamageOnly) {
+		damage = projectileDamage(t.spec, t.vel.Len(), t.power, t.critical)
+	}
+	hurt := damage > 0 && target.TakeDamage(damage, DamageSource{Cause: causeProjectile, Attacker: t.owner})
+	if damage > 0 && !hurt && t.spec.Bounce {
+		t.vel = t.vel.Mul(projectileBounce)
+		t.spec.DestroyOnHit = false
 	}
 }
 

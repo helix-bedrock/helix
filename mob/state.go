@@ -17,14 +17,8 @@ import (
 // breathable, burns_in_daylight, hurt_on_condition, despawn and the rest), run by the entity
 // library's state package once per tick while the mob thinks. What they do to the mob itself
 // happens at once; hurting it waits for Apply. A despawned mob is removed as BDS's
-// Actor::despawn: no death, no drops. Burning is the engine's (fireTick).
-
-// fireDamageEvery is how often a burning mob takes fire damage, and fireDamage how much.
-const (
-	fireDamageEvery = 20
-	fireDamage      = 1
-	causeFireTick   = 7
-)
+// Actor::despawn: no death, no drops. Burning down is the engine's, shared with players
+// (FireTicks, SetFireTicks).
 
 // readStates builds the state components from the definition. A component whose JSON did not
 // change keeps its state.
@@ -58,32 +52,24 @@ func (m *Mob) stateTick() bool {
 		// engine's and not hooked up.
 		m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}})
 	}
-	m.fireTick()
 	return m.despawned
 }
 
-// fireTick burns the mob while it is on fire: fire damage every second, put out in water.
-func (m *Mob) fireTick() {
-	if m.fireTicks <= 0 {
-		return
-	}
-	if m.InWater() || m.flags.Has(behavior.FlagFireImmune) {
-		m.fireTicks = 0
-	} else {
-		// Counted apart from fireTicks: burns_in_daylight lights the mob again every tick, so
-		// the time left never runs down while the sun shines. Not checked against BDS's actor
-		// fire tick.
-		m.burnTicks++
-		if m.burnTicks%fireDamageEvery == 0 {
-			stateMob{m}.Hurt(causeFireTick, fireDamage)
-		}
-		m.fireTicks--
-	}
-	if m.fireTicks == 0 {
-		m.burnTicks = 0
-		m.SetFlag(flagOnFire, false)
-	}
+// FireTicks is how long the mob still burns.
+func (m *Mob) FireTicks() int32 { return m.fireTicks }
+
+// SetFireTicks sets how long the mob burns, and its on-fire flag with it. Runs: Apply, or
+// the engine's tick of the mob.
+func (m *Mob) SetFireTicks(n int32) {
+	m.fireTicks = max(n, 0)
+	m.SetFlag(flagOnFire, m.fireTicks > 0)
 }
+
+// FireImmune reports minecraft:fire_immune.
+func (m *Mob) FireImmune() bool { return m.flags.Has(behavior.FlagFireImmune) }
+
+// Wet is in water, or in the rain under the open sky: what puts a mob's fire out.
+func (m *Mob) Wet() bool { return stateMob{m}.InWaterOrRain() }
 
 // Despawned reports whether the mob despawned, to be removed without dying.
 func (m *Mob) Despawned() bool { return m.despawned }
@@ -188,8 +174,7 @@ func (s stateMob) SetOnFire(seconds int32) {
 	if s.flags.Has(behavior.FlagFireImmune) || seconds <= 0 {
 		return
 	}
-	s.fireTicks = max(s.fireTicks, seconds*ticksPerSecond)
-	s.SetFlag(flagOnFire, true)
+	s.SetFireTicks(max(s.fireTicks, seconds*ticksPerSecond))
 }
 
 // CanSeeDaylight is day with the sky above the mob's eyes.

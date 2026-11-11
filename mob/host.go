@@ -152,6 +152,10 @@ func (t tester) Test(test *definition.Test) (pass, resolved bool) {
 	if a == nil {
 		return false, false
 	}
+	// State components see the mob as stateMob; its tests are about the mob itself.
+	if sm, ok := a.(stateMob); ok {
+		a = sm.Mob
+	}
 	// The mob itself is read live; another mob through its snapshot, as it may be thinking
 	// on another core.
 	m, _ := a.(*Mob)

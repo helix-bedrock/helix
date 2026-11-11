@@ -171,17 +171,8 @@ func (p *Player) fireProtection() int32 {
 // void hurts. Assumed from the game modes, not read.
 func (p *Player) fireImmune() bool { return p.invulnerable() }
 
-// burnHurt deals fire damage, which Fire Resistance stops.
-func (p *Player) burnHurt(damage float32, cause DamageCause) {
-	if _, ok := p.Effect(EffectFireResistance); ok {
-		return
-	}
-	p.s.game.sys.Hurt(p, damage, DamageSource{Cause: cause})
-}
-
-// tickBurning is a player's tick of fire: what it stands in hurts it and sets it on fire, lava
-// hurts it, and the fire it is on burns down, hurting once a second, or goes out in water or
-// rain.
+// tickBurning is a player's tick of the shared hazards (living.go): what it stands in hurts
+// it and sets it on fire, lava hurts it, and its fire burns down. A berry bush also slows it.
 // Runs: the player's region, once a tick.
 func (p *Player) tickBurning() {
 	if p.entity == nil || p.dead() {
@@ -191,45 +182,18 @@ func (p *Player) tickBurning() {
 	if r == nil {
 		return
 	}
-	at := p.entity.Position()
-	feet := at[1] - eyeHeight
-	lo, hi := playerBox(at)
+	lo, hi := playerBox(p.entity.Position())
+	moved := p.move.moved
+	if p.invulnerable() {
+		// Creative and spectator players take no contact damage.
+		moved = mgl32.Vec3{}
+	}
 	c := p.s.touching(r, lo, hi)
-	p.tickContact(c)
-	if p.dead() {
-		return
+	p.move.inBerry = c.contact == contactBerry
+	if p.invulnerable() && c.contact == contactCactus {
+		c.contact = contactNone
 	}
-	immune := p.fireImmune()
-	if !immune {
-		if c.fire > 0 {
-			p.burnHurt(c.fire, DamageFire)
-			p.SetOnFire(burnSeconds)
-		}
-		if c.lavaBurn {
-			p.burnHurt(fireBlockDamage, DamageFire)
-			p.SetOnFire(burnSeconds)
-		}
-		if c.lava {
-			p.burnHurt(lavaDamage, DamageLava)
-		}
-	}
-	if p.burn.ticks <= 0 || p.dead() {
-		return
-	}
-	if !immune && (p.move.inWater || p.s.inRain(r, mgl32.Vec3{at[0], feet + playerHeight, at[2]})) && !c.lava {
-		p.Extinguish()
-		fizzOut(r, lo, hi)
-		return
-	}
-	if immune {
-		p.burn.ticks -= immuneBurnOut
-	} else {
-		if p.burn.ticks%burnEvery == 0 {
-			p.burnHurt(burnDamage, DamageFireTick)
-		}
-		p.burn.ticks--
-	}
-	p.showBurning()
+	p.s.tickHazardsFrom(r, p, lo, hi, moved, c)
 }
 
 // showBurning tells everyone, the player too, when the fire flag changes.

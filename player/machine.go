@@ -452,10 +452,16 @@ func (c *Chest) viewersChanged(r *world.Region) {
 // experience orbs. Runs: owner of the entity's region.
 func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 	at := e.Position()
-	switch e.Owner().(type) {
+	switch o := e.Owner().(type) {
 	case *Player:
 		lo = mgl32.Vec3{at[0] - playerHalfWidth, at[1] - eyeHeight, at[2] - playerHalfWidth}
 		return lo, mgl32.Vec3{at[0] + playerHalfWidth, lo[1] + playerHeight, at[2] + playerHalfWidth}, true, true
+	case *Mob:
+		if o.gone {
+			return lo, hi, false, false
+		}
+		bx := o.m.Box()
+		return mglVec(bx.Min), mglVec(bx.Max), true, true
 	case *ItemActor:
 		lo = mgl32.Vec3{at[0] - itemHalfSize, at[1], at[2] - itemHalfSize}
 		return lo, mgl32.Vec3{at[0] + itemHalfSize, at[1] + 2*itemHalfSize, at[2] + itemHalfSize}, false, true
@@ -493,6 +499,13 @@ func (s *Host) IsArrow(e *world.Entity) bool {
 // the server moves it, stopped by blocks as BDS's actor move is, and corrects the client.
 // Runs: owner of the entity's region.
 func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl32.Vec3) {
+	if m, ok := e.Owner().(*Mob); ok {
+		// The mob's body is where it is; the entity follows it at the mob's next Apply.
+		if !m.gone && e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()}) {
+			m.m.SetPos(vec(e.Position()))
+		}
+		return
+	}
 	p, isPlayer := e.Owner().(*Player)
 	if !isPlayer {
 		e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()})

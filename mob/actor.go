@@ -125,7 +125,7 @@ func (m *Mob) CanMate(behavior.Actor) bool           { return false }
 func (m *Mob) SetPersistent()                        { m.persistent = true }
 func (m *Mob) CanSit() bool                          { return false }
 func (m *Mob) OnGround() bool                        { return m.body.OnGround }
-func (m *Mob) OnFire() bool                          { return false }
+func (m *Mob) OnFire() bool                          { return m.fireTicks > 0 }
 func (m *Mob) Velocity() behavior.Vec3               { return m.body.Vel }
 func (m *Mob) SetVelocity(v behavior.Vec3)           { m.body.Vel = v }
 func (m *Mob) HasEffect(int) bool                    { return false }

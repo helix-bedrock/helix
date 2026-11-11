@@ -52,33 +52,6 @@ func (s *Host) contactOf(b uint32) contactBlock {
 	return contactNone
 }
 
-// tickContact deals the player its contact damage for what its box touches this tick. For a
-// player BDS's berry bush check (0xD4E0C70) reads PostTickPositionDeltaComponent, how far
-// its last movement took it, not its velocity, which the client keeps at 0 while stuck in
-// the bush. The client plays the bush's scratch sound (block.sweet_berry_bush.hurt) itself on
-// each hurt; BDS sends no sound for it. Runs: the player's region, once a tick.
-func (p *Player) tickContact(c burnContact) {
-	p.move.inBerry = c.contact == contactBerry
-	if p.invulnerable() {
-		return
-	}
-	switch c.contact {
-	case contactCactus:
-	case contactBerry:
-		v := p.move.moved
-		if abs32(v[0]) <= berryMoveLimit && abs32(v[2]) <= berryMoveLimit {
-			return
-		}
-	default:
-		return
-	}
-	block := nameCactus
-	if c.contact == contactBerry {
-		block = nameBerryBush
-	}
-	p.s.game.sys.Hurt(p, contactDamage, DamageSource{Cause: DamageContact, Block: block})
-}
-
 // tickContact is a dropped item's contact damage: a cactus takes 1 from its health each tick.
 func (i *ItemActor) tickContact(e *world.Entity, c burnContact) {
 	if c.contact == contactCactus && !i.taken {

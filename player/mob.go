@@ -165,7 +165,8 @@ func (m *Mob) think(e *world.Entity) {
 }
 
 // apply does what the mob decided this tick, in the region's runtime ID order: its queued
-// effects, the void check and the move of its entity.
+// effects, the void check, the shared hazards (fire, lava, contact blocks, landing) and the
+// move of its entity.
 func (m *Mob) apply(e *world.Entity) {
 	if e.Region() == nil || m.gone {
 		return
@@ -176,6 +177,9 @@ func (m *Mob) apply(e *world.Entity) {
 		return
 	}
 	if m.s.checkVoid(e); m.gone || e.Region() == nil || m.m.Dead() {
+		return
+	}
+	if m.tickHazards(e.Region()); m.gone || e.Region() == nil {
 		return
 	}
 	b := m.m.Body()

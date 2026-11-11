@@ -160,23 +160,23 @@ func (b *LightningBolt) fire(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// hitAround is each player in reach struck (Actor::thunderHit): 5 damage, and set on fire for
+// hitAround is each living entity in reach struck (Actor::thunderHit): 5 damage, and set on fire for
 // 8 seconds unless it does not burn.
 func (b *LightningBolt) hitAround(r *world.Region, at mgl32.Vec3) {
 	lo := mgl32.Vec3{at[0] - boltReach, at[1] - boltReach, at[2] - boltReach}
 	hi := mgl32.Vec3{at[0] + boltReach, at[1] + boltReachUp + boltReach, at[2] + boltReach}
 	for _, e := range r.AppendEntitiesIn(nil, lo[0], lo[2], hi[0], hi[2]) {
-		p, ok := e.Owner().(*Player)
-		if !ok || p.dead() {
+		l, ok := e.Owner().(Living)
+		if !ok || l.Dead() {
 			continue
 		}
 		elo, ehi, _, _ := b.s.EntityBox(e)
 		if ehi[0] < lo[0] || elo[0] > hi[0] || ehi[1] < lo[1] || elo[1] > hi[1] || ehi[2] < lo[2] || elo[2] > hi[2] {
 			continue
 		}
-		p.s.game.sys.Hurt(p, boltDamage, DamageSource{Cause: DamageLightning})
-		if !p.fireImmune() {
-			p.SetOnFire(boltBurnSeconds)
+		l.TakeDamage(boltDamage, DamageSource{Cause: DamageLightning})
+		if !l.FireImmune() {
+			l.SetOnFire(boltBurnSeconds)
 		}
 	}
 }

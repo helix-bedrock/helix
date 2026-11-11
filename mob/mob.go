@@ -169,10 +169,10 @@ type Mob struct {
 	stateEnv   state.Env
 	stateComps definition.Group
 	despawned  bool
-	// fireTicks is how long the mob still burns, burnTicks how long it has burned; air and
-	// maxAir its air supply.
-	fireTicks, burnTicks int32
-	air, maxAir          int16
+	// fireTicks is how long the mob still burns (the engine counts it down and burns it, as
+	// it does a player); air and maxAir its air supply.
+	fireTicks   int32
+	air, maxAir int16
 	// sensors are the definition's sensors and event components (sensors.go), sensorEnv what
 	// they run with, sensorComps the components they were read from.
 	sensors      *sensor.Set
