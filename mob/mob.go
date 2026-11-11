@@ -586,7 +586,33 @@ func (m *Mob) physicsTick() {
 	}
 	m.body.Tick(physWorld{&m.v})
 	m.body.Box = boxAt(m.body.Pos, m.body.Width, m.body.Height)
+	m.body.UpdateLiquid(physWorld{&m.v})
+	m.body.HeadInWater = m.headInWater()
 }
+
+// headInWater is BDS 1.26.60's Actor::isHeadInLiquid with water (sub_B39C240): the block at
+// the mob's eyes is water whose surface, by BlockUtils::getLiquidBlockHeight (0xB656EF0), is
+// above them.
+func (m *Mob) headInWater() bool {
+	eyes := m.Eyes()
+	p := path.Pos{X: floor32(m.body.Pos.X), Y: floor32(eyes.Y), Z: floor32(m.body.Pos.Z)}
+	b := m.v.block(p, 0)
+	if m.v.blocks.Path(b).Material != path.MaterialWater {
+		return false
+	}
+	depth, _ := m.v.blocks.reg.States(b)["liquid_depth"].(int32)
+	if depth >= liquidFalling {
+		depth = 0
+	}
+	return float32(p.Y)+1-float32(depth)/liquidLevels > eyes.Y
+}
+
+// The liquid depths: liquidFalling and above is falling liquid, a full block; liquidLevels
+// divides the depth into the block's height.
+const (
+	liquidFalling = 8
+	liquidLevels  = 9
+)
 
 func (m *Mob) eyeHeight() float32 { return m.body.Height * 0.85 }
 
