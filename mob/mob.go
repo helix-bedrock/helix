@@ -23,7 +23,9 @@ import (
 	"github.com/helix-bedrock/entity/physics"
 	"github.com/helix-bedrock/entity/sensor"
 	"github.com/helix-bedrock/entity/state"
+	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/world/cube"
 )
 
 // BDS's actor flag numbers the runtime sets itself.
@@ -584,11 +586,50 @@ func (m *Mob) physicsTick() {
 	} else {
 		m.body.HasTarget = false
 	}
+	m.liquidPush()
 	m.body.Tick(physWorld{&m.v})
 	m.body.Box = boxAt(m.body.Pos, m.body.Width, m.body.Height)
-	m.body.UpdateLiquid(physWorld{&m.v})
+	m.body.UpdateLiquid(physWorld{&m.v}, m.ridingBoat())
 	m.body.HeadInWater = m.headInWater()
 }
+
+// liquidPush is BDS 1.26.60's LiquidPhysicsSystem push (sub_77DCDE0) before the mob moves: the
+// current of the lava or water in the body's liquid boxes, the same push items get.
+func (m *Mob) liquidPush() {
+	lava, water := m.body.LiquidBoxes()
+	push := liquid.Push(m.v.blocks.reg, m.v.r, blockArea(lava), blockArea(water))
+	m.body.Vel.X += push[0]
+	m.body.Vel.Y += push[1]
+	m.body.Vel.Z += push[2]
+}
+
+// blockArea is the blocks a box covers.
+func blockArea(b path.Box) liquid.Area {
+	return liquid.Area{
+		Min: cube.Pos{int(floor32(b.Min.X)), int(floor32(b.Min.Y)), int(floor32(b.Min.Z))},
+		Max: cube.Pos{int(floor32(b.Max.X)), int(floor32(b.Max.Y)), int(floor32(b.Max.Z))},
+	}
+}
+
+// ridingBoat reports a vehicle that is a boat, whose riders BDS never counts as in water.
+func (m *Mob) ridingBoat() bool {
+	v := m.Vehicle()
+	if v == behavior.NoID {
+		return false
+	}
+	a := m.rt.Env.Actor(m.v.r, v)
+	if a == nil {
+		return false
+	}
+	t := a.Type()
+	return t == nameBoat || t == nameChestBoat
+}
+
+// The boats, whose riders are never in water.
+const (
+	nameBoat      = "minecraft:boat"
+	nameChestBoat = "minecraft:chest_boat"
+)
 
 // headInWater is BDS 1.26.60's Actor::isHeadInLiquid with water (sub_B39C240): the block at
 // the mob's eyes is water whose surface, by BlockUtils::getLiquidBlockHeight (0xB656EF0), is

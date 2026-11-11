@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -97,7 +98,7 @@ func TestLiquidFlow(t *testing.T) {
 	w.blocks[cube.Pos{-1, 64, 0}] = water(1)
 	w.blocks[cube.Pos{0, 64, 0}] = water(2)
 	w.blocks[cube.Pos{1, 64, 0}] = water(3)
-	f := liquidFlow(reg, w, cube.Pos{0, 64, 0}, 5)
+	f := liquid.Flow(reg.Blocks, w, cube.Pos{0, 64, 0}, 5)
 	if f[0] <= 0 || f[1] != 0 {
 		t.Fatalf("flow %v, want towards +x", f)
 	}
