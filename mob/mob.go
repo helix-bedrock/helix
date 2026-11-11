@@ -158,9 +158,11 @@ type Mob struct {
 	// playerHitTime counts down from playerHitTicks after a player hurt the mob: Molang's
 	// query.last_hit_by_player.
 	playerHitTime int32
-	lastCause     int
-	deathTime     int32
-	persistent    bool
+	// pushNear is scratch space for the actors pushActors finds.
+	pushNear   []behavior.Actor
+	lastCause  int
+	deathTime  int32
+	persistent bool
 	// states are the definition's state components (state.go), stateEnv what they run with,
 	// stateComps the components they were read from. despawned is set when the mob despawned.
 	states     *state.Set

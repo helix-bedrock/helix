@@ -73,6 +73,7 @@ func (m *Mob) Apply() {
 		m.ops[i] = op{}
 	}
 	m.ops = m.ops[:0]
+	m.pushActors()
 	if m.flagsDirty {
 		m.flagsDirty = false
 		m.flagsChanged()
@@ -144,6 +145,9 @@ func (m *Mob) run(o op) {
 // Snapshot is a mob as the other mobs see it while they think: a copy taken when its last
 // Apply ended. Valid until its next Apply.
 type Snapshot struct {
+	// mob is the mob it was taken of, for Apply-time work such as pushing; never read
+	// while mobs think.
+	mob           *Mob
 	id            behavior.ID
 	typ           string
 	pos, eyes     behavior.Vec3
@@ -174,6 +178,7 @@ func (m *Mob) Snapshot() *Snapshot { return &m.snap }
 // snapshot copies the parts of the mob others read. It reuses the families slice.
 func (m *Mob) snapshot() {
 	s := &m.snap
+	s.mob = m
 	s.id, s.typ = m.id, m.typ
 	s.pos, s.eyes, s.box = m.body.Pos, m.Eyes(), m.body.Box
 	s.alive = !m.Dead()
