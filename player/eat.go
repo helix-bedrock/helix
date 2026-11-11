@@ -303,7 +303,7 @@ func (p *Player) tickUsing() {
 		return
 	}
 	if u.left > 0 {
-		if !u.milk && u.left < eatEffectStart && u.left%eatEffectEvery == 0 {
+		if u.left < eatEffectStart && u.left%eatEffectEvery == 0 {
 			p.showEating(held)
 		}
 		return

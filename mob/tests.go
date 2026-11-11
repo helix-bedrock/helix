@@ -202,7 +202,11 @@ func (t tester) equipped(p PlayerInfo, test *definition.Test, tag bool) bool {
 	}
 	want := rawString(test.Value)
 	if !tag {
-		want = ns(want)
+		name, ok := itemWithoutAux(want)
+		if !ok {
+			return false
+		}
+		want = ns(name)
 	}
 	for _, item := range p.Equipment(domainOr(test, "any"), nil) {
 		if !tag && item == want || tag && slices.Contains(p.ItemTags(item), want) {
@@ -210,6 +214,21 @@ func (t tester) equipped(p PlayerInfo, test *definition.Test, tag bool) bool {
 		}
 	}
 	return false
+}
+
+// itemWithoutAux reads a filter's item named the old way, "name:aux" ("bucket:0" is an empty
+// bucket): the name, and false for an aux value other than 0, which only old item numberings
+// used and nothing in the slots carries now.
+func itemWithoutAux(v string) (string, bool) {
+	i := strings.LastIndexByte(v, ':')
+	if i < 0 {
+		return v, true
+	}
+	aux, err := strconv.Atoi(v[i+1:])
+	if err != nil {
+		return v, true
+	}
+	return v[:i], aux == 0
 }
 
 // nearestPlayer is the distance to the nearest player of the region.

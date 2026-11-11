@@ -33,7 +33,9 @@ import (
 // are taken as bucket.empty.fish and bucket.empty.land_animal (not read where BDS plays them).
 //
 // Milk (useTimeDepleted, 0xC999F60) is drunk in 32 ticks like every bucket's use time; it
-// clears every effect and, outside creative, leaves an empty bucket.
+// clears every effect and, outside creative, leaves an empty bucket. While it is drunk the
+// eating event goes out as for food, which the client plays the drink sound for (taken to
+// be the same for milk as for food, not read).
 
 // mobBucket is one entry of BDS's mob bucket table.
 type mobBucket struct {
