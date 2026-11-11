@@ -5,6 +5,7 @@ import (
 
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
+	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/entity/physics"
 )
 
@@ -224,6 +225,41 @@ func (m *Mob) Swing() { m.do(op{kind: opSwing}) }
 // result there.
 func (m *Mob) Attack(a behavior.Actor, then behavior.AttackResult) {
 	m.do(op{kind: opAttack, id: a.ID(), then: then})
+}
+
+// --- BlockEater (behavior.eat_block, a sheep growing its wool back) ---
+
+// ActorEvent sends an actor event about the mob; the eat goal's head-down animation.
+func (m *Mob) ActorEvent(id, _ int32) { m.do(op{kind: opActorEvent, n: id}) }
+
+// EatGameEvent would post the eat game event; game events (vibrations) are not built.
+func (m *Mob) EatGameEvent(behavior.Vec3) {}
+
+// standProbe is how far under its box BDS looks for what a mob stands on.
+const standProbe = 0.2
+
+// StandingOn is Actor::getBlockPosCurrentlyStandingOn (BDS 1.26.60 0xB394740): the block
+// whose collision meets a flat box 0.2 under the mob's box, else the block the mob is in.
+// When several blocks meet it, BDS's choice was not read; the one nearest the mob's middle
+// is taken.
+func (m *Mob) StandingOn() behavior.Pos {
+	b := m.body.Box
+	y := b.Min.Y - standProbe
+	probe := path.Box{Min: path.Vec3{X: b.Min.X, Y: y, Z: b.Min.Z}, Max: path.Vec3{X: b.Max.X, Y: y, Z: b.Max.Z}}
+	m.standBoxes = physWorld{&m.v}.CollisionBoxes(m.standBoxes[:0], probe)
+	cx, cz := (b.Min.X+b.Max.X)/2, (b.Min.Z+b.Max.Z)/2
+	best, found := float32(0), false
+	var at path.Vec3
+	for _, bx := range m.standBoxes {
+		dx, dz := (bx.Min.X+bx.Max.X)/2-cx, (bx.Min.Z+bx.Max.Z)/2-cz
+		if d := dx*dx + dz*dz; !found || d < best {
+			best, found, at = d, true, bx.Min
+		}
+	}
+	if !found {
+		at = m.body.Pos
+	}
+	return behavior.Pos{X: floor32(at.X), Y: floor32(at.Y), Z: floor32(at.Z)}
 }
 
 // --- Creeper ---

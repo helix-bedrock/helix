@@ -20,8 +20,8 @@ const (
 	enchantSilkTouch = int16(16)
 	enchantFortune   = int16(18)
 	enchantLooting   = int16(14)
-	// Not read from BDS: where its spawner sets an item's speed was not found.
-	// Refine against BDS.
+	// Every new item's speed, from BDS 1.26.60's ItemActor constructor (0xBD61040):
+	// sideways r*0.2-0.1 on x and z, up 0.2.
 	dropDriftSpan = 0.2
 	dropUp        = 0.2
 )

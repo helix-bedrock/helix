@@ -169,7 +169,9 @@ type Mob struct {
 	charged      bool
 	chargeAmount int8
 	// pushNear is scratch space for the actors pushActors finds.
-	pushNear   []behavior.Actor
+	pushNear []behavior.Actor
+	// standBoxes is scratch space for StandingOn.
+	standBoxes []path.Box
 	lastCause  int
 	deathTime  int32
 	persistent bool
