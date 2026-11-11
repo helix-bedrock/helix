@@ -37,8 +37,12 @@ func EquipSlotByName(name string) (int, bool) {
 	return s, ok
 }
 
-// itemCrossbow is the item that makes ranged_attack charge before shooting.
-const itemCrossbow = "minecraft:crossbow"
+// itemCrossbow is the item that makes ranged_attack charge before shooting; it and
+// itemBow are the ranged weapons of has_ranged_weapon.
+const (
+	itemCrossbow = "minecraft:crossbow"
+	itemBow      = "minecraft:bow"
+)
 
 // Equipment is the item in a slot; empty for none or a slot out of range.
 func (m *Mob) Equipment(slot int) behavior.Item {

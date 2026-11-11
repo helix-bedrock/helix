@@ -124,18 +124,24 @@ func vec(p mgl32.Vec3) behavior.Vec3 { return behavior.Vec3{X: p[0], Y: p[1], Z:
 
 func mglVec(p behavior.Vec3) mgl32.Vec3 { return mgl32.Vec3{p.X, p.Y, p.Z} }
 
-// metadata is the mob's actor data: flags, size and air.
+// metadata is the mob's actor data: flags, size, air, its target's unique ID (0 for none,
+// as Mob::setTarget writes it) and what its components wrote.
 func (m *Mob) metadata() protocol.EntityMetadata {
 	f := m.m.Flags()
 	w, h := m.m.Size()
 	air, maxAir := m.m.Air()
-	return protocol.EntityMetadata{
+	md := protocol.EntityMetadata{
 		protocol.EntityDataKeyFlags:    int64(f[0]), //nolint:gosec // a bit set sent as int64
 		protocol.EntityDataKeyFlagsTwo: int64(f[1]), //nolint:gosec // a bit set sent as int64
 		protocol.EntityDataKeyWidth:    w, protocol.EntityDataKeyHeight: h,
 		protocol.EntityDataKeyScale:     m.m.Scale(),
 		protocol.EntityDataKeyAirSupply: air, protocol.EntityDataKeyAirSupplyMax: maxAir,
+		protocol.EntityDataKeyTarget: int64(m.m.Target()),
 	}
+	for _, d := range m.m.ActorData() {
+		md[uint32(d.Key)] = d.Value //nolint:gosec // actor data keys are small
+	}
+	return md
 }
 
 // spawnPackets show the mob. Not yet compared with what BDS sends.
@@ -251,6 +257,9 @@ func (p *Player) feet() mgl32.Vec3 {
 // system, then a push away from the mob. BDS's difficulty scaling of mob damage and hits
 // on other mobs are not built yet.
 func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
+	// Mob::doHurtTarget (0xBFEE420, 1.26.60) swings and broadcasts ActorEvent 4 before it
+	// looks at the target.
+	m.swingEvent()
 	r := m.entity.Region()
 	if r == nil {
 		return false, false
@@ -274,10 +283,22 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	return true, p.dead()
 }
 
-// Swing shows the mob's arm swing. Not compared with BDS: it may send an ActorEvent
-// instead.
+// Swing is the attack goals' swing. BDS's melee goal swings and sends ActorEvent 4 (data
+// 0) only while the mob holds an item (MeleeAttackBaseGoal::_attemptAttackTarget,
+// 0x5431880 in 1.26.60); the hit itself sends one more (swingEvent).
 func (m *Mob) Swing(*mob.Mob) {
-	m.entity.Send(&packet.Animate{ActionType: packet.AnimateActionSwingArm, EntityRuntimeID: m.entity.RuntimeID()})
+	if !m.m.Equipment(mob.EquipMainhand).Empty() {
+		m.swingEvent()
+	}
+}
+
+// swingEvent shows the mob's arm swing: ActorEvent 4 with data 0, which BDS broadcasts from
+// Mob::swing's callers. Mobs ignore the player's Animate swing.
+func (m *Mob) swingEvent() {
+	if m.entity == nil || m.entity.Region() == nil {
+		return
+	}
+	m.entity.Send(&packet.ActorEvent{EntityRuntimeID: m.entity.RuntimeID(), EventType: packet.ActorEventStartAttacking})
 }
 
 // Sound plays a level sound event the mob made, for those who see it.

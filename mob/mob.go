@@ -188,6 +188,8 @@ type Mob struct {
 	sensorComps  definition.Group
 	swellDir     int32
 	noActionTime int32
+	// data is the actor data the components wrote (data.go).
+	data []DataValue
 	// scale is minecraft:scale's value, the size the client draws the mob at (a rabbit 0.6,
 	// babies their group's own).
 	scale float32

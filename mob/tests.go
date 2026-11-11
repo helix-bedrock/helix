@@ -87,11 +87,21 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		return definition.Compare(op, int32(len(a.Riders())), rawInt(test.Value)), true //nolint:gosec // a rider count
 	case "is_riding":
 		return definition.CompareBool(op, a.Vehicle() != behavior.NoID, rawBool(test.Value, true)), true
+	case "has_ranged_weapon":
+		// ActorHasRangedWeaponTest::evaluate (1.21.3 names): a bow or crossbow in the main hand.
+		var hand []string
+		if eq := mobEquip(m, s); eq != nil {
+			hand = equipmentNames(eq, "hand", nil)
+		} else if p != nil {
+			hand = p.Equipment("hand", nil)
+		}
+		ranged := slices.ContainsFunc(hand, func(n string) bool { return n == itemBow || n == itemCrossbow })
+		return definition.CompareBool(op, ranged, rawBool(test.Value, true)), true
 	case "is_riding_self", "is_vehicle_family", "is_controlling_passenger_family", "in_caravan", "is_leashed_to",
-		"has_ranged_weapon", "has_nametag", "has_mob_effect", "is_avoiding_mobs", "is_owner", "trusts",
+		"has_nametag", "has_mob_effect", "is_avoiding_mobs", "is_owner", "trusts",
 		"has_damaged_equipment", "has_same_equipment_in_slot_as", "has_trade_supply", "has_container_open":
 		// Nothing a mob or player can have yet: riding, leashes, owners, effects, name tags,
-		// weapons and trades are not hooked up.
+		// and trades are not hooked up.
 		return definition.CompareBool(op, false, rawBool(test.Value, true)), true
 	case "is_variant", "is_mark_variant", "is_skin_id", "is_color":
 		v, ok := intComponent(comps(m, s), variantComponents[test.Name])

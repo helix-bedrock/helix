@@ -68,6 +68,9 @@ func (m *Mob) SetTarget(id behavior.ID) {
 	}
 	old := m.target
 	m.target = id
+	// Mob::setTarget writes the target's unique ID to actor data 6 (1.21.3 names), which
+	// the client's query.has_target reads: a skeleton raises its bow by it.
+	m.flagsChanged()
 	switch {
 	case id != behavior.NoID:
 		m.fire(onTargetAcquired, m.actor(id))
