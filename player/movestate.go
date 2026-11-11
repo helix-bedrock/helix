@@ -111,7 +111,7 @@ func (p *Player) glideInput(start, stop bool) {
 
 // actorFlags are the player's actor flags as other players see them.
 func (p *Player) actorFlags() int64 {
-	f := int64(1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagBreathing |
+	f := int64(1<<protocol.EntityDataFlagHasGravity |
 		1<<protocol.EntityDataFlagHasCollision | 1<<protocol.EntityDataFlagShowName | 1<<protocol.EntityDataFlagAlwaysShowName)
 	for i, in := range moveFlagInputs {
 		if p.move.flags&(1<<i) != 0 {
@@ -126,6 +126,9 @@ func (p *Player) actorFlags() int64 {
 	}
 	if p.burn.ticks > 0 {
 		f |= 1 << protocol.EntityDataFlagOnFire
+	}
+	if p.breathing() {
+		f |= 1 << protocol.EntityDataFlagBreathing
 	}
 	return f
 }

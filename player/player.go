@@ -121,13 +121,15 @@ type Player struct {
 	// storageSent is what the client was last sent of each storage item it holds, by
 	// dynamic container ID.
 	storageSent map[int32][]ItemStack
-	food     foodState
-	hurt     hurtState
-	glide    glideState
+	food        foodState
+	hurt        hurtState
+	glide       glideState
 	// portal is the player's time in portals and its cooldown.
 	portal portalState
 	// burn is the player's on-fire timer.
-	burn   burnState
+	burn burnState
+	// breath is the player's air supply.
+	breath breathState
 	shield shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int

@@ -88,6 +88,7 @@ const (
 // floats and walks through blocks. Keys are by number in the protocol
 // library, whose names for some newer keys lag behind 1.26.60.
 func (p *Player) ownMetadata() protocol.EntityMetadata {
+	b := p.Breathable()
 	return protocol.EntityMetadata{
 		protocol.EntityDataKeyFlags:                            int64(ownFlags),
 		protocol.EntityDataKeyStructuralIntegrity:              int32(1),
@@ -96,14 +97,14 @@ func (p *Player) ownMetadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyName:                             p.name,
 		protocol.EntityDataKeyOwner:                            int64(-1),
 		protocol.EntityDataKeyTarget:                           int64(0),
-		protocol.EntityDataKeyAirSupply:                        int16(300),
+		protocol.EntityDataKeyAirSupply:                        b.Air(),
 		protocol.EntityDataKeyChargeAmount:                     uint8(0),
 		protocol.EntityDataKeyPlayerFlags:                      uint8(0),
 		protocol.EntityDataKeyPlayerIndex:                      int32(1),
 		protocol.EntityDataKeyBedPosition:                      protocol.BlockPos{},
 		protocol.EntityDataKeyLeashHolder:                      int64(-1),
 		protocol.EntityDataKeyHasNPC:                           uint8(0),
-		protocol.EntityDataKeyAirSupplyMax:                     int16(300),
+		protocol.EntityDataKeyAirSupplyMax:                     b.MaxAir(),
 		protocol.EntityDataKeyMarkVariant:                      int32(0),
 		protocol.EntityDataKeyContainerType:                    uint8(0),
 		protocol.EntityDataKeyContainerSize:                    int32(0),
