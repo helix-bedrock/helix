@@ -92,6 +92,7 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickHurt()
 	p.tickBurning()
 	p.tickBreath()
+	p.tickSpin()
 	p.tickShield()
 	p.tickSleep()
 	p.reseat()

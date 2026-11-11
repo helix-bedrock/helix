@@ -130,6 +130,8 @@ type Player struct {
 	burn burnState
 	// breath is the player's air supply.
 	breath breathState
+	// spin is the Riptide spin attack.
+	spin   spinState
 	shield shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int

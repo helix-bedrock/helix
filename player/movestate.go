@@ -130,6 +130,9 @@ func (p *Player) actorFlags() int64 {
 	if p.breathing() {
 		f |= 1 << protocol.EntityDataFlagBreathing
 	}
+	if p.spin.active {
+		f |= 1 << protocol.EntityDataFlagDamageNearbyMobs
+	}
 	return f
 }
 

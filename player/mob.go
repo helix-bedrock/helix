@@ -373,13 +373,22 @@ func (p *Player) useOnMob(d *protocol.UseItemOnEntityTransactionData) bool {
 	if pos.Sub(d.Position).Len() > attackFromRange || pos.Sub(o.entity.Position()).Len() > limit {
 		return true
 	}
+	p.attackMob(o)
+	return true
+}
+
+// attackMob is the player's melee attack on a mob, BDS's player attack: the abilities rule,
+// the hit's parts, the mob's hurt, then the mace's smash and what the hit costs the attacker
+// and its item, and the sound.
+func (p *Player) attackMob(o *Mob) {
 	if !p.abilities.Flag(AbilityAttackMobs) {
-		return true
+		return
 	}
 	r := p.entity.Region()
 	if r == nil {
-		return true
+		return
 	}
+	pos := p.entity.Position()
 	h := p.s.game.sys.AttackParts(p, nil)
 	sound := packet.SoundEventAttackNoDamage
 	if h != nil {
@@ -396,7 +405,6 @@ func (p *Player) useOnMob(d *protocol.UseItemOnEntityTransactionData) bool {
 	}
 	playSound(r, p.blockPos(), soundEvent{name: sound, pos: pos, extra: -1, entity: "minecraft:player"}, p.viewer)
 	p.flush()
-	return true
 }
 
 // mobNear finds a mob near the player by its runtime ID, in the player's region.

@@ -14,8 +14,8 @@ import (
 // (sub_BC99330); its void (sub_BC99300). Its flight, damage, sticking and hit sounds come
 // from the thrown_trident definition through the projectile code.
 //
-// Not done: the riptide spin's own damage and wear (BDS's movement simulation runs the launch,
-// which Helix leaves to the client), Channeling on lightning rods, and the hit_ground sound.
+// The Riptide launch is the client's movement; its spin attack is below. Not done: Channeling
+// on lightning rods, and the hit_ground sound.
 // Channeling's thunder test reads the thunder level above 0 and the target's column to the
 // sky; BDS's exact test was not read. stop_on_hurt is taken as the trident stopping dead.
 
@@ -69,6 +69,7 @@ func (p *Player) releaseTrident(held ItemStack, used int32) {
 		if p.Wet() && p.vehicle == nil {
 			sound := riptideSounds[min(int(level), len(riptideSounds))-1]
 			playSound(r, p.blockPos(), soundEvent{name: sound, pos: p.AttachPos(AttachWeapon), extra: -1, entity: "minecraft:player"}, nil)
+			p.startSpin()
 		}
 		return
 	}
@@ -205,5 +206,98 @@ func (t *Projectile) loadTrident(data map[string]any) {
 	}
 	t.trident = &tridentState{
 		loyalty: heldEnchant(t.item, enchantLoyalty), impaling: heldEnchant(t.item, EnchantImpaling), channeling: heldEnchant(t.item, EnchantChanneling),
+	}
+}
+
+// The Riptide spin attack, from BDS 1.26.60's spin attack systems (registered by sub_76CE4D0).
+// The release sets the damage-nearby-mobs actor flag (StartSpinAttackActionSystem,
+// sub_76EE600, which also launches the player; Helix leaves the launch to the client). While it
+// is set, SpinAttackFetchNearbyMobsSystem (sub_76CDC40) finds every other mob or player whose
+// box touches the spinner's grown by 1, and DamageNearbyMobsServerSystem (sub_76CE0B0) hits
+// each with the player's own attack, the held trident's damage and enchantments. A hit ends
+// the spin (PostDamageNearbyMobsSystem, sub_76F7010), as does its 20th tick, or any from the
+// 5th on with a condition BDS reads from a component not named here: Helix takes it as being
+// on the ground. The bounce back after a hit (the speed times -0.2 for each mob hit) runs in
+// that shared system on the client too, which moves the player, so the server sends none.
+const (
+	// spinReach is how far around the spinner's box the spin hits.
+	spinReach = 1
+	// spinMaxTicks is the spin's last tick; spinGroundFrom the first that landing ends.
+	spinMaxTicks   = 18
+	spinGroundFrom = 5
+)
+
+// spinState is a running Riptide spin attack.
+type spinState struct {
+	active bool
+	ticks  int32
+}
+
+// startSpin starts the spin attack and shows its flag.
+func (p *Player) startSpin() {
+	p.spin = spinState{active: true}
+	p.sendActorFlags()
+}
+
+// endSpin ends the spin attack.
+func (p *Player) endSpin() {
+	if !p.spin.active {
+		return
+	}
+	p.spin = spinState{}
+	p.sendActorFlags()
+}
+
+// tickSpin is one tick of the spin attack: everything it touches is hit, and the spin ends
+// on a hit, on its last tick or on landing. Runs: the player's region, once a tick.
+func (p *Player) tickSpin() {
+	s := &p.spin
+	if !s.active {
+		return
+	}
+	if p.entity == nil || p.dead() {
+		p.endSpin()
+		return
+	}
+	r := p.entity.Region()
+	lo, hi, ok := p.BlastBox()
+	if r == nil || !ok {
+		return
+	}
+	grow := mgl32.Vec3{spinReach, spinReach, spinReach}
+	lo, hi = lo.Sub(grow), hi.Add(grow)
+	hits := 0
+	for _, e := range r.AppendEntitiesIn(nil, lo[0], lo[2], hi[0], hi[2]) {
+		if e == p.entity {
+			continue
+		}
+		elo, ehi, _, _ := p.s.EntityBox(e)
+		if ehi[0] < lo[0] || elo[0] > hi[0] || ehi[1] < lo[1] || elo[1] > hi[1] || ehi[2] < lo[2] || elo[2] > hi[2] {
+			continue
+		}
+		switch o := e.Owner().(type) {
+		case *Player:
+			if o.dead() || o.mode() == GameModeSpectator {
+				continue
+			}
+			p.s.game.sys.Attack(p, o)
+		case *Mob:
+			if o.Dead() {
+				continue
+			}
+			p.attackMob(o)
+		default:
+			continue
+		}
+		hits++
+	}
+	if hits > 0 {
+		p.endSpin()
+		return
+	}
+	old := s.ticks
+	s.ticks++
+	if old > spinMaxTicks || old >= spinGroundFrom && p.entity.OnGround() {
+		p.endSpin()
 	}
 }
