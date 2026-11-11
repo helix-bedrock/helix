@@ -81,7 +81,7 @@ func (d *Dimension) runTick(r *Region) {
 	r.next = r.next.Add(TickDuration)
 	if took > TickDuration && start.Sub(r.lastWarn) > overrunWarnEvery {
 		r.lastWarn = start
-		d.log.Warn("region tick over budget", "region", r.id, "took", took, "chunks", len(r.chunks), "viewers", len(r.viewers))
+		d.log.Warn("region tick over budget", "region", r.id, "took", took, "chunks", len(r.chunks), "viewers", len(r.viewers), "entities", len(r.entities), "phases", r.phases.String())
 	}
 	d.maintain(r)
 	if r.state == stateReady && d.wantedByParked(r) {

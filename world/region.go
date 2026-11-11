@@ -88,6 +88,8 @@ type Region struct {
 	contested bool
 	info      RegionInfo
 	lastWarn  time.Time
+	// phases is how long each part of the last tick took, for the over-budget warning.
+	phases tickPhases
 
 	inMu sync.Mutex
 	in   []entry
@@ -317,28 +319,41 @@ func (r *Region) post(e entry) {
 // then movement), one flush per player, saving, and handing the entities
 // that left to their new region.
 func (r *Region) tick() {
+	t := &r.phases
+	t.start()
 	r.ticks++
 	r.drain()
+	t.mark(phaseDrain)
 	r.tickEntities()
+	t.mark(phaseEntities)
 	r.planViewers()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
+	t.mark(phaseViewers)
 	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
 		rt.BeforeBlockTicks(r)
 	}
+	t.mark(phaseBeforeBlocks)
 	r.tickBlocks()
+	t.mark(phaseBlocks)
 	r.flushLight()
+	t.mark(phaseLight)
 	r.sendChunkPackets()
+	t.mark(phaseChunks)
 	r.updateVisibility()
 	r.sendMovement()
+	t.mark(phaseMovement)
 	for _, v := range r.viewers {
 		if v.unflushed {
 			v.unflushed = false
 			v.flush()
 		}
 	}
+	t.mark(phaseFlush)
 	r.saveChanged(false)
+	t.mark(phaseSave)
 	r.flushLight()
 	r.handOff()
+	t.mark(phaseHandOff)
 }
 
 // drain runs the work queued for this tick. It reuses its buffers.
