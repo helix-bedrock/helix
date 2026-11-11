@@ -17,6 +17,7 @@ const Owner = "minecraft"
 // all are the built-in commands.
 var all = []command.Spec{
 	give,
+	clearSpec,
 	teleport,
 	weatherSpec,
 	toggleDownfall,
