@@ -166,6 +166,12 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == emptyBucket {
 		return p.fillBucket(clicked)
 	}
+	if b, ok := mobBucketItem(held.Name); ok {
+		return p.pourMobBucket(clicked, face, held, b)
+	}
+	if held.Name == namePowderSnowBucket {
+		return p.pourPowderSnow(clicked, face)
+	}
 	if held.Name == paintingID {
 		return p.placePainting(r, clicked, face)
 	}

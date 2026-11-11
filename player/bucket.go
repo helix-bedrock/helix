@@ -97,55 +97,91 @@ func (p *Player) fillBucket(clicked cube.Pos) bool {
 	return true
 }
 
-// pourBucket is BDS's bucket emptying for water and lava: the liquid goes
-// in the clicked block if it can be built over, else in its neighbour on
-// the clicked face if that can. There, water goes in the second layer of a
-// block that can hold it; otherwise the liquid replaces air or a block
-// whose material is not solid, a block whose liquid reaction is popped
-// throwing out its drops first (0xC99EC80). Neighbours are told, the liquid is ticked
-// after its delay, the empty sound plays and the bucket becomes an empty
-// bucket outside creative. Not yet read from BDS: how the block is picked
-// (the built-over rule above is Helix's), the nether's rule for water, and buckets of fish and powder snow. False if
-// nothing was poured.
+// pourBucket is BDS's bucket emptying for water and lava (BucketItem::_emptyBucket,
+// 0xC99EC80): pourLiquid, the empty sound, and an empty bucket outside creative. Water in
+// the Nether boils away instead, and the bucket is still emptied. False if nothing was
+// poured.
 func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 	liq, ok := bucketLiquids[held.Name]
 	r := p.entity.Region()
 	if !ok || r == nil || !p.inReach(clicked) {
 		return false
 	}
-	blocks := p.s.reg.Blocks
-	block, ok := blocks.Block(liq.block)
+	pos, boiled, ok := p.pourLiquid(r, clicked, face, liq)
 	if !ok {
 		return false
 	}
-	pos := clicked
-	if b, ok := r.Block(clicked, 0); !ok || !p.s.game.replaceable(p, r, clicked, b, block) {
-		pos = clicked.Side(cube.Face(face))
-		if b, ok := r.Block(pos, 0); !ok || !p.s.game.replaceable(p, r, pos, b, block) {
-			return false
-		}
+	if !boiled {
+		playSound(r, pos, soundEvent{name: liq.sound, pos: blockCenter(pos), extra: -1}, nil)
+	}
+	p.emptyHeldBucket()
+	return true
+}
+
+// emptyHeldBucket turns the held bucket into an empty one outside creative.
+func (p *Player) emptyHeldBucket() {
+	if p.creative() {
+		return
+	}
+	inv := &p.inventory
+	inv.main[inv.held] = ItemStack{Name: emptyBucket, Count: 1, netID: p.s.stackIDs.Add(1)}
+	p.sendHeld()
+}
+
+// liquidTarget is where a bucket pours: the clicked block if it can be built over with
+// block, else its neighbour on the clicked face if that can (the built-over rule is
+// Helix's; how BDS picks the block was not read). False if neither can.
+func (p *Player) liquidTarget(r *world.Region, clicked cube.Pos, face int32, block uint32) (cube.Pos, bool) {
+	if b, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, b, block) {
+		return clicked, true
+	}
+	pos := clicked.Side(cube.Face(face))
+	if b, ok := r.Block(pos, 0); ok && p.s.game.replaceable(p, r, pos, b, block) {
+		return pos, true
+	}
+	return cube.Pos{}, false
+}
+
+// pourLiquid puts a bucket's liquid in at the target: water goes in the second layer of a
+// block that can hold it; otherwise the liquid replaces air or a block whose material is
+// not solid, a block whose liquid reaction is popped throwing out its drops first.
+// Neighbours are told and the liquid is ticked after its delay. Water in the Nether boils
+// away instead (BDS checks the dimension's ultrawarm flag, which only the Nether has): the
+// fizz sound at the block's middle and the water_evaporation_bucket_emitter particle at its
+// corner, and boiled is set. False if nothing was poured.
+func (p *Player) pourLiquid(r *world.Region, clicked cube.Pos, face int32, liq bucketLiquid) (pos cube.Pos, boiled, ok bool) {
+	blocks := p.s.reg.Blocks
+	block, ok := blocks.Block(liq.block)
+	if !ok {
+		return cube.Pos{}, false, false
+	}
+	pos, ok = p.liquidTarget(r, clicked, face, block)
+	if !ok {
+		return cube.Pos{}, false, false
 	}
 	target, _ := r.Block(pos, 0)
 	tp := blocks.Properties(target)
+	if liq.kind == liquid.Water && r.Dimension() == p.s.nether {
+		playSound(r, pos, soundEvent{name: packet.SoundEventFizz, pos: blockCenter(pos), extra: -1}, nil)
+		p.s.Particle(r, waterBoilParticle, vec(blockVec(pos)))
+		return pos, true, true
+	}
 	layer := uint8(0)
 	switch {
 	case liq.kind == liquid.Water && target != blocks.Air() && tp.CanContainLiquid:
 		layer = 1
 	case target != blocks.Air() && tp.SolidMaterial:
-		return false
+		return cube.Pos{}, false, false
 	case target != blocks.Air() && tp.LiquidReaction == registry.LiquidPopped:
 		p.s.PopBlock(r, pos, target)
 	}
 	if !r.SetBlock(pos, layer, block) {
-		return false
+		return cube.Pos{}, false, false
 	}
 	r.UpdateNeighbours(pos)
 	r.ScheduleTick(pos, block, liquid.TickDelay(liq.kind, false), 0)
-	playSound(r, pos, soundEvent{name: liq.sound, pos: blockCenter(pos), extra: -1}, nil)
-	if !p.creative() {
-		inv := &p.inventory
-		inv.main[inv.held] = ItemStack{Name: emptyBucket, Count: 1, netID: p.s.stackIDs.Add(1)}
-		p.sendHeld()
-	}
-	return true
+	return pos, false, true
 }
+
+// waterBoilParticle is what water poured in the Nether shows.
+const waterBoilParticle = "minecraft:water_evaporation_bucket_emitter"

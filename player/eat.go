@@ -46,6 +46,8 @@ type usingState struct {
 	left   int32
 	// bow is a bow being drawn, which ends when the player lets go.
 	bow bool
+	// milk is a milk bucket being drunk.
+	milk bool
 }
 
 // ItemUseEvent fires before a player starts using the item it holds in the air.
@@ -204,6 +206,10 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		p.startTrident(held)
 		return true
 	}
+	if held.Name == nameMilkBucket {
+		p.startMilk(held)
+		return true
+	}
 	food, ok := g.sys.FoodOf(p, held)
 	if !ok || !p.mayEat(food) {
 		return false
@@ -228,6 +234,17 @@ func (p *Player) startUsing(held ItemStack, food FoodItem) {
 		return
 	}
 	*u = usingState{active: true, slot: slot, item: held, food: food, left: food.Duration}
+	p.sendActorFlags()
+}
+
+// startMilk starts drinking milk, which any player may.
+func (p *Player) startMilk(held ItemStack) {
+	u := &p.using
+	slot := p.inventory.held
+	if u.active && u.slot == slot && u.item.Name == held.Name {
+		return
+	}
+	*u = usingState{active: true, slot: slot, item: held, left: bucketUseTicks, milk: true}
 	p.sendActorFlags()
 }
 
@@ -286,13 +303,17 @@ func (p *Player) tickUsing() {
 		return
 	}
 	if u.left > 0 {
-		if u.left < eatEffectStart && u.left%eatEffectEvery == 0 {
+		if !u.milk && u.left < eatEffectStart && u.left%eatEffectEvery == 0 {
 			p.showEating(held)
 		}
 		return
 	}
-	food := u.food
+	food, milk := u.food, u.milk
 	p.stopUsing()
+	if milk {
+		p.drinkMilk()
+		return
+	}
 	p.s.game.sys.Eat(p, held, food)
 }
 

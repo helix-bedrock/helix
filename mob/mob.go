@@ -133,20 +133,22 @@ type Mob struct {
 	id    behavior.ID
 	rid   uint64
 
-	inst     *definition.Instance
-	families []string
-	sel      goal.Selector
-	nv       *nav.Navigation
-	navigate navigator
-	finder   *path.Finder
-	movement component.Movement
-	hasMove  bool
-	ctl      move.Control
-	look     move.Look
-	jump     move.Jump
-	lookSet  bool
-	body     physics.Body
-	flags    path.ActorFlags
+	inst *definition.Instance
+	// savedHealth is a restored health the first rebuild puts in place of the default, 0 for none.
+	savedHealth float32
+	families    []string
+	sel         goal.Selector
+	nv          *nav.Navigation
+	navigate    navigator
+	finder      *path.Finder
+	movement    component.Movement
+	hasMove     bool
+	ctl         move.Control
+	look        move.Look
+	jump        move.Jump
+	lookSet     bool
+	body        physics.Body
+	flags       path.ActorFlags
 
 	pitch, yaw, headYaw, bodyYaw float32
 	prevPitch, prevYaw           float32

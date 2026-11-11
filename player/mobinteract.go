@@ -15,10 +15,12 @@ import (
 // A player using an item on a mob: the mob's minecraft:interact (the entity library picks
 // the interaction, starts its cooldown and fires on_interact, so a sheep turns sheared), then
 // the item work the interaction's JSON asks for, which is the engine's. Shearing sheep, snow
-// golems, bogged and mooshrooms all go through here.
+// golems, bogged and mooshrooms, and milking cows, goats and mooshrooms, all go through
+// here; a mob a bucket takes is taken first (mobbucket.go). transform_to_item gives its item
+// as a bucket fills (takeFilled); how BDS's interaction hands it over was not read.
 //
-// Done of the item work: hurt_item, use_item, spawn_items, play_sounds, swing. Not done:
-// transform_to_item, add_items, equip_item_slot, drop_item_slot, health_amount, particles,
+// Done of the item work: hurt_item, use_item, transform_to_item, spawn_items, play_sounds,
+// swing. Not done: add_items, equip_item_slot, drop_item_slot, health_amount, particles,
 // vibration (game events) and interact_text.
 //
 // Spawned items are BDS 1.26.60's (the interact runtime 0x71FABF0): each item of the table
@@ -29,11 +31,13 @@ import (
 
 // interaction is the item work of one minecraft:interact interaction.
 type interaction struct {
-	UseItem    bool            `json:"use_item"`
-	HurtItem   int32           `json:"hurt_item"`
-	Swing      bool            `json:"swing"`
-	PlaySounds json.RawMessage `json:"play_sounds"`
-	SpawnItems *struct {
+	UseItem bool `json:"use_item"`
+	// TransformToItem is what the used item becomes, as "name:aux".
+	TransformToItem string          `json:"transform_to_item"`
+	HurtItem        int32           `json:"hurt_item"`
+	Swing           bool            `json:"swing"`
+	PlaySounds      json.RawMessage `json:"play_sounds"`
+	SpawnItems      *struct {
 		Table   string   `json:"table"`
 		YOffset *float32 `json:"y_offset"`
 	} `json:"spawn_items"`
@@ -73,6 +77,9 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	if r == nil || p.entity.Position().Sub(o.entity.Position()).Len() > attackRangeCreative {
 		return
 	}
+	if p.bucketMob(r, o) {
+		return
+	}
 	raw, ok := o.m.Interact(actorOf(p.entity))
 	if !ok {
 		return
@@ -101,7 +108,10 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	if it.HurtItem > 0 && !p.creative() {
 		p.hurtHeld(it.HurtItem)
 	}
-	if it.UseItem {
+	switch name, ok := itemByAux(it.TransformToItem); {
+	case it.TransformToItem != "" && ok:
+		p.takeFilled(ItemStack{Name: name, Count: 1, netID: p.s.stackIDs.Add(1)})
+	case it.UseItem:
 		p.useUpHeld()
 	}
 	if it.Swing {
