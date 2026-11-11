@@ -189,6 +189,8 @@ type Table struct {
 	// smelt and smeltTags are the one-item recipes of furnaces and campfires, by block,
 	// then by the input's name or tag.
 	smelt, smeltTags map[string]map[string][]*Recipe
+	// brewing is the brewing stand's recipes, indexed on first use.
+	brewing atomic.Pointer[brewing]
 }
 
 // smeltBlocks are the blocks whose recipes take one item, looked up by that item.

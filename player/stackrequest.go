@@ -361,6 +361,11 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.open[slot]
+	case protocol.ContainerBrewingStandInput, protocol.ContainerBrewingStandResult, protocol.ContainerBrewingStandFuel:
+		if !p.brewingSlot(container, slot) || int(slot) >= len(inv.open) {
+			return r, false
+		}
+		r.stack = &inv.open[slot]
 	default:
 		return r, false
 	}
@@ -611,6 +616,8 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return p.storageAccepts(r, s)
 	case protocol.ContainerFurnaceFuel:
 		return p.furnaceFuelAllowed(s)
+	case protocol.ContainerBrewingStandInput, protocol.ContainerBrewingStandResult, protocol.ContainerBrewingStandFuel:
+		return p.brewingAllows(r.kind, s)
 	case protocol.ContainerEnchantingInput:
 		return s.Count == 1
 	case protocol.ContainerEnchantingMaterial:

@@ -221,6 +221,9 @@ func (s *Host) newMachine(pos cube.Pos, spec *machineSpec) *Chest {
 	if spec.furnace != nil {
 		c.furnace = &Furnace{c: c, kind: spec.furnace}
 	}
+	if spec.brewing {
+		c.brewing = &BrewingStand{c: c}
+	}
 	return c
 }
 

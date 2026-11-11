@@ -169,6 +169,8 @@ type Chest struct {
 	machine *machineSpec
 	// furnace is a furnace's, blast furnace's or smoker's own part.
 	furnace *Furnace
+	// brewing is a brewing stand's own part.
+	brewing *BrewingStand
 	// cooldown and lastTick are a hopper's, in ticks.
 	cooldown int32
 	lastTick int64
@@ -279,6 +281,8 @@ func (c *Chest) Kind() ContainerKind {
 		return ContainerCrafter
 	case c.machine.furnace != nil:
 		return c.machine.furnace.kind
+	case c.machine.brewing:
+		return ContainerBrewingStand
 	}
 	return ContainerDispenser
 }
@@ -435,6 +439,9 @@ func (c *Chest) SaveData(pos cube.Pos) map[string]any {
 		}
 		if c.furnace != nil {
 			c.furnace.save(m)
+		}
+		if c.brewing != nil {
+			c.brewing.save(m)
 		}
 	}
 	return m
@@ -634,6 +641,9 @@ func (c *Chest) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		}
 		if c.furnace != nil {
 			c.tickFurnace(r, pos)
+		}
+		if c.brewing != nil {
+			c.tickBrewing(r, pos)
 		}
 		return
 	}
@@ -875,6 +885,9 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 	lead.addViewer(r, p)
 	if c.furnace != nil {
 		c.furnace.showAll(p)
+	}
+	if c.brewing != nil {
+		c.brewing.showAll(p)
 	}
 }
 

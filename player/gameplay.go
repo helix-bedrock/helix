@@ -84,6 +84,10 @@ type Systems struct {
 	FurnaceFuel   FurnaceFuelFunc
 	FurnaceResult FurnaceResultFunc
 	FurnaceXP     FurnaceXPFunc
+	// BrewFuel is how many brews a fuel item gives a brewing stand, BrewResult what a bottle
+	// becomes with an ingredient.
+	BrewFuel   BrewFuelFunc
+	BrewResult BrewResultFunc
 	// OutOfWorld says whether an entity is in the void, Void what the void does to it.
 	OutOfWorld  OutOfWorldFunc
 	Void        VoidFunc
@@ -206,6 +210,7 @@ type gameplay struct {
 	furnaceBurnEv    listeners[FurnaceBurnEvent]
 	furnaceSmeltEv   listeners[FurnaceSmeltEvent]
 	campfireCookEv   listeners[CampfireCookEvent]
+	brewEv           listeners[BrewEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	glideEv          listeners[GlideEvent]
 	fireworkEv       listeners[FireworkEvent]
@@ -267,6 +272,7 @@ type gameState struct {
 	furnaceBurnEv    listeners[FurnaceBurnEvent]
 	furnaceSmeltEv   listeners[FurnaceSmeltEvent]
 	campfireCookEv   listeners[CampfireCookEvent]
+	brewEv           listeners[BrewEvent]
 	tntPrimeEv       listeners[TNTPrimeEvent]
 	glideEv          listeners[GlideEvent]
 	fireworkEv       listeners[FireworkEvent]
@@ -469,6 +475,8 @@ func vanillaGameplay(s *Setup) error {
 	sys.FurnaceFuel = vanillaFurnaceFuel
 	sys.FurnaceResult = vanillaFurnaceResult
 	sys.FurnaceXP = vanillaFurnaceXP
+	sys.BrewFuel = vanillaBrewFuel
+	sys.BrewResult = vanillaBrewResult
 	sys.OutOfWorld = vanillaOutOfWorld
 	sys.Void = vanillaVoid
 	sys.ShieldUp = vanillaShieldUp
@@ -520,7 +528,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
 		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, campfireCookEv: gs.campfireCookEv, tntPrimeEv: gs.tntPrimeEv, glideEv: gs.glideEv, fireworkEv: gs.fireworkEv, fishCatchEv: gs.fishCatchEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, blockFallEv: gs.blockFallEv, banners: gs.banners, motives: slices.Clone(gs.motives),
+		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, campfireCookEv: gs.campfireCookEv, brewEv: gs.brewEv, tntPrimeEv: gs.tntPrimeEv, glideEv: gs.glideEv, fireworkEv: gs.fireworkEv, fishCatchEv: gs.fishCatchEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, blockFallEv: gs.blockFallEv, banners: gs.banners, motives: slices.Clone(gs.motives),
 		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
 		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
 		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
@@ -556,6 +564,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.furnaceBurnEv.freeze()
 	g.furnaceSmeltEv.freeze()
 	g.campfireCookEv.freeze()
+	g.brewEv.freeze()
 	g.tntPrimeEv.freeze()
 	g.glideEv.freeze()
 	g.fireworkEv.freeze()

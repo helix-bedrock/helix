@@ -47,6 +47,8 @@ const (
 	ContainerLoom
 	// ContainerChestBoat is a chest boat's slots.
 	ContainerChestBoat
+	// ContainerBrewingStand has five slots: the ingredient, three bottles and the fuel.
+	ContainerBrewingStand
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

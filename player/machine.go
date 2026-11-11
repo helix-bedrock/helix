@@ -49,6 +49,8 @@ type machineSpec struct {
 	crafter bool
 	// furnace smelts: a furnace, blast furnace or smoker, lit or not.
 	furnace *furnaceKind
+	// brewing brews potions: a brewing stand.
+	brewing bool
 }
 
 // machineSpecs are the blocks that have only slots.
@@ -63,6 +65,7 @@ var machineSpecs = map[string]*machineSpec{
 	"minecraft:lit_blast_furnace": blastFurnaceSpec,
 	"minecraft:smoker":            smokerSpec,
 	"minecraft:lit_smoker":        smokerSpec,
+	brewingStandName:              brewingStandSpec,
 }
 
 // machineByID is the spec of a saved id, nil if it is no such block.
@@ -91,6 +94,9 @@ func (s *Host) loadMachine(pos cube.Pos, saved map[string]any, spec *machineSpec
 	c.cooldown, _ = saved[transferCooldownTag].(int32)
 	if v, ok := saved[disabledSlotsTag].(int16); ok {
 		c.disabled = uint16(v) & allCrafterSlots //nolint:gosec // masked
+	}
+	if c.brewing != nil {
+		c.brewing.load(saved)
 	}
 	delete(c.saved, disabledSlotsTag)
 	delete(c.saved, "Items")
@@ -350,6 +356,9 @@ func (c *Chest) putOne(r *world.Region, to *Chest, s ItemStack) bool {
 	if to.furnace != nil {
 		return to.furnaceTakeOne(r, s, c.cart == nil && c.pos[1] > to.pos[1])
 	}
+	if to.brewing != nil {
+		return to.brewTakeOne(r, s, c.cart == nil && c.pos[1] > to.pos[1])
+	}
 	return to.takeOne(r, s)
 }
 
@@ -392,6 +401,9 @@ func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
 func (c *Chest) pullOne(r *world.Region, from *Chest) bool {
 	if from.furnace != nil {
 		return from.furnaceGiveOne(r, c)
+	}
+	if from.brewing != nil {
+		return from.brewGiveOne(r, c)
 	}
 	for i, size := 0, from.Inventory(r).Size(); i < size; i++ {
 		s := from.Inventory(r).Item(i)
