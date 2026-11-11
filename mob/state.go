@@ -48,6 +48,12 @@ func (m *Mob) stateTick() bool {
 	if m.despawned {
 		return true
 	}
+	if m.geneEvents && m.states != nil && m.states.Genetics != nil {
+		// GeneticsComponent's initialize: a new mob's random genes run their variants' birth
+		// events (a goat's born_default adds its milking interaction).
+		m.geneEvents = false
+		m.states.Genetics.FireEvents(&m.stateEnv)
+	}
 	if m.states != nil {
 		// A transformation that comes due is not run yet: making the new entity is the
 		// engine's and not hooked up.

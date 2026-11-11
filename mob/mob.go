@@ -134,6 +134,8 @@ type Mob struct {
 	rid   uint64
 
 	inst *definition.Instance
+	// geneEvents is set until a new (not loaded) mob's genetics have run their birth events.
+	geneEvents bool
 	// savedHealth is a restored health the first rebuild puts in place of the default, 0 for none.
 	savedHealth float32
 	families    []string
@@ -244,6 +246,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	m.flags.Set(FlagBreathing, true)
 	m.flags.Set(FlagCanClimb, true)
 	m.inst = definition.New(def, m, method, initEvent)
+	m.geneEvents = method != definition.InitLoaded
 	m.setSize(0.6, 1.8)
 	m.snapshot()
 	return m, nil
