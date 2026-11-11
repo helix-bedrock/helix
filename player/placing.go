@@ -151,6 +151,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == nameFireworkRocket {
 		return p.useFireworkOn(r, clicked, click, held)
 	}
+	if held.Name == nameShears {
+		return p.useShearsOn(r, clicked, face)
+	}
 	if held.Name == nameEnderEye {
 		return p.useEnderEye(r, clicked)
 	}

@@ -1,6 +1,7 @@
 package mob
 
 import (
+	"encoding/json"
 	"maps"
 	"math"
 	"slices"
@@ -258,3 +259,22 @@ func (m *Mob) Air() (air, maxAir int16) {
 
 // defaultAir is BDS's air supply for a mob without breathable.
 const defaultAir = 300
+
+// Interact is a player using an item on the mob, as BDS's InteractComponent: the first of
+// minecraft:interact's interactions the player may run (cooldown over, on_interact's filters
+// passing with the player as other) runs, starting its cooldown and firing on_interact, and
+// its JSON comes back for the engine's item work. False when none applies. Runs: the mob's
+// region.
+func (m *Mob) Interact(player behavior.Actor) (json.RawMessage, bool) {
+	if m.states == nil || m.states.Interact == nil || m.stateEnv.Self == nil || player == nil {
+		return nil, false
+	}
+	in := m.states.Interact
+	i := in.Find(&m.stateEnv, player)
+	if i < 0 {
+		return nil, false
+	}
+	raw := in.Config().Interactions[i].Raw
+	in.Run(&m.stateEnv, i, player)
+	return raw, true
+}

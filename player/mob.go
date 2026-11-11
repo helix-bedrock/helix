@@ -353,6 +353,10 @@ func (p *Player) useOnMob(d *protocol.UseItemOnEntityTransactionData) bool {
 	if o == nil {
 		return false
 	}
+	if d.ActionType == protocol.UseItemOnEntityActionInteract {
+		p.interactMob(o, d)
+		return true
+	}
 	if d.ActionType != protocol.UseItemOnEntityActionAttack {
 		return true
 	}
