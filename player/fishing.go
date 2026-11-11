@@ -211,17 +211,17 @@ func (p *Player) useFishingRod() bool {
 		return true
 	}
 	p.fishHook = p.s.castHook(r, p)
-	eyes := p.entity.Position()
-	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: eyes, extra: -1, entity: "minecraft:player"}, nil)
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
 	return true
 }
 
 // castHook adds a hook in front of p as reloadHardcoded aims it: the look direction times
 // hookCastSpeed plus the angler's speed, made one long, spread by a gaussian on each axis,
-// times hookCastPower. It starts at the angler's eyes; BDS's start is the player's drop
-// attach point, which is not read yet.
+// times hookCastPower. It starts at the angler's drop attach point plus the angler's speed,
+// as FishingRodItem::use (0xC990440) places it.
 func (s *Host) castHook(r *world.Region, p *Player) *FishingHook {
-	eyes, rot := p.entity.Position(), p.entity.Rotation()
+	rot := p.entity.Rotation()
+	start := p.AttachPos(AttachDrop).Add(p.move.velocity)
 	dir := lookDirection(rot).Mul(hookCastSpeed).Add(p.move.velocity)
 	if dir.Len() > 0 {
 		dir = dir.Normalize()
@@ -229,9 +229,9 @@ func (s *Host) castHook(r *world.Region, p *Player) *FishingHook {
 	for n := range 3 {
 		dir[n] += float32(rand.NormFloat64()) * hookSpread //nolint:gosec // an aim, not a secret
 	}
-	h := &FishingHook{s: s, owner: p, vel: dir.Mul(hookCastPower), gravity: true, waiting: true, table: s.hookTable(r, eyes)}
+	h := &FishingHook{s: s, owner: p, vel: dir.Mul(hookCastPower), gravity: true, waiting: true, table: s.hookTable(r, start)}
 	h.rot = flightRotation(h.vel)
-	h.entity = r.Dimension().AddEntity(h.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), eyes, h.rot)) //nolint:gosec // an ID, not a secret
+	h.entity = r.Dimension().AddEntity(h.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), start, h.rot)) //nolint:gosec // an ID, not a secret
 	return h
 }
 
@@ -709,10 +709,10 @@ func (h *FishingHook) waterAnimalsNear(r *world.Region, pos mgl32.Vec3) bool {
 	return false
 }
 
-// pullPoint is where reeling in pulls toward: hookPullAbove over the angler's head. BDS uses
-// the head attach point, taken as the eyes here.
+// pullPoint is where reeling in pulls toward: hookPullAbove over the angler's head attach
+// point, as _pullCloser (0xC08DAA0) aims.
 func (h *FishingHook) pullPoint() mgl32.Vec3 {
-	return h.owner.entity.Position().Add(mgl32.Vec3{0, hookPullAbove, 0})
+	return h.owner.AttachPos(AttachHead).Add(mgl32.Vec3{0, hookPullAbove, 0})
 }
 
 // retrieve is FishingHook::retrieve (0xC08DBF0): a hooked entity is pulled to the angler, a
@@ -764,8 +764,7 @@ func (h *FishingHook) catch(r *world.Region) bool {
 	}
 	at := h.entity.Position()
 	to := h.pullPoint()
-	lo, hi, _ := p.BlastBox()
-	orbs := lo.Add(hi).Mul(0.5).Add(lookDirection(p.entity.Rotation()).Mul(hookXPAhead))
+	orbs := p.AttachPos(AttachBody).Add(lookDirection(p.entity.Rotation()).Mul(hookXPAhead))
 	for i, it := range ev.Items {
 		s.spawnItem(r.Dimension(), s.freshStack(it), at, PullVelocity(at, to, hookPullScale), world.Rotation{}, hookCatchDelay, 0)
 		if i < len(ev.Experience) {

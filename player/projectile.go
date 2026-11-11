@@ -1078,7 +1078,8 @@ func (p *Player) throwItem(held ItemStack) bool {
 	p.thrownAt = now
 	eyes, rot := p.entity.Position(), p.entity.Rotation()
 	p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power, p)
-	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: eyes, extra: -1, entity: "minecraft:player"}, nil)
+	// BDS's throwable items (0xC985510 and the like) play it at the drop attach point.
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
 	if !p.creative() {
 		p.useHeld()
 	}
@@ -1155,7 +1156,8 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	if infinity || creative {
 		t.pickup = arrowPickupCreative
 	}
-	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBow, pos: eyes, extra: -1, entity: "minecraft:player"}, nil)
+	// BDS's bow (0xC8D71C0) plays it at the weapon attach point.
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBow, pos: p.AttachPos(AttachWeapon), extra: -1, entity: "minecraft:player"}, nil)
 	if creative {
 		return
 	}
