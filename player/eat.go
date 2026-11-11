@@ -167,7 +167,7 @@ func (p *Player) handleUseAir(d *protocol.UseItemTransactionData) {
 }
 
 // vanillaUseItem is BDS's useItem as far as built: armour goes on, snowballs, eggs and
-// pearls are thrown, a bow starts drawing, and foods start being eaten when the player may
+// pearls are thrown, a fishing rod casts or reels in, a bow starts drawing, and foods start being eaten when the player may
 // eat. Potions, crossbows, tridents, milk and other items used in the air come later.
 func vanillaUseItem(p *Player, held ItemStack) bool {
 	g := p.s.game
@@ -189,6 +189,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 	}
 	if held.Name == nameGoatHorn {
 		return p.useGoatHorn(held)
+	}
+	if held.Name == nameFishingRod {
+		return p.useFishingRod()
 	}
 	if held.Name == nameBow {
 		if !p.mayDrawBow(held) {

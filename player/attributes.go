@@ -41,6 +41,7 @@ const (
 	attrKnockbackResistance = 2
 	attrAttackDamage        = 6
 	attrAbsorption          = 7
+	attrLuck                = 8
 	attrHunger              = 12
 	attrSaturation          = 13
 	attrExhaustion          = 14

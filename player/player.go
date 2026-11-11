@@ -116,6 +116,8 @@ type Player struct {
 	pearlReady int64
 	// thrownAt is the tick the player last threw something.
 	thrownAt int64
+	// fishHook is the fishing hook the player has out, BDS's fishing hook ID.
+	fishHook *FishingHook
 	food     foodState
 	hurt     hurtState
 	glide    glideState
