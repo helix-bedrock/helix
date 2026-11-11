@@ -229,7 +229,7 @@ func (p *Player) pourMobBucket(clicked cube.Pos, face int32, held ItemStack, b m
 	var pos cube.Pos
 	sound := packet.SoundEventBucketEmptyFish
 	if b.water {
-		at, _, ok := p.pourLiquid(r, clicked, face, bucketLiquids[nameWaterBucket])
+		at, _, ok := p.pourLiquid(r, clicked, face, bucketLiquids[nameWaterBucket], pourFish)
 		if !ok {
 			return false
 		}
@@ -247,19 +247,12 @@ func (p *Player) pourMobBucket(clicked cube.Pos, face int32, held ItemStack, b m
 	return true
 }
 
-// landTarget is where a land animal comes out of its bucket: the block a liquid would be
-// poured in, which must be air or not of solid material.
+// landTarget is where a land animal comes out of its bucket: bucketTarget, which must be air
+// or not of solid material.
 func (p *Player) landTarget(r *world.Region, clicked cube.Pos, face int32) (cube.Pos, bool) {
 	blocks := p.s.reg.Blocks
-	water, ok := blocks.Block(bucketLiquids[nameWaterBucket].block)
-	if !ok {
-		return cube.Pos{}, false
-	}
-	pos, ok := p.liquidTarget(r, clicked, face, water)
-	if !ok {
-		return cube.Pos{}, false
-	}
-	if b, _ := r.Block(pos, 0); b != blocks.Air() && blocks.Properties(b).SolidMaterial {
+	pos := p.bucketTarget(r, clicked, face, pourLand)
+	if b, ok := r.Block(pos, 0); !ok || b != blocks.Air() && blocks.Properties(b).SolidMaterial {
 		return cube.Pos{}, false
 	}
 	return pos, true
@@ -287,7 +280,9 @@ func (s *Host) spawnBucketMob(r *world.Region, b mobBucket, held ItemStack, pos 
 	}
 }
 
-// pourPowderSnow empties a powder snow bucket where its block may go. False if it may not.
+// pourPowderSnow empties a powder snow bucket at bucketTarget, if powder snow may go there
+// (BDS asks the block's mayPlace; Helix takes it as the block there being built over).
+// False if it may not.
 func (p *Player) pourPowderSnow(clicked cube.Pos, face int32) bool {
 	r := p.entity.Region()
 	if r == nil || !p.inReach(clicked) {
@@ -298,11 +293,12 @@ func (p *Player) pourPowderSnow(clicked cube.Pos, face int32) bool {
 	if !ok {
 		return false
 	}
-	pos, ok := p.liquidTarget(r, clicked, face, snow)
-	if !ok {
+	pos := p.bucketTarget(r, clicked, face, pourLiquid)
+	target, ok := r.Block(pos, 0)
+	if !ok || !p.s.game.replaceable(p, r, pos, target, snow) {
 		return false
 	}
-	if target, _ := r.Block(pos, 0); target != blocks.Air() && blocks.Properties(target).LiquidReaction == registry.LiquidPopped {
+	if target != blocks.Air() && blocks.Properties(target).LiquidReaction == registry.LiquidPopped {
 		p.s.PopBlock(r, pos, target)
 	}
 	if !r.SetBlock(pos, 0, snow) {

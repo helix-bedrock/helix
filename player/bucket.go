@@ -107,7 +107,11 @@ func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 	if !ok || r == nil || !p.inReach(clicked) {
 		return false
 	}
-	pos, boiled, ok := p.pourLiquid(r, clicked, face, liq)
+	kind := pourLiquid
+	if liq.kind == liquid.Water {
+		kind = pourWater
+	}
+	pos, boiled, ok := p.pourLiquid(r, clicked, face, liq, kind)
 	if !ok {
 		return false
 	}
@@ -128,37 +132,64 @@ func (p *Player) emptyHeldBucket() {
 	p.sendHeld()
 }
 
-// liquidTarget is where a bucket pours: the clicked block if it can be built over with
-// block, else its neighbour on the clicked face if that can (the built-over rule is
-// Helix's; how BDS picks the block was not read). False if neither can.
-func (p *Player) liquidTarget(r *world.Region, clicked cube.Pos, face int32, block uint32) (cube.Pos, bool) {
-	if b, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, b, block) {
-		return clicked, true
-	}
+// bucketPour is what a bucket empties, as far as where it goes is concerned.
+type bucketPour uint8
+
+const (
+	pourLiquid bucketPour = iota
+	// pourWater is water, which goes into a block that can hold it.
+	pourWater
+	// pourFish is a water animal's bucket, which goes into the water clicked.
+	pourFish
+	// pourLand is a land animal's bucket, which leaves snow layers alone.
+	pourLand
+)
+
+// bucketTarget is where BDS 1.26.60's BucketItem::_useOn (0xC99AC00) empties a bucket: the
+// neighbour on the clicked face, never the clicked block built over, except water clicked on
+// a block that can hold it and a water animal's bucket clicked on water or lava, which go in
+// the clicked block. A snow layer right under that spot is broken, with its particles and no
+// drops, and the bucket empties there instead (not for a land animal's bucket).
+func (p *Player) bucketTarget(r *world.Region, clicked cube.Pos, face int32, kind bucketPour) cube.Pos {
+	blocks := p.s.reg.Blocks
 	pos := clicked.Side(cube.Face(face))
-	if b, ok := r.Block(pos, 0); ok && p.s.game.replaceable(p, r, pos, b, block) {
-		return pos, true
+	if c, ok := r.Block(clicked, 0); ok {
+		props := blocks.Properties(c)
+		switch {
+		case kind == pourFish && (props.Material == registry.MaterialWater || props.Material == registry.MaterialLava):
+			pos = clicked
+		case kind == pourWater && props.CanContainLiquid:
+			pos = clicked
+		}
 	}
-	return cube.Pos{}, false
+	if kind == pourLand {
+		return pos
+	}
+	below := pos.Side(cube.FaceDown)
+	if b, ok := r.Block(below, 0); ok && blocks.Name(b) == nameSnowLayer {
+		levelEvent(r, below, blockVec(below), levelEventDestroyParticles, int32(blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
+		if r.SetBlock(below, 0, blocks.Air()) {
+			r.UpdateNeighbours(below)
+		}
+		pos = below
+	}
+	return pos
 }
 
-// pourLiquid puts a bucket's liquid in at the target: water goes in the second layer of a
+// pourLiquid puts a bucket's liquid in at bucketTarget: water goes in the second layer of a
 // block that can hold it; otherwise the liquid replaces air or a block whose material is
 // not solid, a block whose liquid reaction is popped throwing out its drops first.
 // Neighbours are told and the liquid is ticked after its delay. Water in the Nether boils
 // away instead (BDS checks the dimension's ultrawarm flag, which only the Nether has): the
 // fizz sound at the block's middle and the water_evaporation_bucket_emitter particle at its
 // corner, and boiled is set. False if nothing was poured.
-func (p *Player) pourLiquid(r *world.Region, clicked cube.Pos, face int32, liq bucketLiquid) (pos cube.Pos, boiled, ok bool) {
+func (p *Player) pourLiquid(r *world.Region, clicked cube.Pos, face int32, liq bucketLiquid, kind bucketPour) (pos cube.Pos, boiled, ok bool) {
 	blocks := p.s.reg.Blocks
 	block, ok := blocks.Block(liq.block)
 	if !ok {
 		return cube.Pos{}, false, false
 	}
-	pos, ok = p.liquidTarget(r, clicked, face, block)
-	if !ok {
-		return cube.Pos{}, false, false
-	}
+	pos = p.bucketTarget(r, clicked, face, kind)
 	target, _ := r.Block(pos, 0)
 	tp := blocks.Properties(target)
 	if liq.kind == liquid.Water && r.Dimension() == p.s.nether {
