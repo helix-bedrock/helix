@@ -61,11 +61,21 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 	env, r := t.m.rt.Env, t.m.v.r
 	switch test.Name {
 	case "has_equipment":
+		if eq := mobEquip(m, s); eq != nil {
+			has := slices.Contains(equipmentNames(eq, domainOr(test, "any"), nil), ns(rawString(test.Value)))
+			return definition.CompareBool(op, has, true), true
+		}
 		return definition.CompareBool(op, t.equipped(p, test, false), true), true
 	case "has_equipment_tag":
+		// Item tags of a mob's equipment are not looked up yet: only players answer.
 		return definition.CompareBool(op, t.equipped(p, test, true), true), true
 	case "all_slots_empty":
-		empty := p == nil || len(p.Equipment(domainOr(test, "any"), nil)) == 0
+		var empty bool
+		if eq := mobEquip(m, s); eq != nil {
+			empty = len(equipmentNames(eq, domainOr(test, "any"), nil)) == 0
+		} else {
+			empty = p == nil || len(p.Equipment(domainOr(test, "any"), nil)) == 0
+		}
 		return definition.CompareBool(op, empty, rawBool(test.Value, true)), true
 	case "is_sneak_held", "is_sneaking":
 		return definition.CompareBool(op, p != nil && p.Sneaking(), rawBool(test.Value, true)), true
@@ -205,6 +215,17 @@ func (t tester) nearestPlayer(p behavior.Vec3) (float32, bool) {
 		}
 	}
 	return best, found
+}
+
+// mobEquip is the equipment of the mob behind a test's subject, nil for a player.
+func mobEquip(m *Mob, s *Snapshot) *[EquipSlots]behavior.Item {
+	switch {
+	case m != nil:
+		return &m.equip
+	case s != nil:
+		return &s.equip
+	}
+	return nil
 }
 
 // variantComponents are the components the variant tests read their value from.

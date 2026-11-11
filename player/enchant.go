@@ -113,6 +113,8 @@ type Enchantment struct {
 	Knockback bool
 	// SilkTouch and Fortune make its level count in what a broken block drops.
 	SilkTouch, Fortune bool
+	// Looting makes its level, on the killer's held item, count in what a mob drops.
+	Looting bool
 	// StaysWorn keeps armour with it on a player out of creative.
 	StaysWorn bool
 	// VanishesOnDeath destroys an item with it when the player dies keeping its items.
@@ -464,6 +466,8 @@ func vanillaEnchantHooks(e *Enchantment) {
 		e.SilkTouch = true
 	case enchantFortune:
 		e.Fortune = true
+	case enchantLooting:
+		e.Looting = true
 	case enchantBinding:
 		e.StaysWorn, e.Curse = true, true
 	case enchantVanishing:

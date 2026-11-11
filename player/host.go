@@ -18,8 +18,8 @@ import (
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/daytime"
-	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fall"
+	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/mob"
@@ -150,6 +150,8 @@ type Host struct {
 	discs map[string]data.MusicDisc
 	// drops holds what each block drops.
 	drops *loot.Table
+	// entityLoot are the entity loot tables: mob death drops and equipment.
+	entityLoot *loot.EntityTables
 	// foods holds what each item does when eaten, from the items' own data.
 	foods map[string]FoodItem
 	// runtimeIDs numbers players' entities; stackIDs numbers item stacks
@@ -196,6 +198,10 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: drops: %w", err)
 	}
+	entityLoot, err := loot.NewEntityTables()
+	if err != nil {
+		return nil, fmt.Errorf("player: entity loot: %w", err)
+	}
 	furnaces, err := loadFurnaceFacts()
 	if err != nil {
 		return nil, fmt.Errorf("player: furnaces: %w", err)
@@ -208,7 +214,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	}
 	h := &Host{
 		redstone: conf.Redstone,
-		drops:    drops, foods: foodTable(conf.Registry.Items),
+		drops:    drops, entityLoot: entityLoot, foods: foodTable(conf.Registry.Items),
 		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, nether: conf.Nether, end: conf.End, portals: conf.Portals, onEnterEnd: conf.OnEnterEnd, playerStore: conf.Store, level: conf.Level,
 		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
 		handlers: setup.freeze(), game: g, global: nil, connections: connections, attach: attached, farm: conf.Farm, fire: conf.Fire, chests: chests, discs: discs,

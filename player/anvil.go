@@ -233,8 +233,11 @@ func (p *Player) damageable(s ItemStack) bool {
 }
 
 // maxDamage is the item's durability.
-func (p *Player) maxDamage(name string) int32 {
-	g := p.s.game
+func (p *Player) maxDamage(name string) int32 { return p.s.maxDamage(name) }
+
+// maxDamage is an item's durability, 0 for none. Runs: anywhere.
+func (s *Host) maxDamage(name string) int32 {
+	g := s.game
 	if d, ok := g.durability[name]; ok && d.MaxDamage > 0 {
 		return int32(d.MaxDamage)
 	}

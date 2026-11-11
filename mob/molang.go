@@ -19,7 +19,7 @@ import (
 // expression using them does not compile and the component keeps its default.
 //
 // A query about something the engine does not have yet answers as BDS does for a mob without
-// it: equipment_count and is_using_item 0 (mobs hold nothing yet), player_level 0.
+// it: is_using_item 0 (mobs use no items yet), player_level 0.
 
 // playerHitTicks is how long after a player hurt a mob query.last_hit_by_player holds: BDS's
 // lastHurtByPlayerTime of 100 ticks.
@@ -517,8 +517,10 @@ func (e *molangExpr) query(m *Mob) float32 {
 		return m.health
 	case callMaxHealth:
 		return m.maxHealth
+	case callEquipmentCount:
+		return float32(m.equipmentCount())
 	}
-	// equipment_count, is_using_item, player_level: nothing a mob has yet.
+	// is_using_item, player_level: nothing a mob has yet.
 	return 0
 }
 

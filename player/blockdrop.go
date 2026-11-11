@@ -19,6 +19,7 @@ const (
 	blockDropDelay   = 10
 	enchantSilkTouch = int16(16)
 	enchantFortune   = int16(18)
+	enchantLooting   = int16(14)
 	// Not read from BDS: where its spawner sets an item's speed was not found.
 	// Refine against BDS.
 	dropDriftSpan = 0.2

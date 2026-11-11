@@ -29,6 +29,7 @@ const (
 	opMobEvent
 	opActorEvent
 	opHurt
+	opShoot
 )
 
 // op is one queued change. Only the fields its kind uses are set.
@@ -125,6 +126,10 @@ func (m *Mob) run(o op) {
 			t.SetTarget(o.other)
 			t.snapshot()
 		}
+	case opShoot:
+		if m.hooks != nil && !m.Dead() {
+			m.hooks.Shoot(m, o.id, o.name, o.n, o.amount, int(o.other))
+		}
 	case opActorEvent:
 		if m.hooks != nil {
 			m.hooks.ActorEvent(m, int(o.n))
@@ -170,6 +175,8 @@ type Snapshot struct {
 	underWater    bool
 	inLava        bool
 	onGround      bool
+	// equip is the equipment, for other mobs' has_equipment tests.
+	equip [EquipSlots]behavior.Item
 }
 
 // Snapshot returns the mob as others see it this tick.
@@ -191,6 +198,7 @@ func (m *Mob) snapshot() {
 	s.comps = m.inst.Components()
 	s.health = m.health
 	s.inWater, s.underWater, s.inLava, s.onGround = m.InWater(), m.UnderWater(), m.InLava(), m.OnGround()
+	s.equip = m.equip
 }
 
 func (s *Snapshot) ID() behavior.ID                    { return s.id }

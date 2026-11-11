@@ -59,6 +59,11 @@ type Mob struct {
 	gone bool
 	// ended is set by think when the mob's death has run its course; apply removes it.
 	ended bool
+	// items is the mob's real equipment (mobequip.go); needEquip is set until a created
+	// mob has rolled its equipment table. lastPlayer is the last player to hurt it.
+	items      mobItems
+	needEquip  bool
+	lastPlayer *Player
 }
 
 // Entity returns the mob's entity.
@@ -91,7 +96,7 @@ func (s *Host) newMob(typ string, pos mgl32.Vec3, yaw float32, method definition
 	if s.mobs == nil {
 		return nil, false
 	}
-	o := &Mob{s: s}
+	o := &Mob{s: s, needEquip: method != definition.InitLoaded}
 	uid := itemUniqueIDBase | rand.Int64N(itemUniqueIDBase) //nolint:gosec // an entity ID, not a secret
 	rid := s.runtimeIDs.Add(1)
 	m, err := s.mobs.NewWithEvent(typ, uid, rid, vec(pos), yaw, o, method, initEvent)
@@ -136,7 +141,7 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 // spawnPackets show the mob. Not yet compared with what BDS sends.
 func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 	pitch, yaw, head, body := m.m.Rotation()
-	return []packet.Packet{&packet.AddActor{
+	return m.spawnEquipment([]packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: m.m.Type(),
 		Position: e.Position(), Velocity: mglVec(m.m.Body().Vel),
 		Pitch: pitch, Yaw: yaw, HeadYaw: head, BodyYaw: body,
@@ -145,7 +150,7 @@ func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 			{Name: "minecraft:movement", Value: m.m.MovementSpeed(), Max: math.MaxFloat32},
 		},
 		EntityMetadata: m.metadata(),
-	}}
+	}})
 }
 
 // movePacket sends its move with BDS's actor movement sync, head yaw included.
@@ -173,8 +178,14 @@ func (m *Mob) apply(e *world.Entity) {
 	}
 	m.m.Apply()
 	if m.ended {
+		if r := e.Region(); r != nil {
+			m.dropExperience(r)
+		}
 		m.remove(e)
 		return
+	}
+	if m.needEquip {
+		m.equipFromTable(e.Region())
 	}
 	if m.s.checkVoid(e); m.gone || e.Region() == nil || m.m.Dead() {
 		return
@@ -208,6 +219,7 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 	id := behavior.NoID
 	if by != nil && by.entity != nil {
 		id = behavior.ID(by.entity.UniqueID())
+		m.lastPlayer = by
 	}
 	dealt := m.m.Hurt(amount, id, int(cause), uint64(max(r.CurrentTick(), 0))) //nolint:gosec // clamped
 	if dealt <= 0 {
@@ -223,6 +235,7 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 	if m.m.Dead() && !m.died {
 		m.died = true
 		m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventDeath))
+		m.dropOnDeath(r)
 	}
 	return dealt
 }

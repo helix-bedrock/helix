@@ -113,6 +113,9 @@ type Hooks interface {
 	Sound(m *Mob, sound int, p behavior.Vec3)
 	// FlagsChanged tells those who see the mob that its actor flags or air changed.
 	FlagsChanged(m *Mob)
+	// Shoot fires the projectile def (aux value aux) at the target as minecraft:shooter
+	// does, at power when above 0, playing sound (a level sound event, NoSound for none).
+	Shoot(m *Mob, target behavior.ID, def string, aux int32, power float32, sound int)
 	// ActorEvent sends an actor event about the mob.
 	ActorEvent(m *Mob, id int)
 	// Hurt hurts the mob through the engine's hurt (its packets included) with no attacker.
@@ -158,6 +161,11 @@ type Mob struct {
 	// playerHitTime counts down from playerHitTicks after a player hurt the mob: Molang's
 	// query.last_hit_by_player.
 	playerHitTime int32
+	// equip is what the mob holds and wears (equipment.go); charged and chargeAmount its
+	// crossbow's state.
+	equip        [EquipSlots]behavior.Item
+	charged      bool
+	chargeAmount int8
 	// pushNear is scratch space for the actors pushActors finds.
 	pushNear   []behavior.Actor
 	lastCause  int
