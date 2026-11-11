@@ -155,9 +155,12 @@ type Mob struct {
 	lastHurtStamp                   int32
 	lastHurtAmount                  float32
 	hurtTime                        int32
-	lastCause                       int
-	deathTime                       int32
-	persistent                      bool
+	// playerHitTime counts down from playerHitTicks after a player hurt the mob: Molang's
+	// query.last_hit_by_player.
+	playerHitTime int32
+	lastCause     int
+	deathTime     int32
+	persistent    bool
 	// states are the definition's state components (state.go), stateEnv what they run with,
 	// stateComps the components they were read from. despawned is set when the mob despawned.
 	states     *state.Set
@@ -299,6 +302,9 @@ func (m *Mob) think() (remove bool) {
 	}
 	if m.hurtTime > 0 {
 		m.hurtTime--
+	}
+	if m.playerHitTime > 0 {
+		m.playerHitTime--
 	}
 	if m.Dead() {
 		m.deathTime++
@@ -622,6 +628,7 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 	m.noActionTime = 0
 	m.fire(onHurt, attacker)
 	if attacker != nil && attacker.IsPlayer() {
+		m.playerHitTime = playerHitTicks
 		m.fire(onHurtByPlayer, attacker)
 	}
 	if m.Dead() {

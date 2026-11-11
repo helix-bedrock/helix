@@ -3,7 +3,6 @@ package mob
 import (
 	"encoding/json"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/helix-bedrock/entity/behavior"
@@ -39,14 +38,14 @@ func (m *Mob) Trigger(t *definition.Trigger, ctx definition.Tester, g *definitio
 	}
 }
 
-// Molang answers only number constants: property defaults written as query expressions keep
-// their type's zero.
+// Molang evaluates a property default or set_property value (molang.go) for this mob.
 func (m *Mob) Molang(expr string, _ definition.Tester) (definition.Value, bool) {
-	v, err := strconv.ParseFloat(strings.TrimSpace(expr), 32)
+	e, err := parseMolang(expr)
 	if err != nil {
+		m.rt.Log.Debug("mob molang", "type", m.typ, "expr", expr, "err", err)
 		return definition.Value{}, false
 	}
-	return definition.Value{Number: float32(v)}, true
+	return definition.Value{Number: e.eval(m)}, true
 }
 
 // resolver is the component.Resolver of one mob.
@@ -103,14 +102,15 @@ func (resolver) HoldsItem(a behavior.Actor, items []string) bool {
 	return false
 }
 
-// Molang answers only number constants; query expressions are not hooked up.
-func (resolver) Molang(expr string) (func(behavior.Mob) float32, bool) {
-	v, err := strconv.ParseFloat(strings.TrimSpace(expr), 32)
+// Molang compiles an expression (molang.go). It is evaluated for the mob the resolver is for:
+// every Molang the components hold is about the mob itself.
+func (r resolver) Molang(expr string) (func(behavior.Mob) float32, bool) {
+	e, err := parseMolang(expr)
 	if err != nil {
+		r.m.rt.Log.Debug("mob molang", "type", r.m.typ, "expr", expr, "err", err)
 		return nil, false
 	}
-	f := float32(v)
-	return func(behavior.Mob) float32 { return f }, true
+	return molangFunc{e: e, m: r.m}.eval, true
 }
 
 func (m *Mob) tester(other behavior.Actor) tester { return tester{m: m, self: m, other: other} }
