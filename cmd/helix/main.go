@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"sync/atomic"
 	"syscall"
 
@@ -25,6 +26,7 @@ func main() {
 	applicationTenantID := flag.String("application-tenant-id", "", "BDS's application-tenant-id: your Azure application's tenant")
 	lan := flag.Bool("lan", true, "answer players looking for games on this network")
 	udpPorts := flag.String("udp-ports", "", "BDS's server-udp-ports: each connection takes its own UDP port from these, such as 19133-19200 or 19133-19200:29133-29200 for public:local; forward them on the router")
+	cpuProfile := flag.String("cpuprofile", "", "write a CPU profile to this file until the server stops, to find what makes ticks slow")
 	tickDistance := flag.Int("tick-distance", int(helix.DefaultConfig().TickDistance), "radius in chunks kept loaded and ticked around each player, BDS's tick-distance")
 	flag.Parse()
 	level := slog.LevelInfo
@@ -32,6 +34,14 @@ func main() {
 		level = slog.LevelDebug
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	if *cpuProfile != "" {
+		stopProfile, err := startProfile(*cpuProfile)
+		if err != nil {
+			log.Error("cannot start the CPU profile", "err", err)
+			return
+		}
+		defer stopProfile(log)
+	}
 	// Ctrl-C, and on Windows Ctrl-Break and closing the window (SIGTERM), stop the server:
 	// everyone is told it shut down and the world is saved. A second one kills it at once.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -74,4 +84,25 @@ func main() {
 	if err := srv.Run(ctx); err != nil {
 		log.Error("server stopped", "err", err)
 	}
+}
+
+// startProfile starts a CPU profile written to path; the returned func ends it once the server
+// has stopped, so stop the server with Ctrl-C to keep the profile.
+func startProfile(path string) (func(*slog.Logger), error) {
+	f, err := os.Create(path) //nolint:gosec // the path is the operator's own flag
+	if err != nil {
+		return nil, err
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return func(log *slog.Logger) {
+		pprof.StopCPUProfile()
+		if err := f.Close(); err != nil {
+			log.Error("cannot write the CPU profile", "err", err)
+			return
+		}
+		log.Info("CPU profile written", "file", path)
+	}, nil
 }
