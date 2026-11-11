@@ -158,6 +158,9 @@ type Host struct {
 	// for the network, as BDS does with one counter for the whole server.
 	runtimeIDs atomic.Uint64
 	stackIDs   atomic.Int32
+	// storageIDs numbers storage items (bundles) for the network, BDS's dynamic
+	// container IDs: one counter for the level, the first being 0.
+	storageIDs atomic.Int32
 	// itemLifetime is the live age items vanish at; 0 is vanilla's.
 	itemLifetime atomic.Int32
 	// mobs runs every mob from its entity definition.

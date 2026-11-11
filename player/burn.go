@@ -262,6 +262,7 @@ func (i *ItemActor) loseHealth(e *world.Entity, damage float32) {
 	i.health -= int32(damage)
 	if i.health <= 0 {
 		i.taken = true
+		i.spillStored(e)
 		e.Remove()
 	}
 }

@@ -31,6 +31,8 @@ type slotRef struct {
 	stack     *ItemStack
 	// kind tells the slot's rules apart.
 	kind byte
+	// dynamic is a storage item's slot's dynamic container ID plus one, 0 for others.
+	dynamic int32
 }
 
 // requestState is a player's stack request state: the copy a request
@@ -56,6 +58,8 @@ type requestState struct {
 	// refresh means a listener changed what a request did, so the player must be
 	// sent its items after the response.
 	refresh bool
+	// storage are the running request's copies of storage items' slots.
+	storage []storageWork
 	// viewed are the slots passed requests changed in inventories with a view, sent
 	// again after the response: the client keeps what it moved as it saw it.
 	viewed []viewedSlot
@@ -85,6 +89,7 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 		resp.Responses = append(resp.Responses, p.stackRequest(req))
 	}
 	p.send(resp)
+	p.syncStorage()
 	st := &p.requests
 	if st.refresh {
 		st.refresh = false
@@ -107,6 +112,7 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	st.drops = st.drops[:0]
 	st.craft = craftState{}
 	st.filter = req.FilterStrings
+	st.storage = st.storage[:0]
 	var touched []slotRef
 	for _, a := range req.Actions {
 		if status := p.preCraftAction(a); status != protocol.ItemStackResponseStatusOK {
@@ -120,6 +126,9 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	}
 	if status := p.finishCraft(); status != protocol.ItemStackResponseStatusOK {
 		return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
+	}
+	if !p.commitStorage() {
+		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
 	}
 	if p.shulkerInShulker() {
 		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
@@ -144,7 +153,7 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 			continue
 		}
 		key := [2]byte{r.container, r.slot}
-		if _, seen := slots[key]; seen {
+		if _, seen := slots[key]; seen && r.dynamic == 0 {
 			continue
 		}
 		s := p.slotStack(r)
@@ -153,9 +162,13 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 			st.viewed = append(st.viewed, viewedSlot{inv: inv, slot: slot})
 		}
 		info := protocol.StackResponseSlotInfo{Slot: r.slot, HotbarSlot: r.slot, Count: s.Count, StackNetworkID: s.netID, CustomName: customName(s)}
-		i := containerIndex(resp.ContainerInfo, r.container)
+		name := protocol.FullContainerName{ContainerID: r.container}
+		if r.dynamic != 0 {
+			name.DynamicContainerID = protocol.Option(uint32(r.dynamic - 1)) //nolint:gosec // IDs are small
+		}
+		i := containerIndex(resp.ContainerInfo, name)
 		if i < 0 {
-			resp.ContainerInfo = append(resp.ContainerInfo, protocol.StackResponseContainerInfo{Container: protocol.FullContainerName{ContainerID: r.container}})
+			resp.ContainerInfo = append(resp.ContainerInfo, protocol.StackResponseContainerInfo{Container: name})
 			i = len(resp.ContainerInfo) - 1
 		}
 		resp.ContainerInfo[i].SlotInfo = append(resp.ContainerInfo[i].SlotInfo, info)
@@ -166,9 +179,11 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	return resp
 }
 
-func containerIndex(l []protocol.StackResponseContainerInfo, id byte) int {
+func containerIndex(l []protocol.StackResponseContainerInfo, name protocol.FullContainerName) int {
+	want, _ := name.DynamicContainerID.Value()
 	for i, c := range l {
-		if c.Container.ContainerID == id {
+		got, _ := c.Container.DynamicContainerID.Value()
+		if c.Container.ContainerID == name.ContainerID && got == want {
 			return i
 		}
 	}
@@ -187,6 +202,8 @@ func customName(s ItemStack) string {
 func (p *Player) inventoryOf(r slotRef) (*Inventory, int) {
 	invs := p.inventories()
 	switch r.kind {
+	case protocol.ContainerDynamic:
+		return nil, int(r.slot)
 	case containerCombined:
 		return invs.main, int(r.slot)
 	case containerArmor:
@@ -205,6 +222,9 @@ func (p *Player) inventoryOf(r slotRef) (*Inventory, int) {
 
 // slotStack returns the final stack of a touched slot.
 func (p *Player) slotStack(r slotRef) ItemStack {
+	if r.dynamic != 0 {
+		return p.storageStack(r)
+	}
 	ref, ok := p.slot(&p.inventory, r.container, r.slot)
 	if !ok {
 		return ItemStack{}
@@ -336,7 +356,13 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 // created output holds the item this request made, whatever ID the
 // client gives it.
 func (p *Player) validate(info protocol.StackRequestSlotInfo, needItem bool) (slotRef, bool) {
-	r, ok := p.slot(&p.requests.work, info.Container.ContainerID, info.Slot)
+	var r slotRef
+	var ok bool
+	if info.Container.ContainerID == protocol.ContainerDynamic {
+		r, ok = p.storageSlot(info)
+	} else {
+		r, ok = p.slot(&p.requests.work, info.Container.ContainerID, info.Slot)
+	}
 	if !ok {
 		return r, false
 	}
@@ -370,6 +396,9 @@ func (p *Player) emptiedByCraft(r slotRef, want int32) bool {
 	}
 	if want == p.requests.current {
 		return true
+	}
+	if r.dynamic != 0 {
+		return false
 	}
 	before, ok := p.slot(&p.inventory, r.container, r.slot)
 	return ok && !before.stack.Empty() && before.stack.netID == want
@@ -549,6 +578,8 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return p.s.Recipes().SmithingAllows(slot, p.craftItem(s))
 	case protocol.ContainerFurnaceResult:
 		return false
+	case protocol.ContainerDynamic:
+		return p.storageAccepts(r, s)
 	case protocol.ContainerFurnaceFuel:
 		return p.furnaceFuelAllowed(s)
 	case protocol.ContainerEnchantingInput:

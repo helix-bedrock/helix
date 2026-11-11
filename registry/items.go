@@ -38,6 +38,29 @@ type ItemType struct {
 	ArmorSlot uint8
 	// Offhand marks items the offhand accepts.
 	Offhand bool
+	// Storage is what the item holds when it holds items itself, as a bundle does
+	// (BDS's minecraft:storage_item and minecraft:storage_weight_limit); nil for items
+	// that hold none.
+	Storage *ItemStorage
+	// StorageWeight is what the item weighs inside a storage item on top of what it
+	// holds (minecraft:storage_weight_modifier). A storage item with 0 cannot go in
+	// another.
+	StorageWeight int
+}
+
+// ItemStorage is the rules of an item that holds items, from its definition's
+// components. Any item can have them; vanilla's are the bundles.
+type ItemStorage struct {
+	// Slots is how many stacks it holds (max_slots).
+	Slots int
+	// WeightLimit is the total weight it holds (max_weight_limit): an item weighs
+	// 64 / its stack size each, so 64 of a 64-stack item fill it.
+	WeightLimit int
+	// Nested lets other storage items in (allow_nested_storage_items), if they have a
+	// StorageWeight.
+	Nested bool
+	// Banned items never go in; when Allowed is not empty, only those go in.
+	Banned, Allowed []string
 }
 
 // RegisterItem adds an item type. Registering a name that exists replaces

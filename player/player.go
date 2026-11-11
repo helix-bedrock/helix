@@ -118,6 +118,9 @@ type Player struct {
 	thrownAt int64
 	// fishHook is the fishing hook the player has out, BDS's fishing hook ID.
 	fishHook *FishingHook
+	// storageSent is what the client was last sent of each storage item it holds, by
+	// dynamic container ID.
+	storageSent map[int32][]ItemStack
 	food     foodState
 	hurt     hurtState
 	glide    glideState

@@ -155,6 +155,10 @@ func vanillaItems(s *Setup) error {
 	for i, it := range list {
 		info[it.Name] = i
 	}
+	storage, err := vanillaItemStorage()
+	if err != nil {
+		return err
+	}
 	for _, e := range reg {
 		t := ItemType{Name: e.Name, ID: e.RuntimeID, Version: e.Version, ComponentBased: e.ComponentBased, Components: e.Data}
 		if i, ok := info[e.Name]; ok {
@@ -162,6 +166,9 @@ func vanillaItems(s *Setup) error {
 		}
 		t.ArmorSlot, t.Wearable = armorSlots[e.Name]
 		t.Offhand = offhand[e.Name]
+		if st, ok := storage[e.Name]; ok {
+			t.Storage, t.StorageWeight = st.rules, st.weight
+		}
 		if err := s.RegisterItem(t); err != nil {
 			return err
 		}
@@ -437,4 +444,59 @@ func vanillaHumid(name string, downfall float32) bool {
 // "..._double_cut_copper_slab".
 func halfSlab(name string) bool {
 	return strings.HasSuffix(name, "_slab") && !strings.Contains(name, "double_")
+}
+
+// itemStorageDef is the storage components of one item definition.
+type itemStorageDef struct {
+	rules  *ItemStorage
+	weight int
+}
+
+// vanillaItemStorage reads the storage components of every vanilla item definition:
+// minecraft:storage_item, minecraft:storage_weight_limit and
+// minecraft:storage_weight_modifier.
+func vanillaItemStorage() (map[string]itemStorageDef, error) {
+	defs, err := data.ItemDefinitions()
+	if err != nil {
+		return nil, fmt.Errorf("registry: vanilla: %w", err)
+	}
+	out := map[string]itemStorageDef{}
+	for name, raw := range defs {
+		var def struct {
+			Item struct {
+				Components struct {
+					Storage *struct {
+						MaxSlots int      `json:"max_slots"`
+						Nested   bool     `json:"allow_nested_storage_items"`
+						Banned   []string `json:"banned_items"`
+						Allowed  []string `json:"allowed_items"`
+					} `json:"minecraft:storage_item"`
+					Limit *struct {
+						Max int `json:"max_weight_limit"`
+					} `json:"minecraft:storage_weight_limit"`
+					Modifier *struct {
+						Weight int `json:"weight_in_storage_item"`
+					} `json:"minecraft:storage_weight_modifier"`
+				} `json:"components"`
+			} `json:"minecraft:item"`
+		}
+		if err := json.Unmarshal(raw, &def); err != nil {
+			return nil, fmt.Errorf("registry: vanilla: item %s: %w", name, err)
+		}
+		c := def.Item.Components
+		var d itemStorageDef
+		if c.Storage != nil {
+			d.rules = &ItemStorage{Slots: c.Storage.MaxSlots, Nested: c.Storage.Nested, Banned: c.Storage.Banned, Allowed: c.Storage.Allowed}
+			if c.Limit != nil {
+				d.rules.WeightLimit = c.Limit.Max
+			}
+		}
+		if c.Modifier != nil {
+			d.weight = c.Modifier.Weight
+		}
+		if d.rules != nil || d.weight != 0 {
+			out[name] = d
+		}
+	}
+	return out, nil
 }

@@ -91,11 +91,15 @@ func (p *Player) sendArmour() { p.Armour().sendAll(p, false) }
 // armour, UI, offhand, then the selected hotbar slot.
 func (p *Player) sendOwnItems() {
 	invs := p.inventories()
+	// Storage items get their IDs before their slots are sent.
+	p.syncStorageIDs()
 	invs.main.sendAll(p, false)
 	invs.armour.sendAll(p, false)
 	invs.ui.sendAll(p, false)
 	invs.offhand.sendAll(p, false)
 	p.send(&packet.PlayerHotBar{SelectedHotBarSlot: uint32(p.inventory.held), WindowID: protocol.WindowIDInventory, SelectHotBarSlot: true})
+	p.storageSent = nil
+	p.syncStorage()
 }
 
 // blockPos is a block position as packets carry it.

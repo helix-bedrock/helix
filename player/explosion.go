@@ -713,6 +713,7 @@ func (i *ItemActor) BlastHit(damage float32, _ DamageSource) {
 	i.health -= int32(damage)
 	if i.health <= 0 {
 		i.taken = true
+		i.spillStored(i.entity)
 		i.entity.Remove()
 	}
 }

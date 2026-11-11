@@ -28,6 +28,15 @@ type ItemStack struct {
 	saved map[string]any
 	// netID is the stack's network ID, which the client names it by.
 	netID int32
+	// stored is what a storage item (a bundle) holds, one entry a slot. It is never
+	// changed in place: a change makes a new slice, so copies of the stack (a request's
+	// work copy) keep what they had.
+	stored []ItemStack
+	// storedWeight is what stored weighs, saved as BDS's "bundle_weight".
+	storedWeight int32
+	// storageID is the item's dynamic container ID plus one (BDS's runtime "bundle_id"
+	// tag); 0 until the server gives it one.
+	storageID int32
 }
 
 // Empty reports whether the slot holds nothing.
@@ -51,6 +60,7 @@ func itemFromNBT(m map[string]any) ItemStack {
 	s.Meta, _ = m["Damage"].(int16)
 	s.Block, _ = m["Block"].(map[string]any)
 	s.Tag, _ = m["tag"].(map[string]any)
+	s.readStored()
 	for k, v := range m {
 		switch k {
 		case "Name", "Count", "Damage", "Block", "tag", "Slot":
@@ -78,8 +88,8 @@ func (s ItemStack) nbt(slot int, withSlot bool) map[string]any {
 	if s.Block != nil {
 		m["Block"] = s.Block
 	}
-	if s.Tag != nil {
-		m["tag"] = s.Tag
+	if tag := s.savedTag(); tag != nil {
+		m["tag"] = tag
 	}
 	if withSlot {
 		m["Slot"] = uint8(slot) //nolint:gosec // slots are small
@@ -99,7 +109,7 @@ func (s ItemStack) network(reg *registry.Registry) protocol.ItemInstance {
 	}
 	st := protocol.ItemStack{
 		ItemType: protocol.ItemType{NetworkID: int32(t.ID), MetadataValue: uint32(uint16(s.Meta))},
-		Count:    uint16(s.Count), NBTData: s.Tag,
+		Count:    uint16(s.Count), NBTData: s.networkTag(),
 	}
 	if s.Block != nil {
 		name, _ := s.Block["name"].(string)

@@ -162,8 +162,16 @@ func (inv *Inventory) SetItem(slot int, s ItemStack) bool {
 // changed saves a slot that changed and shows it to everyone looking.
 func (inv *Inventory) changed(slot int) {
 	inv.holder.inventoryChanged(slot)
+	if inv.owner != nil && inv.kind.own() {
+		// A storage item put in gets its ID before the slot is sent.
+		inv.owner.syncStorageIDs()
+	}
 	for _, v := range inv.Viewers() {
 		inv.sendSlot(v, slot, true)
+	}
+	if inv.owner != nil && inv.kind.own() {
+		inv.owner.syncStorage()
+		inv.owner.flushNow()
 	}
 }
 

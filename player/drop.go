@@ -303,13 +303,18 @@ func (p *Player) Give(s ItemStack) ItemStack {
 		return ItemStack{}
 	}
 	rest := p.inventory.add(p.s.reg, s, func() int32 { return p.s.stackIDs.Add(1) }, p.sendSlot)
+	p.syncStorage()
 	p.sendEquipment()
 	p.flush()
 	return rest
 }
 
 // sendSlot sends an inventory slot as the server has it.
-func (p *Player) sendSlot(i int) { p.Inventory().sendSlot(p, i, false) }
+func (p *Player) sendSlot(i int) {
+	// A storage item put in gets its ID before the slot is sent.
+	p.syncStorageIDs()
+	p.Inventory().sendSlot(p, i, false)
+}
 
 // sendEquipment shows the players who see this one what it holds, if that
 // changed.
