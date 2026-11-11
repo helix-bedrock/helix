@@ -494,10 +494,9 @@ func excludes(id int16) func(self, other *Enchantment) bool {
 	return func(self, other *Enchantment) bool { return groupCompatible(self, other) && other.ID != id }
 }
 
-// impalingDamage is BDS's Impaling on a target in water. BDS also counts rain, which is
-// not built.
+// impalingDamage is BDS's Impaling on a target in water or rain.
 func impalingDamage(_ *Player, level int16, target *Player) float32 {
-	if target == nil || !target.move.inWater {
+	if target == nil || !target.Wet() {
 		return 0
 	}
 	return float32(level) * smiteLikeDamage

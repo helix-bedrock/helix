@@ -142,6 +142,8 @@ type ProjectileSpec struct {
 	Bounce bool
 	// HitSound is the sound it makes on hitting something, empty for none.
 	HitSound string
+	// StopOnHurt stops it when it hurts what it hits (stop_on_hurt).
+	StopOnHurt bool
 	// Offset is how far from its shooter's eyes it starts, turned with the shooter.
 	Offset mgl32.Vec3
 }
@@ -164,6 +166,7 @@ type projectileComponent struct {
 	UncertaintyMult float32   `json:"uncertainty_multiplier"`
 	HitSound        string    `json:"hit_sound"`
 	ShouldBounce    string    `json:"should_bounce"`
+	StopOnHurt      bool      `json:"stop_on_hurt"`
 	Offset          []float32 `json:"offset"`
 	OnHit           struct {
 		Impact *struct {
@@ -248,7 +251,7 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 		ID: id, Width: box.Width, Height: box.Height, Power: c.Power, Gravity: c.Gravity,
 		Inertia: projectileInertia, LiquidInertia: projectileLiquidInertia,
 		UncertaintyBase: c.UncertaintyBase, UncertaintyPerDifficulty: c.UncertaintyMult,
-		HitSound: c.HitSound, Bounce: c.ShouldBounce == projectileBounceNoDamage,
+		HitSound: c.HitSound, Bounce: c.ShouldBounce == projectileBounceNoDamage, StopOnHurt: c.StopOnHurt,
 		RemoveOnHit: c.OnHit.Remove != nil, TeleportOwner: c.OnHit.Teleport != nil,
 	}
 	if len(c.Offset) == 3 {
@@ -326,6 +329,8 @@ type Projectile struct {
 	punch    float32
 	pickup   arrowPickup
 	item     ItemStack
+	// trident is set for a thrown trident.
+	trident *tridentState
 
 	// moves is what those who see it were last told of its movement.
 	moves actorMoves
@@ -421,6 +426,9 @@ func (t *Projectile) flags() int64 {
 	if t.critical {
 		f |= 1 << protocol.EntityDataFlagCritical
 	}
+	if t.trident != nil && t.trident.returning {
+		f |= 1 << protocol.EntityDataFlagReturnTrident
+	}
 	return f
 }
 
@@ -480,6 +488,10 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	if t.shake > 0 {
 		e.Send(actorEventData(e.RuntimeID(), actorEventArrowShake, t.shake))
 		t.shake = 0
+	}
+	if t.tridentReturns(r, e) {
+		t.planned = false
+		return
 	}
 	if t.stuck {
 		t.planned = false
@@ -902,8 +914,14 @@ func (t *Projectile) hitPlayer(target *Player) {
 	if t.spec.DamageOnly == "" {
 		damage = projectileDamage(t.spec, t.vel.Len(), t.power, t.critical)
 	}
+	if r := target.entity.Region(); r != nil && damage > 0 {
+		damage += t.tridentHit(r, target, target.entity.Position())
+	}
 	g := t.s.game
 	hurt := damage > 0 && g.sys.Hurt(target, damage, DamageSource{Cause: causeProjectile, Attacker: t.owner})
+	if hurt && t.spec.StopOnHurt {
+		t.tridentHurt()
+	}
 	if damage > 0 && !hurt && t.spec.Bounce {
 		t.vel = t.vel.Mul(projectileBounce)
 		t.spec.DestroyOnHit = false
@@ -923,7 +941,13 @@ func (t *Projectile) hitMob(target *Mob) {
 	if t.spec.DamageOnly == "" || target.hasFamily(t.spec.DamageOnly) {
 		damage = projectileDamage(t.spec, t.vel.Len(), t.power, t.critical)
 	}
+	if r := target.entity.Region(); r != nil && damage > 0 {
+		damage += t.tridentHit(r, target, target.entity.Position())
+	}
 	hurt := damage > 0 && target.TakeDamage(damage, DamageSource{Cause: causeProjectile, Attacker: t.owner})
+	if hurt && t.spec.StopOnHurt {
+		t.tridentHurt()
+	}
 	if damage > 0 && !hurt && t.spec.Bounce {
 		t.vel = t.vel.Mul(projectileBounce)
 		t.spec.DestroyOnHit = false
@@ -989,13 +1013,14 @@ func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	data[projectileKeyInGround] = stuck
 	data[projectileKeyPickup] = uint8(t.pickup)
+	t.saveTrident(data)
 	data[projectileKeyStuckAt] = []int32{int32(t.stuckAt[0]), int32(t.stuckAt[1]), int32(t.stuckAt[2])} //nolint:gosec // block positions fit
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
 // isProjectile reports whether a saved entity's identifier is one this runs.
 func isProjectile(id string) bool {
-	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow
+	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow || id == nameThrownTrident
 }
 
 // loadProjectile brings back a saved one. Who shot it is not kept, so a bow's enchantments
@@ -1029,6 +1054,7 @@ func (s *Host) loadProjectile(r *world.Region, at mcdb.ChunkPos, saved chunk.Ent
 	if v, isList := saved.Data[projectileKeyStuckAt].([]int32); isList && len(v) == 3 {
 		t.stuckAt = cube.Pos{int(v[0]), int(v[1]), int(v[2])}
 	}
+	t.loadTrident(saved.Data)
 	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, t.rot))
 	return true
 }

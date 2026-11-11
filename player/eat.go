@@ -200,6 +200,10 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		p.startDrawing(held)
 		return true
 	}
+	if held.Name == nameTrident {
+		p.startTrident(held)
+		return true
+	}
 	food, ok := g.sys.FoodOf(p, held)
 	if !ok || !p.mayEat(food) {
 		return false
@@ -243,7 +247,11 @@ func (p *Player) letGo() {
 	u := p.using
 	if u.active && u.bow && p.inventory.held == u.slot {
 		if held := p.inventory.Held(); held.Name == u.item.Name {
-			p.releaseBow(held, bowUseTicks-u.left)
+			if held.Name == nameTrident {
+				p.releaseTrident(held, bowUseTicks-u.left)
+			} else {
+				p.releaseBow(held, bowUseTicks-u.left)
+			}
 		}
 	}
 	p.stopUsing()

@@ -132,9 +132,17 @@ func (m *Minecart) OutOfWorld(_ *Host, e *world.Entity) {
 	}
 }
 
-// OutOfWorld removes the projectile. A trident with Loyalty returns in BDS; Helix has no
-// Loyalty yet.
-func (t *Projectile) OutOfWorld(_ *Host, e *world.Entity) { t.remove(e) }
+// OutOfWorld removes the projectile, except a trident with Loyalty, which starts back to its
+// owner as BDS's (sub_BC99300).
+func (t *Projectile) OutOfWorld(_ *Host, e *world.Entity) {
+	if tr := t.trident; tr != nil && tr.loyalty > 0 && t.owner != nil && !t.owner.dead() {
+		if r := e.Region(); r != nil && t.owner.entity != nil && t.owner.entity.Region() == r {
+			t.returnStep(r, e, t.owner, float32(tr.loyalty))
+			return
+		}
+	}
+	t.remove(e)
+}
 
 // OutOfWorld removes the cushion with no drop, letting its riders go.
 func (c *Cushion) OutOfWorld(_ *Host, e *world.Entity) {
