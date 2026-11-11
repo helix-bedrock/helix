@@ -1,6 +1,8 @@
 package player
 
 import (
+	"fmt"
+
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -86,7 +88,11 @@ type pendingDrop struct {
 func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 	resp := &packet.ItemStackResponse{Responses: make([]protocol.ItemStackResponse, 0, len(pk.Requests))}
 	for _, req := range pk.Requests {
-		resp.Responses = append(resp.Responses, p.stackRequest(req))
+		r := p.stackRequest(req)
+		if r.Status != protocol.ItemStackResponseStatusOK {
+			p.s.log.Debug("item stack request refused", "name", p.name, "status", r.Status, "request", describeStackRequest(req))
+		}
+		resp.Responses = append(resp.Responses, r)
 	}
 	p.send(resp)
 	p.syncStorage()
@@ -177,6 +183,15 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	a.id, a.slots = req.RequestID, slots
 	st.next++
 	return resp
+}
+
+// describeStackRequest is a request's actions as text, for the debug log.
+func describeStackRequest(req protocol.ItemStackRequest) string {
+	out := fmt.Sprintf("id=%d", req.RequestID)
+	for _, a := range req.Actions {
+		out += fmt.Sprintf(" %T%+v", a, a)
+	}
+	return out
 }
 
 func containerIndex(l []protocol.StackResponseContainerInfo, name protocol.FullContainerName) int {
