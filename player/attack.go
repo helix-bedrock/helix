@@ -162,6 +162,7 @@ func vanillaAttack(p, target *Player) bool {
 				sound = packet.SoundEventAttackCritical
 				target.entity.Send(&packet.Animate{ActionType: packet.AnimateActionCriticalHit, EntityRuntimeID: target.runtimeID, Data: critEventData})
 			}
+			p.maceSmash(r, target.entity)
 			h.attackerAfter()
 		}
 	}
@@ -173,7 +174,7 @@ func vanillaAttack(p, target *Player) bool {
 
 // hitWear is what one hit wears item by.
 func (g *gameplay) hitWear(item string) int32 {
-	if g.combat.wearOne[item] {
+	if g.combat.wearOne[item] || item == nameMace {
 		return hitWearWeapon
 	}
 	return hitWearDefault

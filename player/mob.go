@@ -390,6 +390,7 @@ func (p *Player) useOnMob(d *protocol.UseItemOnEntityTransactionData) bool {
 				sound = packet.SoundEventAttackCritical
 				o.entity.Send(&packet.Animate{ActionType: packet.AnimateActionCriticalHit, EntityRuntimeID: o.entity.RuntimeID(), Data: critEventData})
 			}
+			p.maceSmash(r, o.entity)
 			h.attackerAfter()
 		}
 	}

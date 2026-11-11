@@ -406,6 +406,10 @@ func vanillaAttackParts(p, target *Player) *Hit {
 	if !held.Empty() {
 		h.Base += float32(g.combat.damage[held.Name])
 	}
+	if held.Name == nameMace {
+		// BDS adds the item's attack bonus to the base damage.
+		h.Base += MaceBonus(p.FallDistance())
+	}
 	enchantLevels(held, func(id, level int16) {
 		if e, ok := p.hitEnchant(id); ok && e.Melee != nil {
 			h.Bonuses = append(h.Bonuses, Part{Kind: PartMelee, ID: int32(id), Level: int32(level), Slot: -1, Value: e.Melee(p, level, target), Scale: 1})
