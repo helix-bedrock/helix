@@ -154,14 +154,16 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 
 	resp := protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusOK, RequestID: req.RequestID}
 	slots := map[[2]byte]int32{}
+	listed := map[[3]int32]bool{}
 	for _, r := range touched {
 		if r.container == containerCreatedOutput {
 			continue
 		}
 		key := [2]byte{r.container, r.slot}
-		if _, seen := slots[key]; seen && r.dynamic == 0 {
+		if listed[[3]int32{int32(r.container), int32(r.slot), r.dynamic}] {
 			continue
 		}
+		listed[[3]int32{int32(r.container), int32(r.slot), r.dynamic}] = true
 		s := p.slotStack(r)
 		slots[key] = s.netID
 		if inv, slot := p.inventoryOf(r); inv.viewed() {
@@ -391,6 +393,12 @@ func (p *Player) validate(info protocol.StackRequestSlotInfo, needItem bool) (sl
 	if !needItem && p.emptiedByCraft(r, want) {
 		return r, true
 	}
+	if want < 0 && want == p.requests.current {
+		// The running request names a slot by its own ID: the stack it left there with
+		// an earlier action, as the client does when it fills a storage item and then
+		// orders its slots in one request.
+		return r, true
+	}
 	if want < 0 {
 		var found bool
 		want, found = p.requests.assigned(want, info.Container.ContainerID, info.Slot)
@@ -504,6 +512,12 @@ func (p *Player) swap(srcInfo, dstInfo protocol.StackRequestSlotInfo) (uint8, []
 		return protocol.ItemStackResponseStatusDstContainerAndSlotEqualToSrcContainerAndSlot, nil
 	}
 	a, b := *src.stack, *dst.stack
+	if src.dynamic != 0 && src.dynamic == dst.dynamic {
+		// Two slots of one storage item: what it holds stays the same, so its rules
+		// still hold.
+		*src.stack, *dst.stack = b, a
+		return protocol.ItemStackResponseStatusOK, []slotRef{src, dst}
+	}
 	if !p.mayRemove(src, a) || !p.mayRemove(dst, b) || !p.mayPlace(dst, a) || !p.mayPlace(src, b) {
 		return protocol.ItemStackResponseStatusCannotSwapItem, nil
 	}
