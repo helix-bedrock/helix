@@ -90,6 +90,8 @@ type Region struct {
 	lastWarn  time.Time
 	// phases is how long each part of the last tick took, for the over-budget warning.
 	phases tickPhases
+	// late is drain's scratch list of the work it leaves for the next tick.
+	late []entry
 
 	inMu sync.Mutex
 	in   []entry
@@ -142,6 +144,8 @@ type entry struct {
 	v   *Viewer
 	// every goes to each region a split makes, as well as staying.
 	every bool
+	// arrival is a loaded chunk joining the region, which drain spreads over ticks.
+	arrival bool
 }
 
 // ID returns the region's ID, unique within its dimension. Runs: anywhere.
@@ -361,11 +365,42 @@ func (r *Region) drain() {
 	r.inMu.Lock()
 	r.run, r.in = r.in, r.run[:0]
 	r.inMu.Unlock()
+	start := time.Now()
+	late := r.late[:0]
 	for i := range r.run {
-		r.run[i].fn(r)
+		e := r.run[i]
 		r.run[i] = entry{}
+		// Once joining chunks has used the tick's share, the chunks left join next tick, and so
+		// does any later work at their positions, so it still finds them joined.
+		if (e.arrival || e.at && r.lateAt(late, e.pos)) && time.Since(start) > arriveBudget {
+			late = append(late, e)
+			continue
+		}
+		e.fn(r)
 	}
+	r.late = late[:0]
+	if len(late) == 0 {
+		return
+	}
+	r.inMu.Lock()
+	r.in = append(append(r.run[:0:0], late...), r.in...)
+	r.inMu.Unlock()
+	clear(late)
 }
+
+// lateAt reports a chunk arrival at pos among the work left for the next tick.
+func (r *Region) lateAt(late []entry, pos mcdb.ChunkPos) bool {
+	for _, e := range late {
+		if e.arrival && e.pos == pos {
+			return true
+		}
+	}
+	return false
+}
+
+// arriveBudget is how long one tick spends joining loaded chunks before leaving the rest for
+// the next: a burst of loads, such as a player joining, otherwise stalls one tick for all.
+const arriveBudget = 10 * time.Millisecond
 
 // owns reports whether the chunk at pos is in one of the region's sections.
 func (r *Region) owns(pos mcdb.ChunkPos) bool {

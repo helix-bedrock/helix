@@ -359,6 +359,18 @@ func (d *Dimension) postAt(pos mcdb.ChunkPos, fn func(*Region)) bool {
 	return true
 }
 
+// postArrival is postAt for a loaded chunk joining its region.
+func (d *Dimension) postArrival(pos mcdb.ChunkPos, fn func(*Region)) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	o, ok := d.sections[d.sectionOf(pos)]
+	if !ok {
+		return false
+	}
+	o.post(entry{fn: fn, pos: pos, at: true, arrival: true})
+	return true
+}
+
 // postViewer queues fn for the region v is in.
 func (d *Dimension) postViewer(v *Viewer, fn func(*Region)) {
 	d.mu.Lock()
@@ -440,7 +452,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
-	d.postAt(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light) })
+	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light) })
 }
 
 // tickSafely is runTick with a panic recovered and passed to the scheduler's handler.
