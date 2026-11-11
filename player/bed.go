@@ -166,7 +166,7 @@ func (p *Player) placeBed(r *world.Region, clicked cube.Pos, face int32, held It
 		return false
 	}
 	pos := clicked.Side(cube.Face(face))
-	if b, isB := r.Block(clicked, 0); isB && p.s.game.replaceable(p, b, block) {
+	if b, isB := r.Block(clicked, 0); isB && p.s.game.replaceable(p, r, clicked, b, block) {
 		pos = clicked
 	}
 	if p.tryBed(r, clicked, pos, block, held) {
@@ -191,7 +191,7 @@ func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, h
 	headState := blockuse.BedSet(blocks, footState, blockuse.BedHead, true)
 	for _, at := range [...]cube.Pos{foot, head} {
 		b, ok := r.Block(at, 0)
-		if !ok || !p.s.game.replaceable(p, b, block) || blocks.Properties(b).Material == registry.MaterialLava {
+		if !ok || !p.s.game.replaceable(p, r, at, b, block) || blocks.Properties(b).Material == registry.MaterialLava {
 			return false
 		}
 		under, okUnder := r.Block(at.Side(cube.FaceDown), 0)

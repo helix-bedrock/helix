@@ -192,7 +192,7 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 		return false
 	}
 	pl := &Placement{Player: p, Clicked: clicked, Face: face, ClickPos: click, Pos: clicked.Side(cube.Face(face)), Item: held, Block: block}
-	if b, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, b, block) {
+	if b, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, b, block) {
 		pl.Pos = clicked
 	}
 	sys := p.s.game.sys
@@ -246,16 +246,45 @@ func (p *Player) itemBlock(s ItemStack) (uint32, bool) {
 	return blocks.Block(s.Name)
 }
 
-// replaceable reports whether placing block on b replaces b: what b's
+// replaceable reports whether placing block on b, at pos, replaces b: what b's
 // behaviour says, else BDS's replaceable component (helix-data's list),
 // except where BDS's own rule refuses the block placed (light blocks are
-// not replaced by light blocks).
-func (g *gameplay) replaceable(p *Player, b, block uint32) bool {
-	name := p.s.reg.Blocks.Name(b)
-	if r, ok := g.blocks[name].(Replaceable); ok {
-		return r.Replaceable(b)
+// not replaced by light blocks, full snow layers are not built over).
+func (g *gameplay) replaceable(p *Player, r *world.Region, pos cube.Pos, b, block uint32) bool {
+	blocks := p.s.reg.Blocks
+	name := blocks.Name(b)
+	if rb, ok := g.blocks[name].(Replaceable); ok {
+		return rb.Replaceable(b)
 	}
-	return g.replaceables[name] && !g.notReplacedBy[name][p.s.reg.Blocks.Name(block)]
+	if !g.replaceables[name] || g.notReplacedBy[name][blocks.Name(block)] {
+		return false
+	}
+	if name == nameSnowLayer {
+		return g.snowReplaceable(p, r, pos, b, block)
+	}
+	return true
+}
+
+// Snow layer states read by snowReplaceable.
+const (
+	nameSnowLayer    = "minecraft:snow_layer"
+	nameAir          = "minecraft:air"
+	stateSnowHeight  = "height"
+	snowHeightFilled = 7
+)
+
+// snowReplaceable is BDS 1.26.60's TopSnowBlock::canBeBuiltOver (sub_D4EB2B0): unless a snow
+// layer is placed, a block in the snow's second layer (a plant it covers) decides; otherwise
+// only snow below its full height (8 layers, which looks like a snow block) is built over.
+func (g *gameplay) snowReplaceable(p *Player, r *world.Region, pos cube.Pos, b, block uint32) bool {
+	blocks := p.s.reg.Blocks
+	if blocks.Name(block) != nameSnowLayer && r != nil {
+		if covered, ok := r.Block(pos, 1); ok && blocks.Name(covered) != nameAir {
+			return g.replaceable(p, r, pos, covered, block)
+		}
+	}
+	h, _ := blocks.States(b)[stateSnowHeight].(int32)
+	return h < snowHeightFilled
 }
 
 // vanillaPlaceCheck is BDS's mayPlace as far as built: the target is in the
@@ -268,12 +297,12 @@ func vanillaPlaceCheck(pl *Placement) bool {
 		return false
 	}
 	b, ok := r.Block(pl.Pos, 0)
-	if !ok || !p.s.game.replaceable(p, b, pl.Block) {
+	if !ok || !p.s.game.replaceable(p, r, pl.Pos, b, pl.Block) {
 		return false
 	}
 	blocks := p.s.reg.Blocks
 	if blockuse.IsDoor(blocks, pl.Block) && !blockuse.DoorFits(blocks, r, pl.Pos, func(above uint32) bool {
-		return p.s.game.replaceable(p, above, pl.Block)
+		return p.s.game.replaceable(p, r, pl.Pos.Side(cube.FaceUp), above, pl.Block)
 	}) {
 		return false
 	}

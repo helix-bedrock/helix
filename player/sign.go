@@ -259,7 +259,7 @@ func (p *Player) placeSign(r *world.Region, clicked cube.Pos, face int32, held I
 	blocks := p.s.reg.Blocks
 	standing, wall := signBlocks(held.Name)
 	pos := clicked.Side(f)
-	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, c, c) {
+	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, c, c) {
 		pos, f = clicked, cube.FaceUp
 	}
 	var state uint32
@@ -284,7 +284,7 @@ func (p *Player) placeHangingSign(r *world.Region, clicked cube.Pos, face int32,
 		return false
 	}
 	pos := clicked.Side(f)
-	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, c, c) {
+	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, c, c) {
 		pos = clicked
 	}
 	yaw := p.entity.Rotation().Yaw
@@ -330,7 +330,7 @@ func hangingSideFacing(yaw float32, f cube.Face) cube.Face {
 // putSign is SignItem's placing once the state is chosen: BDS's checks, the block, the
 // sound, the item used up, then the editor opened on the front.
 func (p *Player) putSign(r *world.Region, pos cube.Pos, state uint32, f cube.Face, held ItemStack) bool {
-	if b, okAt := r.Block(pos, 0); !okAt || !p.s.game.replaceable(p, b, state) || !p.s.attach.MayPlace(r, pos, state, f) || p.inside(pos, state) {
+	if b, okAt := r.Block(pos, 0); !okAt || !p.s.game.replaceable(p, r, pos, b, state) || !p.s.attach.MayPlace(r, pos, state, f) || p.inside(pos, state) {
 		return false
 	}
 	if g := p.s.game; g.placeEv.Has() {

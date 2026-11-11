@@ -322,7 +322,7 @@ func (p *Player) placeBanner(r *world.Region, clicked cube.Pos, face int32, held
 	if !ok {
 		return false
 	}
-	if b, okAt := r.Block(pos, 0); !okAt || !p.s.game.replaceable(p, b, state) || !p.s.attach.MayPlace(r, pos, state, f) || p.inside(pos, state) {
+	if b, okAt := r.Block(pos, 0); !okAt || !p.s.game.replaceable(p, r, pos, b, state) || !p.s.attach.MayPlace(r, pos, state, f) || p.inside(pos, state) {
 		return false
 	}
 	if g := p.s.game; g.placeEv.Has() {

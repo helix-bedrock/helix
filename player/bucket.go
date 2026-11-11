@@ -119,9 +119,9 @@ func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
 		return false
 	}
 	pos := clicked
-	if b, ok := r.Block(clicked, 0); !ok || !p.s.game.replaceable(p, b, block) {
+	if b, ok := r.Block(clicked, 0); !ok || !p.s.game.replaceable(p, r, clicked, b, block) {
 		pos = clicked.Side(cube.Face(face))
-		if b, ok := r.Block(pos, 0); !ok || !p.s.game.replaceable(p, b, block) {
+		if b, ok := r.Block(pos, 0); !ok || !p.s.game.replaceable(p, r, pos, b, block) {
 			return false
 		}
 	}
