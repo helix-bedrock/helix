@@ -112,7 +112,9 @@ type Ticker struct {
 	biomes  *registry.Biomes
 	support *attach.Table
 	prime   PrimeFunc
-	rules   atomic.Pointer[Rules]
+	// campfireWet throws out the food of a campfire that water reached; nil for none.
+	campfireWet CampfireWetFunc
+	rules       atomic.Pointer[Rules]
 	// rain says where it rains; nil for never.
 	rain atomic.Pointer[weather.Ticker]
 	info []info
@@ -308,6 +310,8 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 		if !t.soulSurvives(r, pos) {
 			t.remove(r, pos)
 		}
+	case layer == 0 && t.is(block, isCampfire), layer == 1 && t.campfireAt(r, pos):
+		t.campfireChanged(r, pos)
 	}
 	t.BlockTicker.Placed(r, pos, block, layer)
 }
@@ -326,6 +330,8 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		if !t.soulSurvives(r, pos) {
 			r.ScheduleTick(pos, t.soulFire, survivalDelay, 0)
 		}
+	case layer == 0 && t.is(block, isCampfire):
+		t.campfireChanged(r, pos)
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }

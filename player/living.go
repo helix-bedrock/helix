@@ -58,6 +58,10 @@ func (s *Host) tickHazardsFrom(r *world.Region, l Living, lo, hi, moved mgl32.Ve
 	if l.Dead() {
 		return c
 	}
+	s.campfireHurt(r, l, c.campfire)
+	if l.Dead() {
+		return c
+	}
 	immune := l.FireImmune()
 	if !immune {
 		if c.fire > 0 {

@@ -61,6 +61,8 @@ type burnContact struct {
 	lava, lavaBurn bool
 	// contact is the block touched that hurts by contact, cactus first.
 	contact contactBlock
+	// campfire is the campfire touched, lit or not.
+	campfire campfireTouch
 }
 
 // burning reports whether c touches anything that sets on fire.
@@ -86,6 +88,9 @@ func (s *Host) touching(r *world.Region, lo, hi mgl32.Vec3) burnContact {
 					c.contact = k
 				}
 				switch blocks.Name(b) {
+				case nameCampfire, nameSoulCampfire:
+					s.touchCampfire(&c.campfire, pos, b)
+					continue
 				case nameFire:
 					c.fire = max(c.fire, fireBlockDamage)
 					continue

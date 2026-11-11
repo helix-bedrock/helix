@@ -15,8 +15,8 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/daytime"
-	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fall"
+	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
@@ -89,7 +89,7 @@ func (s *Server) openWorld() error {
 		PVP: ldat.PVP, NaturalRegeneration: ldat.NaturalRegeneration,
 		TNTExplodes: ldat.TNTExplodes, TNTExplosionDropDecay: ldat.TNTExplosionDropDecay, DoTileDrops: ldat.DoTileDrops, GameRules: gameRules(ldat),
 		RespawnBlocksExplode: ldat.RespawnBlocksExplode, DoDayLightCycle: ldat.DoDayLightCycle, DoEntityDrops: ldat.DoEntityDrops, MobGriefing: ldat.MobGriefing,
-		DoMobSpawning: ldat.DoMobSpawning,
+		DoMobSpawning:             ldat.DoMobSpawning,
 		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
 	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
@@ -165,6 +165,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
 		s.farm.SetSupport(attached.Supports)
 		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
+		s.fire.SetCampfireWet(s.campfireWet)
 		falls, err := fall.New(s.reg.Blocks, attached.Supports)
 		if err != nil {
 			return err
@@ -343,6 +344,13 @@ func (s *Server) PlayerStore() mcdb.PlayerStore { return s.playerStore }
 func (s *Server) primeTNT(r *world.Region, pos cube.Pos) {
 	if host := s.players.Load(); host != nil {
 		host.PrimeBlock(r, pos, nil)
+	}
+}
+
+// campfireWet throws out the food of a campfire that water reached.
+func (s *Server) campfireWet(r *world.Region, pos cube.Pos) {
+	if host := s.players.Load(); host != nil {
+		host.DropCampfireItems(r, pos)
 	}
 }
 

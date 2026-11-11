@@ -80,6 +80,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useBed(r, u)
 	case jukeboxBlock:
 		return p.useJukebox(r, u)
+	case nameCampfire, nameSoulCampfire:
+		return p.useCampfire(r, u)
 	case frameBlock, glowFrameBlock:
 		return p.useFrame(r, u)
 	case craftingTable:
