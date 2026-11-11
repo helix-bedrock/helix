@@ -136,12 +136,21 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyWidth:    w, protocol.EntityDataKeyHeight: h,
 		protocol.EntityDataKeyScale:     m.m.Scale(),
 		protocol.EntityDataKeyAirSupply: air, protocol.EntityDataKeyAirSupplyMax: maxAir,
-		protocol.EntityDataKeyTarget: int64(m.m.Target()),
+		protocol.EntityDataKeyTarget: targetData(m.m.Target()),
 	}
 	for _, d := range m.m.ActorData() {
 		md[uint32(d.Key)] = d.Value //nolint:gosec // actor data keys are small
 	}
 	return md
+}
+
+// targetData is a target as actor data 6: its unique ID, or 0 for none as BDS writes it.
+// The client raises a skeleton's bow for any other value, so NoID (-1) must not go out.
+func targetData(id behavior.ID) int64 {
+	if id == behavior.NoID {
+		return 0
+	}
+	return int64(id)
 }
 
 // spawnPackets show the mob. Not yet compared with what BDS sends.
