@@ -116,6 +116,8 @@ type Player struct {
 	pearlReady int64
 	// thrownAt is the tick the player last threw something.
 	thrownAt int64
+	// useRepeat is set while a use in the air sent for a button held down is handled.
+	useRepeat bool
 	// fishHook is the fishing hook the player has out, BDS's fishing hook ID.
 	fishHook *FishingHook
 	// storageSent is what the client was last sent of each storage item it holds, by

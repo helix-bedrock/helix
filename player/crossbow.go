@@ -72,6 +72,11 @@ func (inv *playerItems) crossbowAmmo() (ItemStack, int, bool) {
 // loading if there is something to load (anything in creative). False if nothing happened.
 func (p *Player) useCrossbow(held ItemStack) bool {
 	if !crossbowCharged(held).Empty() {
+		// The client keeps sending the use while the button stays held after loading; only
+		// a new press shoots, so holding to load does not fire the moment it is loaded.
+		if p.useRepeat {
+			return true
+		}
 		p.shootCrossbow(held)
 		return true
 	}

@@ -166,7 +166,9 @@ func (p *Player) handleUseAir(d *protocol.UseItemTransactionData) {
 		return
 	}
 	if held := p.inventory.Held(); !held.Empty() {
+		p.useRepeat = d.TriggerType == protocol.TriggerTypeSimulationTick
 		p.s.game.sys.UseItem(p, held)
+		p.useRepeat = false
 	}
 }
 
