@@ -69,7 +69,37 @@ type FireworkRocket struct {
 	attached *Player
 	// dispensed is set for rockets from a dispenser (BDS's +944).
 	dispensed bool
-	gone      bool
+	// shot is set for rockets from a crossbow (BDS's init with its last argument set), which
+	// explode when they hit a block or an entity (fireworksRocketServerProjectileHit);
+	// struck is that its think step found such a hit.
+	shot, struck bool
+	// shooter is who shot it from a crossbow, whom it flies through.
+	shooter *Player
+	gone    bool
+}
+
+// Shot reports whether a crossbow shot it.
+func (f *FireworkRocket) Shot() bool { return f.shot }
+
+// shotHits is whether a shot rocket at pos touches a living entity other than its shooter.
+// It only reads the region, so it may run in the think step.
+func (f *FireworkRocket) shotHits(r *world.Region, pos mgl32.Vec3) bool {
+	lo := pos.Sub(mgl32.Vec3{fireworkHalf, 0, fireworkHalf})
+	hi := pos.Add(mgl32.Vec3{fireworkHalf, 2 * fireworkHalf, fireworkHalf})
+	for _, o := range r.AppendEntitiesIn(nil, lo[0]-2, lo[2]-2, hi[0]+2, hi[2]+2) {
+		l, ok := o.Owner().(Living)
+		if !ok || o == f.entity {
+			continue
+		}
+		if p, isPlayer := l.(*Player); isPlayer && (p == f.shooter || p.dead() || p.mode() == GameModeSpectator) {
+			continue
+		}
+		bl, bh, has := l.BlastBox()
+		if has && lo[0] < bh[0] && hi[0] > bl[0] && lo[1] < bh[1] && hi[1] > bl[1] && lo[2] < bh[2] && hi[2] > bl[2] {
+			return true
+		}
+	}
+	return false
 }
 
 // Entity returns the rocket's entity.
@@ -207,7 +237,7 @@ func (f *FireworkRocket) tick(e *world.Entity) {
 		playSound(r, vecPos(e.Position()), soundEvent{name: packet.SoundEventLaunch, pos: e.Position(), extra: -1}, nil)
 	}
 	f.age++
-	if f.age > f.lifetime {
+	if f.age > f.lifetime || f.struck {
 		f.gone = true
 		f.s.game.sys.Firework(r, f)
 		e.Remove()
@@ -232,8 +262,12 @@ func (f *FireworkRocket) think(e *world.Entity) {
 		d := f.s.clipMove(r, pos, fireworkHalf, axis, f.vel[axis])
 		if d != f.vel[axis] {
 			f.vel[axis] = 0
+			f.struck = f.shot
 		}
 		pos[axis] += d
+	}
+	if f.shot && !f.struck {
+		f.struck = f.shotHits(r, pos)
 	}
 	f.next = thought{pos: pos, ok: true}
 }

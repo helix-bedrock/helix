@@ -48,6 +48,8 @@ type usingState struct {
 	bow bool
 	// milk is a milk bucket being drunk.
 	milk bool
+	// crossbow is a crossbow being loaded: it loads when the draw is done or let go after.
+	crossbow bool
 }
 
 // ItemUseEvent fires before a player starts using the item it holds in the air.
@@ -206,6 +208,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		p.startTrident(held)
 		return true
 	}
+	if held.Name == nameCrossbow {
+		return p.useCrossbow(held)
+	}
 	if held.Name == nameMilkBucket {
 		p.startMilk(held)
 		return true
@@ -262,6 +267,11 @@ func (p *Player) startDrawing(held ItemStack) {
 // letGo is the client saying it let go of what it was using: a drawn bow shoots.
 func (p *Player) letGo() {
 	u := p.using
+	if u.active && u.crossbow && p.inventory.held == u.slot {
+		if held := p.inventory.Held(); held.Name == u.item.Name {
+			p.loadCrossbow(held, crossbowLoadTime(u.item)-u.left)
+		}
+	}
 	if u.active && u.bow && p.inventory.held == u.slot {
 		if held := p.inventory.Held(); held.Name == u.item.Name {
 			if held.Name == nameTrident {
@@ -296,6 +306,13 @@ func (p *Player) tickUsing() {
 		return
 	}
 	u.left--
+	if u.crossbow {
+		// BDS's useTimeDepleted (0xC9B0E70) lets go by itself once the draw is done.
+		if u.left <= 0 {
+			p.letGo()
+		}
+		return
+	}
 	if u.bow {
 		if u.left <= 0 {
 			p.stopUsing()

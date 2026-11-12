@@ -83,7 +83,7 @@ func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, first) {
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 		// What is thrown or drawn does not need the air: aimed at a block it still goes.
-		if held := p.inventory.Held(); first && (throwable(held.Name) != "" || held.Name == nameBow || held.Name == nameFishingRod) {
+		if held := p.inventory.Held(); first && (throwable(held.Name) != "" || held.Name == nameBow || held.Name == nameCrossbow || held.Name == nameFishingRod) {
 			p.s.game.sys.UseItem(p, held)
 		}
 	}

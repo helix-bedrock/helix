@@ -329,6 +329,10 @@ type Projectile struct {
 	punch    float32
 	pickup   arrowPickup
 	item     ItemStack
+	// pierce is how many more entities it may fly through (a crossbow's Piercing), and
+	// pierced those it already went through, which it does not hit again.
+	pierce  int32
+	pierced []*world.Entity
 	// trident is set for a thrown trident.
 	trident *tridentState
 
@@ -514,6 +518,9 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 		if t.gone || t.stuck {
 			return
 		}
+		if kind == projectileHitEntity && t.wasPierced(hit.entity) {
+			pos = to
+		}
 	}
 	rot := t.rot
 	t.turn()
@@ -620,6 +627,8 @@ type projectileHit struct {
 	player *Player
 	// mob is the mob hit, when a mob and not a player was hit.
 	mob *Mob
+	// entity is the entity hit.
+	entity *world.Entity
 }
 
 // firstHit is the nearest thing along from to to.
@@ -635,7 +644,10 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 	t.found = r.AppendEntitiesIn(t.found[:0], lo[0]-projectileScan, lo[2]-projectileScan, hi[0]+projectileScan, hi[2]+projectileScan)
 	grow := mgl32.Vec3{reach, reach, reach}
 	for _, o := range t.found {
-		var hit projectileHit
+		if t.wasPierced(o) {
+			continue
+		}
+		hit := projectileHit{entity: o}
 		switch target := o.Owner().(type) {
 		case *Player:
 			if target.dead() || target == t.owner && !t.separated || target.gameMode == GameModeSpectator {
@@ -770,6 +782,13 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 			t.hitMob(hit.mob)
 		} else {
 			t.hitPlayer(hit.player)
+		}
+		// BDS's Piercing (0xC9AF5C0 gives the arrow the level and level + 1 hits): it flies
+		// on through the entity.
+		if t.pierce > 0 {
+			t.pierce--
+			t.pierced = append(t.pierced, hit.entity)
+			return
 		}
 		if t.spec.DestroyOnHit {
 			t.remove(e)
@@ -1226,4 +1245,14 @@ func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.V
 	s.SpawnProjectile(r.Dimension(), spec, at, dir.Add(mgl32.Vec3{0, dispenseLift, 0}), spec.Power, nil)
 	levelEvent(r, pos, at, levelEventDispenseProjectile, dispenseProjectilePitch)
 	return true
+}
+
+// wasPierced is whether it already flew through o.
+func (t *Projectile) wasPierced(o *world.Entity) bool {
+	for _, p := range t.pierced {
+		if p == o {
+			return true
+		}
+	}
+	return false
 }
