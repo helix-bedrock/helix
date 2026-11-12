@@ -37,11 +37,20 @@ type Scenario struct {
 	// by themselves and must be replaced to stay steady (TNT explodes, rockets burst). Nil
 	// for none.
 	Tick func(w *World, n, tick int)
+	// Bot, when set, makes n the number of bots: n bots join before Start and each runs
+	// Bot on its own 50 ms client tick. BotMode is their game mode.
+	Bot     BotFunc
+	BotMode int32
+	// WorldType replaces the run's world type, for scenarios about generation ("vanilla").
+	WorldType string
 }
 
 // Run starts a fresh server, adds n units of the scenario's load, runs it for the warmup,
 // measures it, and stops the server.
 func Run(ctx context.Context, conf Config, sc Scenario, n int) (Report, error) {
+	if sc.WorldType != "" {
+		conf.WorldType = sc.WorldType
+	}
 	w, err := Start(ctx, conf, sc.Size)
 	if err != nil {
 		return Report{}, err
@@ -77,10 +86,12 @@ func measure(ctx context.Context, conf Config, w *World, sc Scenario, n int) (Re
 	if length <= 0 {
 		length = DefaultMeasure
 	}
-	if sc.Start != nil {
-		if err := sc.Start(ctx, w, n); err != nil {
-			return Report{}, err
-		}
+	bs, err := startLoad(ctx, w, sc, n)
+	if err != nil {
+		return Report{}, err
+	}
+	if bs != nil {
+		defer bs.close()
 	}
 	c := newCollector(length)
 	w.Dim.SetTickObserver(c.observe)
@@ -90,16 +101,47 @@ func measure(ctx context.Context, conf Config, w *World, sc Scenario, n int) (Re
 	if err := drive(ctx, w, sc, n, &tick, warmup); err != nil {
 		return Report{}, err
 	}
-	before := readProcess()
+	before, movesBefore := readProcess(), bs.movesSoFar()
 	c.setOn(true)
+	bs.measure(true)
 	start := time.Now()
 	if err := drive(ctx, w, sc, n, &tick, length); err != nil {
 		return Report{}, err
 	}
 	c.setOn(false)
+	bs.measure(false)
 	took := time.Since(start)
 	after := readProcess()
-	return c.report(sc, n, conf.Cores, took, after.since(before)), nil
+	if conf.HeapProfile != nil {
+		if err := conf.HeapProfile(sc, n); err != nil {
+			return Report{}, err
+		}
+	}
+	rep := c.report(sc, n, conf.Cores, took, after.since(before))
+	bs.addTo(&rep, bs.movesSoFar()-movesBefore)
+	return rep, nil
+}
+
+// startLoad joins the scenario's bots, if it has any, runs its Start and sets the bots
+// going.
+func startLoad(ctx context.Context, w *World, sc Scenario, n int) (*bots, error) {
+	var bs *bots
+	if sc.Bot != nil && n > 0 {
+		var err error
+		if bs, err = w.joinBots(ctx, n, sc.BotMode); err != nil {
+			return nil, err
+		}
+	}
+	if sc.Start != nil {
+		if err := sc.Start(ctx, w, n); err != nil {
+			bs.closeIfAny()
+			return nil, err
+		}
+	}
+	if bs != nil {
+		bs.drive(w, sc.Bot)
+	}
+	return bs, nil
 }
 
 // drive runs the scenario's Tick every 50 ms for d.
@@ -175,7 +217,7 @@ func metricNames() [metricCount]string {
 		metricAllocBytes:   "/gc/heap/allocs:bytes",
 		metricGCCPU:        "/cpu/classes/gc/total:cpu-seconds",
 		metricTotalCPU:     "/cpu/classes/total:cpu-seconds",
-		metricHeapLive:     "/memory/classes/heap/objects:bytes",
+		metricHeapLive:     "/gc/heap/live:bytes",
 		metricGCCycles:     "/gc/cycles/total:gc-cycles",
 	}
 }

@@ -105,6 +105,9 @@ type Config struct {
 	NetherNet NetherNetConfig
 	// RakNet configures the RakNet transport.
 	RakNet RakNetConfig
+	// Transports are more transports to serve besides NetherNet and RakNet: a plugin's own,
+	// or a network.Memory for bots in the same process (package sim).
+	Transports []network.Transport
 	// Network configures the login sequence.
 	Network network.Config
 	// Auth configures the Xbox Live token checks used in online mode.
@@ -252,7 +255,7 @@ func New(conf Config) (*Server, error) {
 	if conf.TickCores < 0 {
 		return nil, errors.New("helix: TickCores must not be negative")
 	}
-	if !conf.NetherNet.Enabled && !conf.RakNet.Enabled {
+	if !conf.NetherNet.Enabled && !conf.RakNet.Enabled && len(conf.Transports) == 0 {
 		return nil, errors.New("helix: no transport enabled")
 	}
 	var id [8]byte
@@ -464,6 +467,9 @@ func (s *Server) openTransports() error {
 		}
 		s.listener.Serve(t)
 		s.log.Info("RakNet listening", "addr", t.Addr())
+	}
+	for _, t := range s.conf.Transports {
+		s.listener.Serve(t)
 	}
 	return nil
 }

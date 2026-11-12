@@ -9,10 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"net"
-	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -24,119 +21,24 @@ import (
 	"github.com/helix-bedrock/protocol/version"
 )
 
-// memConn is one end of an in-memory batch connection.
-type memConn struct {
-	in, out  chan []byte
-	mu       sync.Mutex
-	deadline chan struct{}
-	closed   chan struct{}
-	once     *sync.Once
-}
-
-func memPair() (*memConn, *memConn) {
-	a, b := make(chan []byte, 64), make(chan []byte, 64)
-	closed, once := make(chan struct{}), new(sync.Once)
-	return &memConn{in: a, out: b, deadline: make(chan struct{}), closed: closed, once: once},
-		&memConn{in: b, out: a, deadline: make(chan struct{}), closed: closed, once: once}
-}
-
-func (m *memConn) ReadPacket() ([]byte, error) {
-	m.mu.Lock()
-	d := m.deadline
-	m.mu.Unlock()
-	// Packets sent before the close are read first, as a real connection
-	// delivers them: select alone picks at random when both are ready.
-	select {
-	case b := <-m.in:
-		return b, nil
-	default:
+// dialMemory connects a client to a memory transport.
+func dialMemory(t *testing.T, tr *Memory) *conn.Conn {
+	t.Helper()
+	c, err := tr.Dial()
+	if err != nil {
+		t.Fatal(err)
 	}
-	select {
-	case b := <-m.in:
-		return b, nil
-	case <-d:
-		return nil, os.ErrDeadlineExceeded
-	case <-m.closed:
-		return nil, net.ErrClosed
-	}
-}
-
-func (m *memConn) Read(b []byte) (int, error) {
-	p, err := m.ReadPacket()
-	return copy(b, p), err
-}
-
-func (m *memConn) Write(b []byte) (int, error) {
-	select {
-	case m.out <- append([]byte(nil), b...):
-		return len(b), nil
-	case <-m.closed:
-		return 0, net.ErrClosed
-	}
-}
-
-func (m *memConn) SetReadDeadline(t time.Time) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if t.IsZero() {
-		m.deadline = make(chan struct{})
-		return nil
-	}
-	d := m.deadline
-	time.AfterFunc(time.Until(t), func() {
-		m.mu.Lock()
-		if m.deadline == d {
-			close(d)
-			m.deadline = make(chan struct{})
-		}
-		m.mu.Unlock()
-	})
-	return nil
-}
-
-func (m *memConn) Close() error                     { m.once.Do(func() { close(m.closed) }); return nil }
-func (m *memConn) LocalAddr() net.Addr              { return &net.UDPAddr{} }
-func (m *memConn) RemoteAddr() net.Addr             { return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1} }
-func (m *memConn) SetDeadline(time.Time) error      { return nil }
-func (m *memConn) SetWriteDeadline(time.Time) error { return nil }
-
-// memTransport hands out the server ends of dialled memConns.
-type memTransport struct {
-	conns  chan net.Conn
-	closed chan struct{}
-	once   sync.Once
-}
-
-func newMemTransport() *memTransport {
-	return &memTransport{conns: make(chan net.Conn), closed: make(chan struct{})}
-}
-
-func (t *memTransport) Accept() (net.Conn, error) {
-	select {
-	case c := <-t.conns:
-		return c, nil
-	case <-t.closed:
-		return nil, net.ErrClosed
-	}
-}
-
-func (t *memTransport) Addr() net.Addr { return &net.UDPAddr{} }
-func (t *memTransport) SetPong([]byte) {}
-func (t *memTransport) Close() error   { t.once.Do(func() { close(t.closed) }); return nil }
-func (t *memTransport) dial() *conn.Conn {
-	c, s := memPair()
-	t.conns <- s
 	return conn.New(c, conn.Config{Pool: version.Latest.Packets(false)})
 }
 
-func listen(t *testing.T, conf Config) (*Listener, *memTransport) {
+func listen(t *testing.T, conf Config) (*Listener, *Memory) {
 	t.Helper()
 	conf.ReadTimeout = 2 * time.Second
 	l, err := New(conf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tr := newMemTransport()
+	tr := NewMemory()
 	l.Serve(tr)
 	t.Cleanup(func() { _ = l.Close() })
 	return l, tr
@@ -252,7 +154,7 @@ func accept(t *testing.T, l *Listener) *Conn {
 
 func TestLoginOffline(t *testing.T) {
 	l, tr := listen(t, DefaultConfig())
-	cl := newClient(t, tr.dial())
+	cl := newClient(t, dialMemory(t, tr))
 	cl.requestSettings(protocol.CurrentProtocol)
 	cl.login()
 	cl.encrypt()
@@ -275,7 +177,7 @@ func TestOutdatedClients(t *testing.T) {
 		{protocol.CurrentProtocol + 1, packet.PlayStatusLoginFailedServer, packet.DisconnectReasonOutdatedServer},
 	} {
 		_, tr := listen(t, DefaultConfig())
-		cl := newClient(t, tr.dial())
+		cl := newClient(t, dialMemory(t, tr))
 		cl.requestSettings(tc.protocol)
 		if ps := read[*packet.PlayStatus](cl); ps.Status != tc.status {
 			t.Fatalf("protocol %d: play status %d, want %d", tc.protocol, ps.Status, tc.status)
@@ -296,7 +198,7 @@ func TestServerStep(t *testing.T) {
 		return Refuse(packet.DisconnectReasonDenyListed, "", errors.New("not on the list"))
 	}})
 	_, tr := listen(t, conf)
-	cl := newClient(t, tr.dial())
+	cl := newClient(t, dialMemory(t, tr))
 	cl.requestSettings(protocol.CurrentProtocol)
 	cl.login()
 	if d := read[*packet.Disconnect](cl); d.Reason != packet.DisconnectReasonDenyListed {
@@ -314,10 +216,10 @@ func TestSilentClientTimesOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	l.conf.ReadTimeout = 50 * time.Millisecond
-	tr := newMemTransport()
+	tr := NewMemory()
 	l.Serve(tr)
 	defer func() { _ = l.Close() }()
-	c := tr.dial()
+	c := dialMemory(t, tr)
 	done := make(chan error, 1)
 	go func() { _, err := c.ReadPacket(); done <- err }()
 	select {

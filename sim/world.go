@@ -27,6 +27,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix"
 	"github.com/helix-bedrock/helix/generator"
+	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/mcdb"
@@ -44,6 +45,8 @@ const (
 	levelName = "sim"
 	// worldSeed keeps every run on the same world.
 	worldSeed int64 = 1
+	// maxBots is the server's MaxPlayers, more than any run joins.
+	maxBots = 10000
 )
 
 // Config configures the server a run starts. The zero value works: a flat world, every
@@ -60,6 +63,9 @@ type Config struct {
 	// Dir is the folder the world is made in. Empty means a new temporary folder, removed
 	// when the world closes.
 	Dir string
+	// HeapProfile, when set, runs at the end of each measurement, before the server stops,
+	// to write a heap profile (cmd/sim's -memprofile).
+	HeapProfile func(sc Scenario, n int) error
 	// Warmup is how long the load runs before measuring, Measure how long it is measured.
 	// Zero means DefaultWarmup and DefaultMeasure.
 	Warmup, Measure time.Duration
@@ -76,6 +82,7 @@ type World struct {
 
 	size    int32
 	surface float32
+	memory  *network.Memory
 	ticket  *world.Ticket
 	cancel  context.CancelFunc
 	done    chan error
@@ -93,7 +100,8 @@ func Start(ctx context.Context, conf Config, size int32) (*World, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := helix.New(serverConfig(conf, dir))
+	w.memory = network.NewMemory()
+	s, err := helix.New(serverConfig(conf, dir, w.memory))
 	if err != nil {
 		w.removeTemp()
 		return nil, fmt.Errorf("sim: new server: %w", err)
@@ -127,9 +135,9 @@ func (w *World) worldDir(dir string) (string, error) {
 	return tmp, nil
 }
 
-// serverConfig is a server with no network a player could reach: offline, RakNet on a
-// free loopback port (a server needs one transport), no NetherNet.
-func serverConfig(conf Config, dir string) helix.Config {
+// serverConfig is a server with no network a player could reach: offline, the memory
+// transport the bots join over, no NetherNet or RakNet.
+func serverConfig(conf Config, dir string, memory *network.Memory) helix.Config {
 	c := helix.DefaultConfig()
 	c.Log = conf.Log
 	if c.Log == nil {
@@ -145,7 +153,8 @@ func serverConfig(conf Config, dir string) helix.Config {
 	c.TickCores = conf.Cores
 	c.OnlineMode = false
 	c.NetherNet.Enabled = false
-	c.RakNet = helix.RakNetConfig{Enabled: true, Address: "127.0.0.1:0"}
+	c.Transports = []network.Transport{memory}
+	c.MaxPlayers = maxBots
 	return c
 }
 

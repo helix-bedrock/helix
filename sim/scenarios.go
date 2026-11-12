@@ -36,6 +36,11 @@ func itemKinds() []string {
 
 // Scenarios are the built-in scenarios, a new list each call.
 func Scenarios() []Scenario {
+	return append(loadScenarios(), botScenarios()...)
+}
+
+// loadScenarios are the scenarios without bots.
+func loadScenarios() []Scenario {
 	return []Scenario{
 		{Name: "idle", About: "the loaded area alone, nothing added: the baseline", Unit: "-"},
 		{Name: "items", About: "dropped items lying on the ground, kinds mixed so they never merge", Unit: "items", Start: startItems},
@@ -44,6 +49,7 @@ func Scenarios() []Scenario {
 		{Name: "fireworks", About: "firework rockets launched all the time, about n in the air", Unit: "rockets", Tick: tickFireworks},
 		{Name: "mobs", About: "cows wandering the area", Unit: "cows", Start: startMobs},
 		{Name: "clouds", About: "lingering Regeneration clouds (no players to touch, so only their own tick)", Unit: "clouds", Start: startClouds},
+		{Name: "redstone", About: "observer clocks (two observers facing each other) each driving a line of redstone dust", Unit: "clocks", Size: redstoneSize, Start: startClocks},
 	}
 }
 

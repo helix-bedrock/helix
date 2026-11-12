@@ -14,8 +14,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 
@@ -33,6 +37,7 @@ func main() {
 type options struct {
 	scenario, counts, jsonPath string
 	list                       bool
+	logLevel, memProfile       string
 	size                       int
 	conf                       sim.Config
 }
@@ -49,7 +54,16 @@ func parseFlags() options {
 	flag.StringVar(&o.conf.WorldType, "world", "", "world type (empty: flat)")
 	flag.DurationVar(&o.conf.Warmup, "warmup", sim.DefaultWarmup, "how long the load runs before measuring")
 	flag.DurationVar(&o.conf.Measure, "measure", sim.DefaultMeasure, "how long the load is measured")
+	flag.StringVar(&o.logLevel, "log", "error", "server log level: debug, info, warn or error")
+	flag.StringVar(&o.memProfile, "memprofile", "", "write a heap profile at the end of each run to this path, with scenario and n added")
 	flag.Parse()
+	if o.memProfile != "" {
+		o.conf.HeapProfile = heapProfile(o.memProfile)
+	}
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(o.logLevel)); err == nil {
+		o.conf.Log = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	}
 	return o
 }
 
@@ -78,6 +92,23 @@ func run() error {
 		}
 	}
 	return writeResults(all, o.jsonPath)
+}
+
+// heapProfile writes a heap profile per run to path with the scenario and count added.
+func heapProfile(path string) func(sc sim.Scenario, n int) error {
+	return func(sc sim.Scenario, n int) error {
+		ext := filepath.Ext(path)
+		f, err := os.Create(fmt.Sprintf("%s-%s-%d%s", strings.TrimSuffix(path, ext), sc.Name, n, ext))
+		if err != nil {
+			return err
+		}
+		runtime.GC()
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			_ = f.Close()
+			return err
+		}
+		return f.Close()
+	}
 }
 
 // listScenarios prints every scenario's name and what it is.

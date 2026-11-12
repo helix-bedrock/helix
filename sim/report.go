@@ -43,10 +43,20 @@ type Report struct {
 	// AllocsPerTick and BytesPerTick are what the whole process allocated per world tick.
 	AllocsPerTick, BytesPerTick float64
 	// GCShare is the share of the process's CPU time the garbage collector took; GCCycles
-	// how many collections ran; HeapBytes the live heap at the end.
+	// how many collections ran; HeapBytes the heap live at the last collection.
 	GCShare   float64
 	GCCycles  uint64
 	HeapBytes uint64
+	// Bots is how many bots played, JoinTime how long they took to log in, all together.
+	Bots     int
+	JoinTime time.Duration
+	// ActionMedian, ActionP99 and ActionWorst are the delays from a bot sending a block
+	// action to the server's block update reaching it, over Actions answered actions: what
+	// a player feels between breaking a block and seeing it go.
+	ActionMedian, ActionP99, ActionWorst time.Duration
+	Actions                              int
+	// MovesPerBot is the movement packets about others each bot got per second.
+	MovesPerBot float64
 	// Dropped is how many region ticks did not fit the collector's buffer (more than
 	// maxRegions regions); their times are missing from the numbers above.
 	Dropped int
@@ -137,6 +147,12 @@ func WriteTable(out io.Writer, reps []Report) error {
 	for _, r := range reps {
 		if _, err := fmt.Fprintf(out, "%s n=%d phases: %s\n", r.Scenario, r.N, r.phaseLine()); err != nil {
 			return err
+		}
+		if r.Bots > 0 {
+			if _, err := fmt.Fprintf(out, "  bots=%d joined in %s, actions answered=%d delay median=%s p99=%s worst=%s, moves seen per bot=%.0f/s\n",
+				r.Bots, r.JoinTime.Round(time.Millisecond), r.Actions, ms(r.ActionMedian), ms(r.ActionP99), ms(r.ActionWorst), r.MovesPerBot); err != nil {
+				return err
+			}
 		}
 		if r.Dropped > 0 {
 			if _, err := fmt.Fprintf(out, "  %d region ticks dropped: more than %d regions\n", r.Dropped, maxRegions); err != nil {
