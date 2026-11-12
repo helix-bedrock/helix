@@ -396,6 +396,9 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		return false
 	}
 	r.UpdateNeighbours(pos)
+	if k := p.s.knotAt(r, pos); k != nil {
+		k.Break(r)
+	}
 	g.sys.Exhaust(p, p.Tuning(TuneExhaustMine))
 	levelEvent(r, pos, blockCenter(pos), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
 	p.s.throwDrops(r, drops)

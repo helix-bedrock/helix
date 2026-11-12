@@ -96,8 +96,13 @@ func (p *Player) leashMob(o *Mob) bool {
 // whatever held it (a player or a knot), as a dying actor drops its leash in BDS. It runs
 // straight away, not through the mob's queued ops, which stop once it is dead.
 func (m *Mob) dropLeashOnDeath(r *world.Region) {
+	holder := m.m.LeashHolder()
 	m.m.SetLeashHolder(behavior.NoID)
-	if r != nil {
-		m.s.spawnMobDrop(r, ItemStack{Name: leadItem, Count: 1}, m.entity.Position())
+	if r == nil {
+		return
+	}
+	m.s.spawnMobDrop(r, ItemStack{Name: leadItem, Count: 1}, m.entity.Position())
+	if k := m.s.knotByID(r, holder); k != nil {
+		k.removeIfEmpty(r)
 	}
 }

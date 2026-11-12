@@ -111,7 +111,31 @@ func (k *LeashKnot) tick(e *world.Entity) {
 	b, ok := r.Block(k.block(), 0)
 	if ok && !isLeashFence(k.s.reg.Blocks.Name(b)) {
 		k.Break(r)
+		return
 	}
+	k.removeIfEmpty(r)
+}
+
+// removeIfEmpty takes the knot away, quietly, once no mob is tied to it.
+func (k *LeashKnot) removeIfEmpty(r *world.Region) {
+	if k.gone || len(k.s.leashedTo(r, behavior.ID(k.entity.UniqueID()))) > 0 {
+		return
+	}
+	k.gone = true
+	k.entity.Remove()
+}
+
+// knotByID is the region's knot with the unique ID, nil for none.
+func (s *Host) knotByID(r *world.Region, id behavior.ID) *LeashKnot {
+	if id == behavior.NoID {
+		return nil
+	}
+	for _, e := range r.AppendEntities(nil) {
+		if k, ok := e.Owner().(*LeashKnot); ok && !k.gone && behavior.ID(e.UniqueID()) == id {
+			return k
+		}
+	}
+	return nil
 }
 
 // Break takes the knot away: its sound, and every mob tied to it drops its lead.
