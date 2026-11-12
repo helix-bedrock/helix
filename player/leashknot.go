@@ -16,8 +16,8 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Leash knots, BDS 1.26.60's LeashKnot (a HangingActor, vtable 0xFAF64D8). A player who
-// uses a fence while holding leashed mobs ties every one of them within its leash preset's
+// Leash knots on fences and walls, BDS 1.26.60's LeashKnot (a HangingActor, vtable
+// 0xFAF64D8). A player who uses a fence or wall while holding leashed mobs ties every one of them within its leash preset's
 // max distance of the fence's centre to the fence's knot, made if there is none
 // (LeashFenceKnotActor's bind 0xBFCBDD0, the fence's use 0xD29E7B0; any item, and the use
 // counts only when a mob was tied), with the leashknot.place sound. The knot stands at the
@@ -25,8 +25,10 @@ import (
 // it away with leashknot.break (0xBFCAE90), and every mob tied to it drops its lead. Every
 // 80 to 120 ticks it checks its fence is still there (HangingActor's tick 0xBFC44D0).
 //
-// Not read from BDS: which blocks take a knot (BlockLeashableDescription is attached by
-// code not found): every *_fence block but gates; the fence's own leash offset, taken as 0.
+// The blocks that take a knot are the ones BDS's block registration (0x5BC7DE0) gives a
+// BlockLeashableDescription: every fence and every wall (not fence gates), all with the offset
+// (0, 12, 0) in sixteenths, which puts the knot at the block's centre and y + 0.25 (12/16 - 0.5,
+// as the fence use 0xD29E7B0 turns it into a position).
 
 const (
 	leashKnotID = "minecraft:leash_knot"
@@ -45,9 +47,9 @@ type LeashKnot struct {
 	check  int32
 }
 
-// isLeashFence reports a block a leash knot goes on.
+// isLeashFence reports a block a leash knot goes on: a fence or a wall.
 func isLeashFence(name string) bool {
-	return strings.HasSuffix(name, "_fence") && !strings.HasSuffix(name, "fence_gate")
+	return strings.HasSuffix(name, "_fence") || strings.HasSuffix(name, "_wall")
 }
 
 func (k *LeashKnot) config(uid int64, rid uint64, pos mgl32.Vec3) world.EntityConfig {
