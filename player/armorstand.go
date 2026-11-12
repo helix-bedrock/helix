@@ -161,7 +161,14 @@ func (p *Player) interactArmorStand(o *Mob, d *protocol.UseItemOnEntityTransacti
 			return
 		}
 		slot = p.s.standItemSlot(held)
-		worn := o.items.stacks[standSlot(slot)]
+	}
+	// BDS refuses the interaction when the hand and the slot hold the same stack, an empty
+	// hand at an empty slot included, so nothing swaps and no sound plays.
+	worn := o.items.stacks[standSlot(slot)]
+	if worn.Empty() && held.Empty() {
+		return
+	}
+	if !held.Empty() {
 		if worn.Count == held.Count && sameStack(worn, held) {
 			return
 		}
