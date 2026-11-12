@@ -304,6 +304,7 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 		if !t.survives(r, pos) {
 			t.remove(r, pos)
 		} else if !t.toSoulFire(r, pos) {
+			t.connect(r, pos, block)
 			r.ScheduleTick(pos, t.fire[0], placedDelay, 0)
 		}
 	case layer == 0 && t.is(block, isSoulFire):
@@ -326,6 +327,7 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		} else if b, ok := r.Block(pos.Side(cube.FaceDown), 0); ok && t.is(b, soulBase) {
 			r.ScheduleTick(pos, t.fire[0], soulDelay, 0)
 		}
+		t.connect(r, pos, block)
 	case layer == 0 && t.is(block, isSoulFire):
 		if !t.soulSurvives(r, pos) {
 			r.ScheduleTick(pos, t.soulFire, survivalDelay, 0)
