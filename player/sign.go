@@ -259,7 +259,8 @@ func (p *Player) placeSign(r *world.Region, clicked cube.Pos, face int32, held I
 	blocks := p.s.reg.Blocks
 	standing, wall := signBlocks(held.Name)
 	pos := clicked.Side(f)
-	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, c, c) {
+	placed, _ := blocks.Block(standing)
+	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, c, placed) {
 		pos, f = clicked, cube.FaceUp
 	}
 	var state uint32
@@ -284,7 +285,8 @@ func (p *Player) placeHangingSign(r *world.Region, clicked cube.Pos, face int32,
 		return false
 	}
 	pos := clicked.Side(f)
-	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, c, c) {
+	placed, _ := p.s.reg.Blocks.Block(held.Name)
+	if c, ok := r.Block(clicked, 0); ok && p.s.game.replaceable(p, r, clicked, c, placed) {
 		pos = clicked
 	}
 	yaw := p.entity.Rotation().Yaw

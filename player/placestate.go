@@ -134,6 +134,9 @@ func vanillaPlaceState(pl *Placement) (uint32, bool) {
 	if s, ok := p.s.game.blocks[name].(PlacementStater); ok {
 		return s.PlacementState(pl)
 	}
+	if flowerBeds[name] {
+		return flowerBedState(pl)
+	}
 	how, ok := p.s.game.placement[name]
 	r := p.entity.Region()
 	if !ok || r == nil {
