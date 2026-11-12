@@ -30,6 +30,8 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		protocol.EntityDataKeyWidth:    float32(0.6),
 		protocol.EntityDataKeyHeight:   float32(1.8),
 		protocol.EntityDataKeyScale:    float32(1),
+
+		protocol.EntityDataKeyVisibleMobEffects: p.visibleEffects(),
 	}
 	var links []protocol.EntityLink
 	if p.vehicle != nil {
@@ -153,7 +155,7 @@ func (p *Player) ownMetadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyPlayerLastDeathDimension:         int32(0),
 		protocol.EntityDataKeyPlayerHasDied:                    uint8(0),
 		protocol.EntityDataKeyCollisionBox:                     mgl32.Vec3{playerWidth, playerHeight, 0},
-		protocol.EntityDataKeyVisibleMobEffects:                int64(0),
+		protocol.EntityDataKeyVisibleMobEffects:                p.visibleEffects(),
 		protocol.EntityDataKeyFilteredName:                     "",
 		protocol.EntityDataKeyEnterBedPosition:                 mgl32.Vec3{},
 		protocol.EntityDataKeySeatThirdPersonCameraRadius:      float32(0),

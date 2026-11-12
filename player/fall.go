@@ -8,12 +8,6 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Vanilla effect IDs the fall reads (BDS 1.26.60).
-const (
-	EffectJumpBoost   int32 = 8
-	EffectSlowFalling int32 = 27
-)
-
 // DamageCause is why a player is hurt, as BDS's ActorDamageCause numbers
 // it.
 type DamageCause int32

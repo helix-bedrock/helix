@@ -23,6 +23,7 @@ var all = []command.Spec{
 	toggleDownfall,
 	fog,
 	summon,
+	effectSpec,
 }
 
 // Register puts every built-in command on a Setup.

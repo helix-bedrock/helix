@@ -117,6 +117,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 		&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()},
 		s.reg.Creative.Packet(), s.reg.Trims.Packet())
 	p.sendOwnItems()
+	p.sendEffects()
 	p.send(p.recipesPacket())
 	p.send(p.commandsPacket())
 

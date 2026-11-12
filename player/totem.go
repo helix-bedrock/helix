@@ -11,13 +11,6 @@ const (
 	totemHealth = 1
 )
 
-// Vanilla effect IDs a totem gives (BDS 1.26.60).
-const (
-	EffectRegeneration   int32 = 10
-	EffectFireResistance int32 = 12
-	EffectAbsorption     int32 = 22
-)
-
 // totemEffects are the effects a totem gives, in BDS's order.
 func totemEffects() []ActiveEffect {
 	return []ActiveEffect{
@@ -82,9 +75,7 @@ func vanillaTotem(p *Player, src DamageSource) bool {
 		health, effects = e.Health, e.Effects
 	}
 	p.SetHealth(health)
-	for _, e := range p.Effects() {
-		p.RemoveEffect(e.ID)
-	}
+	p.ClearEffects()
 	for _, e := range effects {
 		p.AddEffect(e.ID, e.Amplifier, e.Duration)
 	}

@@ -315,9 +315,7 @@ func (p *Player) pourPowderSnow(clicked cube.Pos, face int32) bool {
 // drinkMilk is milk drunk: every effect goes, and outside creative the milk becomes an
 // empty bucket.
 func (p *Player) drinkMilk() {
-	for _, e := range p.Effects() {
-		p.RemoveEffect(e.ID)
-	}
+	p.ClearEffects()
 	if !p.creative() {
 		p.useHeld()
 		left := ItemStack{Name: emptyBucket, Count: 1, netID: p.s.stackIDs.Add(1)}

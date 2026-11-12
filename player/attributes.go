@@ -39,6 +39,7 @@ var playerAttributes = [...]attributeDef{
 const (
 	attrHealth              = 0
 	attrKnockbackResistance = 2
+	attrMovement            = 3
 	attrAttackDamage        = 6
 	attrAbsorption          = 7
 	attrLuck                = 8
@@ -52,6 +53,21 @@ type attributeValue struct {
 	base, current float32
 	// limit is the most it can be; 0 is its definition's maximum.
 	limit float32
+	// maxBonus is what effects add to the maximum (Health Boost).
+	maxBonus float32
+}
+
+// attrMovementName is the movement speed attribute's name.
+const attrMovementName = "minecraft:movement"
+
+// attributeIndex returns the index of the player attribute with the name.
+func attributeIndex(name string) (int, bool) {
+	for i, d := range playerAttributes {
+		if d.name == name {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // Attributes are a player's attribute values, in playerAttributes' order.
@@ -116,9 +132,9 @@ func (a *Attributes) set(i int, v float32) bool {
 // maximum returns the most attribute i can be.
 func (a *Attributes) maximum(i int) float32 {
 	if l := a[i].limit; l != 0 {
-		return l
+		return l + a[i].maxBonus
 	}
-	return playerAttributes[i].max
+	return playerAttributes[i].max + a[i].maxBonus
 }
 
 // save writes the attributes BDS saves, as it writes them, into the

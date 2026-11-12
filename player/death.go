@@ -203,9 +203,7 @@ func (p *Player) respawnPoint() mgl32.Vec3 {
 // health, hunger, saturation and exhaustion to their defaults, effects gone.
 func vanillaRespawn(p *Player, pos mgl32.Vec3) {
 	p.respawn = respawnNone
-	for _, e := range p.Effects() {
-		p.RemoveEffect(e.ID)
-	}
+	p.ClearEffects()
 	p.setAttributes(attrHealth, p.attributes.maximum(attrHealth), attrHunger, p.attributes.maximum(attrHunger),
 		attrSaturation, playerAttributes[attrSaturation].def, attrExhaustion, playerAttributes[attrExhaustion].def)
 	p.move = moveState{}

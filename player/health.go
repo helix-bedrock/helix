@@ -72,8 +72,6 @@ const (
 	EnchantFeatherFalling       int16 = 2
 	EnchantBlastProtection      int16 = 3
 	EnchantProjectileProtection int16 = 4
-
-	EffectResistance int32 = 11
 )
 
 // hurtState is what is left of the player's last hurt.

@@ -28,45 +28,12 @@ type BreakInfo struct {
 	Enchantable bool
 }
 
-// Effect is a status effect's entry. Vanilla's carry BDS's numbers.
-type Effect struct {
-	// ID is BDS's effect ID, sent in MobEffect.
-	ID   int32
-	Name string
-	// BreakSpeed changes the break speed while a player has the effect at
-	// amplifier (0 is level I). Nil changes nothing.
-	BreakSpeed func(b *BreakInfo, amplifier int32, speed float32) float32
-	// BreakRate changes the progress a tick, applied after BreakSpeed. BDS
-	// applies Haste and Mining Fatigue at both stages.
-	BreakRate func(b *BreakInfo, amplifier int32, rate float32) float32
-	// Attack changes the damage of the player's hits.
-	Attack func(amplifier int32, damage float32) float32
-	// Resist changes the damage the player takes, for causes it applies to.
-	Resist func(amplifier int32, damage float32) float32
-	// Added runs when the player gets the effect, Removed when it loses it, and Tick
-	// each tick it has it, with the ticks left before this one counts.
-	Added   func(p *Player, amplifier int32)
-	Removed func(p *Player)
-	Tick    func(p *Player, amplifier, left int32)
-}
-
-// Vanilla enchantment and effect IDs used by the break speed (BDS 1.26.60:
-// read in its destroy speed and digger code).
+// Vanilla enchantment IDs used by the break speed (BDS 1.26.60: read in its destroy speed
+// and digger code).
 const (
 	EnchantAquaAffinity int16 = 8
 	EnchantEfficiency   int16 = 15
-
-	EffectHaste         int32 = 3
-	EffectMiningFatigue int32 = 4
-	EffectConduitPower  int32 = 26
 )
-
-// ActiveEffect is an effect a player has; Duration is the ticks left.
-type ActiveEffect struct {
-	ID        int32
-	Amplifier int32
-	Duration  int32
-}
 
 // breakEnd is the progress at which BDS counts a block as broken.
 const breakEnd = 0.99999
@@ -79,22 +46,6 @@ func efficiencySpeed(b *BreakInfo, level int16, speed float32) float32 {
 	}
 	l := float32(level)
 	return speed + l*l + 1
-}
-
-// vanillaEffects are BDS's effects that change the break speed. Haste and
-// Conduit Power do not add up: the higher one counts (Haste on a tie).
-func vanillaEffects() []Effect {
-	return []Effect{
-		{ID: EffectHaste, Name: "minecraft:haste", BreakSpeed: hasteSpeed(EffectHaste), BreakRate: hasteRate(EffectHaste)},
-		{ID: EffectConduitPower, Name: "minecraft:conduit_power", BreakSpeed: hasteSpeed(EffectConduitPower), BreakRate: hasteRate(EffectConduitPower)},
-		{ID: EffectMiningFatigue, Name: "minecraft:mining_fatigue", BreakSpeed: fatigueSpeed, BreakRate: fatigueRate},
-		{ID: EffectStrength, Name: "minecraft:strength", Attack: strengthAttack},
-		{ID: EffectWeakness, Name: "minecraft:weakness", Attack: weaknessAttack},
-		{ID: EffectResistance, Name: "minecraft:resistance", Resist: resistanceDamage},
-		{ID: EffectRegeneration, Name: "minecraft:regeneration", Tick: regenerationTick},
-		{ID: EffectAbsorption, Name: "minecraft:absorption", Added: absorptionAdded, Removed: absorptionRemoved},
-		{ID: EffectFireResistance, Name: "minecraft:fire_resistance"},
-	}
 }
 
 // hasteCounts reports whether effect id is the haste that counts: the

@@ -136,6 +136,9 @@ func (p *Player) actorFlags() int64 {
 	if p.freeze.shaking {
 		f |= 1 << protocol.EntityDataFlagShaking
 	}
+	if _, ok := p.Effect(EffectInvisibility); ok {
+		f |= 1 << protocol.EntityDataFlagInvisible
+	}
 	return f
 }
 

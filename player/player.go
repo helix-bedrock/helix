@@ -95,6 +95,9 @@ type Player struct {
 	invs       playerInventories
 	requests   requestState
 	effects    []ActiveEffect
+	// effectValued and effectMaxed mark the attributes whose value and maximum effect
+	// modifiers changed, so they go back when the effects go.
+	effectValued, effectMaxed uint32
 	brk        breakState
 	move       moveState
 	// vehicle is what the player sits on, riding whether others see it so.

@@ -29,6 +29,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 	}
 	p.abilities.load(data)
 	p.attributes.load(data)
+	p.loadEffects(data)
 	// A player saved dead comes back on the death screen, its items long gone.
 	if p.dead() {
 		p.respawn = respawnStart
@@ -102,6 +103,7 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	data["PlayerGameMode"] = p.gameMode
 	p.abilities.save(data)
 	p.attributes.save(data)
+	p.saveEffects(data)
 	p.inventory.save(data)
 	p.saveSpawn(data)
 	p.saveFogs(data)

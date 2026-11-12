@@ -47,11 +47,9 @@ const (
 	minSkyDarken = 4
 	// dayTicks is the length of a day.
 	dayTicks = 24000
-	// effectWaterBreathing and effectConduitPower let a player sleep in a bed under water, as
-	// does enchantRespiration on what it wears.
-	effectWaterBreathing = 13
-	effectConduitPower   = 26
-	enchantRespiration   = int16(6)
+	// enchantRespiration on what it wears lets a player sleep in a bed under water, as do
+	// Water Breathing and Conduit Power.
+	enchantRespiration = int16(6)
 	// levelEventDestroyStrawBed is the break particles a used straw bed leaves.
 	levelEventDestroyStrawBed = 2021
 )
@@ -388,10 +386,10 @@ func (p *Player) startSleep(r *world.Region, head cube.Pos, setSpawn bool) int {
 
 // breathesWater reports whether the player may sleep in a bed under water.
 func (p *Player) breathesWater() bool {
-	if _, ok := p.Effect(effectWaterBreathing); ok {
+	if _, ok := p.Effect(EffectWaterBreathing); ok {
 		return true
 	}
-	if _, ok := p.Effect(effectConduitPower); ok {
+	if _, ok := p.Effect(EffectConduitPower); ok {
 		return true
 	}
 	for _, it := range p.Armour().Items() {

@@ -57,10 +57,6 @@ const (
 const (
 	EnchantSharpness int16 = 9
 	EnchantKnockback int16 = 12
-
-	EffectStrength  int32 = 5
-	EffectBlindness int32 = 15
-	EffectWeakness  int32 = 18
 )
 
 // AttackFunc is a player hitting target; false if nothing happened.

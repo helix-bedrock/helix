@@ -28,8 +28,6 @@ const (
 	// freezeDamage and freezeEffectDamage are that hurt, without and with the Freezing effect.
 	freezeDamage       = 1
 	freezeEffectDamage = 1.5
-	// effectFreezing is the Freezing effect's ID.
-	effectFreezing = int32(38)
 	// freezeEpsilon is BDS's float compare for 0 and 1.
 	freezeEpsilon = 1.1920929e-07
 	// gameRuleFreezeDamage turns the hurt off.
@@ -61,7 +59,7 @@ func (p *Player) tickFreeze() {
 	}
 	f := &p.freeze
 	f.ticks++
-	_, effect := p.Effect(effectFreezing)
+	_, effect := p.Effect(EffectFreezing)
 	immune := p.freezeImmuneWorn()
 	rising := false
 	switch {

@@ -484,7 +484,9 @@ func vanillaTakeHit(h *Hit) bool {
 		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventHurt), nil)
 	}
 	h.afterHurt(raw)
+	p.effectsHurt(src)
 	if p.dead() {
+		p.effectsDied()
 		g.sys.Die(p, src)
 	}
 	p.flush()
