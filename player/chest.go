@@ -303,6 +303,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == enchantingTable {
 		return &enchantTableEntity{}
 	}
+	if e.s.reg.Blocks.Name(block) == mobSpawnerBlock {
+		return e.s.newSpawner()
+	}
 	if e.s.reg.Blocks.Name(block) == blockuse.Bed {
 		return &bedEntity{}
 	}
@@ -334,6 +337,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == bedEntityID {
 		return loadBed(saved), true
+	}
+	if id == spawnerEntityID {
+		return e.s.loadSpawner(saved), true
 	}
 	if id == campfireEntityID {
 		return e.s.loadCampfire(saved), true

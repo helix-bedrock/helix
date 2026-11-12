@@ -21,9 +21,9 @@ import (
 // is a mob's entity, its packets and the hits between mobs and players. What a mob does is
 // all in its definition, run by package mob.
 //
-// First hookup only: mobs are not saved (one whose chunk unloads is gone; natural
-// spawning is in naturalspawn.go, despawning in mob/despawn.go), drop no loot or experience, and are hurt outside the Hit pipeline (no armour,
-// no HitEvent).
+// Mobs are saved with their chunk in BDS's actor format (mobsave.go); natural spawning is
+// in naturalspawn.go, monster spawners in spawner.go, despawning in mob/despawn.go. Mobs are
+// still hurt outside the Hit pipeline (no armour, no HitEvent).
 
 // setUpMobs reads every entity definition the mob runtime can run, at boot.
 func (s *Host) setUpMobs() {
@@ -64,6 +64,12 @@ type Mob struct {
 	items      mobItems
 	needEquip  bool
 	lastPlayer *Player
+	// saved is the data the mob was loaded from: fields Helix does not run yet are written
+	// back unchanged (mobsave.go).
+	saved map[string]any
+	// naturalSpawn is set for a mob the natural spawner or a monster spawner made (BDS's
+	// NaturalSpawn).
+	naturalSpawn bool
 }
 
 // Entity returns the mob's entity.
@@ -93,11 +99,16 @@ func (s *Host) SpawnMob(d *world.Dimension, typ string, pos mgl32.Vec3, yaw floa
 // newMob makes a mob that is not in the world yet: its definition runs once add puts it
 // there. initEvent is the event to start with when method is definition.InitEvent.
 func (s *Host) newMob(typ string, pos mgl32.Vec3, yaw float32, method definition.InitMethod, initEvent string) (*Mob, bool) {
+	uid := itemUniqueIDBase | rand.Int64N(itemUniqueIDBase) //nolint:gosec // an entity ID, not a secret
+	return s.newMobID(uid, typ, pos, yaw, method, initEvent)
+}
+
+// newMobID is newMob with the unique ID given, as a saved mob keeps its own.
+func (s *Host) newMobID(uid int64, typ string, pos mgl32.Vec3, yaw float32, method definition.InitMethod, initEvent string) (*Mob, bool) {
 	if s.mobs == nil {
 		return nil, false
 	}
 	o := &Mob{s: s, needEquip: method != definition.InitLoaded}
-	uid := itemUniqueIDBase | rand.Int64N(itemUniqueIDBase) //nolint:gosec // an entity ID, not a secret
 	rid := s.runtimeIDs.Add(1)
 	m, err := s.mobs.NewWithEvent(typ, uid, rid, vec(pos), yaw, o, method, initEvent)
 	if err != nil {
@@ -114,10 +125,15 @@ func (o *Mob) add(d *world.Dimension) {
 	rot := world.Rotation{Yaw: yaw, HeadYaw: head}
 	o.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	o.moves.head = true
-	o.entity = d.AddEntity(world.EntityConfig{
+	o.entity = d.AddEntity(o.config(pos, rot))
+}
+
+// config is the mob's entity, saved with its chunk.
+func (o *Mob) config(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+	return world.EntityConfig{
 		UniqueID: int64(o.m.ID()), RuntimeID: o.m.RuntimeID(), Pos: pos, Rot: rot,
-		Owner: o, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply,
-	})
+		Owner: o, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply, Save: o.saveEntity,
+	}
 }
 
 func vec(p mgl32.Vec3) behavior.Vec3 { return behavior.Vec3{X: p[0], Y: p[1], Z: p[2]} }

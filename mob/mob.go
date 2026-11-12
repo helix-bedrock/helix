@@ -179,6 +179,8 @@ type Mob struct {
 	lastCause  int
 	deathTime  int32
 	persistent bool
+	// nameTag is the mob's name (BDS's setNameTag), "" for none.
+	nameTag string
 	// states are the definition's state components (state.go), stateEnv what they run with,
 	// stateComps the components they were read from. despawned is set when the mob despawned.
 	states     *state.Set
@@ -401,6 +403,11 @@ func (m *Mob) readAttributes(comps definition.Group) {
 			m.health = v
 		}
 		m.maxHealth = mx
+	}
+	if m.savedHealth > 0 {
+		// A save's health replaces the definition's once its components are read.
+		m.health = min(m.savedHealth, m.maxHealth)
+		m.savedHealth = 0
 	}
 	if v, _, ok := attribute(comps["minecraft:movement"]); ok {
 		m.speed = v

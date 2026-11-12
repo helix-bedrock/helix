@@ -77,6 +77,9 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	if r == nil || p.entity.Position().Sub(o.entity.Position()).Len() > attackRangeCreative {
 		return
 	}
+	if p.nameMob(o) {
+		return
+	}
 	if p.bucketMob(r, o) {
 		return
 	}
@@ -136,4 +139,26 @@ func (s *Host) spawnInteractDrop(r *world.Region, it ItemStack, from mgl32.Vec3)
 // feetBlock is the block a position is in.
 func feetBlock(v mgl32.Vec3) cube.Pos {
 	return cube.Pos{int(math.Floor(float64(v[0]))), int(math.Floor(float64(v[1]))), int(math.Floor(float64(v[2])))}
+}
+
+// nameTagItem is the name tag.
+const nameTagItem = "minecraft:name_tag"
+
+// nameMob is a renamed name tag used on a mob, NameableComponent's interaction (1.26.60
+// getInteraction 0x7139820, its callback 0x72009D0): the mob takes the tag's custom name
+// (nameEntity: name, flag, persistent, name actions) and the player uses the item up
+// (Player::useItem, so not in creative). A name tag without a custom name does nothing, as
+// does a mob without minecraft:nameable. True if the mob was named.
+func (p *Player) nameMob(o *Mob) bool {
+	held := p.inventory.Held()
+	if held.Name != nameTagItem || o.gone || o.m.Dead() {
+		return false
+	}
+	name := held.CustomName()
+	if name == "" || !o.m.Name(name) {
+		return false
+	}
+	p.useUpHeld()
+	p.flush()
+	return true
 }

@@ -11,8 +11,8 @@ import (
 
 // The Mob is its definition's Host.
 
-// NameTag is the mob's name tag; none yet.
-func (m *Mob) NameTag() string { return "" }
+// NameTag is the mob's name tag, "" for none.
+func (m *Mob) NameTag() string { return m.nameTag }
 
 // NextFloat draws from the region's random.
 func (m *Mob) NextFloat() float32 {

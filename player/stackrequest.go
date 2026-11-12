@@ -581,6 +581,15 @@ func (p *Player) creative() bool {
 	return mode == GameModeCreative
 }
 
+// spectating reports whether the player is in spectator mode.
+func (p *Player) spectating() bool {
+	mode := p.gameMode
+	if mode == GameModeDefault {
+		mode = p.s.level.GameMode
+	}
+	return mode == GameModeSpectator
+}
+
 // mayRemove applies BDS's rules for taking an item out of a slot: an item
 // locked in its slot stays, and armour with the curse of binding stays on
 // a player not in creative.

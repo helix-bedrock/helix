@@ -110,6 +110,16 @@ func (s *Host) PopulationSpawn(r *world.Region, pos mcdb.ChunkPos) {
 // regionSpawn readies the region's spawner state for one call this tick, nil when nothing
 // may spawn.
 func (s *Host) regionSpawn(r *world.Region) *regionSpawn {
+	rs := s.regionSpawnState(r)
+	if rs == nil || !rs.lv.MobSpawning {
+		return nil
+	}
+	return rs
+}
+
+// regionSpawnState is regionSpawn whatever the doMobSpawning game rule says, for monster
+// spawners, which BDS runs without it.
+func (s *Host) regionSpawnState(r *world.Region) *regionSpawn {
 	sg := s.spawning
 	if sg == nil || s.mobs == nil {
 		return nil
@@ -125,9 +135,6 @@ func (s *Host) regionSpawn(r *world.Region) *regionSpawn {
 	if rs.tick != now {
 		rs.tick = now
 		s.fillSpawnLevel(r, &rs.lv)
-	}
-	if !rs.lv.MobSpawning {
-		return nil
 	}
 	rg := r.Dimension().Range()
 	rs.w = spawnWorld{s: s, sg: sg, r: r, d: r.Dimension(), minY: int32(rg[0]), maxY: int32(rg[1]) + 1, rnd: &rs.rnd, list: rs.w.list}
@@ -291,7 +298,7 @@ func (w *spawnWorld) NewMob(identifier string, pos path.Vec3, surface bool) spaw
 	if !ok {
 		return nil
 	}
-	o.surface = surface
+	o.surface, o.naturalSpawn = surface, true
 	o.m.Ready(w.r)
 	return &spawnedMob{o: o, d: w.d}
 }

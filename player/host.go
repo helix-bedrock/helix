@@ -229,8 +229,14 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	h.setUpMobs()
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()
-	conf.Overworld.SetEntityLoader(h.loadEntity)
-	conf.Overworld.SetBlockEntities(chestEntities{s: h})
+	// Every dimension loads its saved entities and runs its block entities (Nether fortress
+	// spawners and bastion chests included).
+	for _, d := range []*world.Dimension{conf.Overworld, conf.Nether, conf.End} {
+		if d != nil {
+			d.SetEntityLoader(h.loadEntity)
+			d.SetBlockEntities(chestEntities{s: h})
+		}
+	}
 	h.global.run(func() { h.global.tick = h.globalTick })
 	return h, nil
 }

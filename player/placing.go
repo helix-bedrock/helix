@@ -154,6 +154,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == nameShears {
 		return p.useShearsOn(r, clicked, face)
 	}
+	if spawnEggMob(held.Name) != "" {
+		return p.useSpawnEgg(r, clicked, face, held)
+	}
 	if held.Name == nameEnderEye {
 		return p.useEnderEye(r, clicked)
 	}

@@ -183,6 +183,9 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	if isProjectile(id) {
 		return s.loadProjectile(r, at, saved, id)
 	}
+	if s.CanSpawnMob(id) {
+		return s.loadMob(r, at, saved, id)
+	}
 	if id != itemIdentifier {
 		return false
 	}

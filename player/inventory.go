@@ -386,6 +386,13 @@ func (s ItemStack) WithLore(lines ...string) ItemStack {
 	return s.withDisplay("Lore", lines)
 }
 
+// CustomName returns the stack's custom name (display Name), "" for none.
+func (s ItemStack) CustomName() string {
+	display, _ := s.Tag["display"].(map[string]any)
+	name, _ := display["Name"].(string)
+	return name
+}
+
 // WithName returns the stack with a custom name, or none for "". It copies the data.
 func (s ItemStack) WithName(name string) ItemStack {
 	if name == "" {
