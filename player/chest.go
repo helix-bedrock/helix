@@ -775,6 +775,7 @@ func (c *Chest) addViewer(r *world.Region, p *Player) {
 	c.viewersChanged(r)
 	if len(c.viewers) == 1 {
 		c.blockEvent(r)
+		c.barrelOpen(r, true)
 	}
 }
 
@@ -789,6 +790,7 @@ func (c *Chest) removeViewer(r *world.Region, p *Player) {
 	if len(c.viewers) == 0 {
 		c.open = false
 		c.blockEvent(r)
+		c.barrelOpen(r, false)
 	}
 }
 

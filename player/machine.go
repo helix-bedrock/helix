@@ -51,6 +51,8 @@ type machineSpec struct {
 	furnace *furnaceKind
 	// brewing brews potions: a brewing stand.
 	brewing bool
+	// barrel shows open_bit while anyone has it open.
+	barrel bool
 }
 
 // machineSpecs are the blocks that have only slots.
@@ -66,6 +68,7 @@ var machineSpecs = map[string]*machineSpec{
 	"minecraft:smoker":            smokerSpec,
 	"minecraft:lit_smoker":        smokerSpec,
 	brewingStandName:              brewingStandSpec,
+	barrelBlock:                   {id: barrelEntityID, size: barrelSize, window: byte(protocol.ContainerTypeContainer), barrel: true},
 }
 
 // machineByID is the spec of a saved id, nil if it is no such block.
