@@ -70,6 +70,8 @@ type Mob struct {
 	// naturalSpawn is set for a mob the natural spawner or a monster spawner made (BDS's
 	// NaturalSpawn).
 	naturalSpawn bool
+	// stand is an armour stand's own state, nil for any other mob (armorstand.go).
+	stand *armorStand
 }
 
 // Entity returns the mob's entity.
@@ -115,6 +117,9 @@ func (s *Host) newMobID(uid int64, typ string, pos mgl32.Vec3, yaw float32, meth
 		return nil, false
 	}
 	o.m = m
+	if typ == armorStandID {
+		o.stand = &armorStand{}
+	}
 	return o, true
 }
 
@@ -156,6 +161,9 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 	}
 	for _, d := range m.m.ActorData() {
 		md[uint32(d.Key)] = d.Value //nolint:gosec // actor data keys are small
+	}
+	if m.stand != nil {
+		md[protocol.EntityDataKeyPoseIndex] = m.stand.pose
 	}
 	return md
 }
@@ -227,6 +235,9 @@ func (m *Mob) apply(e *world.Entity) {
 	if m.tickHazards(e.Region()); m.gone || e.Region() == nil {
 		return
 	}
+	if m.stand != nil {
+		m.tickArmorStand(e.Region())
+	}
 	b := m.m.Body()
 	pitch, yaw, head, _ := m.m.Rotation()
 	if !e.Apply(world.Movement{Pos: mglVec(b.Pos), Rot: world.Rotation{Pitch: pitch, Yaw: yaw, HeadYaw: head}, OnGround: b.OnGround, Tick: e.Tick()}) {
@@ -249,6 +260,9 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 	r := m.entity.Region()
 	if r == nil || m.gone {
 		return 0
+	}
+	if m.stand != nil {
+		return m.standHurt(by, cause)
 	}
 	id := behavior.NoID
 	if by != nil && by.entity != nil {
@@ -371,6 +385,10 @@ func (p *Player) useOnMob(d *protocol.UseItemOnEntityTransactionData) bool {
 	o := p.mobNear(d.TargetEntityRuntimeID)
 	if o == nil {
 		return false
+	}
+	if d.ActionType == protocol.UseItemOnEntityActionInteract && o.stand != nil {
+		p.interactArmorStand(o, d)
+		return true
 	}
 	if d.ActionType == protocol.UseItemOnEntityActionInteract {
 		p.interactMob(o, d)

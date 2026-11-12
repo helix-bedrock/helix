@@ -437,6 +437,9 @@ type CircuitHooks struct {
 	HitTarget func(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool
 	// CartOnRail is a minecart in the block at pos.
 	CartOnRail func(r *world.Region, pos cube.Pos)
+	// Signal is the strength of the circuit part at pos, -1 for none: what an armour
+	// stand takes its pose from.
+	Signal func(r *world.Region, pos cube.Pos) int32
 }
 
 // SetCircuitHooks sets what redstone answers for. Call it before any player joins.

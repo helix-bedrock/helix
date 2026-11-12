@@ -303,6 +303,11 @@ func (m *Mob) MaxHealth() float32 { return m.maxHealth }
 // HealthValue is the mob's health.
 func (m *Mob) HealthValue() float32 { return m.health }
 
+// SetHealth sets the health straight, between 0 and the maximum, with no hurt or death
+// handling: for actors that run their own damage, as BDS's armour stand burns its health
+// attribute down.
+func (m *Mob) SetHealth(h float32) { m.health = min(max(h, 0), m.maxHealth) }
+
 // AttackDamage is the attack component's damage.
 func (m *Mob) AttackDamage() float32 { return m.attackDamage }
 

@@ -178,6 +178,9 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 	if held.Name == paintingID {
 		return p.placePainting(r, clicked, face)
 	}
+	if held.Name == armorStandID {
+		return p.placeArmorStand(r, clicked, face)
+	}
 	if isCushionItem(held.Name) {
 		return p.placeCushion(r, clicked, face, click, held)
 	}

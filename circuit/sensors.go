@@ -493,3 +493,9 @@ func (t *Ticker) AttackBlock(r *world.Region, pos cube.Pos, block uint32) {
 		t.playNote(r, pos, t.ensureNote(r, pos).note)
 	}
 }
+
+// Signal is the strength of the circuit part at pos, -1 when there is none, as BDS's
+// armour stand reads its block's component. Runs: owner of the region.
+func (t *Ticker) Signal(r *world.Region, pos cube.Pos) int32 {
+	return int32(t.circuitOf(r).sys.Strength(toPos(pos)))
+}

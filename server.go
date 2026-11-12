@@ -354,7 +354,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		s.circuits.SetCartBox(host.CartBox)
 		s.circuits.SetPowerTNT(host.PowerTNT)
 		host.SetCircuitHooks(player.CircuitHooks{
-			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, JukeboxPower: s.circuits.SetJukeboxPower, RingBell: s.circuits.RingBell, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers, CartOnRail: s.circuits.CartOnRail, HitTarget: s.circuits.HitTarget,
+			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, JukeboxPower: s.circuits.SetJukeboxPower, RingBell: s.circuits.RingBell, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers, CartOnRail: s.circuits.CartOnRail, HitTarget: s.circuits.HitTarget, Signal: s.circuits.Signal,
 		})
 		for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
 			d.SetBlockEntities(s.circuits.Entities(d.BlockEntityMaker()))
