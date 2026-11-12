@@ -122,6 +122,15 @@ type Hooks interface {
 	ActorEvent(m *Mob, id int)
 	// Hurt hurts the mob through the engine's hurt (its packets included) with no attacker.
 	Hurt(m *Mob, amount float32, cause int)
+	// Born makes the baby of a mating beside the parent m (BDS's
+	// ActorFactory::createBornActor) and returns it as the mob runtime sees it, nil when
+	// none was made. It runs in m's Apply.
+	Born(m *Mob, b state.Birth) behavior.Actor
+	// Experience drops experience orbs worth amount at the mob.
+	Experience(m *Mob, amount int32)
+	// LeashDropped is the mob's leash coming off (Actor::dropLeash); dropLead drops a lead
+	// item at the mob.
+	LeashDropped(m *Mob, dropLead bool)
 }
 
 // Mob is one mob: its definition state, goals, navigation and body. It is used only from its
@@ -181,6 +190,12 @@ type Mob struct {
 	persistent bool
 	// nameTag is the mob's name (BDS's setNameTag), "" for none.
 	nameTag string
+	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
+	leashHolder behavior.ID
+	// saved is the age and breeding state a save holds, put back once the components are
+	// built; births is scratch space for a mating's babies.
+	saved  *SavedState
+	births []state.Birth
 	// states are the definition's state components (state.go), stateEnv what they run with,
 	// stateComps the components they were read from. despawned is set when the mob despawned.
 	states     *state.Set
@@ -234,7 +249,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	}
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, id: behavior.ID(uniqueID), rid: runtimeID,
-		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastCause: -1,
+		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID,
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,

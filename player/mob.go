@@ -478,6 +478,10 @@ func actorOf(e *world.Entity) behavior.Actor {
 		if !o.gone {
 			return o.m.Snapshot()
 		}
+	case *LeashKnot:
+		if !o.gone {
+			return knotActor{id: behavior.ID(e.UniqueID()), pos: vec(e.Position())}
+		}
 	}
 	return nil
 }

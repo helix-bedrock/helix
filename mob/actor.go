@@ -112,39 +112,36 @@ func (m *Mob) Event(name string, other behavior.ID) {
 	m.inst.Execute(name, m.tester(o))
 }
 
-func (m *Mob) Teleport(p behavior.Vec3)              { m.SetPos(p) }
-func (m *Mob) Dwelling() (behavior.Pos, bool, bool)  { return behavior.Pos{}, false, false }
-func (m *Mob) Home() (behavior.Pos, int32, bool)     { return behavior.Pos{}, 0, false }
-func (m *Mob) Leash() (behavior.Vec3, float32, bool) { return behavior.Vec3{}, 0, false }
-func (m *Mob) InLava() bool                          { return m.body.Travel() == physics.TravelLava }
-func (m *Mob) InWater() bool                         { return m.body.WasInWater }
-func (m *Mob) UnderWater() bool                      { return m.body.HeadInWater }
-func (m *Mob) FloatJump()                            { m.jump.Jumping = true }
-func (m *Mob) DismountPassengers()                   {}
-func (m *Mob) HeardVibration() (uint64, bool)        { return 0, false }
-func (m *Mob) CanMate(behavior.Actor) bool           { return false }
-func (m *Mob) SetPersistent()                        { m.persistent = true }
-func (m *Mob) CanSit() bool                          { return false }
-func (m *Mob) OnGround() bool                        { return m.body.OnGround }
-func (m *Mob) OnFire() bool                          { return m.fireTicks > 0 }
-func (m *Mob) Velocity() behavior.Vec3               { return m.body.Vel }
-func (m *Mob) SetVelocity(v behavior.Vec3)           { m.body.Vel = v }
-func (m *Mob) HasEffect(int) bool                    { return false }
-func (m *Mob) SetHijackable(bool)                    {}
-func (m *Mob) NoActionTime() int32                   { return m.noActionTime }
-func (m *Mob) ResetFlock()                           {}
-func (m *Mob) LeashStretched() bool                  { return false }
-func (m *Mob) SetPersistSit(bool)                    {}
-func (m *Mob) HelmetEmpty() bool                     { return true }
-func (m *Mob) Speed() float32                        { return m.speed }
-func (m *Mob) UnderwaterSpeed() float32              { return m.underwaterSpeed }
-func (m *Mob) FollowRange() float32                  { return m.followRange }
-func (m *Mob) PrevRotation() (pitch, yaw float32)    { return m.prevPitch, m.prevYaw }
-func (m *Mob) SetYaw(yaw float32)                    { m.yaw = yaw }
-func (m *Mob) Breathable() bool                      { return true }
-func (m *Mob) AirSupply() int16                      { return 300 }
-func (m *Mob) VerticalCollision() bool               { return m.body.VerticalCollision }
-func (m *Mob) Persistent() bool                      { return m.persistent }
+func (m *Mob) Teleport(p behavior.Vec3)             { m.SetPos(p) }
+func (m *Mob) Dwelling() (behavior.Pos, bool, bool) { return behavior.Pos{}, false, false }
+func (m *Mob) Home() (behavior.Pos, int32, bool)    { return behavior.Pos{}, 0, false }
+func (m *Mob) InLava() bool                         { return m.body.Travel() == physics.TravelLava }
+func (m *Mob) InWater() bool                        { return m.body.WasInWater }
+func (m *Mob) UnderWater() bool                     { return m.body.HeadInWater }
+func (m *Mob) FloatJump()                           { m.jump.Jumping = true }
+func (m *Mob) DismountPassengers()                  {}
+func (m *Mob) HeardVibration() (uint64, bool)       { return 0, false }
+func (m *Mob) SetPersistent()                       { m.persistent = true }
+func (m *Mob) CanSit() bool                         { return false }
+func (m *Mob) OnGround() bool                       { return m.body.OnGround }
+func (m *Mob) OnFire() bool                         { return m.fireTicks > 0 }
+func (m *Mob) Velocity() behavior.Vec3              { return m.body.Vel }
+func (m *Mob) SetVelocity(v behavior.Vec3)          { m.body.Vel = v }
+func (m *Mob) HasEffect(int) bool                   { return false }
+func (m *Mob) SetHijackable(bool)                   {}
+func (m *Mob) NoActionTime() int32                  { return m.noActionTime }
+func (m *Mob) ResetFlock()                          {}
+func (m *Mob) SetPersistSit(bool)                   {}
+func (m *Mob) HelmetEmpty() bool                    { return true }
+func (m *Mob) Speed() float32                       { return m.speed }
+func (m *Mob) UnderwaterSpeed() float32             { return m.underwaterSpeed }
+func (m *Mob) FollowRange() float32                 { return m.followRange }
+func (m *Mob) PrevRotation() (pitch, yaw float32)   { return m.prevPitch, m.prevYaw }
+func (m *Mob) SetYaw(yaw float32)                   { m.yaw = yaw }
+func (m *Mob) Breathable() bool                     { return true }
+func (m *Mob) AirSupply() int16                     { return 300 }
+func (m *Mob) VerticalCollision() bool              { return m.body.VerticalCollision }
+func (m *Mob) Persistent() bool                     { return m.persistent }
 
 // OverWater is in water, or water is the first non-air block below.
 func (m *Mob) OverWater() bool {

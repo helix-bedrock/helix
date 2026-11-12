@@ -180,6 +180,9 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 	if id == paintingID {
 		return s.loadPainting(r, at, saved)
 	}
+	if id == leashKnotID {
+		return s.loadKnot(r, at, saved)
+	}
 	if isProjectile(id) {
 		return s.loadProjectile(r, at, saved, id)
 	}

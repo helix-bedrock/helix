@@ -131,6 +131,7 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	data[mobKeyNaturalSpawn] = boolByte(o.naturalSpawn)
 	data["TargetID"] = int64(o.m.Target())
 	data["Attributes"] = o.saveAttributes(prevAttrs)
+	o.saveBreeding(data)
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
@@ -224,6 +225,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 		}
 	}
 	o.loadEquipment(saved.Data)
+	o.loadBreeding(saved.Data)
 	surface, _ := saved.Data[mobKeySurface].(uint8)
 	natural, _ := saved.Data[mobKeyNaturalSpawn].(uint8)
 	o.surface, o.naturalSpawn = surface != 0, natural != 0
@@ -259,5 +261,58 @@ func (o *Mob) loadEquipment(data map[string]any) {
 		if it := itemFromNBT(m); !it.Empty() {
 			o.setItem(slot, it)
 		}
+	}
+}
+
+// The age, breeding and leash fields BDS saves: AgeableComponent's Age (never above 0) and
+// GrowthPaused (0x7444D80), BreedableComponent's InLove, LoveCause and BreedCooldown
+// (0x7372E40), written while the mob has the component, and Actor's LeasherID (read at
+// 0xB3974B0), the holder's unique ID, -1 for none.
+const (
+	mobKeyAge          = "Age"
+	mobKeyGrowthPaused = "GrowthPaused"
+	mobKeyInLove       = "InLove"
+	mobKeyLoveCause    = "LoveCause"
+	mobKeyBreedCool    = "BreedCooldown"
+	mobKeyLeasher      = "LeasherID"
+)
+
+func (o *Mob) saveBreeding(data map[string]any) {
+	st := o.m.SaveState()
+	if st.HasAge {
+		data[mobKeyAge] = st.Age
+		if _, ok := data[mobKeyGrowthPaused]; !ok {
+			data[mobKeyGrowthPaused] = uint8(0)
+		}
+	} else {
+		delete(data, mobKeyAge)
+		delete(data, mobKeyGrowthPaused)
+	}
+	if st.HasBreed {
+		data[mobKeyInLove] = st.InLove
+		data[mobKeyLoveCause] = st.LoveCause
+		data[mobKeyBreedCool] = st.Cooldown
+	} else {
+		delete(data, mobKeyInLove)
+		delete(data, mobKeyLoveCause)
+		delete(data, mobKeyBreedCool)
+	}
+	data[mobKeyLeasher] = int64(o.m.LeashHolder())
+}
+
+func (o *Mob) loadBreeding(data map[string]any) {
+	var st mob.SavedState
+	st.Age, st.HasAge = data[mobKeyAge].(int32)
+	paused, _ := data[mobKeyGrowthPaused].(uint8)
+	st.GrowthPaused = paused != 0
+	st.InLove, st.HasBreed = data[mobKeyInLove].(int32)
+	st.Cooldown, _ = data[mobKeyBreedCool].(int32)
+	st.LoveCause, _ = data[mobKeyLoveCause].(int64)
+	if !st.HasBreed {
+		st.LoveCause = int64(behavior.NoID)
+	}
+	o.m.RestoreState(st)
+	if id, ok := data[mobKeyLeasher].(int64); ok && behavior.ID(id) != behavior.NoID {
+		o.m.SetLeashHolder(behavior.ID(id))
 	}
 }

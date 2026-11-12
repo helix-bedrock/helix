@@ -40,6 +40,7 @@ func (m *Mob) readStates(c component.Context, comps definition.Group) {
 	}
 	m.states = s
 	m.stateComps = maps.Clone(comps)
+	m.applySaved()
 }
 
 // stateTick runs the state components and burning, and reports whether the mob despawned.
@@ -57,7 +58,7 @@ func (m *Mob) stateTick() bool {
 	if m.states != nil {
 		// A transformation that comes due is not run yet: making the new entity is the
 		// engine's and not hooked up.
-		m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}})
+		m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}, LeashChunks: despawnChunks{m}})
 	}
 	return m.despawned
 }
@@ -242,9 +243,6 @@ func (stateMob) Particles(int, int)                           {}
 func (stateMob) MakeMad()                                     {}
 func (stateMob) SlotEmpty(string) bool                        { return true }
 func (stateMob) Respiration() int32                           { return 0 }
-func (stateMob) LeashHolder() behavior.ID                     { return behavior.NoID }
-func (stateMob) SetLeashHolder(behavior.ID)                   {}
-func (stateMob) DropLeash(bool, bool)                         {}
 func (stateMob) StopRiding()                                  {}
 func (stateMob) GameEvent(string, behavior.ID, behavior.Vec3) {}
 

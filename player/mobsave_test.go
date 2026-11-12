@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
@@ -21,7 +22,13 @@ func TestMobSavesAndLoads(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		o.m.SetNameTag("Bessie")
 		o.m.SetPersistent()
+		if _, fed := o.m.Feed(playerActor{p}, mob.HeldItem{Name: "minecraft:wheat"}); !fed {
+			t.Error("cow did not take wheat")
+		}
 		saved, ok := o.saveEntity(o.entity)
+		if love, _ := saved.Data["InLove"].(int32); love <= 0 {
+			t.Errorf("saved InLove %v", saved.Data["InLove"])
+		}
 		if !ok || saved.Data["identifier"] != "minecraft:cow" || saved.Data["CustomName"] != "Bessie" || saved.Data["Persistent"] != uint8(1) {
 			t.Fatalf("saved %v", saved.Data)
 		}

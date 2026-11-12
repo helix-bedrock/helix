@@ -30,6 +30,8 @@ const (
 	opActorEvent
 	opHurt
 	opShoot
+	opBreed
+	opDropLeash
 )
 
 // op is one queued change. Only the fields its kind uses are set.
@@ -138,6 +140,12 @@ func (m *Mob) run(o op) {
 		if m.hooks != nil {
 			m.hooks.Hurt(m, o.amount, int(o.n))
 		}
+	case opBreed:
+		m.mate(o.id)
+	case opDropLeash:
+		if m.hooks != nil {
+			m.hooks.LeashDropped(m, o.n != 0)
+		}
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r
@@ -175,6 +183,9 @@ type Snapshot struct {
 	underWater    bool
 	inLava        bool
 	onGround      bool
+	// breedReady is minecraft:breedable present and not cooling down, for other mobs'
+	// CanMate.
+	breedReady bool
 	// equip is the equipment, for other mobs' has_equipment tests.
 	equip [EquipSlots]behavior.Item
 }
@@ -199,6 +210,7 @@ func (m *Mob) snapshot() {
 	s.health = m.health
 	s.inWater, s.underWater, s.inLava, s.onGround = m.InWater(), m.UnderWater(), m.InLava(), m.OnGround()
 	s.equip = m.equip
+	s.breedReady = m.states != nil && m.states.Breedable != nil && m.states.Breedable.Cooldown() <= 0
 }
 
 func (s *Snapshot) ID() behavior.ID                    { return s.id }
