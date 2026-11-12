@@ -148,7 +148,9 @@ func (k *LeashKnot) Break(r *world.Region) {
 	playSound(r, k.block(), soundEvent{name: packet.SoundEventBreakLeashKnot, pos: pos, extra: -1}, nil)
 	id := behavior.ID(k.entity.UniqueID())
 	for _, o := range k.s.leashedTo(r, id) {
-		o.m.Unleash(true)
+		// The lead drops at the knot, where it was tied, not at the mob.
+		o.m.Unleash(false)
+		k.s.spawnMobDrop(r, ItemStack{Name: leadItem, Count: 1}, pos)
 	}
 	k.entity.Remove()
 }

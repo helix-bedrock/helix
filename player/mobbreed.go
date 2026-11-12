@@ -101,8 +101,14 @@ func (m *Mob) dropLeashOnDeath(r *world.Region) {
 	if r == nil {
 		return
 	}
-	m.s.spawnMobDrop(r, ItemStack{Name: leadItem, Count: 1}, m.entity.Position())
-	if k := m.s.knotByID(r, holder); k != nil {
+	at := m.entity.Position()
+	k := m.s.knotByID(r, holder)
+	if k != nil {
+		// Tied to a fence, the lead drops at the knot.
+		at = k.entity.Position()
+	}
+	m.s.spawnMobDrop(r, ItemStack{Name: leadItem, Count: 1}, at)
+	if k != nil {
 		k.removeIfEmpty(r)
 	}
 }
