@@ -334,12 +334,7 @@ func (p *Player) fireChestItems() bool {
 	if c == nil || inv == nil {
 		return true
 	}
-	var changed []int
-	for i := range st.work.main {
-		if s, o := &st.work.main[i], &p.inventory.main[i]; s.netID != o.netID || s.Count != o.Count {
-			changed = append(changed, i)
-		}
-	}
+	changed := p.changedMainSlots()
 	for i := range work {
 		old := inv.Item(i)
 		if old.netID == work[i].netID && old.Count == work[i].Count {
@@ -349,14 +344,7 @@ func (p *Player) fireChestItems() bool {
 			Player: p, Region: r, Kind: inv.kind, Inventory: inv, Slot: i, Change: chestChange(old, work[i]),
 			Old: old, New: work[i], Cursor: st.work.ui[cursorSlot], InventorySlots: changed,
 		}
-		switch {
-		case c.cart != nil:
-			e.Cart = c.cart
-		case c.boat != nil:
-			e.Boat = c.boat
-		default:
-			e.Chest = c
-		}
+		e.setHolder(c)
 		g.containerItemEv.fire(p.s.log, &e)
 		if e.Cancelled() {
 			return false
@@ -371,6 +359,30 @@ func (p *Player) fireChestItems() bool {
 		}
 	}
 	return true
+}
+
+// changedMainSlots is the slots of the player's inventory the running request changes.
+func (p *Player) changedMainSlots() []int {
+	work := &p.requests.work
+	var changed []int
+	for i := range work.main {
+		if s, o := &work.main[i], &p.inventory.main[i]; s.netID != o.netID || s.Count != o.Count {
+			changed = append(changed, i)
+		}
+	}
+	return changed
+}
+
+// setHolder names what holds the slots: a cart, a boat or else the chest c itself.
+func (e *ContainerItemEvent) setHolder(c *Chest) {
+	switch {
+	case c.cart != nil:
+		e.Cart = c.cart
+	case c.boat != nil:
+		e.Boat = c.boat
+	default:
+		e.Chest = c
+	}
 }
 
 // chestChange says what going from old to next does to a slot.

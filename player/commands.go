@@ -1,6 +1,7 @@
 package player
 
 import (
+	"cmp"
 	"math/rand/v2"
 	"slices"
 	"strconv"
@@ -80,64 +81,86 @@ func (h *Host) selectPlayers(self *Player, from mgl32.Vec3, sel command.Selector
 		}
 		return nil
 	}
-	type found struct {
-		p    *Player
-		dist float32
-	}
-	var list []found
-	if sel.Kind == "s" || sel.Kind == "initiator" {
-		if self != nil {
-			list = append(list, found{p: self})
-		}
-	} else {
-		for _, o := range h.Online() {
-			list = append(list, found{p: o})
-		}
-	}
-	at := from
-	for _, axis := range []struct {
-		key string
-		i   int
-	}{{"x", 0}, {"y", 1}, {"z", 2}} {
-		if a, ok := sel.Arg(axis.key); ok {
-			if v, err := strconv.ParseFloat(strings.TrimPrefix(a.Value, "~"), 32); err == nil {
-				if strings.HasPrefix(a.Value, "~") {
-					at[axis.i] += float32(v)
-				} else {
-					at[axis.i] = float32(v)
-				}
-			}
-		}
-	}
-	list = slices.DeleteFunc(list, func(f found) bool { return !matchesSelector(f.p, at, sel) })
+	at := selectorOrigin(from, sel)
+	list := h.selectorCandidates(self, sel)
+	list = slices.DeleteFunc(list, func(f selected) bool { return !matchesSelector(f.p, at, sel) })
 	for i := range list {
 		list[i].dist = list[i].p.State().Position.Sub(at).Len()
 	}
+	list = orderSelected(list, sel)
+	out := make([]command.Target, len(list))
+	for i, f := range list {
+		out[i] = f.p
+	}
+	return out
+}
+
+// selected is a player a selector picked, with its distance from the selector's origin.
+type selected struct {
+	p    *Player
+	dist float32
+}
+
+// selectorAxes are the selector arguments that move its origin, with their axis.
+var selectorAxes = [...]struct {
+	key string
+	i   int
+}{{"x", 0}, {"y", 1}, {"z", 2}}
+
+// selectorOrigin is where the selector measures from: from, with its x, y and z arguments
+// set or, after ~, added.
+func selectorOrigin(from mgl32.Vec3, sel command.Selector) mgl32.Vec3 {
+	at := from
+	for _, axis := range selectorAxes {
+		a, ok := sel.Arg(axis.key)
+		if !ok {
+			continue
+		}
+		v, err := strconv.ParseFloat(strings.TrimPrefix(a.Value, "~"), 32)
+		if err != nil {
+			continue
+		}
+		if strings.HasPrefix(a.Value, "~") {
+			at[axis.i] += float32(v)
+		} else {
+			at[axis.i] = float32(v)
+		}
+	}
+	return at
+}
+
+// selectorCandidates is who the selector chooses from: the runner for @s and
+// @initiator, else everyone online.
+func (h *Host) selectorCandidates(self *Player, sel command.Selector) []selected {
+	if sel.Kind == "s" || sel.Kind == "initiator" {
+		if self == nil {
+			return nil
+		}
+		return []selected{{p: self}}
+	}
+	online := h.Online()
+	list := make([]selected, 0, len(online))
+	for _, o := range online {
+		list = append(list, selected{p: o})
+	}
+	return list
+}
+
+// orderSelected orders the players picked and keeps as many as the c argument asks:
+// nearest first (@r shuffled instead), the farthest first for a negative c, one for @p
+// and @r without c.
+func orderSelected(list []selected, sel command.Selector) []selected {
 	count := 0
 	if a, ok := sel.Arg("c"); ok {
 		count, _ = strconv.Atoi(a.Value)
 	}
-	switch sel.Kind {
-	case "p":
-		if count == 0 {
-			count = 1
-		}
-	case "r":
-		rand.Shuffle(len(list), func(i, j int) { list[i], list[j] = list[j], list[i] })
-		if count == 0 {
-			count = 1
-		}
+	if (sel.Kind == "p" || sel.Kind == "r") && count == 0 {
+		count = 1
 	}
-	if sel.Kind != "r" {
-		slices.SortStableFunc(list, func(a, b found) int {
-			switch {
-			case a.dist < b.dist:
-				return -1
-			case a.dist > b.dist:
-				return 1
-			}
-			return 0
-		})
+	if sel.Kind == "r" {
+		rand.Shuffle(len(list), func(i, j int) { list[i], list[j] = list[j], list[i] })
+	} else {
+		slices.SortStableFunc(list, func(a, b selected) int { return cmp.Compare(a.dist, b.dist) })
 	}
 	if count < 0 {
 		slices.Reverse(list)
@@ -146,11 +169,7 @@ func (h *Host) selectPlayers(self *Player, from mgl32.Vec3, sel command.Selector
 	if count > 0 && count < len(list) {
 		list = list[:count]
 	}
-	out := make([]command.Target, len(list))
-	for i, f := range list {
-		out[i] = f.p
-	}
-	return out
+	return list
 }
 
 // matchesSelector checks a player against a selector's filters.

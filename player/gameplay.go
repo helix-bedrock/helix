@@ -537,26 +537,79 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	gs.banners.index()
 	g := gs.out
 	*g = gameplay{
-		tuning: gs.tuning, breathable: gs.breathable, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, hitEv: gs.hitEv, explosionEv: gs.explosionEv,
-		sys: gs.sys, effects: maps.Clone(gs.effects), potions: maps.Clone(gs.potions),
-		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
-		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
-		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
-		containerOpenEv: gs.containerOpenEv, containerCloseEv: gs.containerCloseEv, containerItemEv: gs.containerItemEv,
-		inventoryViewEv: gs.inventoryViewEv, explosionStartEv: gs.explosionStartEv, explosionHitEv: gs.explosionHitEv, voidEv: gs.voidEv, furnaceBurnEv: gs.furnaceBurnEv, furnaceSmeltEv: gs.furnaceSmeltEv, campfireCookEv: gs.campfireCookEv, brewEv: gs.brewEv, tntPrimeEv: gs.tntPrimeEv, glideEv: gs.glideEv, fireworkEv: gs.fireworkEv, fishCatchEv: gs.fishCatchEv, craftEv: gs.craftEv, smithEv: gs.smithEv, loomEv: gs.loomEv, shieldBannerEv: gs.shieldBannerEv, craftRepairEv: gs.craftRepairEv, blockFallEv: gs.blockFallEv, banners: gs.banners, motives: slices.Clone(gs.motives),
-		chestPairEv: gs.chestPairEv, chestSpillEv: gs.chestSpillEv, dropsEv: gs.dropsEv, xpEv: gs.xpEv, dropRules: maps.Clone(gs.dropRules),
-		blockEv: gs.blockEv, totemEv: gs.totemEv, armorEquipEv: gs.armorEquipEv,
-		enchantOptionsEv: gs.enchantOptionsEv, enchantEv: gs.enchantEv, anvilEv: gs.anvilEv, grindstoneEv: gs.grindstoneEv,
+		tuning:           gs.tuning,
+		breathable:       gs.breathable,
+		combat:           combat,
+		sys:              gs.sys,
+		effects:          maps.Clone(gs.effects),
+		potions:          maps.Clone(gs.potions),
+		blocks:           maps.Clone(gs.blocks),
+		mining:           m,
+		durability:       durabilityTable(bp),
+		fireResistant:    set(flags.FireResistant),
+		replaceables:     set(bp.Replaceable),
+		notReplacedBy:    map[string]map[string]bool{},
+		placement:        placement,
+		banners:          gs.banners,
+		motives:          slices.Clone(gs.motives),
+		dropRules:        maps.Clone(gs.dropRules),
+		itemUseEv:        gs.itemUseEv,
+		itemEatEv:        gs.itemEatEv,
+		hitEv:            gs.hitEv,
+		explosionEv:      gs.explosionEv,
+		breakEv:          gs.breakEv,
+		placeEv:          gs.placeEv,
+		itemDropEv:       gs.itemDropEv,
+		itemLoadEv:       gs.itemLoadEv,
+		useEv:            gs.useEv,
+		containerOpenEv:  gs.containerOpenEv,
+		containerCloseEv: gs.containerCloseEv,
+		containerItemEv:  gs.containerItemEv,
+		inventoryViewEv:  gs.inventoryViewEv,
+		explosionStartEv: gs.explosionStartEv,
+		explosionHitEv:   gs.explosionHitEv,
+		voidEv:           gs.voidEv,
+		furnaceBurnEv:    gs.furnaceBurnEv,
+		furnaceSmeltEv:   gs.furnaceSmeltEv,
+		campfireCookEv:   gs.campfireCookEv,
+		brewEv:           gs.brewEv,
+		tntPrimeEv:       gs.tntPrimeEv,
+		glideEv:          gs.glideEv,
+		fireworkEv:       gs.fireworkEv,
+		fishCatchEv:      gs.fishCatchEv,
+		craftEv:          gs.craftEv,
+		smithEv:          gs.smithEv,
+		loomEv:           gs.loomEv,
+		shieldBannerEv:   gs.shieldBannerEv,
+		craftRepairEv:    gs.craftRepairEv,
+		blockFallEv:      gs.blockFallEv,
+		chestPairEv:      gs.chestPairEv,
+		chestSpillEv:     gs.chestSpillEv,
+		dropsEv:          gs.dropsEv,
+		xpEv:             gs.xpEv,
+		blockEv:          gs.blockEv,
+		totemEv:          gs.totemEv,
+		armorEquipEv:     gs.armorEquipEv,
+		enchantOptionsEv: gs.enchantOptionsEv,
+		enchantEv:        gs.enchantEv,
+		anvilEv:          gs.anvilEv,
+		grindstoneEv:     gs.grindstoneEv,
 	}
 	g.enchants.Store(newEnchantTable(gs.enchants))
 	g.enchantRules.Store(gs.enchanting)
+	for name, by := range bp.NotReplacedBy {
+		g.notReplacedBy[name] = set(by)
+	}
+	g.freezeEvents()
+	return g, nil
+}
+
+// freezeEvents puts every event's listeners in priority order, once registration ends.
+func (g *gameplay) freezeEvents() {
 	g.enchantOptionsEv.freeze()
 	g.enchantEv.freeze()
 	g.anvilEv.freeze()
 	g.grindstoneEv.freeze()
-	for name, by := range bp.NotReplacedBy {
-		g.notReplacedBy[name] = set(by)
-	}
 	g.itemUseEv.freeze()
 	g.itemEatEv.freeze()
 	g.hitEv.freeze()
@@ -594,5 +647,4 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g.chestSpillEv.freeze()
 	g.dropsEv.freeze()
 	g.xpEv.freeze()
-	return g, nil
 }

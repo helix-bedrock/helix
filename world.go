@@ -27,6 +27,7 @@ import (
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
+	"github.com/helix-bedrock/world/mcdb/leveldat"
 )
 
 // StorageConfig replaces where the world and its players are kept. Every
@@ -59,13 +60,7 @@ func (s *Server) openWorld() error {
 	}
 	ldat := db.LevelDat()
 	if isNew {
-		ldat.LevelName = s.conf.LevelName
-		if s.conf.Seed != nil {
-			ldat.RandomSeed = *s.conf.Seed
-		}
-	}
-	if isNew {
-		ldat.RainTime, ldat.LightningTime = weather.NewTimes(uint64(ldat.RandomSeed)) //nolint:gosec // a seed
+		s.newLevel(ldat)
 	}
 	s.weather = weather.New(weather.Levels{Rain: ldat.RainLevel, Thunder: ldat.LightningLevel, RainTime: ldat.RainTime, ThunderTime: ldat.LightningTime},
 		ldat.DoWeatherCycle, uint64(ldat.RandomSeed)^uint64(time.Now().UnixNano()), s.broadcastLevelEvent) //nolint:gosec // a seed
@@ -75,23 +70,8 @@ func (s *Server) openWorld() error {
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
 	ldat.Generator = gt.Level
-	s.db, s.worldStore, s.playerStore = db, mcdb.WorldStore(db), mcdb.PlayerStore(db)
-	if st := s.conf.Storage.World; st != nil {
-		s.worldStore = st
-	}
-	if st := s.conf.Storage.Players; st != nil {
-		s.playerStore = st
-	}
-	s.level = player.Level{
-		Name: ldat.LevelName, Seed: ldat.RandomSeed, GameMode: ldat.GameType, Difficulty: ldat.Difficulty,
-		Spawn: [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ}, Generator: ldat.Generator,
-		KeepInventory: ldat.KeepInventory, ShowDeathMessages: ldat.ShowDeathMessages,
-		PVP: ldat.PVP, NaturalRegeneration: ldat.NaturalRegeneration,
-		TNTExplodes: ldat.TNTExplodes, TNTExplosionDropDecay: ldat.TNTExplosionDropDecay, DoTileDrops: ldat.DoTileDrops, GameRules: gameRules(ldat),
-		RespawnBlocksExplode: ldat.RespawnBlocksExplode, DoDayLightCycle: ldat.DoDayLightCycle, DoEntityDrops: ldat.DoEntityDrops, MobGriefing: ldat.MobGriefing,
-		DoMobSpawning:             ldat.DoMobSpawning,
-		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
-	}
+	s.useStores(db)
+	s.level = levelOf(ldat)
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetPanicHandler(s.panicked)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
@@ -109,6 +89,54 @@ func (s *Server) openWorld() error {
 	}
 	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew, "type", worldType, "seed", ldat.RandomSeed)
 	return nil
+}
+
+// newLevel fills in a new world's level.dat: its name, the configured seed and the
+// first weather times.
+func (s *Server) newLevel(ldat *leveldat.Data) {
+	ldat.LevelName = s.conf.LevelName
+	if s.conf.Seed != nil {
+		ldat.RandomSeed = *s.conf.Seed
+	}
+	ldat.RainTime, ldat.LightningTime = weather.NewTimes(uint64(ldat.RandomSeed)) //nolint:gosec // a seed
+}
+
+// useStores keeps the open database and the world and player stores on it, unless the
+// configuration replaces them.
+func (s *Server) useStores(db *mcdb.DB) {
+	s.db, s.worldStore, s.playerStore = db, mcdb.WorldStore(db), mcdb.PlayerStore(db)
+	if st := s.conf.Storage.World; st != nil {
+		s.worldStore = st
+	}
+	if st := s.conf.Storage.Players; st != nil {
+		s.playerStore = st
+	}
+}
+
+// levelOf is the level.dat values the players read.
+func levelOf(ldat *leveldat.Data) player.Level {
+	return player.Level{
+		Name:                      ldat.LevelName,
+		Seed:                      ldat.RandomSeed,
+		GameMode:                  ldat.GameType,
+		Difficulty:                ldat.Difficulty,
+		Spawn:                     [3]int32{ldat.SpawnX, ldat.SpawnY, ldat.SpawnZ},
+		Generator:                 ldat.Generator,
+		KeepInventory:             ldat.KeepInventory,
+		ShowDeathMessages:         ldat.ShowDeathMessages,
+		PVP:                       ldat.PVP,
+		NaturalRegeneration:       ldat.NaturalRegeneration,
+		TNTExplodes:               ldat.TNTExplodes,
+		TNTExplosionDropDecay:     ldat.TNTExplosionDropDecay,
+		DoTileDrops:               ldat.DoTileDrops,
+		RespawnBlocksExplode:      ldat.RespawnBlocksExplode,
+		DoDayLightCycle:           ldat.DoDayLightCycle,
+		DoEntityDrops:             ldat.DoEntityDrops,
+		MobGriefing:               ldat.MobGriefing,
+		DoMobSpawning:             ldat.DoMobSpawning,
+		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
+		GameRules:                 gameRules(ldat),
+	}
 }
 
 // worldType picks the world type: the configured one, else the one level.dat

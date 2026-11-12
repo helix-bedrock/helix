@@ -214,7 +214,6 @@ func (c *AreaEffectCloud) touch(r *world.Region, e *world.Entity, age int64) {
 	lo := mgl32.Vec3{pos[0] - radius, pos[1] - radius/2, pos[2] - radius}
 	hi := mgl32.Vec3{pos[0] + radius, pos[1] + radius/2, pos[2] + radius}
 	c.found = r.AppendEntitiesIn(c.found[:0], lo[0], lo[2], hi[0], hi[2])
-	g := c.s.game
 	for _, o := range c.found {
 		target, ok := o.Owner().(*Player)
 		if !ok || target.dead() || target.gameMode == GameModeSpectator {
@@ -235,40 +234,56 @@ func (c *AreaEffectCloud) touch(r *world.Region, e *world.Entity, age int64) {
 			continue
 		}
 		c.victims[uid] = age + int64(c.reapplication)
-		for _, eff := range c.effects {
-			def, known := g.effects[eff.ID]
-			if !known {
-				continue
-			}
-			if def.Instant {
-				target.ApplyInstantEffect(eff.ID, eff.Amplifier, cloudInstantScale)
-				continue
-			}
-			ticks := eff.Duration
-			if ticks != EffectInfinite {
-				ticks = max(int32(float32(ticks)*cloudDurationScale), 0)
-			}
-			target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
-		}
-		if c.radiusOnUse != 0 {
-			c.radius = max(c.radius+c.radiusOnUse, 0)
-			if c.currentRadius(age) < cloudMinRadius {
-				c.remove()
-				return
-			}
-			e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyDataRadius: c.radius}))
-		}
-		if c.durationOnUse != EffectInfinite && c.durationOnUse != 0 {
-			if c.duration != EffectInfinite {
-				c.duration += c.durationOnUse
-				if c.duration < EffectInfinite || c.duration == 0 {
-					c.remove()
-					return
-				}
-			}
-			e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyDataDuration: c.duration}))
+		c.affect(target)
+		if !c.used(e, age) {
+			return
 		}
 	}
+}
+
+// affect gives target the cloud's effects: instant ones at the cloud's scale, the others
+// for a share of their time.
+func (c *AreaEffectCloud) affect(target *Player) {
+	g := c.s.game
+	for _, eff := range c.effects {
+		def, known := g.effects[eff.ID]
+		if !known {
+			continue
+		}
+		if def.Instant {
+			target.ApplyInstantEffect(eff.ID, eff.Amplifier, cloudInstantScale)
+			continue
+		}
+		ticks := eff.Duration
+		if ticks != EffectInfinite {
+			ticks = max(int32(float32(ticks)*cloudDurationScale), 0)
+		}
+		target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
+	}
+}
+
+// used shrinks the cloud and shortens its time by what each touch costs, telling those who
+// see it. False if that used it up and it is gone.
+func (c *AreaEffectCloud) used(e *world.Entity, age int64) bool {
+	if c.radiusOnUse != 0 {
+		c.radius = max(c.radius+c.radiusOnUse, 0)
+		if c.currentRadius(age) < cloudMinRadius {
+			c.remove()
+			return false
+		}
+		e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyDataRadius: c.radius}))
+	}
+	if c.durationOnUse != EffectInfinite && c.durationOnUse != 0 {
+		if c.duration != EffectInfinite {
+			c.duration += c.durationOnUse
+			if c.duration < EffectInfinite || c.duration == 0 {
+				c.remove()
+				return false
+			}
+		}
+		e.Send(actorData(e.RuntimeID(), protocol.EntityMetadata{protocol.EntityDataKeyDataDuration: c.duration}))
+	}
+	return true
 }
 
 func (c *AreaEffectCloud) saveEntity(e *world.Entity) (chunk.Entity, bool) {

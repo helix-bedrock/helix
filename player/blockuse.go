@@ -63,19 +63,20 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return false
 	}
 	blocks := p.s.reg.Blocks
-	if b, ok := p.s.game.blocks[blocks.Name(u.Block)].(Usable); ok {
+	name := blocks.Name(u.Block)
+	if b, ok := p.s.game.blocks[name].(Usable); ok {
 		return b.Use(u)
 	}
 	if p.tillWithHoe(r, u) || p.pickBerries(r, u) || p.useComposter(r, u) || p.tieToFence(r, u) {
 		return true
 	}
-	if lightLevel(blocks.Name(u.Block)) >= 0 && lightLevel(u.Item.Name) >= 0 {
+	if lightLevel(name) >= 0 && lightLevel(u.Item.Name) >= 0 {
 		return p.useLightBlock(r, u)
 	}
 	if p.s.chests.kind[u.Block] != chestNone {
 		return p.useChest(r, u)
 	}
-	switch blocks.Name(u.Block) {
+	switch name {
 	case blockuse.Bed, blockuse.StrawBed:
 		return p.useBed(r, u)
 	case jukeboxBlock:
@@ -101,18 +102,19 @@ func vanillaUseBlock(u *BlockUse) bool {
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
 		return p.useAnvil(r, u)
 	}
-	if isSignBlock(blocks.Name(u.Block)) {
+	if isSignBlock(name) {
 		return p.useSign(r, u)
 	}
-	if n := blocks.Name(u.Block); isCandleCake(n) {
+	if isCandleCake(name) {
 		return p.useCandleCake(r, u)
-	} else if isCandleBlock(n) {
+	}
+	if isCandleBlock(name) {
 		return p.useCandle(r, u)
 	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)
 	}
-	if ring := p.s.circuits.RingBell; ring != nil && blocks.Name(u.Block) == bellBlock {
+	if ring := p.s.circuits.RingBell; ring != nil && name == bellBlock {
 		return ring(r, u.Pos, u.Block, p.entity.Rotation().Yaw)
 	}
 	if use := p.s.circuits.Use; use != nil && use(r, u.Pos, u.Block) {

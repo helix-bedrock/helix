@@ -262,7 +262,6 @@ func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit)
 	hi := mgl32.Vec3{pos[0] + half + rng + reach, pos[1] + t.spec.Height + rng/2 + reach, pos[2] + half + rng + reach}
 	grow := mgl32.Vec3{reach, reach, reach}
 	t.found = r.AppendEntitiesIn(t.found[:0], lo[0], lo[2], hi[0], hi[2])
-	g := t.s.game
 	for _, o := range t.found {
 		target, ok := o.Owner().(*Player)
 		if !ok || target.dead() || target.gameMode == GameModeSpectator {
@@ -281,28 +280,36 @@ func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit)
 		if o != hit.entity {
 			scale = 1 - float32(math.Sqrt(float64(dist)))/rng
 		}
-		for _, eff := range pot.Effects {
-			def, known := g.effects[eff.ID]
-			if !known {
-				continue
-			}
-			if def.Harmful && t.owner != nil && !t.s.level.PVP {
-				continue
-			}
-			if def.Instant {
-				target.ApplyInstantEffect(eff.ID, eff.Amplifier, scale)
-				continue
-			}
-			ticks := eff.Duration
-			if ticks != EffectInfinite {
-				ticks = max(int32(splashDurationScale*float32(ticks)), 0)
-				ticks = int32(scale*float32(ticks) + 0.5)
-				if ticks <= splashMinTicks {
-					continue
-				}
-			}
-			target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
+		t.splashOn(target, pot.Effects, scale)
+	}
+}
+
+// splashOn gives target the splash's effects at scale: instant ones scaled, the others for
+// a scaled share of their time, dropped when too short. Harmful effects from a player's
+// potion pass players by while pvp is off.
+func (t *Projectile) splashOn(target *Player, effects []ActiveEffect, scale float32) {
+	g := t.s.game
+	for _, eff := range effects {
+		def, known := g.effects[eff.ID]
+		if !known {
+			continue
 		}
+		if def.Harmful && t.owner != nil && !t.s.level.PVP {
+			continue
+		}
+		if def.Instant {
+			target.ApplyInstantEffect(eff.ID, eff.Amplifier, scale)
+			continue
+		}
+		ticks := eff.Duration
+		if ticks != EffectInfinite {
+			ticks = max(int32(splashDurationScale*float32(ticks)), 0)
+			ticks = int32(scale*float32(ticks) + 0.5)
+			if ticks <= splashMinTicks {
+				continue
+			}
+		}
+		target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
 	}
 }
 
