@@ -86,6 +86,8 @@ const (
 	ExplosionEndCrystal
 	ExplosionWither
 	ExplosionFireball
+	// ExplosionWindCharge is a wind charge's burst.
+	ExplosionWindCharge
 	// ExplosionPluginBase is where plugins' own kinds start.
 	ExplosionPluginBase ExplosionKind = 1000
 )
@@ -130,6 +132,10 @@ type Explosion struct {
 	Sound    string
 	// DropRadius is what drops decay with, one in this many survive; 0 is Radius.
 	DropRadius float32
+	// ToggleBlocks has every block its rays reach do what wind does to it (doors open,
+	// levers flip, candles go out), BDS's toggles_blocks. NegatesFallDamage clears the fall
+	// of everything it pushes, BDS's negates_fall_damage.
+	ToggleBlocks, NegatesFallDamage bool
 }
 
 // NewExplosion returns BDS's defaults for an explosion that breaks blocks.
@@ -245,7 +251,7 @@ func vanillaExplode(s *Host, r *world.Region, e *Explosion) bool {
 		s.pullBack(r, e, &underwater)
 	}
 	var blocks []cube.Pos
-	if e.BreaksBlocks && (!underwater || e.AllowUnderwater) {
+	if (e.BreaksBlocks || e.ToggleBlocks) && (!underwater || e.AllowUnderwater) {
 		blocks = s.blastRays(r, e)
 	}
 	if s.game.explosionEv.Has() {
@@ -261,6 +267,15 @@ func vanillaExplode(s *Host, r *world.Region, e *Explosion) bool {
 	if e.Radius > 0 {
 		playSound(r, at, soundEvent{name: e.Sound, pos: e.Pos, extra: -1}, nil)
 		levelEvent(r, at, e.Pos, e.Particle, int32(e.Radius))
+	}
+	if e.ToggleBlocks {
+		// BDS's explode (0xCE03BA0) toggles each block (0xCB79C30) before breaking any.
+		for _, pos := range blocks {
+			s.windToggle(r, pos)
+		}
+	}
+	if !e.BreaksBlocks {
+		blocks = nil
 	}
 	smoke := s.takeBlocks(r, e, blocks)
 	if pk := blockExplosionPacket(e, smoke); pk != nil {
@@ -459,6 +474,14 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 	}
 	if push != (mgl32.Vec3{}) {
 		target.BlastPush(push)
+	}
+	if e.NegatesFallDamage {
+		switch t := o.Owner().(type) {
+		case *Player:
+			t.move.fall = 0
+		case *Mob:
+			t.m.Body().FallDistance = 0
+		}
 	}
 }
 

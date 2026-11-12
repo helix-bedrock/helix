@@ -116,6 +116,33 @@ func Use(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, y
 	return true
 }
 
+// WindToggle is what a wind burst does to block at pos, BDS 1.26.60's BlockType slot 132
+// overrides: doors (0xCB19200, from the lower half only), trapdoors (0xD46F6E0) and gates
+// (0xCAFE4B0, keeping their direction) open or close, iron ones never; levers flip
+// (0xD5574E0); a button not pressed is pressed (0xCB84930). False if the block takes no
+// wind. BDS also leaves doors, trapdoors and gates alone while redstone powers them; that
+// check is not made here yet. Runs: owner of the region.
+func WindToggle(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32) bool {
+	name := blocks.Name(block)
+	switch kindOf(name) {
+	case kindDoor:
+		if name == "minecraft:iron_door" || bit(blocks, block, stateUpper) {
+			return false
+		}
+		return useDoor(blocks, r, pos, block)
+	case kindTrapdoor, kindLever:
+		return Use(blocks, r, pos, block, 0)
+	case kindGate:
+		open := bit(blocks, block, stateOpen)
+		setAndUpdate(r, pos, with(blocks, block, stateOpen, flag(!open)))
+		sound(blocks, r, pos, choose(open, packet.SoundEventFenceGateClose, packet.SoundEventFenceGateOpen), block)
+		return true
+	case kindButton:
+		return Use(blocks, r, pos, block, 0)
+	}
+	return false
+}
+
 // useGate opens or closes a gate. Opened from the side it would swing towards,
 // it turns to swing away from the user.
 func useGate(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, yaw float32) {

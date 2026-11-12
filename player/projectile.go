@@ -146,6 +146,65 @@ type ProjectileSpec struct {
 	StopOnHurt bool
 	// Offset is how far from its shooter's eyes it starts, turned with the shooter.
 	Offset mgl32.Vec3
+	// WindBurst explodes it with Burst where it hits, then removes it (wind_burst_on_hit).
+	WindBurst bool
+	// Burst is its minecraft:explode component.
+	Burst ExplodeSpec
+	// Particle is the particle_on_hit particle, empty for none, shown when it hits an
+	// entity (ParticleOnEntity) or anything else (ParticleOnOther).
+	Particle                          string
+	ParticleCount                     int32
+	ParticleOnEntity, ParticleOnOther bool
+}
+
+// ExplodeSpec is a definition's minecraft:explode component.
+type ExplodeSpec struct {
+	Power, DamageScale, KnockbackScale        float32
+	BreaksBlocks, CausesFire, AllowUnderwater bool
+	TogglesBlocks, NegatesFallDamage          bool
+	ParticleEffect, SoundEffect               string
+}
+
+// explodeComponent is the minecraft:explode component, with BDS's defaults (0x7258540).
+type explodeComponent struct {
+	Power           *float32 `json:"power"`
+	DamageScale     *float32 `json:"damage_scaling"`
+	KnockbackScale  *float32 `json:"knockback_scaling"`
+	BreaksBlocks    *bool    `json:"breaks_blocks"`
+	CausesFire      bool     `json:"causes_fire"`
+	AllowUnderwater bool     `json:"allow_underwater"`
+	TogglesBlocks   bool     `json:"toggles_blocks"`
+	NegatesFall     bool     `json:"negates_fall_damage"`
+	Particle        string   `json:"particle_effect"`
+	Sound           string   `json:"sound_effect"`
+}
+
+// BDS's defaults of minecraft:explode where a definition does not say.
+const (
+	explodeDefaultPower = 3
+	explodeDefaultScale = 1
+)
+
+// spec is the component read with its defaults.
+func (c explodeComponent) spec() ExplodeSpec {
+	s := ExplodeSpec{
+		Power: explodeDefaultPower, DamageScale: explodeDefaultScale, KnockbackScale: explodeDefaultScale, BreaksBlocks: true,
+		CausesFire: c.CausesFire, AllowUnderwater: c.AllowUnderwater, TogglesBlocks: c.TogglesBlocks,
+		NegatesFallDamage: c.NegatesFall, ParticleEffect: c.Particle, SoundEffect: c.Sound,
+	}
+	if c.Power != nil {
+		s.Power = *c.Power
+	}
+	if c.DamageScale != nil {
+		s.DamageScale = *c.DamageScale
+	}
+	if c.KnockbackScale != nil {
+		s.KnockbackScale = *c.KnockbackScale
+	}
+	if c.BreaksBlocks != nil {
+		s.BreaksBlocks = *c.BreaksBlocks
+	}
+	return s
 }
 
 // projectileDefinition is the part of a definition this reads.
@@ -184,7 +243,14 @@ type projectileComponent struct {
 		Stick  *struct {
 			ShakeTime float32 `json:"shake_time"`
 		} `json:"stick_in_ground"`
-		Teleport *struct{} `json:"teleport_owner"`
+		Teleport  *struct{} `json:"teleport_owner"`
+		WindBurst *struct{} `json:"wind_burst_on_hit"`
+		Particle  *struct {
+			Type     string `json:"particle_type"`
+			Count    int32  `json:"num_particles"`
+			OnEntity bool   `json:"on_entity_hit"`
+			OnOther  bool   `json:"on_other_hit"`
+		} `json:"particle_on_hit"`
 	} `json:"on_hit"`
 }
 
@@ -269,6 +335,19 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 	}
 	if st := c.OnHit.Stick; st != nil {
 		s.Stick, s.ShakeTicks = true, int32(st.ShakeTime*ticksPerShakeSecond)
+	}
+	if p := c.OnHit.Particle; p != nil {
+		s.Particle, s.ParticleCount, s.ParticleOnEntity, s.ParticleOnOther = p.Type, p.Count, p.OnEntity, p.OnOther
+	}
+	if c.OnHit.WindBurst != nil {
+		s.WindBurst = true
+		var ex explodeComponent
+		if raw, has := d.Entity.Components["minecraft:explode"]; has {
+			if err := json.Unmarshal(raw, &ex); err != nil {
+				return ProjectileSpec{}, fmt.Errorf("player: projectile %s: %w", id, err)
+			}
+		}
+		s.Burst = ex.spec()
 	}
 	return s, nil
 }
@@ -629,6 +708,25 @@ type projectileHit struct {
 	mob *Mob
 	// entity is the entity hit.
 	entity *world.Entity
+	// normal is the hit block face's outward direction, zero if not worked out.
+	normal mgl32.Vec3
+}
+
+// faceNormal is the face of the box lo to hi that a flight along vel entered at pos.
+func faceNormal(pos, lo, hi, vel mgl32.Vec3) mgl32.Vec3 {
+	const edge = 1e-4
+	var n mgl32.Vec3
+	for a := range 3 {
+		switch {
+		case vel[a] > 0 && pos[a]-lo[a] < edge:
+			n[a] = -1
+			return n
+		case vel[a] < 0 && hi[a]-pos[a] < edge:
+			n[a] = 1
+			return n
+		}
+	}
+	return n
 }
 
 // firstHit is the nearest thing along from to to.
@@ -637,7 +735,7 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 	limit := float64(2)
 	if at, block, lo, hi, ok := t.s.clipBlocks(r, from, to); ok {
 		pos := clampToBox(from.Add(to.Sub(from).Mul(float32(at))), lo, hi)
-		best, kind, limit = projectileHit{pos: pos, block: block}, projectileHitBlock, at
+		best, kind, limit = projectileHit{pos: pos, block: block, normal: faceNormal(pos, lo, hi, to.Sub(from))}, projectileHitBlock, at
 	}
 	reach := min(max((float32(t.age)-projectileReachFrom)*projectileReachStep, 0), projectileReachMax)
 	lo, hi := minVec(from, to), maxVec(from, to)
@@ -799,6 +897,12 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 			t.stickIn(e, hit)
 			return
 		}
+	}
+	t.hitParticles(r, hit.pos, kind)
+	if t.spec.WindBurst {
+		t.windBurst(r, hit, kind)
+		t.remove(e)
+		return
 	}
 	if t.spec.TeleportOwner {
 		t.teleportOwner(r, hit.pos)
@@ -1039,7 +1143,7 @@ func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 
 // isProjectile reports whether a saved entity's identifier is one this runs.
 func isProjectile(id string) bool {
-	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow || id == nameThrownTrident
+	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow || id == nameThrownTrident || id == nameWindChargeProjectile
 }
 
 // loadProjectile brings back a saved one. Who shot it is not kept, so a bow's enchantments
@@ -1089,6 +1193,8 @@ func throwable(item string) string {
 	switch item {
 	case nameSnowball, nameEgg, nameEnderPearl:
 		return item
+	case nameWindCharge:
+		return nameWindChargeProjectile
 	}
 	return ""
 }
@@ -1115,6 +1221,12 @@ func (p *Player) throwItem(held ItemStack) bool {
 			return false
 		}
 		p.pearlReady = now + pearlCooldown
+	}
+	if category, ticks, has := throwableCooldown(held.Name); has {
+		if p.Cooldown(category) > 0 {
+			return false
+		}
+		p.StartCooldown(category, ticks)
 	}
 	spec, ok := p.s.projectileSpec(id, "")
 	if !ok {
