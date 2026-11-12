@@ -208,6 +208,9 @@ func (m *Mob) apply(e *world.Entity) {
 		return
 	}
 	m.m.Apply()
+	if m.m.Dead() && m.m.LeashHolder() != behavior.NoID {
+		m.dropLeashOnDeath(e.Region())
+	}
 	if m.ended {
 		if r := e.Region(); r != nil {
 			m.dropExperience(r)

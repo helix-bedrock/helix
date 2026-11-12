@@ -2,6 +2,7 @@ package player
 
 import (
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/mob"
@@ -89,4 +90,14 @@ func (p *Player) leashMob(o *Mob) bool {
 	}
 	p.flush()
 	return true
+}
+
+// dropLeashOnDeath takes the leash off a mob that died and drops the lead where it fell,
+// whatever held it (a player or a knot), as a dying actor drops its leash in BDS. It runs
+// straight away, not through the mob's queued ops, which stop once it is dead.
+func (m *Mob) dropLeashOnDeath(r *world.Region) {
+	m.m.SetLeashHolder(behavior.NoID)
+	if r != nil {
+		m.s.spawnMobDrop(r, ItemStack{Name: leadItem, Count: 1}, m.entity.Position())
+	}
 }
