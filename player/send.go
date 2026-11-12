@@ -48,6 +48,35 @@ func (p *Player) sendNow(pks ...packet.Packet) bool {
 // logSendError logs the first failed send of the player's connection: at
 // debug level when the connection was closed (a player leaving), as a
 // warning otherwise.
+// addViewer adds the player's zones to d, sending through the player's connection, and
+// taking packets encoded once for everyone (the movement fan-out) as they are when the
+// client can.
+func (p *Player) addViewer(d *world.Dimension) *world.Viewer {
+	v := d.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
+	v.SetRaw(p.sendRaw)
+	return v
+}
+
+// sendRaw writes a packet already encoded in the latest version, false if the client
+// needs it as a packet instead (another version, a packet-out hook).
+func (p *Player) sendRaw(b []byte) bool {
+	if p.conn == nil || !p.conn.RawOK() {
+		return false
+	}
+	if err := p.conn.WriteRaw(b); err != nil {
+		p.logSendError(err, nil)
+	}
+	return true
+}
+
+// releasePacket hands a handled packet back to the connection, which reuses the ones it
+// reads many times a second.
+func (p *Player) releasePacket(pk packet.Packet) {
+	if p.conn != nil {
+		p.conn.Release(pk)
+	}
+}
+
 func (p *Player) logSendError(err error, pk packet.Packet) {
 	if p.sendErrLogged.Swap(true) {
 		return

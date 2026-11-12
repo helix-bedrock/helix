@@ -325,7 +325,7 @@ func (p *Player) arrive(mv *dimMove) {
 	z.mu.Lock()
 	old := p.viewer
 	p.dim = mv.to
-	p.viewer = mv.to.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
+	p.viewer = p.addViewer(mv.to)
 	z.pos, z.published = mv.eyes, false
 	z.mu.Unlock()
 	old.Close()

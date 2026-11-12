@@ -38,6 +38,19 @@ func (c *Conn) ReadPacket() (packet.Packet, error) { return c.c.ReadPacket() }
 // WritePacket queues a packet; it is sent at the next flush.
 func (c *Conn) WritePacket(pk packet.Packet) error { return c.c.WritePacket(pk) }
 
+// WriteRaw buffers a packet already encoded in the latest version (packet.RawWriter), for
+// a packet encoded once for many players. Check RawOK first. The bytes are copied.
+func (c *Conn) WriteRaw(b []byte) error { return c.c.WriteRaw(b) }
+
+// RawOK reports whether WriteRaw of the latest version's bytes can stand in for
+// WritePacket: the client speaks the latest version and no packet-out hook would miss it.
+func (c *Conn) RawOK() bool { return c.c.RawOK() }
+
+// Release hands back a packet read from the connection once it was handled. The packets
+// the listener reuses (PlayerAuthInput, read 20 times a second per player) are read into
+// again, so nothing of one may be used after it. Safe from any goroutine.
+func (c *Conn) Release(pk packet.Packet) { c.c.Release(pk) }
+
 // Flush sends the queued packets.
 func (c *Conn) Flush() error { return c.c.Flush() }
 

@@ -1,6 +1,7 @@
 package world
 
 import (
+	"github.com/helix-bedrock/protocol/packet"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -56,6 +57,11 @@ type Region struct {
 	// outbox, sent to each player after.
 	fanout bool
 	outbox []outItem
+	// raw encodes each outbox packet once for every player, into rawArena (rawEnds where
+	// each one stops), reused tick after tick.
+	raw      *packet.RawWriter
+	rawArena []byte
+	rawEnds  []int
 	// plans and planned are this tick's random tick plans (randomplan.go); planFn draws one.
 	plans   []chunkPlan
 	planned []plannedTick

@@ -63,7 +63,8 @@ type thinkEntry struct {
 }
 
 // Think adds a think step that runs on every player each tick (ThinkHandler). Steps run in
-// the order they were added. Vanilla adds none.
+// the order they were added. Vanilla adds none. As with handlers, the packets are only
+// valid during the tick: copy what is kept.
 func (s *Setup) Think(fn ThinkHandler) error {
 	if s.h.frozen {
 		return registry.ErrFrozen
@@ -92,7 +93,10 @@ func (s *Setup) As(owner string) *Setup { return &Setup{owner: owner, h: s.h} }
 
 // Handle sets the handler of the packet type T, replacing vanilla's or an
 // earlier one; the log says who replaced whom. Without a handler a packet
-// that changes the world is ignored.
+// that changes the world is ignored. A handler must not keep the packet, or a
+// slice in it, after it returns: the connection reads later packets of a kind
+// sent many times a second (PlayerAuthInput) into the same one. Copy what is
+// needed.
 func Handle[T packet.Packet](s *Setup, fn PacketHandler[T]) error {
 	if s.h.frozen {
 		return registry.ErrFrozen

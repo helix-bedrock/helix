@@ -107,6 +107,9 @@ func (p *Player) handleInput(*world.Entity) {
 		if h := p.s.handlers.handler(pk.ID()); h != nil {
 			h(p, pk)
 		}
+		// A handler, vanilla's or a plugin's, must not keep the packet: the connection reads
+		// the next PlayerAuthInput into this one.
+		p.releasePacket(pk)
 		run[i] = nil
 	}
 	p.runQueued()

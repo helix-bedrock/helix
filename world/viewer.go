@@ -21,6 +21,9 @@ type Viewer struct {
 	id    uint64
 	out   func(pk packet.Packet)
 	flush func()
+	// raw takes a packet already encoded for everyone, false if this player cannot (another
+	// version, a hook that must see the packet); nil until SetRaw. Under sendMu.
+	raw func(b []byte) bool
 
 	// sendMu orders sends with Close: once Close returned, nothing more goes
 	// out through this viewer. A player changing dimension closes its old
@@ -377,6 +380,31 @@ func (v *Viewer) arrived(pos mcdb.ChunkPos, nc *NetChunk) {
 func (v *Viewer) sendEntity(pk packet.Packet) {
 	v.send(pk)
 	v.unflushed = true
+}
+
+// sendEntityRaw is sendEntity of pk encoded once for everyone as raw: the bytes when the
+// player takes them, else pk.
+func (v *Viewer) sendEntityRaw(pk packet.Packet, raw []byte) {
+	v.unflushed = true
+	v.sendMu.Lock()
+	defer v.sendMu.Unlock()
+	if v.closed {
+		return
+	}
+	if raw != nil && v.raw != nil && v.raw(raw) {
+		return
+	}
+	v.out(pk)
+}
+
+// SetRaw gives the viewer a way to send packets already encoded for everyone (the latest
+// version's raw bytes, which fn copies): it returns false for a packet it cannot take that
+// way, which is then sent as a packet. Without it every packet goes through the send
+// function. Runs: anywhere.
+func (v *Viewer) SetRaw(fn func(b []byte) bool) {
+	v.sendMu.Lock()
+	v.raw = fn
+	v.sendMu.Unlock()
 }
 
 // deliver sends the chunk to the client.

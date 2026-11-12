@@ -37,6 +37,9 @@ type Config struct {
 	Biomes *registry.Biomes
 	// Generator makes chunks the store does not have. If nil, Empty.
 	Generator Generator
+	// ShieldID is the shield's item runtime ID, which encoding packets with items needs
+	// (the movement fan-out encodes each packet once for every player).
+	ShieldID int32
 	// DiscardGenerated keeps generated chunks out of the store, even when
 	// changed: for a stand-in generator whose chunks must never end up in
 	// a world that will get real ones.

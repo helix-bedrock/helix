@@ -57,7 +57,8 @@ type Config struct {
 	// HandshakeKey is the P-384 key that signs every encryption handshake;
 	// BDS holds one key for the whole server too. If nil, one is generated.
 	HandshakeKey *ecdsa.PrivateKey
-	// Compression is the batch compression. If nil, flate (BDS's "zlib").
+	// Compression is the batch compression. If nil, flate (BDS's "zlib") at
+	// packet.DefaultFlateLevel; packet.NewFlateCompression picks another level.
 	Compression packet.Compression
 	// CompressionThreshold is the smallest batch compressed. BDS's default
 	// is 1.
@@ -265,7 +266,12 @@ func (l *Listener) login(t conn.Transport) {
 		}
 	}
 	log := l.log.With("addr", t.RemoteAddr())
-	c := conn.New(t, conn.Config{Log: log, FlushInterval: l.conf.FlushInterval, Shared: l.conf.Hooks, MaxBatchSize: l.conf.MaxBatchSize, ShieldID: l.conf.ShieldID})
+	c := conn.New(t, conn.Config{
+		Log: log, FlushInterval: l.conf.FlushInterval, Shared: l.conf.Hooks, MaxBatchSize: l.conf.MaxBatchSize, ShieldID: l.conf.ShieldID,
+		// Every player sends one 20 times a second: read into the same few packets, released
+		// after the region tick handles them (player package), it allocates nothing.
+		ReusePackets: []uint32{packet.IDPlayerAuthInput},
+	})
 	// Closing the Listener stops a read the login is blocked in.
 	stop := context.AfterFunc(l.ctx, func() { _ = t.SetReadDeadline(time.Now()) })
 	defer stop()

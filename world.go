@@ -174,6 +174,9 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
 	conf.EntityViewRadius2 = s.conf.EntityViewRadius2
 	conf.Scheduler, conf.RandomTickSpeed = s.ticker, randomTickSpeed
+	if shield, ok := s.reg.Items.ByName("minecraft:shield"); ok {
+		conf.ShieldID = int32(shield.ID)
+	}
 	if err := s.openPortals(); err != nil {
 		return err
 	}

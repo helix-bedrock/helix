@@ -57,6 +57,8 @@ type Entity struct {
 type outItem struct {
 	from, to *Entity
 	pk       packet.Packet
+	// raw is pk encoded once for everyone (encodeOutbox), nil if it could not be.
+	raw []byte
 }
 
 type known struct {
@@ -662,6 +664,7 @@ func (r *Region) sendMovement() {
 		return
 	}
 	r.collectSeers()
+	r.encodeOutbox()
 	if r.fanFn == nil {
 		r.fanFn = r.fanOut
 	}
@@ -669,6 +672,32 @@ func (r *Region) sendMovement() {
 	clear(r.seers)
 	clear(r.outbox)
 	r.outbox = r.outbox[:0]
+}
+
+// encodeOutbox encodes each packet meant for more than one player once, so the fan-out
+// hands every player the same bytes instead of encoding a packet per player: with 400
+// players in view that is 400 encodes of each move saved, and no allocation.
+func (r *Region) encodeOutbox() {
+	if r.raw == nil {
+		r.raw = packet.NewRawWriter(r.d.conf.ShieldID)
+	}
+	r.rawArena, r.rawEnds = r.rawArena[:0], r.rawEnds[:0]
+	for _, it := range r.outbox {
+		if it.to == nil {
+			if arena, err := r.raw.Append(r.rawArena, it.pk); err == nil {
+				r.rawArena = arena
+			}
+		}
+		r.rawEnds = append(r.rawEnds, len(r.rawArena))
+	}
+	// The views are taken once the arena stops growing.
+	start := 0
+	for i, end := range r.rawEnds {
+		if end > start {
+			r.outbox[i].raw = r.rawArena[start:end:end]
+		}
+		start = end
+	}
 }
 
 // fanOut sends one player the movement phase's packets meant for it.
@@ -682,7 +711,7 @@ func (r *Region) fanOut(i int) {
 			continue
 		}
 		if _, ok := p.known[it.from]; ok {
-			p.conf.Viewer.sendEntity(it.pk)
+			p.conf.Viewer.sendEntityRaw(it.pk, it.raw)
 		}
 	}
 }

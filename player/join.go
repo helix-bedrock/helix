@@ -168,7 +168,7 @@ func (p *Player) startFlusher(done <-chan struct{}) {
 // leaveWorld takes them out again.
 func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) {
 	p.zone.pos = spawn
-	p.viewer = p.dim.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
+	p.viewer = p.addViewer(p.dim)
 	p.removed = make(chan lastPlace, 1)
 	// Until its first tick, others see where it spawns.
 	p.seen.store(PlayerState{Position: spawn.Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: rot, GameMode: p.gameMode, Level: p.Level()})
