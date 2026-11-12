@@ -106,3 +106,14 @@ func (m *Mob) dropLeashOnDeath(r *world.Region) {
 		k.removeIfEmpty(r)
 	}
 }
+
+// dropLeashes frees every mob the player leads, each dropping its lead: the player died, left
+// or changed dimension.
+func (p *Player) dropLeashes(r *world.Region) {
+	if r == nil {
+		return
+	}
+	for _, o := range p.s.leashedTo(r, behavior.ID(p.uniqueID)) {
+		o.m.Unleash(true)
+	}
+}

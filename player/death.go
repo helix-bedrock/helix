@@ -45,6 +45,7 @@ func vanillaDie(p *Player, src DamageSource) {
 	p.hurt = hurtState{}
 	p.Extinguish()
 	p.leaveChest(p.entity.Region(), true)
+	p.dropLeashes(p.entity.Region())
 	if !p.s.level.KeepInventory {
 		p.dropAllOnDeath()
 	}
