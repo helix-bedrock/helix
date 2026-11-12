@@ -11,6 +11,7 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -192,8 +193,17 @@ func TestViewerAndSave(t *testing.T) {
 	if got := col.Chunk.Block(0, -61, 0, 0); got != grass {
 		t.Fatalf("block at -61 is %s, want grass", reg.Blocks.Name(got))
 	}
-	if _, err := db.LoadColumn(mcdb.ChunkPos{1, 0}, mcdb.Overworld); err == nil {
-		t.Fatal("an unchanged generated chunk was saved")
+	// A chunk in the simulation zone ticked, which populates it (BDS's finalisation), so it
+	// is saved as done; one only in view never ticked and is not saved.
+	ticked, err := db.LoadColumn(mcdb.ChunkPos{1, 0}, mcdb.Overworld)
+	if err != nil {
+		t.Fatalf("ticked chunk not saved: %v", err)
+	}
+	if ticked.Finalisation != chunk.FinalisationDone {
+		t.Fatalf("ticked chunk saved with finalisation %d, want done", ticked.Finalisation)
+	}
+	if _, err := db.LoadColumn(mcdb.ChunkPos{5, 0}, mcdb.Overworld); err == nil {
+		t.Fatal("a generated chunk that never ticked was saved")
 	}
 }
 

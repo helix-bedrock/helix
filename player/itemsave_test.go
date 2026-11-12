@@ -53,25 +53,26 @@ func TestItemSavedWithChunk(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	ticket.Release()
 
+	// The new chunk is first saved on the tick it is generated, with the item at age 0;
+	// wait for the save made when it unloads, which carries the age the item reached.
 	var col *chunk.Column
+	var age int16
 	deadline := time.Now().Add(15 * time.Second)
 	for {
 		col, err = db.LoadColumn(at, mcdb.Overworld)
 		if err == nil && len(col.Entities) == 1 {
-			break
+			if age, _ = col.Entities[0].Data["Age"].(int16); age > 0 {
+				break
+			}
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("item not saved: %v, %+v", err, col)
+			t.Fatalf("item not saved with its age: %v, %+v", err, col)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	data := col.Entities[0].Data
 	if data["identifier"] != itemIdentifier || col.Entities[0].ID != it.entity.UniqueID() {
 		t.Fatalf("saved %+v", data)
-	}
-	age, _ := data["Age"].(int16)
-	if age <= 0 {
-		t.Fatalf("saved age %d", age)
 	}
 
 	again := d.KeepLoaded(world.Chunks(at), true)
