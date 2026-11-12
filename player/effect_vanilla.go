@@ -28,6 +28,9 @@ type Effect struct {
 	Color   uint32
 	// Instant effects do their work once, as Apply, when given and are never kept.
 	Instant bool
+	// NoParticles is BDS's effect visibility flag turned off (Darkness): the effect never
+	// shows particles, whatever it is given with.
+	NoParticles bool
 	// Modifiers change the player's attributes while it has the effect, each by its
 	// Amount times the level (amplifier + 1), as BDS's getAttributeModifierValue.
 	Modifiers []EffectModifier
@@ -138,7 +141,8 @@ const (
 	witherBase       = 40
 	// effectHealthStep is what one of those changes heals or hurts.
 	effectHealthStep = 1
-	// poisonFloor is the health Poison leaves; Fatal Poison goes on past it.
+	// poisonFloor is the least health a Poison hit may leave (the health attribute
+	// delegate's check 0xBC46140 for buff type 7); Fatal Poison has no floor.
 	poisonFloor = 1
 	// absorptionPerLevel is the extra health Absorption gives per level.
 	absorptionPerLevel = 4
@@ -148,8 +152,10 @@ const (
 	// instant effects heal and hurt (BDS's instantaneous amplifiers 4 and 6).
 	instantHealthBase = 4
 	instantDamageBase = 6
-	// saturationModifier is Saturation's food modifier (its "Saturation" buff of 1).
-	saturationModifier = 1
+	// saturationHunger is what Saturation adds to minecraft:player.hunger a level (its
+	// instant "Saturation" buff with a linear amplifier of 1; the hunger delegate takes it
+	// as it is, so saturation itself is untouched).
+	saturationHunger = 1
 )
 
 // Numbers of the effects that act when a player dies or is hurt (BDS 1.26.60).
@@ -182,7 +188,8 @@ const (
 	nameSilverfish = "minecraft:silverfish"
 )
 
-// Damage causes of the effects (BDS's ActorDamageCause).
+// Damage causes of the effects (BDS's ActorDamageCause, from its buff type table
+// 0x1B34DE4: Harm, Poison and Fatal Poison are magic, Wither is wither).
 const (
 	DamageMagic  DamageCause = 14
 	DamageWither DamageCause = 15
@@ -226,7 +233,7 @@ func vanillaEffects() []Effect {
 		// The omens and Hero of the Village wait for raids, trial spawners and trading.
 		{ID: EffectBadOmen, Name: "bad_omen", Description: "effect.badOmen", Color: 0x0B6138},
 		{ID: EffectVillageHero, Name: "village_hero", Description: "effect.villageHero", Color: 0x44FF44},
-		{ID: EffectDarkness, Name: "darkness", Description: "effect.darkness", Harmful: true, Color: 0x44FF44},
+		{ID: EffectDarkness, Name: "darkness", Description: "effect.darkness", Harmful: true, Color: 0x44FF44, NoParticles: true},
 		{ID: EffectTrialOmen, Name: "trial_omen", Description: "effect.trial_omen", Color: 0x16A6A6},
 		{ID: EffectWindCharged, Name: "wind_charged", Description: "effect.wind_charged", Harmful: true, Color: 0xBDC9FF, Died: windChargedDied},
 		{ID: EffectWeaving, Name: "weaving", Description: "effect.weaving", Harmful: true, Color: 0x78695A, Died: weavingDied},
@@ -254,10 +261,11 @@ func regenerationTick(p *Player, amplifier, left int32) {
 }
 
 // poisonTick is BDS's Poison ("Poison" buff) and Fatal Poison ("FatalPoison"): magic
-// damage at each spaced tick. Poison stops at poisonFloor health.
+// damage at each spaced tick (buff types 7 and 8 both map to cause 14 in BDS's table
+// 0x1B34DE4). A Poison hit only lands if it leaves at least poisonFloor health.
 func poisonTick(fatal bool) func(p *Player, amplifier, left int32) {
 	return func(p *Player, amplifier, left int32) {
-		if !spaced(poisonBase, amplifier, left) || p.dead() || !fatal && p.Health() <= poisonFloor {
+		if !spaced(poisonBase, amplifier, left) || p.dead() || !fatal && p.Health()-effectHealthStep < poisonFloor {
 			return
 		}
 		p.TakeDamage(effectHealthStep, DamageSource{Cause: DamageMagic})
@@ -294,9 +302,11 @@ func instantDamage(p *Player, amplifier int32, scale float32) {
 	p.TakeDamage(instantAmount(instantDamageBase, amplifier, scale), DamageSource{Cause: DamageMagic})
 }
 
-// saturationApply is BDS's Saturation: the level's worth of food, at modifier 1.
+// saturationApply is BDS's Saturation: hunger goes up by the level, up to its maximum.
 func saturationApply(p *Player, amplifier int32, _ float32) {
-	p.feed(amplifier+1, saturationModifier)
+	f := p.Food()
+	f.Hunger = min(f.Hunger+float32(amplifier+1)*saturationHunger, p.attributes.maximum(attrHunger))
+	p.SetFood(f)
 }
 
 // absorptionAdded is BDS's Absorption: what the player has of it starts over at the
