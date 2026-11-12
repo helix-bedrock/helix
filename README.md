@@ -70,6 +70,9 @@ Helix is **in early development and not ready for real servers yet**. The road t
 
 These lists only cover what we know about: there are surely mechanics we have not found yet that still need to be added.
 
+We are **actively looking for contributors**. If you know Go or Minecraft's mechanics, there is plenty to add: see
+[Contributing](#contributing).
+
 Live progress, by feature: [helixbedrock.com/progress](https://helixbedrock.com/progress/). Engine
 notes with API names: [STATUS.md](STATUS.md). Updated 2026-11-12.
 
