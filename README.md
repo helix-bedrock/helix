@@ -68,6 +68,8 @@ Helix is **in early development and not ready for real servers yet**. The road t
 3. ⬜ Plugin API and custom content (2027 to 2028).
 4. ⬜ Testing on real servers, then a stable release (around 2028).
 
+These lists only cover what we know about: there are surely mechanics we have not found yet that still need to be added.
+
 Live progress, by feature: [helixbedrock.com/progress](https://helixbedrock.com/progress/). Engine
 notes with API names: [STATUS.md](STATUS.md). Updated 2026-11-12.
 
