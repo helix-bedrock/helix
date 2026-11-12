@@ -353,7 +353,7 @@ func (r *Region) tick() {
 		}
 	}
 	t.mark(phaseFlush)
-	r.saveChanged(false)
+	r.saveRound()
 	t.mark(phaseSave)
 	r.flushLight()
 	r.handOff()
@@ -579,6 +579,30 @@ func (r *Region) saveChanged(ticks bool) {
 		r.save(c, ticks)
 	}
 }
+
+// DefaultAutoSaveTicks is Config.AutoSaveTicks when it is 0: 30 seconds.
+const DefaultAutoSaveTicks = 600
+
+// saveRound is the tick's save: every chunk whose blocks changed, and the chunks whose
+// turn of the auto-save interval this is with their entities and tick queues too.
+func (r *Region) saveRound() {
+	every := r.d.conf.AutoSaveTicks
+	if every == 0 {
+		every = DefaultAutoSaveTicks
+	}
+	for _, c := range r.chunks {
+		full := every > 0 && (r.ticks+autoSavePhase(c.pos))%uint64(every) == 0
+		r.save(c, full)
+	}
+}
+
+// autoSavePhase spreads chunks over the auto-save interval by their position.
+func autoSavePhase(pos mcdb.ChunkPos) uint64 {
+	return uint64(uint32(pos[0])*autoSaveSpreadX + uint32(pos[1])) //nolint:gosec // a hash, wrapping is fine
+}
+
+// autoSaveSpreadX keeps neighbouring rows of chunks apart in the interval.
+const autoSaveSpreadX = 31
 
 // save saves c if its blocks changed, or with ticks set, if its tick queues
 // changed or it has or had live entities: they are saved with the blocks but

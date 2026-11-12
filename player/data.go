@@ -72,6 +72,21 @@ func floats(v any) ([]float32, bool) {
 	return nil, false
 }
 
+// autoSave saves an online player every world.DefaultAutoSaveTicks, at its own point in
+// the interval, so a crash or a kill loses at most that much of it. Helix's own: BDS saves
+// a player when it leaves. Not while it moves between dimensions, when its position is
+// not settled. Runs: the player's region.
+func (p *Player) autoSave() {
+	if p.entity == nil || p.moving != nil {
+		return
+	}
+	r := p.entity.Region()
+	if r == nil || (uint64(r.CurrentTick())+p.runtimeID)%world.DefaultAutoSaveTicks != 0 { //nolint:gosec // ticks are never negative
+		return
+	}
+	p.save(p.entity.Position(), p.entity.Rotation())
+}
+
 // save writes the player back where BDS keeps players, from the state the
 // entity had when it was removed. The saved Pos is the eye position, as
 // the client reports it and StartGame takes it.

@@ -122,7 +122,11 @@ sibling library folders, so unreleased library changes are used.
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the
-  end of each tick from a copy-on-write snapshot. Generators: `Flat`
+  end of each tick from a copy-on-write snapshot; every `Config.AutoSaveTicks`
+  (30 s by default, spread over the ticks by chunk) each loaded chunk also
+  saves its entities and tick queues, and online players are saved on the
+  same interval (`Player.autoSave`), so a crash loses at most that much.
+  Generators: `Flat`
   (level.dat's layers), `Empty`, any `Generator`; a `ColumnGenerator` also
   hands over block entities, a `Spawner` answers the spawn height.
 - `generator`: the world types `Config.WorldType` picks by name (`Types`,

@@ -117,6 +117,7 @@ func (p *Player) handleInput(*world.Entity) {
 		p.s.game.sys.GlideTick(p)
 	}
 	p.tickUsing()
+	p.autoSave()
 	if !p.dead() {
 		p.s.game.sys.FoodTick(p)
 	}

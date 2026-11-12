@@ -78,6 +78,13 @@ type Config struct {
 	// Ticker gives blocks their random and queued ticks. Nil ticks nothing,
 	// though scheduled ticks are still kept and saved.
 	Ticker BlockTicker
+	// AutoSaveTicks is how often every loaded chunk also saves its entities and
+	// tick queues, which a tick's block changes do not save, so a crash or a
+	// kill loses at most this much of them. Each chunk takes its turn at its
+	// own point in the interval, so the saves spread over the ticks. 0 is
+	// DefaultAutoSaveTicks; below 0 they are saved only when a chunk unloads
+	// and on Close. Helix's own: BDS does not save like this.
+	AutoSaveTicks int32
 	// Weather runs on every ticking chunk before its random ticks, as BDS's chunk tick runs
 	// lightning, freezing and snow. Nil has no weather.
 	Weather WeatherTicker
