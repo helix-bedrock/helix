@@ -146,6 +146,10 @@ type ProjectileSpec struct {
 	StopOnHurt bool
 	// Offset is how far from its shooter's eyes it starts, turned with the shooter.
 	Offset mgl32.Vec3
+	// ReflectOnHurt turns it back along its attacker's view when hit, once it has flown
+	// ReflectTicks (reflect_on_hurt, reflect_immunity).
+	ReflectOnHurt bool
+	ReflectTicks  int32
 	// WindBurst explodes it with Burst where it hits, then removes it (wind_burst_on_hit).
 	WindBurst bool
 	// Burst is its minecraft:explode component.
@@ -226,6 +230,8 @@ type projectileComponent struct {
 	HitSound        string    `json:"hit_sound"`
 	ShouldBounce    string    `json:"should_bounce"`
 	StopOnHurt      bool      `json:"stop_on_hurt"`
+	ReflectOnHurt   bool      `json:"reflect_on_hurt"`
+	ReflectImmunity float32   `json:"reflect_immunity"`
 	Offset          []float32 `json:"offset"`
 	OnHit           struct {
 		Impact *struct {
@@ -336,6 +342,8 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 	if st := c.OnHit.Stick; st != nil {
 		s.Stick, s.ShakeTicks = true, int32(st.ShakeTime*ticksPerShakeSecond)
 	}
+	s.ReflectOnHurt = c.ReflectOnHurt
+	s.ReflectTicks = int32(math.Floor(float64(c.ReflectImmunity * reflectTicksPerSecond)))
 	if p := c.OnHit.Particle; p != nil {
 		s.Particle, s.ParticleCount, s.ParticleOnEntity, s.ParticleOnOther = p.Type, p.Count, p.OnEntity, p.OnOther
 	}

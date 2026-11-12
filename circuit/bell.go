@@ -130,6 +130,21 @@ func (t *Ticker) RingBell(r *world.Region, pos cube.Pos, block uint32, yaw float
 	return true
 }
 
+// WindBell is a wind burst reaching a bell (BDS's BellBlock slot 132, 0xCCDA770): one not
+// already ringing rings the way its state faces. False if the block is not a bell or it
+// was ringing. Runs: owner of the region.
+func (t *Ticker) WindBell(r *world.Region, pos cube.Pos, block uint32) bool {
+	if t.kind(block) != kindBell {
+		return false
+	}
+	e := t.ensureBell(r, pos)
+	if e.ringing {
+		return false
+	}
+	e.ring(r, pos, block, intState(t.blocks.States(block), stateDirection))
+	return true
+}
+
 // lookOf is the way BDS's bell takes a player to look: the larger of the table's sine and
 // cosine of the yaw, the cosine on a tie.
 func lookOf(yaw float32) direction.Cardinal {

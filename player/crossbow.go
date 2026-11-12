@@ -173,6 +173,11 @@ func (p *Player) shootCrossbow(held ItemStack) {
 		t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), dir, spec.Power, p)
 		t.critical = true
 		t.pierce = pierce
+		// BDS (0xC9CD650) gives the arrow the loaded arrow's potion; its effects wait for the
+		// potion table, but the arrow keeps its aux so a tipped one is picked up tipped.
+		if loaded.Meta > 0 {
+			t.item = ItemStack{Name: nameArrow, Meta: loaded.Meta, Count: 1}
+		}
 		if creative || (n != 1 && i != 1) {
 			t.pickup = arrowPickupCreative
 		}

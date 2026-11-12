@@ -433,6 +433,8 @@ type CircuitHooks struct {
 	// RingBell is a player with this yaw clicking the bell at pos, false if that does not
 	// ring it.
 	RingBell func(r *world.Region, pos cube.Pos, block uint32, yaw float32) bool
+	// WindBell is a wind burst reaching the bell at pos, false if that does not ring it.
+	WindBell func(r *world.Region, pos cube.Pos, block uint32) bool
 	// JukeboxPower gives the jukebox at pos this power.
 	JukeboxPower func(r *world.Region, pos cube.Pos, power int32)
 	// HitTarget is a projectile landing at hit on the target block at pos, false if the

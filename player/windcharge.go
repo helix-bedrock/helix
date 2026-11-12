@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -63,14 +64,22 @@ func burstParticle(name string) int32 {
 }
 
 // windToggle is a wind burst reaching the block at pos (BDS's BlockType slot 132): doors,
-// trapdoors, gates, levers and buttons through blockuse, lit candles and candle cakes put
-// out. Bells are not rung yet. Runs: owner of the region.
+// trapdoors, gates, levers and buttons through blockuse (powered doors, trapdoors and
+// gates left alone), bells rung, lit candles and candle cakes put out. Runs: owner of the
+// region.
 func (s *Host) windToggle(r *world.Region, pos cube.Pos) {
 	b, ok := r.Block(pos, 0)
 	if !ok {
 		return
 	}
-	if blockuse.WindToggle(s.reg.Blocks, r, pos, b) {
+	powered := func(at cube.Pos) bool {
+		signal := s.circuits.Signal
+		return signal != nil && signal(r, at) > 0
+	}
+	if blockuse.WindToggle(s.reg.Blocks, r, pos, b, powered) {
+		return
+	}
+	if ring := s.circuits.WindBell; ring != nil && ring(r, pos, b) {
 		return
 	}
 	if name := s.reg.Blocks.Name(b); (isCandleBlock(name) || isCandleCake(name)) && s.fire != nil {
@@ -110,4 +119,48 @@ func throwableCooldown(item string) (string, int32, bool) {
 		return windChargeCooldownCategory, windChargeCooldownTicks, true
 	}
 	return "", 0, false
+}
+
+// reflectTicksPerSecond turns reflect_immunity into ticks, as BDS's floor(seconds * 20).
+const reflectTicksPerSecond = 20
+
+// useOnProjectile is a player hitting a projectile, BDS's ProjectileComponent hurt
+// (0x7146660): one whose definition reflects on hurt and that has flown at least its
+// reflect immunity turns to fly along the attacker's view at speed 1, with the attacker as
+// its owner. True if the target was a projectile.
+func (p *Player) useOnProjectile(d *protocol.UseItemOnEntityTransactionData) bool {
+	t := p.projectileNear(d.TargetEntityRuntimeID)
+	if t == nil {
+		return false
+	}
+	if d.ActionType != protocol.UseItemOnEntityActionAttack || !t.spec.ReflectOnHurt || t.age < t.spec.ReflectTicks {
+		return true
+	}
+	if p.entity.Position().Sub(t.entity.Position()).Len() > attackRange {
+		return true
+	}
+	t.vel = lookDirection(p.entity.Rotation())
+	t.owner, t.separated = p, false
+	t.planned = false
+	return true
+}
+
+// projectileNear finds a projectile near the player by its runtime ID, in its region.
+func (p *Player) projectileNear(id uint64) *Projectile {
+	r := p.entity.Region()
+	if r == nil {
+		return nil
+	}
+	pos := p.entity.Position()
+	p.touching = r.AppendEntitiesIn(p.touching[:0], pos[0]-attackScan, pos[2]-attackScan, pos[0]+attackScan, pos[2]+attackScan)
+	defer clear(p.touching)
+	for _, e := range p.touching {
+		if e.RuntimeID() != id {
+			continue
+		}
+		if t, ok := e.Owner().(*Projectile); ok && !t.gone && !t.stuck {
+			return t
+		}
+	}
+	return nil
 }
