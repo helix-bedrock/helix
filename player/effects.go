@@ -379,13 +379,16 @@ func (p *Player) visibleEffects() int64 {
 	return v
 }
 
-// sendVisibleEffects shows those who see the player its effects' particles.
+// sendVisibleEffects shows the player and those who see it its effects' particles. The
+// player gets it too: its own client draws the particles around it from this data.
 func (p *Player) sendVisibleEffects() {
 	if p.entity == nil {
 		return
 	}
+	pk := actorDataAt(p.runtimeID, protocol.EntityMetadata{protocol.EntityDataKeyVisibleMobEffects: p.visibleEffects()}, p.entity.Tick())
+	p.send(pk)
 	if r := p.entity.Region(); r != nil {
-		r.Broadcast(p.blockPos(), actorDataAt(p.runtimeID, protocol.EntityMetadata{protocol.EntityDataKeyVisibleMobEffects: p.visibleEffects()}, p.entity.Tick()), p.viewer)
+		r.Broadcast(p.blockPos(), pk, p.viewer)
 	}
 }
 
