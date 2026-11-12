@@ -130,6 +130,7 @@ type Player struct {
 	burn burnState
 	// breath is the player's air supply.
 	breath breathState
+	freeze freezeState
 	// spin is the Riptide spin attack.
 	spin   spinState
 	shield shieldState

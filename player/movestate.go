@@ -133,6 +133,9 @@ func (p *Player) actorFlags() int64 {
 	if p.spin.active {
 		f |= 1 << protocol.EntityDataFlagDamageNearbyMobs
 	}
+	if p.freeze.shaking {
+		f |= 1 << protocol.EntityDataFlagShaking
+	}
 	return f
 }
 
