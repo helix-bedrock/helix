@@ -245,6 +245,13 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	if isHangingSign(name) {
 		return t.hangingSignHeld(r, pos, block)
 	}
+	if isCake(name) {
+		return t.solidMaterial(r, pos.Side(cube.FaceDown))
+	}
+	if strings.HasSuffix(name, "candle") {
+		// CandleBlockItem's useOn (0xC9A3560): the block below must hold it on its top.
+		return t.onFloor(r, pos)
+	}
 	if isFrame(name) {
 		// ItemFrameBlock's mayPlace reads the face clicked, not the state: the state handed
 		// in is still the item's default.
@@ -419,6 +426,10 @@ func (t *Table) survives(r *world.Region, pos, from cube.Pos, block uint32) bool
 		holder, ok := t.bannerHolder(pos, block)
 		return from != holder || !loaded(r, holder) || (ok && t.solidMaterial(r, holder))
 	}
+	if isCake(t.blocks.Name(block)) {
+		below := pos.Side(cube.FaceDown)
+		return from != below || !loaded(r, below) || t.solidMaterial(r, below)
+	}
 	if isFrame(t.blocks.Name(block)) {
 		holder, ok := t.frameHolder(pos, block)
 		return !ok || from != holder || !loaded(r, holder) || t.solidMaterial(r, holder)
@@ -480,6 +491,12 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }
+
+// isCake reports whether name is a cake or a candle cake. BDS 1.26.60's CakeBlock and
+// CandleCakeBlock canSurvive (0xCB895B0, 0xCB48690) need a solid material below; both
+// mayPlace and neighborChanged ask it. BDS breaks the block on a tick it schedules then
+// (sub_CE58DD0, one tick); Helix breaks it at once.
+func isCake(name string) bool { return name == "minecraft:cake" || strings.HasSuffix(name, "candle_cake") }
 
 // isFrame reports whether name is an item frame or a glow item frame.
 func isFrame(name string) bool { return name == "minecraft:frame" || name == "minecraft:glow_frame" }

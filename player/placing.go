@@ -274,6 +274,9 @@ func (g *gameplay) replaceable(p *Player, r *world.Region, pos cube.Pos, b, bloc
 	if flowerBeds[name] {
 		return flowerBedBuiltOver(blocks, b, block)
 	}
+	if isCandleBlock(name) {
+		return candleBuiltOver(blocks, b, block)
+	}
 	if !g.replaceables[name] || g.notReplacedBy[name][blocks.Name(block)] {
 		return false
 	}

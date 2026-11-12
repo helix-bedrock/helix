@@ -143,6 +143,8 @@ const (
 	isTNT
 	// isLava is lava, which lights fire around it on random ticks.
 	isLava
+	// isCandle is a candle or candle cake, which lights and goes out.
+	isCandle
 )
 
 // NewTicker returns fire's ticker, with next for every other block. prime lights TNT; nil
@@ -175,6 +177,9 @@ func NewTicker(reg *registry.Registry, support *attach.Table, rules Rules, prime
 		}
 		if b.Properties(id).Material == materialLava {
 			t.info[id] |= isLava
+		}
+		if candleName(name) {
+			t.info[id] |= isCandle
 		}
 	}
 	t.soulFire, _ = b.Block(SoulFireName)
@@ -313,6 +318,8 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 		}
 	case layer == 0 && t.is(block, isCampfire), layer == 1 && t.campfireAt(r, pos):
 		t.campfireChanged(r, pos)
+	case layer == 0 && t.is(block, isCandle), layer == 1 && t.candleAt(r, pos):
+		t.candleChanged(r, pos)
 	}
 	t.BlockTicker.Placed(r, pos, block, layer)
 }
@@ -334,6 +341,8 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		}
 	case layer == 0 && t.is(block, isCampfire):
 		t.campfireChanged(r, pos)
+	case layer == 0 && t.is(block, isCandle):
+		t.candleChanged(r, pos)
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }

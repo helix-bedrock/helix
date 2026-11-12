@@ -137,6 +137,9 @@ func vanillaPlaceState(pl *Placement) (uint32, bool) {
 	if flowerBeds[name] {
 		return flowerBedState(pl)
 	}
+	if isCandleBlock(name) {
+		return candleState(pl)
+	}
 	how, ok := p.s.game.placement[name]
 	r := p.entity.Region()
 	if !ok || r == nil {
