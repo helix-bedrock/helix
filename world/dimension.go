@@ -169,6 +169,8 @@ type Dimension struct {
 	entityLoader atomic.Pointer[EntityLoader]
 	// blockEntities makes block entities.
 	blockEntities atomic.Pointer[BlockEntities]
+	// tickObserver is SetTickObserver's function.
+	tickObserver atomic.Pointer[TickObserver]
 
 	closeOnce sync.Once
 	closeErr  error

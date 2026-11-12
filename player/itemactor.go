@@ -99,6 +99,12 @@ func (i *ItemActor) Stack() ItemStack { return i.stack }
 // Entity returns the item's entity.
 func (i *ItemActor) Entity() *world.Entity { return i.entity }
 
+// SpawnItem adds stack to the dimension as an item lying at pos, moving at vel blocks per
+// tick, which may be picked up after the drop delay a player's drop has. Runs: anywhere.
+func (s *Host) SpawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec3) *ItemActor {
+	return s.spawnItem(d, stack, pos, vel, world.Rotation{}, dropPickupDelay, 0)
+}
+
 // spawnItem adds an item to the dimension.
 func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec3, rot world.Rotation, pickupDelay, throwTime int32) *ItemActor {
 	i := s.newItem(stack, vel, pickupDelay, throwTime)

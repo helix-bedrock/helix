@@ -107,26 +107,34 @@ func (c *AreaEffectCloud) Effects() []ActiveEffect { return append([]ActiveEffec
 
 // spawnCloud is BDS's spawn_aoe_cloud (0x714EA60) where a lingering potion lands: a potion with
 // no effects other than water shows only its splash; any other leaves a cloud of its effects,
-// owned by the thrower, which waits its reapplication delay between touches of a player
-// unless its first effect is instant.
+// owned by the thrower.
 func (t *Projectile) spawnCloud(r *world.Region, at mgl32.Vec3) {
-	spec := t.spec.Cloud
 	pot, _ := t.s.Potion(int32(t.potion))
-	if len(pot.Effects) == 0 && t.potion != potionWater {
+	if len(pot.Effects) == 0 && t.potion != potionWater || t.spec.Cloud == nil {
 		t.splashShow(r, at, waterColour, false)
 		return
 	}
+	c := t.s.SpawnCloud(r.Dimension(), at, t.potion, *t.spec.Cloud, t.owner)
+	t.splashShow(r, at, c.colour, false)
+}
+
+// SpawnCloud adds a lingering cloud of potion's effects at pos, shaped by spec (a lingering
+// potion's is its projectile's ProjectileSpec.Cloud), owned by owner or nil. It waits its
+// reapplication delay between touches of a player unless its first effect is instant. Runs:
+// anywhere.
+func (s *Host) SpawnCloud(d *world.Dimension, pos mgl32.Vec3, potion int16, spec CloudSpec, owner *Player) *AreaEffectCloud {
+	pot, _ := s.Potion(int32(potion))
 	c := &AreaEffectCloud{
-		s: t.s, potion: t.potion, effects: append([]ActiveEffect(nil), pot.Effects...), colour: t.s.potionColour(pot.Effects),
+		s: s, potion: potion, effects: append([]ActiveEffect(nil), pot.Effects...), colour: s.potionColour(pot.Effects),
 		duration: spec.Duration, radius: max(spec.Radius, 0), radiusOnUse: spec.RadiusOnUse,
 		particle: spec.Particle, changeOnPickup: cloudChangeOnPickup, affectOwner: spec.AffectOwner,
 		reapplication: spec.ReapplicationDelay, victims: map[int64]int64{},
 	}
-	if t.owner != nil && t.owner.entity != nil {
-		c.owner = t.owner.entity.UniqueID()
+	if owner != nil && owner.entity != nil {
+		c.owner = owner.entity.UniqueID()
 	}
 	if len(pot.Effects) > 0 {
-		if def, ok := t.s.game.effects[pot.Effects[0].ID]; ok && def.Instant {
+		if def, ok := s.game.effects[pot.Effects[0].ID]; ok && def.Instant {
 			c.reapplication = 0
 		}
 	}
@@ -134,8 +142,8 @@ func (t *Projectile) spawnCloud(r *world.Region, at mgl32.Vec3) {
 	if c.duration > 0 {
 		c.perTick = -c.radiusOnUse / float32(c.duration)
 	}
-	c.entity = r.Dimension().AddEntity(c.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), t.s.runtimeIDs.Add(1), at)) //nolint:gosec // an ID, not a secret
-	t.splashShow(r, at, c.colour, false)
+	c.entity = d.AddEntity(c.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos)) //nolint:gosec // an ID, not a secret
+	return c
 }
 
 func (c *AreaEffectCloud) config(uid int64, rid uint64, pos mgl32.Vec3) world.EntityConfig {

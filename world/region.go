@@ -327,37 +327,37 @@ func (r *Region) tick() {
 	t.start()
 	r.ticks++
 	r.drain()
-	t.mark(phaseDrain)
+	t.mark(PhaseDrain)
 	r.tickEntities()
-	t.mark(phaseEntities)
+	t.mark(PhaseEntities)
 	r.planViewers()
 	r.viewers = slices.DeleteFunc(r.viewers, func(v *Viewer) bool { return !r.updateViewer(v) })
-	t.mark(phaseViewers)
+	t.mark(PhaseViewers)
 	if rt, ok := r.d.conf.Ticker.(RegionTicker); ok {
 		rt.BeforeBlockTicks(r)
 	}
-	t.mark(phaseBeforeBlocks)
+	t.mark(PhaseBeforeBlocks)
 	r.tickBlocks()
-	t.mark(phaseBlocks)
+	t.mark(PhaseBlocks)
 	r.flushLight()
-	t.mark(phaseLight)
+	t.mark(PhaseLight)
 	r.sendChunkPackets()
-	t.mark(phaseChunks)
+	t.mark(PhaseChunks)
 	r.updateVisibility()
 	r.sendMovement()
-	t.mark(phaseMovement)
+	t.mark(PhaseMovement)
 	for _, v := range r.viewers {
 		if v.unflushed {
 			v.unflushed = false
 			v.flush()
 		}
 	}
-	t.mark(phaseFlush)
+	t.mark(PhaseFlush)
 	r.saveRound()
-	t.mark(phaseSave)
+	t.mark(PhaseSave)
 	r.flushLight()
 	r.handOff()
-	t.mark(phaseHandOff)
+	t.mark(PhaseHandOff)
 }
 
 // drain runs the work queued for this tick. It reuses its buffers.

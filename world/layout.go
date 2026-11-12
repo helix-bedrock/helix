@@ -63,11 +63,13 @@ func (d *Dimension) runTick(r *Region) {
 	d.ticking++
 	d.mu.Unlock()
 
-	start := time.Now()
+	start, tick := time.Now(), d.sched.CurrentTick()
 	r.ticking.Store(true)
 	r.tick()
+	took := r.phases.total()
+	// Still marked ticking, so the region's chunks and entities are its own to count.
+	d.observe(r, start, took, tick)
 	r.ticking.Store(false)
-	took := time.Since(start)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()

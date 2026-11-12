@@ -399,6 +399,10 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 	return s, nil
 }
 
+// ProjectileSpec is the spec of the entity type id's projectile, read from its definition,
+// for SpawnProjectile; false if the type has none. Runs: anywhere.
+func (s *Host) ProjectileSpec(id string) (ProjectileSpec, bool) { return s.projectileSpec(id, "") }
+
 // projectileSpecKey names a spec in the Host's cache.
 type projectileSpecKey struct{ id, group string }
 

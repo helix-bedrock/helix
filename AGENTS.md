@@ -22,6 +22,8 @@ golangci-lint run
 go test -race ./...
 go run ./cmd/helix   # start a server with the default configuration
 go test ./world -run '^$' -bench RegionLayout -benchtime 1x   # 400 fake players per region layout (~4 min)
+go run ./cmd/sim -list                          # load test scenarios
+go run ./cmd/sim -scenario tnt -n 0,100,1000    # one scenario at several sizes, each on a fresh server
 ```
 
 Local development uses a `go.work` (never committed) that points at the
@@ -270,6 +272,16 @@ sibling library folders, so unreleased library changes are used.
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every
   player whose client has the chunk, in other regions too.
+- `sim`: the load test harness (PRIORITIES item L, step 1: no network yet). `Start` runs a real
+  `helix.Server` (flat world, temporary folder, offline, RakNet on a loopback port) with a square
+  held loaded and ticking by a ticket; a `Scenario` adds one kind of load (`Start` once, `Tick`
+  every 50 ms for loads that end by themselves); `Run`/`Sweep` warm up, measure through the
+  world's tick observer (`Dimension.SetTickObserver`, `TickStats`, the `Phase` constants) and
+  runtime/metrics, and give a `Report` (region tick median/p99/worst, late ticks, time per phase,
+  cost per unit, allocations per tick, GC CPU share, heap). Built-in scenarios: idle, items, tnt,
+  falling, fireworks, mobs, clouds. A mechanic that can lag a server gets a scenario here.
+  `cmd/sim` runs them and prints a table (`-json` to keep results). Region ticks are timed with
+  `world/clock*.go`'s fine clock: Go's own clock moves in 0.5 ms steps on Windows.
 - `cmd/helix`: the server program. `-tick-distance` sets `Config.TickDistance`. `-testcmds` adds a stand-in /gamemode
   (and /gm), listed to the client with an AvailableCommands packet on its
   first input, for in-game testing until commands are designed, a countdown
