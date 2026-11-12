@@ -95,6 +95,7 @@ const (
 	projectileKeyInGround = "inGround"
 	projectileKeyPickup   = "pickup"
 	projectileKeyStuckAt  = "stuckAt"
+	projectileKeyPotion   = "PotionId"
 )
 
 // arrowPickup says who may pick up a stuck arrow.
@@ -159,6 +160,15 @@ type ProjectileSpec struct {
 	Particle                          string
 	ParticleCount                     int32
 	ParticleOnEntity, ParticleOnOther bool
+	// AngleOffset turns its thrower's aim up (negative) or down, in degrees (angle_offset).
+	AngleOffset float32
+	// SplashPotion splashes its potion's effects within SplashRange where it hits
+	// (thrown_potion_effect); Cloud leaves its potion's cloud there (spawn_aoe_cloud).
+	SplashPotion bool
+	SplashRange  float32
+	Cloud        *CloudSpec
+	// DouseFire puts fires out where a water potion hits a block (douse_fire).
+	DouseFire bool
 }
 
 // ExplodeSpec is a definition's minecraft:explode component.
@@ -233,6 +243,7 @@ type projectileComponent struct {
 	ReflectOnHurt   bool      `json:"reflect_on_hurt"`
 	ReflectImmunity float32   `json:"reflect_immunity"`
 	Offset          []float32 `json:"offset"`
+	AngleOffset     float32   `json:"angle_offset"`
 	OnHit           struct {
 		Impact *struct {
 			Damage struct {
@@ -249,7 +260,16 @@ type projectileComponent struct {
 		Stick  *struct {
 			ShakeTime float32 `json:"shake_time"`
 		} `json:"stick_in_ground"`
-		Teleport  *struct{} `json:"teleport_owner"`
+		Teleport *struct{} `json:"teleport_owner"`
+		Thrown   *struct{} `json:"thrown_potion_effect"`
+		Douse    *struct{} `json:"douse_fire"`
+		Cloud    *struct {
+			Duration    int32    `json:"duration"`
+			Radius      float32  `json:"radius"`
+			RadiusOnUse *float32 `json:"radius_on_use"`
+			Reapply     int32    `json:"reapplication_delay"`
+			AffectOwner *bool    `json:"affect_owner"`
+		} `json:"spawn_aoe_cloud"`
 		WindBurst *struct{} `json:"wind_burst_on_hit"`
 		Particle  *struct {
 			Type     string `json:"particle_type"`
@@ -271,6 +291,10 @@ type projectileBox struct {
 const (
 	projectileInertia       = 0.99
 	projectileLiquidInertia = 0.6
+	// projectileSplashRange is its splash_range (ProjectileComponent +424).
+	projectileSplashRange = 4
+	// cloudRadiusOnUse is spawn_aoe_cloud's default radius_on_use (0x714E6E0).
+	cloudRadiusOnUse = -1
 )
 
 // projectileBandwidth is the part of a definition that says how often far players get moves.
@@ -325,6 +349,21 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 		UncertaintyBase: c.UncertaintyBase, UncertaintyPerDifficulty: c.UncertaintyMult,
 		HitSound: c.HitSound, Bounce: c.ShouldBounce == projectileBounceNoDamage, StopOnHurt: c.StopOnHurt,
 		RemoveOnHit: c.OnHit.Remove != nil, TeleportOwner: c.OnHit.Teleport != nil,
+		AngleOffset: c.AngleOffset, SplashPotion: c.OnHit.Thrown != nil, SplashRange: projectileSplashRange,
+		DouseFire: c.OnHit.Douse != nil,
+	}
+	if a := c.OnHit.Cloud; a != nil {
+		cs := &CloudSpec{
+			Duration: max(a.Duration, 0) * cloudTicksPerSecond, Radius: a.Radius, RadiusOnUse: cloudRadiusOnUse,
+			ReapplicationDelay: a.Reapply, Particle: cloudParticleMobSpellAmbient, AffectOwner: true,
+		}
+		if a.RadiusOnUse != nil {
+			cs.RadiusOnUse = *a.RadiusOnUse
+		}
+		if a.AffectOwner != nil {
+			cs.AffectOwner = *a.AffectOwner
+		}
+		s.Cloud = cs
 	}
 	if len(c.Offset) == 3 {
 		s.Offset = mgl32.Vec3{c.Offset[0], c.Offset[1], c.Offset[2]}
@@ -422,6 +461,8 @@ type Projectile struct {
 	pierced []*world.Entity
 	// trident is set for a thrown trident.
 	trident *tridentState
+	// potion is a thrown potion's ID, the item's meta.
+	potion int16
 
 	// moves is what those who see it were last told of its movement.
 	moves actorMoves
@@ -500,6 +541,9 @@ func (t *Projectile) spawnPackets(e *world.Entity) []packet.Packet {
 	if t.owner != nil && t.owner.entity != nil {
 		meta[protocol.EntityDataKeyOwner] = t.owner.entity.UniqueID()
 	}
+	if t.isPotion() {
+		meta[protocol.EntityDataKeyAuxValueData] = t.potion
+	}
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: t.spec.ID,
 		Position: e.Position(), Velocity: t.vel, Pitch: t.rot.Pitch, Yaw: t.rot.Yaw, HeadYaw: t.rot.HeadYaw,
@@ -519,6 +563,9 @@ func (t *Projectile) flags() int64 {
 	}
 	if t.trident != nil && t.trident.returning {
 		f |= 1 << protocol.EntityDataFlagReturnTrident
+	}
+	if t.spec.ID == nameLingeringPotion {
+		f |= 1 << protocol.EntityDataFlagLingering
 	}
 	return f
 }
@@ -907,6 +954,9 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 		}
 	}
 	t.hitParticles(r, hit.pos, kind)
+	if t.isPotion() {
+		t.potionHit(r, e, hit, kind)
+	}
 	if t.spec.WindBurst {
 		t.windBurst(r, hit, kind)
 		t.remove(e)
@@ -1145,13 +1195,22 @@ func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	data[projectileKeyInGround] = stuck
 	data[projectileKeyPickup] = uint8(t.pickup)
 	t.saveTrident(data)
+	if t.isPotion() {
+		data[projectileKeyPotion] = t.potion
+	}
 	data[projectileKeyStuckAt] = []int32{int32(t.stuckAt[0]), int32(t.stuckAt[1]), int32(t.stuckAt[2])} //nolint:gosec // block positions fit
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
 // isProjectile reports whether a saved entity's identifier is one this runs.
 func isProjectile(id string) bool {
-	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow || id == nameThrownTrident || id == nameWindChargeProjectile
+	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow || id == nameThrownTrident || id == nameWindChargeProjectile ||
+		id == nameSplashPotion || id == nameLingeringPotion
+}
+
+// isPotion reports a thrown potion.
+func (t *Projectile) isPotion() bool {
+	return t.spec.ID == nameSplashPotion || t.spec.ID == nameLingeringPotion
 }
 
 // loadProjectile brings back a saved one. Who shot it is not kept, so a bow's enchantments
@@ -1186,6 +1245,9 @@ func (s *Host) loadProjectile(r *world.Region, at mcdb.ChunkPos, saved chunk.Ent
 		t.stuckAt = cube.Pos{int(v[0]), int(v[1]), int(v[2])}
 	}
 	t.loadTrident(saved.Data)
+	if v, isShort := saved.Data[projectileKeyPotion].(int16); isShort {
+		t.potion = v
+	}
 	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, t.rot))
 	return true
 }
@@ -1203,6 +1265,8 @@ func throwable(item string) string {
 		return item
 	case nameWindCharge:
 		return nameWindChargeProjectile
+	case nameSplashPotion, nameLingeringPotion:
+		return item
 	}
 	return ""
 }
@@ -1242,7 +1306,8 @@ func (p *Player) throwItem(held ItemStack) bool {
 	}
 	p.thrownAt = now
 	eyes, rot := p.entity.Position(), p.entity.Rotation()
-	p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power, p)
+	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(aimRotation(rot, spec.AngleOffset)), spec.Power, p)
+	t.potion = held.Meta
 	// BDS's throwable items (0xC985510 and the like) play it at the drop attach point.
 	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
 	if !p.creative() {
@@ -1355,7 +1420,8 @@ func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.V
 	if item == nameArrow {
 		id = nameArrow
 	}
-	if id == "" || id == nameEnderPearl {
+	// Dispensed potions wait: this is not given the item's meta, the potion's ID.
+	if id == "" || id == nameEnderPearl || id == nameSplashPotion || id == nameLingeringPotion {
 		return false
 	}
 	spec, ok := s.projectileSpec(id, "")

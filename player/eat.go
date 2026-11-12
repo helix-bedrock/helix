@@ -46,8 +46,8 @@ type usingState struct {
 	left   int32
 	// bow is a bow being drawn, which ends when the player lets go.
 	bow bool
-	// milk is a milk bucket being drunk.
-	milk bool
+	// milk is a milk bucket being drunk, and potion a potion.
+	milk, potion bool
 	// crossbow is a crossbow being loaded: it loads when the draw is done or let go after.
 	crossbow bool
 }
@@ -174,7 +174,7 @@ func (p *Player) handleUseAir(d *protocol.UseItemTransactionData) {
 
 // vanillaUseItem is BDS's useItem as far as built: armour goes on, snowballs, eggs and
 // pearls are thrown, a fishing rod casts or reels in, a bow starts drawing, and foods start being eaten when the player may
-// eat. Potions, crossbows, tridents, milk and other items used in the air come later.
+// eat. Potions are drunk as milk is.
 func vanillaUseItem(p *Player, held ItemStack) bool {
 	g := p.s.game
 	if g.itemUseEv.Has() {
@@ -215,6 +215,10 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 	}
 	if held.Name == nameMilkBucket {
 		p.startMilk(held)
+		return true
+	}
+	if held.Name == namePotion {
+		p.startPotion(held)
 		return true
 	}
 	food, ok := g.sys.FoodOf(p, held)
@@ -328,10 +332,14 @@ func (p *Player) tickUsing() {
 		}
 		return
 	}
-	food, milk := u.food, u.milk
+	food, milk, potion := u.food, u.milk, u.potion
 	p.stopUsing()
 	if milk {
 		p.drinkMilk()
+		return
+	}
+	if potion {
+		p.drinkPotion(held)
 		return
 	}
 	p.s.game.sys.Eat(p, held, food)

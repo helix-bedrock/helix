@@ -163,6 +163,7 @@ type gameplay struct {
 	// enchantRules is what enchanting reads about items and blocks, swapped whole too.
 	enchantRules atomic.Pointer[enchanting]
 	effects      map[int32]*Effect
+	potions      map[int32]*Potion
 	blocks       map[string]BlockBehaviour
 	mining       *mining
 	// durability, replaceables and notReplacedBy are helix-data's
@@ -248,6 +249,7 @@ type gameState struct {
 	anvilEv          listeners[AnvilEvent]
 	grindstoneEv     listeners[GrindstoneEvent]
 	effects          map[int32]*Effect
+	potions          map[int32]*Potion
 	blocks           map[string]BlockBehaviour
 	breakEv          listeners[BlockBreakEvent]
 	placeEv          listeners[BlockPlaceEvent]
@@ -306,7 +308,7 @@ type gameState struct {
 }
 
 func newGameState() *gameState {
-	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, blocks: map[string]BlockBehaviour{nameTNT: tntBlock{}}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), motives: slices.Clone(vanillaMotives[:]), out: &gameplay{}}
+	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, potions: map[int32]*Potion{}, blocks: map[string]BlockBehaviour{nameTNT: tntBlock{}}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), motives: slices.Clone(vanillaMotives[:]), out: &gameplay{}}
 }
 
 // Systems returns the breaking and placing steps to replace or wrap. Not
@@ -430,6 +432,11 @@ func vanillaGameplay(s *Setup) error {
 			return err
 		}
 	}
+	for _, p := range vanillaPotions() {
+		if err := s.RegisterPotion(p); err != nil {
+			return err
+		}
+	}
 	sys, g := s.Systems(), s.h.game.out
 	sys.EnchantOptions = vanillaEnchantOptions
 	sys.EnchantRequire = vanillaEnchantRequire
@@ -531,7 +538,7 @@ func (s *Setup) freezeGameplay() (*gameplay, error) {
 	g := gs.out
 	*g = gameplay{
 		tuning: gs.tuning, breathable: gs.breathable, combat: combat, itemUseEv: gs.itemUseEv, itemEatEv: gs.itemEatEv, hitEv: gs.hitEv, explosionEv: gs.explosionEv,
-		sys: gs.sys, effects: maps.Clone(gs.effects),
+		sys: gs.sys, effects: maps.Clone(gs.effects), potions: maps.Clone(gs.potions),
 		blocks: maps.Clone(gs.blocks), mining: m, breakEv: gs.breakEv, placeEv: gs.placeEv,
 		durability: durabilityTable(bp), fireResistant: set(flags.FireResistant), replaceables: set(bp.Replaceable), notReplacedBy: map[string]map[string]bool{},
 		placement: placement, itemDropEv: gs.itemDropEv, itemLoadEv: gs.itemLoadEv, useEv: gs.useEv,
