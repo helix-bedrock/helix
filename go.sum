@@ -50,6 +50,8 @@ github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10 h1:vWYgr0Uy
 github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
 github.com/helix-bedrock/world v0.0.0-20261105165505-be15cde2480c h1:BNB2ijaOFcVPXie6a/HrzU0hCiPCgWkT+u03OrpIhVk=
 github.com/helix-bedrock/world v0.0.0-20261105165505-be15cde2480c/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
+github.com/helix-bedrock/world v0.0.0-20261112161246-bce1f69fa128 h1:b8BamX7c8DMVXLk3biCrs6C/mK0QkOVxCcj/ELcrrj4=
+github.com/helix-bedrock/world v0.0.0-20261112161246-bce1f69fa128/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
 github.com/helix-bedrock/worldgen v0.0.0-20261110172032-37f34ed98cbe h1:x1EVKEhCo0GUm87RwhIwFAj4qZorZwfefaXtyHcUuIY=
 github.com/helix-bedrock/worldgen v0.0.0-20261110172032-37f34ed98cbe/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
