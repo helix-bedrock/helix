@@ -57,7 +57,10 @@ sibling library folders, so unreleased library changes are used.
   `Config.BlockTicker`): the tick (depth from the neighbours, infinite
   water, falling, spreading along the shortest way down), lava solidifying,
   and the old `flowing_*` names turning into water and lava. Not ported:
-  lava fire, stair and slab shape rules.
+  lava fire, stair and slab shape rules. `settle.go` is Helix's own rule, not BDS's: as
+  `world.Config.Settler` it finds liquid generation left beside open space
+  (below or on a side) and queues its tick, inside the chunk on the loading
+  worker, at the chunk's edge on its ticks once the next chunk is loaded.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.
@@ -128,6 +131,11 @@ sibling library folders, so unreleased library changes are used.
   (30 s by default, spread over the ticks by chunk) each loaded chunk also
   saves its entities and tick queues, and online players are saved on the
   same interval (`Player.autoSave`), so a crash loses at most that much.
+  Tick rates (`tps.go`): `TickMeter` (TPS and MSPT over the last 100 ticks,
+  falling at once when ticks stop), `Region.TPS`/`MSPT`, `RegionInfo.TPS`,
+  `Dimension.TPS` (mean of its regions); `Server.TPS` is the mean of every
+  region, `Player.TPS` the client's own tick rate (its PlayerAuthInput
+  arrivals), `Player.RegionTPS` the player's region's. `-testcmds` adds /tps.
   Generators: `Flat`
   (level.dat's layers), `Empty`, any `Generator`; a `ColumnGenerator` also
   hands over block entities, a `Spawner` answers the spawn height.

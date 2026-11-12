@@ -394,6 +394,9 @@ func (r *Region) tickChunk(pos mcdb.ChunkPos, now, pass int64, speed int32) {
 			}
 		}
 	}
+	if c.settle != nil {
+		r.settleEdges(c)
+	}
 	if w := r.d.conf.Weather; w != nil {
 		w.ChunkWeather(r, pos, speed)
 		if c, ok = r.chunks[pos]; !ok {

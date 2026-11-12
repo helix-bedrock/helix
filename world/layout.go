@@ -76,6 +76,7 @@ func (d *Dimension) runTick(r *Region) {
 	d.ticking--
 	r.state = stateReady
 	r.info = RegionInfo{Chunks: len(r.chunks), Viewers: len(r.viewers), LastTick: took}
+	r.meter.Add(start, took)
 	// A late region does not tick twice in a row to catch up.
 	if r.next.Before(start) {
 		r.next = start

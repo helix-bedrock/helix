@@ -94,6 +94,9 @@ type Config struct {
 	// Spawner runs on every ticking chunk after its block ticks: BDS's natural mob spawner,
 	// which BDS 1.26.60 runs once per ticking chunk per tick. Nil spawns nothing.
 	Spawner ChunkSpawner
+	// Settler queues the ticks a newly generated chunk needs to settle, such as liquid
+	// generation left beside open space. Nil queues none.
+	Settler Settler
 	// ParallelMin is how many items a phase of Region.Parallel (mob AI and the like) needs
 	// before a crowded region spreads it over idle cores; 0 means DefaultParallelMin.
 	ParallelMin int
@@ -215,6 +218,10 @@ type Chunk struct {
 	plan      int
 	// light is the chunk's sky and block light and its height map, worked out on load.
 	light *chunkLight
+	// settle is the edge blocks the Settler kept for the chunk's ticks, nil once decided;
+	// settleTries counts the ticks they were asked about.
+	settle      []chunk.ScheduledBlockUpdate
+	settleTries int
 }
 
 // New opens a dimension. Call Close to save and stop it.
@@ -345,9 +352,11 @@ func (d *Dimension) Regions() []RegionInfo {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	out := make([]RegionInfo, 0, len(d.regions))
+	now := time.Now()
 	for _, r := range d.regions {
 		info := r.info
 		info.ID, info.Sections = r.id, len(r.sections)
+		info.TPS, info.MSPT = r.meter.TPS(now), r.meter.MSPT()
 		out = append(out, info)
 	}
 	slices.SortFunc(out, func(a, b RegionInfo) int { return cmp.Compare(a.ID, b.ID) })
@@ -441,6 +450,7 @@ func (d *Dimension) poolLoad(pos mcdb.ChunkPos) {
 func (d *Dimension) load(pos mcdb.ChunkPos) {
 	col, err := d.conf.Store.LoadColumn(pos, d.conf.Dim)
 	discard := false
+	var settle []chunk.ScheduledBlockUpdate
 	if err != nil {
 		if !errors.Is(err, mcdb.ErrNotFound) {
 			// Never save over data that failed to load: it may be readable
@@ -454,6 +464,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 		if err := d.generate(pos, col); err != nil {
 			d.log.Error("generate chunk", "pos", pos, "err", err)
 		}
+		settle = d.settleChunk(pos, col)
 	} else {
 		col.Chunk.ReplaceBiomes(d.resolveBiome)
 	}
@@ -464,7 +475,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
-	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light) })
+	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle) })
 }
 
 // tickSafely is runTick with a panic recovered and passed to the scheduler's handler.

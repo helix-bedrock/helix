@@ -188,6 +188,12 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return lightning(srv.Load(), p, args)
 		}},
+		{tpsCommand, "Shows the server's, your region's and your client's ticks per second.", nil, func(p *player.Player, _ []string) string {
+			if !registry() {
+				return ""
+			}
+			return tpsRun(srv.Load(), p)
+		}},
 		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""

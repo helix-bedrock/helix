@@ -74,6 +74,8 @@ type Player struct {
 	// input carries world packets from the network goroutine to the
 	// region's tick.
 	input inputQueue
+	// clientTicks times the client's PlayerAuthInput packets for TPS.
+	clientTicks clientTicks
 	// batch is the packets think took for this tick's handleInput; thought is set when it
 	// did. locals is the state Local keeps.
 	batch   []packet.Packet

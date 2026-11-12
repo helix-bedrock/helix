@@ -187,6 +187,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			return err
 		}
 		conf.Ticker = circuits
+		conf.Settler = s.liquids
 	}
 	r, _ := mcdb.Overworld.Range()
 	conf.Generator = s.conf.Generator
@@ -238,6 +239,7 @@ func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
 	}
 	liquids := liquid.New(s.reg.Blocks)
 	liquids.SetDrops(s.popBlock)
+	s.liquids = liquids
 	s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
 	s.farm.SetSupport(attached.Supports)
 	rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}

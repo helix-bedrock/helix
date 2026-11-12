@@ -4,6 +4,7 @@
 package helix
 
 import (
+	"github.com/helix-bedrock/helix/liquid"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -210,6 +211,8 @@ type Server struct {
 	// fire is the vanilla fire ticker, nil when the config gave a BlockTicker.
 	fire *fire.Ticker
 	farm *farm.Ticker
+	// liquids is vanilla's water and lava, also the world's Settler; nil with a custom BlockTicker.
+	liquids *liquid.Liquids
 	// falling is the vanilla falling block rules, nil when the config gave a BlockTicker.
 	falling *fall.Table
 	// weather is the world's weather, chunkWeather the overworld's lightning, ice and snow.
@@ -587,6 +590,24 @@ func (s *Server) Registry() *registry.Registry { return s.reg }
 
 // Host returns what runs the players, nil until Run started.
 func (s *Server) Host() *player.Host { return s.players.Load() }
+
+// TPS is the server's ticks per second: the mean TPS of every region of every dimension
+// (world.Region.TPS), world.MaxTPS with none. One lagging region pulls it down only by its
+// share; Dimension.Regions gives each region's own. Runs: anywhere.
+func (s *Server) TPS() float64 {
+	sum, n := 0.0, 0
+	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
+		if d == nil {
+			continue
+		}
+		ds, dn := d.SumTPS()
+		sum, n = sum+ds, n+dn
+	}
+	if n == 0 {
+		return world.MaxTPS
+	}
+	return sum / float64(n)
+}
 
 // Players returns the players online. Empty until Run started.
 func (s *Server) Players() []*player.Player {

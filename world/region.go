@@ -94,6 +94,8 @@ type Region struct {
 	contested bool
 	info      RegionInfo
 	lastWarn  time.Time
+	// meter times the region's ticks for TPS and MSPT.
+	meter TickMeter
 	// phases is how long each part of the last tick took, for the over-budget warning.
 	phases tickPhases
 	// late is drain's scratch list of the work it leaves for the next tick.
@@ -139,6 +141,10 @@ type RegionInfo struct {
 	Chunks   int
 	Viewers  int
 	LastTick time.Duration
+	// TPS is the region's ticks per second over its last 5 seconds (Region.TPS), MSPT the
+	// mean time those ticks took.
+	TPS  float64
+	MSPT time.Duration
 }
 
 // entry is work queued for a region's next tick. Work for a chunk position
@@ -481,12 +487,12 @@ func (r *Region) requestMissing() {
 }
 
 // arrive takes a chunk a worker loaded.
-func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool, light *chunkLight) {
+func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool, light *chunkLight, settle []chunk.ScheduledBlockUpdate) {
 	delete(r.loading, pos)
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
 	}
-	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: neverTicked, plannedAt: -1, light: light}
+	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: neverTicked, plannedAt: -1, light: light, settle: settle}
 	c.ticks.load(col.ScheduledBlocks, col.Tick)
 	c.ticks.rebase(r.d.sched.CurrentTick())
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)
