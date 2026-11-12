@@ -324,16 +324,38 @@ func vanillaFirework(r *world.Region, f *FireworkRocket) {
 	}
 	at := e.Position()
 	for _, o := range r.AppendEntitiesIn(nil, at[0]-fireworkReach, at[2]-fireworkReach, at[0]+fireworkReach, at[2]+fireworkReach) {
-		p, ok := o.Owner().(*Player)
-		if !ok || p == f.attached || p.dead() || p.mode() == GameModeSpectator {
+		head := o.Position()
+		var mob *Mob
+		switch t := o.Owner().(type) {
+		case *Player:
+			if t == f.attached || t.dead() || t.mode() == GameModeSpectator {
+				continue
+			}
+		case *Mob:
+			// BDS fetches the targets with type mask 256, every mob, not only players.
+			if t.Dead() {
+				continue
+			}
+			lo, hi, ok := t.BlastBox()
+			if !ok {
+				continue
+			}
+			mob, head = t, mgl32.Vec3{(lo[0] + hi[0]) / 2, hi[1], (lo[2] + hi[2]) / 2}
+		default:
 			continue
 		}
-		head := o.Position()
 		dist := head.Sub(at).Len()
 		if dist > fireworkReach || f.s.rayBlocked(r, at, head) {
 			continue
 		}
-		hurt(p, ev.Damage*float32(math.Sqrt(float64((fireworkReach-dist)/fireworkReach))), src)
+		damage := ev.Damage * float32(math.Sqrt(float64((fireworkReach-dist)/fireworkReach)))
+		if mob != nil {
+			mob.TakeDamage(damage, src)
+			continue
+		}
+		if p, ok := o.Owner().(*Player); ok {
+			hurt(p, damage, src)
+		}
 	}
 }
 
