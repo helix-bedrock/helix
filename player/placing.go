@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/blockuse"
+	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -417,7 +418,13 @@ func vanillaPlace(pl *Placement) bool {
 		pl.Block = e.Block
 	}
 	blocks := p.s.reg.Blocks
-	if blockuse.IsDoor(blocks, pl.Block) {
+	if f := p.s.falling; f != nil && f.Kind(pl.Block) == fall.Snow {
+		// TopSnowBlock::tryToPlace (slot 70, 0xD4EA610), the same one landing snow runs:
+		// layers add to snow already there up to a full block, the rest goes on top.
+		if !f.Land(r, pl.Pos, pl.Block) {
+			return false
+		}
+	} else if blockuse.IsDoor(blocks, pl.Block) {
 		if !blockuse.PlaceDoor(blocks, r, pl.Pos, pl.Block) {
 			return false
 		}
