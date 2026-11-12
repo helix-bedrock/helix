@@ -181,64 +181,100 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("player: gameplay: %w", err)
 	}
-	connections, err := connect.New(conf.Registry.Blocks)
-	if err != nil {
-		return nil, fmt.Errorf("player: connections: %w", err)
-	}
-	attached, err := attach.New(conf.Registry.Blocks)
-	if err != nil {
-		return nil, fmt.Errorf("player: attached blocks: %w", err)
-	}
-	discs, err := loadDiscs()
+	t, err := loadHostTables(conf.Registry)
 	if err != nil {
 		return nil, err
 	}
-	chests, err := newChestTable(conf.Registry.Blocks)
-	if err != nil {
-		return nil, fmt.Errorf("player: chests: %w", err)
-	}
-	drops, err := loot.New()
-	if err != nil {
-		return nil, fmt.Errorf("player: drops: %w", err)
-	}
-	entityLoot, err := loot.NewEntityTables()
-	if err != nil {
-		return nil, fmt.Errorf("player: entity loot: %w", err)
-	}
-	furnaces, err := loadFurnaceFacts()
-	if err != nil {
-		return nil, fmt.Errorf("player: furnaces: %w", err)
-	}
 	for name, rule := range g.dropRules {
-		drops.Set(name, rule)
+		t.drops.Set(name, rule)
 	}
 	if conf.Redstone == nil {
 		conf.Redstone = circuit.NewSettings(circuit.DefaultConfig())
 	}
 	h := &Host{
-		redstone: conf.Redstone,
-		drops:    drops, entityLoot: entityLoot, foods: foodTable(conf.Registry.Items),
-		log: conf.Log, reg: conf.Registry, overworld: conf.Overworld, nether: conf.Nether, end: conf.End, portals: conf.Portals, onEnterEnd: conf.OnEnterEnd, playerStore: conf.Store, level: conf.Level,
-		viewDistance: conf.ViewDistance, maxPlayers: conf.MaxPlayers,
-		handlers: setup.freeze(), game: g, global: nil, connections: connections, attach: attached, farm: conf.Farm, fire: conf.Fire, chests: chests, discs: discs,
-		furnaces: furnaces, commands: setup.h.commands,
+		log:          conf.Log,
+		onPanic:      conf.OnPanic,
+		reg:          conf.Registry,
+		overworld:    conf.Overworld,
+		nether:       conf.Nether,
+		end:          conf.End,
+		portals:      conf.Portals,
+		onEnterEnd:   conf.OnEnterEnd,
+		playerStore:  conf.Store,
+		level:        conf.Level,
+		viewDistance: conf.ViewDistance,
+		maxPlayers:   conf.MaxPlayers,
+		redstone:     conf.Redstone,
+		farm:         conf.Farm,
+		fire:         conf.Fire,
+		handlers:     setup.freeze(),
+		commands:     setup.h.commands,
+		game:         g,
+		connections:  t.connections,
+		attach:       t.attach,
+		chests:       t.chests,
+		furnaces:     t.furnaces,
+		discs:        t.discs,
+		drops:        t.drops,
+		entityLoot:   t.entityLoot,
+		foods:        foodTable(conf.Registry.Items),
 	}
-	h.onPanic = conf.OnPanic
 	h.global = newGlobal(h.panicked)
 	h.setUpCommands()
 	h.setUpMobs()
 	h.itemLifetime.Store(g.sys.ItemLifetime)
 	h.ClearAllTuning()
-	// Every dimension loads its saved entities and runs its block entities (Nether fortress
-	// spawners and bastion chests included).
-	for _, d := range []*world.Dimension{conf.Overworld, conf.Nether, conf.End} {
+	h.hookDimensions()
+	h.global.run(func() { h.global.tick = h.globalTick })
+	return h, nil
+}
+
+// hostTables are the block and item tables a Host loads from data when it is made.
+type hostTables struct {
+	connections *connect.Table
+	attach      *attach.Table
+	chests      *chestTable
+	furnaces    *furnaceFacts
+	discs       map[string]data.MusicDisc
+	drops       *loot.Table
+	entityLoot  *loot.EntityTables
+}
+
+// loadHostTables loads the tables a Host reads its blocks' and items' behaviour from.
+func loadHostTables(reg *registry.Registry) (t hostTables, err error) {
+	if t.connections, err = connect.New(reg.Blocks); err != nil {
+		return t, fmt.Errorf("player: connections: %w", err)
+	}
+	if t.attach, err = attach.New(reg.Blocks); err != nil {
+		return t, fmt.Errorf("player: attached blocks: %w", err)
+	}
+	if t.discs, err = loadDiscs(); err != nil {
+		return t, err
+	}
+	if t.chests, err = newChestTable(reg.Blocks); err != nil {
+		return t, fmt.Errorf("player: chests: %w", err)
+	}
+	if t.drops, err = loot.New(); err != nil {
+		return t, fmt.Errorf("player: drops: %w", err)
+	}
+	if t.entityLoot, err = loot.NewEntityTables(); err != nil {
+		return t, fmt.Errorf("player: entity loot: %w", err)
+	}
+	if t.furnaces, err = loadFurnaceFacts(); err != nil {
+		return t, fmt.Errorf("player: furnaces: %w", err)
+	}
+	return t, nil
+}
+
+// hookDimensions has every open dimension load its saved entities and run its block
+// entities through the Host (Nether fortress spawners and bastion chests included).
+func (h *Host) hookDimensions() {
+	for _, d := range []*world.Dimension{h.overworld, h.nether, h.end} {
 		if d != nil {
 			d.SetEntityLoader(h.loadEntity)
 			d.SetBlockEntities(chestEntities{s: h})
 		}
 	}
-	h.global.run(func() { h.global.tick = h.globalTick })
-	return h, nil
 }
 
 // Admit takes a connection that finished the login and plays it until it
@@ -259,13 +295,7 @@ func (h *Host) Admit(c *network.Conn, changed func()) {
 		return
 	}
 	var dup, full bool
-	h.global.call(func() {
-		_, dup = h.global.players[id]
-		full = len(h.global.players) >= h.maxPlayers
-		if !dup && !full {
-			h.global.add(p)
-		}
-	})
+	h.global.call(func() { dup, full = h.admit(p) })
 	switch {
 	case dup:
 		h.refuse(c, packet.DisconnectReasonServerIdConflict)
@@ -277,23 +307,40 @@ func (h *Host) Admit(c *network.Conn, changed func()) {
 	h.log.Info("Player connected", "name", p.name, "xuid", p.xuid, "addr", c.RemoteAddr())
 	changed()
 	h.wg.Add(1)
-	go func() {
-		defer h.wg.Done()
-		defer h.recovered()
-		p.play()
-		h.global.call(func() {
-			h.global.remove(p)
-			pk := &packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionRemove, UUID: p.uuid}}}
-			for _, o := range h.global.order {
-				o.sendNow(pk)
-			}
-		})
-		if err := c.Close(); err != nil && !isClosed(err) {
-			h.log.Debug("close connection", "name", p.name, "err", err)
-		}
-		h.log.Info("Player disconnected", "name", p.name, "xuid", p.xuid)
-		changed()
-	}()
+	go h.run(p, changed)
+}
+
+// run plays an admitted player until it leaves, then takes it off the player list and
+// closes its connection. It is the player's goroutine.
+func (h *Host) run(p *Player, changed func()) {
+	defer h.playerDone()
+	p.play()
+	h.global.call(func() { h.global.leave(p) })
+	if err := p.conn.Close(); err != nil && !isClosed(err) {
+		h.log.Debug("close connection", "name", p.name, "err", err)
+	}
+	h.log.Info("Player disconnected", "name", p.name, "xuid", p.xuid)
+	changed()
+}
+
+// playerDone is deferred by a player's goroutine: it recovers a panic and marks the
+// goroutine finished for Close.
+func (h *Host) playerDone() {
+	if v := recover(); v != nil {
+		h.panicked(v, debug.Stack())
+	}
+	h.wg.Done()
+}
+
+// admit puts p on the player list unless a player with its identity is already
+// online or the server is full, and says which. Global owner only.
+func (h *Host) admit(p *Player) (dup, full bool) {
+	_, dup = h.global.players[p.uuid]
+	full = len(h.global.players) >= h.maxPlayers
+	if !dup && !full {
+		h.global.add(p)
+	}
+	return dup, full
 }
 
 // refuse disconnects a connection that is not let in.

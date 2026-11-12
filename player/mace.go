@@ -62,7 +62,14 @@ func (p *Player) maceSmash(r *world.Region, target *world.Entity) {
 	v := p.Velocity()
 	p.move.fall = 0
 	p.SetVelocity(mgl32.Vec3{v[0], 0, v[2]})
-	at := p.entity.Position()
+	p.showSmash(r, target, fall)
+	p.smashPush(r, target)
+}
+
+// showSmash plays the smash sound where the attacker is, heavier for a longer fall onto a
+// grounded target, and raises dust at the target's feet when it is on the ground or in a
+// liquid.
+func (p *Player) showSmash(r *world.Region, target *world.Entity, fall float32) {
 	feet := target.Position()
 	if t, ok := target.Owner().(*Player); ok {
 		feet = t.AttachPos(AttachFeet)
@@ -75,10 +82,15 @@ func (p *Player) maceSmash(r *world.Region, target *world.Entity) {
 			sound = packet.SoundEventMaceHeavySmashGround
 		}
 	}
-	playSound(r, p.blockPos(), soundEvent{name: sound, pos: at, extra: -1, entity: "minecraft:player"}, nil)
+	playSound(r, p.blockPos(), soundEvent{name: sound, pos: p.entity.Position(), extra: -1, entity: "minecraft:player"}, nil)
 	if grounded || p.s.liquidAtFeet(r, feet) {
 		levelEvent(r, feetBlock(feet), feet, packet.LevelEventParticleSmashAttackGroundDust, 0)
 	}
+}
+
+// smashPush pushes every other player and mob within the mace's reach of the target's box
+// away from the target, more the nearer it is.
+func (p *Player) smashPush(r *world.Region, target *world.Entity) {
 	b, ok := target.Owner().(Blastable)
 	if !ok {
 		return
@@ -87,25 +99,14 @@ func (p *Player) maceSmash(r *world.Region, target *world.Entity) {
 	if !ok {
 		return
 	}
-	lo, hi = lo.Sub(mgl32.Vec3{maceReach, maceReach, maceReach}), hi.Add(mgl32.Vec3{maceReach, maceReach, maceReach})
+	reach := mgl32.Vec3{maceReach, maceReach, maceReach}
+	lo, hi = lo.Sub(reach), hi.Add(reach)
 	for _, o := range r.AppendEntitiesIn(nil, lo[0], lo[2], hi[0], hi[2]) {
 		if o == target || o == p.entity {
 			continue
 		}
 		m, ok := o.Owner().(Moving)
-		if !ok {
-			continue
-		}
-		switch e := o.Owner().(type) {
-		case *Player:
-			if e.mode() == GameModeSpectator {
-				continue
-			}
-		case *Mob:
-			if e.m.Type() == nameArmorStand {
-				continue
-			}
-		default:
+		if !ok || !smashPushes(o) {
 			continue
 		}
 		pos := o.Position()
@@ -121,6 +122,18 @@ func (p *Player) maceSmash(r *world.Region, target *world.Entity) {
 		}
 		m.SetVelocity(m.Velocity().Add(mgl32.Vec3{dx * push, maceLift, dz * push}))
 	}
+}
+
+// smashPushes reports whether a smash pushes o: players not spectating and mobs other
+// than armour stands.
+func smashPushes(o *world.Entity) bool {
+	switch e := o.Owner().(type) {
+	case *Player:
+		return e.mode() != GameModeSpectator
+	case *Mob:
+		return e.m.Type() != nameArmorStand
+	}
+	return false
 }
 
 // minPushDist is the distance under which a smash pushes only upward.

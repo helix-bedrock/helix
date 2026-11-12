@@ -143,66 +143,83 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 	return true
 }
 
-// useHeldOn is the held item's part of useItemOn, for a block item: the target,
-// the check, the state, then the placing. False if nothing was placed.
+// useHeldOn is the held item's part of useItemOn: an item with a use of its own on
+// blocks, else a block item's target, check, state and placing. False if nothing
+// was placed.
 func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
+	if used, ok := p.useSpecialOn(r, clicked, face, click, held); ok {
+		return used
+	}
+	return p.placeHeld(r, clicked, face, click, held)
+}
+
+// useSpecialOn runs the use on a block of an item that is not simply placed: fire,
+// buckets, spawn eggs, entities placed as items, signs, beds and the like. ok is false
+// if held has no such use; used is whether it did something.
+func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) (used, ok bool) {
 	if held.Name == nameFlintSteel {
-		return p.lightFire(r, clicked, face, held)
+		return p.lightFire(r, clicked, face, held), true
 	}
 	if held.Name == nameFireworkRocket {
-		return p.useFireworkOn(r, clicked, click, held)
+		return p.useFireworkOn(r, clicked, click, held), true
 	}
 	if held.Name == nameShears {
-		return p.useShearsOn(r, clicked, face)
+		return p.useShearsOn(r, clicked, face), true
 	}
 	if spawnEggMob(held.Name) != "" {
-		return p.useSpawnEgg(r, clicked, face, held)
+		return p.useSpawnEgg(r, clicked, face, held), true
 	}
 	if held.Name == nameEnderEye {
-		return p.useEnderEye(r, clicked)
+		return p.useEnderEye(r, clicked), true
 	}
 	if held.Name == nameBoneMeal {
-		return p.useBoneMeal(r, clicked, click, held)
+		return p.useBoneMeal(r, clicked, click, held), true
 	}
 	if _, ok := bucketLiquids[held.Name]; ok {
-		return p.pourBucket(clicked, face, held)
+		return p.pourBucket(clicked, face, held), true
 	}
 	if held.Name == emptyBucket {
-		return p.fillBucket(clicked)
+		return p.fillBucket(clicked), true
 	}
 	if b, ok := mobBucketItem(held.Name); ok {
-		return p.pourMobBucket(clicked, face, held, b)
+		return p.pourMobBucket(clicked, face, held, b), true
 	}
 	if held.Name == namePowderSnowBucket {
-		return p.pourPowderSnow(clicked, face)
+		return p.pourPowderSnow(clicked, face), true
 	}
 	if held.Name == paintingID {
-		return p.placePainting(r, clicked, face)
+		return p.placePainting(r, clicked, face), true
 	}
 	if held.Name == armorStandID {
-		return p.placeArmorStand(r, clicked, face)
+		return p.placeArmorStand(r, clicked, face), true
 	}
 	if isCushionItem(held.Name) {
-		return p.placeCushion(r, clicked, face, click, held)
+		return p.placeCushion(r, clicked, face, click, held), true
 	}
 	if isBedItem(held.Name) {
-		return p.placeBed(r, clicked, face, held)
+		return p.placeBed(r, clicked, face, held), true
 	}
 	if held.Name == bannerItem {
-		return p.placeBanner(r, clicked, face, held)
+		return p.placeBanner(r, clicked, face, held), true
 	}
 	if isHangingSignName(held.Name) {
-		return p.placeHangingSign(r, clicked, face, held)
+		return p.placeHangingSign(r, clicked, face, held), true
 	}
 	if isSignItem(held.Name) {
-		return p.placeSign(r, clicked, face, held)
+		return p.placeSign(r, clicked, face, held), true
 	}
 	if IsCartItem(held.Name) {
-		return p.placeCart(r, clicked, held.Name)
+		return p.placeCart(r, clicked, held.Name), true
 	}
 	if IsBoatItem(held.Name) {
-		return p.placeBoat(r, clicked, face, click, held)
+		return p.placeBoat(r, clicked, face, click, held), true
 	}
+	return false, false
+}
+
+// placeHeld places the block item held: the target (the clicked block if it can be built
+// over, else the side clicked), the check and the state. False if nothing was placed.
+func (p *Player) placeHeld(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
 	block, ok := p.itemBlock(held)
 	if !ok {
 		return false

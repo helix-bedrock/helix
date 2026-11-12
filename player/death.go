@@ -39,6 +39,20 @@ func (p *Player) dead() bool { return p.Health() <= 0 }
 // the death event, the death info and the death message follow, and the
 // respawn sequence starts. Experience is not dropped yet.
 func vanillaDie(p *Player, src DamageSource) {
+	p.stopOnDeath()
+	if !p.s.level.KeepInventory {
+		p.dropAllOnDeath()
+	}
+	p.brk = breakState{}
+	p.move.fall = 0
+	p.announceDeath(src)
+	p.respawn = respawnStart
+	p.flush()
+}
+
+// stopOnDeath ends everything the dying player was doing: sleeping, using an item,
+// blocking, burning, looking in a chest and holding leashes.
+func (p *Player) stopOnDeath() {
 	p.StopSleeping()
 	p.stopUsing()
 	p.lowerShield()
@@ -46,28 +60,28 @@ func vanillaDie(p *Player, src DamageSource) {
 	p.Extinguish()
 	p.leaveChest(p.entity.Region(), true)
 	p.dropLeashes(p.entity.Region())
-	if !p.s.level.KeepInventory {
-		p.dropAllOnDeath()
-	}
-	p.brk = breakState{}
-	p.move.fall = 0
+}
+
+// announceDeath shows those who see the player its death, and sends the player its
+// death screen and, with showdeathmessages, everyone the death message.
+func (p *Player) announceDeath(src DamageSource) {
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventDeath), nil)
 	}
-	if key := deathMessage(src); key != "" {
-		params := []string{p.name}
-		if src.Attacker != nil {
-			params = append(params, src.Attacker.name)
-		}
-		p.send(&packet.DeathInfo{Cause: key, Messages: params})
-		if p.s.level.ShowDeathMessages {
-			text := &packet.Text{TextType: packet.TextTypeTranslation, NeedsTranslation: true, Message: key, Parameters: params}
-			p.send(text)
-			p.broadcast(text)
-		}
+	key := deathMessage(src)
+	if key == "" {
+		return
 	}
-	p.respawn = respawnStart
-	p.flush()
+	params := []string{p.name}
+	if src.Attacker != nil {
+		params = append(params, src.Attacker.name)
+	}
+	p.send(&packet.DeathInfo{Cause: key, Messages: params})
+	if p.s.level.ShowDeathMessages {
+		text := &packet.Text{TextType: packet.TextTypeTranslation, NeedsTranslation: true, Message: key, Parameters: params}
+		p.send(text)
+		p.broadcast(text)
+	}
 }
 
 // deathMessage is the translation key BDS picks for a cause, for the causes
@@ -203,15 +217,21 @@ func (p *Player) respawnPoint() mgl32.Vec3 {
 // health, hunger, saturation and exhaustion to their defaults, effects gone.
 func vanillaRespawn(p *Player, pos mgl32.Vec3) {
 	p.respawn = respawnNone
-	p.ClearEffects()
-	p.setAttributes(attrHealth, p.attributes.maximum(attrHealth), attrHunger, p.attributes.maximum(attrHunger),
-		attrSaturation, playerAttributes[attrSaturation].def, attrExhaustion, playerAttributes[attrExhaustion].def)
-	p.move = moveState{}
-	p.food = foodState{}
+	p.resetBody()
 	p.s.handlers.movement(p, moveTo(pos, p.entity.Rotation(), p.entity.Tick()))
 	p.send(&packet.SetHealth{Health: int32(p.Health())})
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventSpawnAlive), nil)
 	}
 	p.flush()
+}
+
+// resetBody gives a respawning player a fresh body: effects gone, health, hunger,
+// saturation and exhaustion at their defaults, and no movement or eating state.
+func (p *Player) resetBody() {
+	p.ClearEffects()
+	p.setAttributes(attrHealth, p.attributes.maximum(attrHealth), attrHunger, p.attributes.maximum(attrHunger),
+		attrSaturation, playerAttributes[attrSaturation].def, attrExhaustion, playerAttributes[attrExhaustion].def)
+	p.move = moveState{}
+	p.food = foodState{}
 }

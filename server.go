@@ -21,8 +21,8 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/commands"
 	"github.com/helix-bedrock/helix/daytime"
-	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fall"
+	"github.com/helix-bedrock/helix/farm"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/network"
@@ -304,14 +304,7 @@ func (s *Server) SetRedstone(c circuit.Config) { s.redstone.Set(c) }
 // cancelled or a transport fails to open. It closes every connection, then
 // saves and closes the world, before it returns.
 func (s *Server) Run(ctx context.Context) (err error) {
-	defer func() {
-		if v := recover(); v != nil {
-			s.panicked(v, debug.Stack())
-		}
-		if c := s.crash.Load(); c != nil {
-			err = errors.Join(err, c)
-		}
-	}()
+	defer s.runDone(&err)
 	if err := s.openWorld(); err != nil {
 		_ = s.listener.Close()
 		return err
@@ -321,44 +314,11 @@ func (s *Server) Run(ctx context.Context) (err error) {
 			err = errors.Join(err, cerr)
 		}
 	}()
-	if s.auth != nil {
-		// BDS sets up its token checks at startup. If Microsoft's services
-		// are down, players are refused with HostWithoutKeys until a retry
-		// in the background succeeds.
-		if err := s.auth.Start(ctx); err != nil {
-			s.log.Warn("Xbox Live checks are not ready; players cannot join until they are", "err", err)
-		} else {
-			s.log.Info("Xbox Live checks ready", "issuer", s.auth.Issuer(), "clock offset", s.auth.Offset())
-		}
-	}
-	host, err := player.NewHost(player.HostConfig{
-		Log: s.log.With("part", "players"), Registry: s.reg, Overworld: s.overworld, Nether: s.nether, End: s.end, Portals: s.portals, OnEnterEnd: s.enterEnd, Store: s.playerStore,
-		Level: s.level, ViewDistance: s.conf.ViewDistance, MaxPlayers: s.conf.MaxPlayers, Redstone: s.redstone, Farm: s.farm, Fire: s.fire,
-		OnPanic: s.panicked,
-	}, s.setup)
+	s.startAuth(ctx)
+	host, err := s.newHost()
 	if err != nil {
 		_ = s.listener.Close()
 		return err
-	}
-	host.SetClock(s.clock)
-	host.SetWeather(s.weather, s.chunkWeather)
-	if s.falling != nil {
-		host.SetFalling(s.falling)
-	}
-	s.players.Store(host)
-	if s.circuits != nil {
-		s.circuits.SetDispense(host.Dispense)
-		s.circuits.SetEntityBox(host.EntityBox)
-		s.circuits.SetPlateBox(host.PlateBox, host.IsArrow)
-		s.circuits.SetEntityPush(host.PistonPush)
-		s.circuits.SetCartBox(host.CartBox)
-		s.circuits.SetPowerTNT(host.PowerTNT)
-		host.SetCircuitHooks(player.CircuitHooks{
-			Use: s.circuits.UseBlock, Attack: s.circuits.AttackBlock, JukeboxPower: s.circuits.SetJukeboxPower, RingBell: s.circuits.RingBell, WindBell: s.circuits.WindBell, Destroy: s.circuits.DestroyBlock, ChestViewers: s.circuits.SetChestViewers, CartOnRail: s.circuits.CartOnRail, HitTarget: s.circuits.HitTarget, Signal: s.circuits.Signal,
-		})
-		for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
-			d.SetBlockEntities(s.circuits.Entities(d.BlockEntityMaker()))
-		}
 	}
 	defer host.Close(packet.DisconnectReasonShutdown)
 	stopPeriodic := s.startPeriodic(host)
@@ -376,6 +336,100 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		_ = s.listener.Close()
 	})
 	defer stop()
+	s.accept(host)
+	return nil
+}
+
+// runDone is deferred by Run: it recovers a panic and adds the crash, if any, to Run's
+// error.
+func (s *Server) runDone(err *error) {
+	if v := recover(); v != nil {
+		s.panicked(v, debug.Stack())
+	}
+	if c := s.crash.Load(); c != nil {
+		*err = errors.Join(*err, c)
+	}
+}
+
+// startAuth starts the Xbox Live token checks. BDS sets them up at startup; if
+// Microsoft's services are down, players are refused with HostWithoutKeys until a retry
+// in the background succeeds.
+func (s *Server) startAuth(ctx context.Context) {
+	if s.auth == nil {
+		return
+	}
+	if err := s.auth.Start(ctx); err != nil {
+		s.log.Warn("Xbox Live checks are not ready; players cannot join until they are", "err", err)
+		return
+	}
+	s.log.Info("Xbox Live checks ready", "issuer", s.auth.Issuer(), "clock offset", s.auth.Offset())
+}
+
+// newHost makes the player Host over the open world and hooks it to the server's
+// systems.
+func (s *Server) newHost() (*player.Host, error) {
+	host, err := player.NewHost(player.HostConfig{
+		Log:          s.log.With("part", "players"),
+		Registry:     s.reg,
+		Overworld:    s.overworld,
+		Nether:       s.nether,
+		End:          s.end,
+		Portals:      s.portals,
+		OnEnterEnd:   s.enterEnd,
+		Store:        s.playerStore,
+		Level:        s.level,
+		ViewDistance: s.conf.ViewDistance,
+		MaxPlayers:   s.conf.MaxPlayers,
+		Redstone:     s.redstone,
+		Farm:         s.farm,
+		Fire:         s.fire,
+		OnPanic:      s.panicked,
+	}, s.setup)
+	if err != nil {
+		return nil, err
+	}
+	host.SetClock(s.clock)
+	host.SetWeather(s.weather, s.chunkWeather)
+	if s.falling != nil {
+		host.SetFalling(s.falling)
+	}
+	s.players.Store(host)
+	if s.circuits != nil {
+		s.hookCircuits(host)
+	}
+	return host, nil
+}
+
+// hookCircuits connects redstone and the players both ways: what redstone asks the
+// players' world (dispensers, entity boxes, pistons pushing, carts, TNT) and what
+// players do to redstone blocks.
+func (s *Server) hookCircuits(host *player.Host) {
+	c := s.circuits
+	c.SetDispense(host.Dispense)
+	c.SetEntityBox(host.EntityBox)
+	c.SetPlateBox(host.PlateBox, host.IsArrow)
+	c.SetEntityPush(host.PistonPush)
+	c.SetCartBox(host.CartBox)
+	c.SetPowerTNT(host.PowerTNT)
+	host.SetCircuitHooks(player.CircuitHooks{
+		Use:          c.UseBlock,
+		Attack:       c.AttackBlock,
+		JukeboxPower: c.SetJukeboxPower,
+		RingBell:     c.RingBell,
+		WindBell:     c.WindBell,
+		Destroy:      c.DestroyBlock,
+		ChestViewers: c.SetChestViewers,
+		CartOnRail:   c.CartOnRail,
+		HitTarget:    c.HitTarget,
+		Signal:       c.Signal,
+	})
+	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
+		d.SetBlockEntities(c.Entities(d.BlockEntityMaker()))
+	}
+}
+
+// accept admits every connection the listener takes until it closes.
+func (s *Server) accept(host *player.Host) {
 	for {
 		c, err := s.listener.Accept()
 		if err != nil {
@@ -384,7 +438,6 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		host.Admit(c, s.updateStatus)
 	}
 	_ = s.listener.Close()
-	return nil
 }
 
 func (s *Server) openTransports() error {
@@ -654,32 +707,39 @@ const levelSaveInterval = 30 * time.Second
 // saving level.dat. The func it returns stops it and waits, so closing the world follows it.
 func (s *Server) startPeriodic(host *player.Host) (stop func()) {
 	quit, done := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(done)
-		defer func() {
-			if v := recover(); v != nil {
-				s.panicked(v, debug.Stack())
-			}
-		}()
-		clocks := time.NewTicker(clockSyncTicks * world.TickDuration)
-		defer clocks.Stop()
-		saves := time.NewTicker(levelSaveInterval)
-		defer saves.Stop()
-		for {
-			select {
-			case <-quit:
-				return
-			case <-clocks.C:
-				host.SyncClocks()
-			case <-saves.C:
-				if err := s.saveLevel(); err != nil {
-					s.log.Error("Save level.dat", "err", err)
-				}
-			}
-		}
-	}()
+	go s.periodic(host, quit, done)
 	return func() {
 		close(quit)
 		<-done
+	}
+}
+
+// periodic is startPeriodic's goroutine: it runs until quit closes, then closes done.
+func (s *Server) periodic(host *player.Host, quit <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+	defer s.recovered()
+	clocks := time.NewTicker(clockSyncTicks * world.TickDuration)
+	defer clocks.Stop()
+	saves := time.NewTicker(levelSaveInterval)
+	defer saves.Stop()
+	for {
+		select {
+		case <-quit:
+			return
+		case <-clocks.C:
+			host.SyncClocks()
+		case <-saves.C:
+			if err := s.saveLevel(); err != nil {
+				s.log.Error("Save level.dat", "err", err)
+			}
+		}
+	}
+}
+
+// recovered is deferred by the server's own goroutines: it recovers a panic and passes it
+// to panicked.
+func (s *Server) recovered() {
+	if v := recover(); v != nil {
+		s.panicked(v, debug.Stack())
 	}
 }

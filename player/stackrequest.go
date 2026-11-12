@@ -109,8 +109,24 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 	p.flush()
 }
 
-// stackRequest runs one request.
+// stackRequest runs one request: its actions on a copy of the player's items, the checks
+// on the result, then, if all pass, the copy becomes the player's items.
 func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackResponse {
+	p.startRequest(req)
+	touched, status := p.runActions(req.Actions)
+	if status == protocol.ItemStackResponseStatusOK {
+		status = p.checkRequest()
+	}
+	if status != protocol.ItemStackResponseStatusOK {
+		return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
+	}
+	p.commitRequest()
+	return p.stackResponse(req.RequestID, touched)
+}
+
+// startRequest readies the request state for req: a fresh copy of the player's items and
+// nothing dropped, crafted or stored yet.
+func (p *Player) startRequest(req protocol.ItemStackRequest) {
 	st := &p.requests
 	st.work = p.inventory
 	st.work.open = p.loadChestWork()
@@ -119,30 +135,43 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	st.craft = craftState{}
 	st.filter = req.FilterStrings
 	st.storage = st.storage[:0]
+}
+
+// runActions checks and applies each action on the copy in order and returns the slots
+// they touched, stopping at the first that fails.
+func (p *Player) runActions(actions []protocol.StackRequestAction) ([]slotRef, uint8) {
 	var touched []slotRef
-	for _, a := range req.Actions {
+	for _, a := range actions {
 		if status := p.preCraftAction(a); status != protocol.ItemStackResponseStatusOK {
-			return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
+			return nil, status
 		}
 		status, refs := p.stackAction(a)
 		if status != protocol.ItemStackResponseStatusOK {
-			return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
+			return nil, status
 		}
 		touched = append(touched, refs...)
 	}
+	return touched, protocol.ItemStackResponseStatusOK
+}
+
+// checkRequest runs the checks on the whole request once its actions are applied: the
+// craft is finished, storage items and shulker boxes hold only what they may, and the
+// container listeners agree. Listeners work on the copy, so refusing here changes
+// nothing.
+func (p *Player) checkRequest() uint8 {
 	if status := p.finishCraft(); status != protocol.ItemStackResponseStatusOK {
-		return protocol.ItemStackResponse{Status: status, RequestID: req.RequestID}
+		return status
 	}
-	if !p.commitStorage() {
-		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
+	if !p.commitStorage() || p.shulkerInShulker() || !p.fireChestItems() {
+		return protocol.ItemStackResponseStatusCannotPlaceItem
 	}
-	if p.shulkerInShulker() {
-		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
-	}
-	// Listeners work on the copy, so refusing here changes nothing.
-	if !p.fireChestItems() {
-		return protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusCannotPlaceItem, RequestID: req.RequestID}
-	}
+	return protocol.ItemStackResponseStatusOK
+}
+
+// commitRequest makes the request's copy the player's items and runs what follows: drops,
+// the craft's level and seed changes, enchanting options and equipment.
+func (p *Player) commitRequest() {
+	st := &p.requests
 	// The created output only holds an item for the request that made it.
 	st.work.ui[createdOutputSlot] = ItemStack{}
 	p.inventory = st.work
@@ -151,40 +180,51 @@ func (p *Player) stackRequest(req protocol.ItemStackRequest) protocol.ItemStackR
 	p.afterCraft(st.craft.after)
 	p.refreshEnchantOptions()
 	p.sendEquipment()
+}
 
-	resp := protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusOK, RequestID: req.RequestID}
+// stackResponse is the accepted request's response: the final stack of every slot it
+// touched, by container. It also keeps the network IDs it gave, for later requests
+// naming them.
+func (p *Player) stackResponse(id int32, touched []slotRef) protocol.ItemStackResponse {
+	st := &p.requests
+	resp := protocol.ItemStackResponse{Status: protocol.ItemStackResponseStatusOK, RequestID: id}
 	slots := map[[2]byte]int32{}
 	listed := map[[3]int32]bool{}
 	for _, r := range touched {
 		if r.container == containerCreatedOutput {
 			continue
 		}
-		key := [2]byte{r.container, r.slot}
-		if listed[[3]int32{int32(r.container), int32(r.slot), r.dynamic}] {
+		key := [3]int32{int32(r.container), int32(r.slot), r.dynamic}
+		if listed[key] {
 			continue
 		}
-		listed[[3]int32{int32(r.container), int32(r.slot), r.dynamic}] = true
+		listed[key] = true
 		s := p.slotStack(r)
-		slots[key] = s.netID
+		slots[[2]byte{r.container, r.slot}] = s.netID
 		if inv, slot := p.inventoryOf(r); inv.viewed() {
 			st.viewed = append(st.viewed, viewedSlot{inv: inv, slot: slot})
 		}
-		info := protocol.StackResponseSlotInfo{Slot: r.slot, HotbarSlot: r.slot, Count: s.Count, StackNetworkID: s.netID, CustomName: customName(s)}
-		name := protocol.FullContainerName{ContainerID: r.container}
-		if r.dynamic != 0 {
-			name.DynamicContainerID = protocol.Option(uint32(r.dynamic - 1)) //nolint:gosec // IDs are small
-		}
-		i := containerIndex(resp.ContainerInfo, name)
-		if i < 0 {
-			resp.ContainerInfo = append(resp.ContainerInfo, protocol.StackResponseContainerInfo{Container: name})
-			i = len(resp.ContainerInfo) - 1
-		}
-		resp.ContainerInfo[i].SlotInfo = append(resp.ContainerInfo[i].SlotInfo, info)
+		addSlotInfo(&resp, r, s)
 	}
 	a := &st.assignments[st.next%assignmentsKept]
-	a.id, a.slots = req.RequestID, slots
+	a.id, a.slots = id, slots
 	st.next++
 	return resp
+}
+
+// addSlotInfo adds the final stack s of slot r to the response, under its container.
+func addSlotInfo(resp *protocol.ItemStackResponse, r slotRef, s ItemStack) {
+	info := protocol.StackResponseSlotInfo{Slot: r.slot, HotbarSlot: r.slot, Count: s.Count, StackNetworkID: s.netID, CustomName: customName(s)}
+	name := protocol.FullContainerName{ContainerID: r.container}
+	if r.dynamic != 0 {
+		name.DynamicContainerID = protocol.Option(uint32(r.dynamic - 1)) //nolint:gosec // IDs are small
+	}
+	i := containerIndex(resp.ContainerInfo, name)
+	if i < 0 {
+		resp.ContainerInfo = append(resp.ContainerInfo, protocol.StackResponseContainerInfo{Container: name})
+		i = len(resp.ContainerInfo) - 1
+	}
+	resp.ContainerInfo[i].SlotInfo = append(resp.ContainerInfo[i].SlotInfo, info)
 }
 
 // describeStackRequest is a request's actions as text, for the debug log.

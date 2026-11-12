@@ -129,67 +129,106 @@ func (p *Portals) Along(dim mcdb.Dimension, pos cube.Pos, feet mgl32.Vec3) float
 // portal is recorded and the traveller's arrival returned.
 func (p *Portals) Make(r *world.Region, dim mcdb.Dimension, from mgl32.Vec3, rng *rand.Rand) Arrival {
 	rg := r.Dimension().Range()
-	at := func(x, y, z int) uint32 {
-		b, _ := r.Block(cube.Pos{x, y, z}, 0)
-		return b
+	sp := portalSearch{p: p, r: r, from: from, rg: rg, best: -1, start: rng.IntN(4)}
+	sp.fx, sp.fy, sp.fz = int(math.Floor(float64(from[0]))), int(math.Floor(float64(from[1]))), int(math.Floor(float64(from[2])))
+	sp.bx, sp.by, sp.bz = sp.fx, sp.fy, sp.fz
+	sp.search(4, 3)
+	if sp.best < 0 {
+		sp.search(2, 1)
 	}
-	fx, fy, fz := int(math.Floor(float64(from[0]))), int(math.Floor(float64(from[1]))), int(math.Floor(float64(from[2])))
-	best := -1.0
-	bx, by, bz, bdir := fx, fy, fz, 0
-	start := rng.IntN(4)
-	search := func(dirs, depth int) {
-		for x := fx - buildRadius; x <= fx+buildRadius; x++ {
-			dx := float64(x) + 0.5 - float64(from[0])
-			for z := fz - buildRadius; z <= fz+buildRadius; z++ {
-				dz := float64(z) + 0.5 - float64(from[2])
-			column:
-				for y := rg[1]; y >= rg[0]; y-- {
-					if at(x, y, z) != p.air {
-						continue
-					}
-					for y > rg[0] && at(x, y-1, z) == p.air {
-						y--
-					}
-					for k := start; k < start+dirs; k++ {
-						sx, sz := dirSteps(k)
-						for w := range depth {
-							for l := range frameColumns {
-								for h := -1; h < frameColumns; h++ {
-									px, py, pz := x+(l-1)*sx+w*sz, y+h, z+(l-1)*sz-w*sx
-									b := at(px, py, pz)
-									if (h < 0 && !p.solid(b)) || (h >= 0 && b != p.air) {
-										continue column
-									}
-								}
-							}
-						}
-						dy := float64(y) + 0.5 - float64(from[1])
-						if d := dx*dx + dy*dy + dz*dz; best < 0 || d < best {
-							best, bx, by, bz, bdir = d, x, y, z, k%4
-						}
-					}
+	sx, sz := dirSteps(sp.bdir)
+	if sp.best < 0 {
+		sp.by = min(max(sp.fy, forcedMinY), rg[1]-forcedTopGap)
+		p.platform(r, sp.bx, sp.by, sp.bz, sx, sz)
+	}
+	p.buildFrame(r, sp.bx, sp.by, sp.bz, sx, sz)
+	rec := Record{Pos: cube.Pos{sp.bx, sp.by, sp.bz}, Span: 2, XA: int8(sx), ZA: int8(sz)} //nolint:gosec // steps are -1, 0 or 1
+	p.Records.Add(dim, rec)
+	return arrivalIn(rec, rec.Pos, -1)
+}
+
+// portalSearch is Make's look for the nearest spot a portal fits, and the best found.
+type portalSearch struct {
+	p          *Portals
+	r          *world.Region
+	from       mgl32.Vec3
+	rg         [2]int
+	fx, fy, fz int
+	start      int
+	// best is the squared distance of the best spot, -1 while none was found.
+	best       float64
+	bx, by, bz int
+	bdir       int
+}
+
+// at is the block at x, y, z on layer 0.
+func (sp *portalSearch) at(x, y, z int) uint32 {
+	b, _ := sp.r.Block(cube.Pos{x, y, z}, 0)
+	return b
+}
+
+// search tries every column within the build radius, from the top down, for a frame
+// depth blocks deep in dirs directions, keeping the nearest spot that fits.
+func (sp *portalSearch) search(dirs, depth int) {
+	for x := sp.fx - buildRadius; x <= sp.fx+buildRadius; x++ {
+		for z := sp.fz - buildRadius; z <= sp.fz+buildRadius; z++ {
+			sp.searchColumn(x, z, dirs, depth)
+		}
+	}
+}
+
+// searchColumn tries each air floor of the column at x, z.
+func (sp *portalSearch) searchColumn(x, z, dirs, depth int) {
+	dx := float64(x) + 0.5 - float64(sp.from[0])
+	dz := float64(z) + 0.5 - float64(sp.from[2])
+	for y := sp.rg[1]; y >= sp.rg[0]; y-- {
+		if sp.at(x, y, z) != sp.p.air {
+			continue
+		}
+		for y > sp.rg[0] && sp.at(x, y-1, z) == sp.p.air {
+			y--
+		}
+		for k := sp.start; k < sp.start+dirs; k++ {
+			if !sp.fits(x, y, z, k, depth) {
+				// BDS gives up on this floor at the first direction that does not fit.
+				break
+			}
+			dy := float64(y) + 0.5 - float64(sp.from[1])
+			if d := dx*dx + dy*dy + dz*dz; sp.best < 0 || d < sp.best {
+				sp.best, sp.bx, sp.by, sp.bz, sp.bdir = d, x, y, z, k%4
+			}
+		}
+	}
+}
+
+// fits reports whether a frame in direction k, depth blocks deep, stands at x, y, z: a
+// solid floor under it and air where it goes.
+func (sp *portalSearch) fits(x, y, z, k, depth int) bool {
+	sx, sz := dirSteps(k)
+	for w := range depth {
+		for l := range frameColumns {
+			for h := -1; h < frameColumns; h++ {
+				b := sp.at(x+(l-1)*sx+w*sz, y+h, z+(l-1)*sz-w*sx)
+				if (h < 0 && !sp.p.solid(b)) || (h >= 0 && b != sp.p.air) {
+					return false
 				}
 			}
 		}
 	}
-	search(4, 3)
-	if best < 0 {
-		search(2, 1)
-	}
-	sx, sz := dirSteps(bdir)
-	if best < 0 {
-		by = min(max(fy, forcedMinY), rg[1]-forcedTopGap)
-		p.platform(r, bx, by, bz, sx, sz)
-	}
+	return true
+}
+
+// buildFrame sets the obsidian frame and portal blocks at bx, by, bz along sx, sz. Each
+// pass sets every frame and portal block first, as BDS's setBlock with flag 2 (no
+// neighbour update), and only then updates the neighbours of all of them in the same
+// order (sub_CE5EAC0 after the pass). A portal told of a neighbour while the frame is
+// half built would find it not whole and break.
+func (p *Portals) buildFrame(r *world.Region, bx, by, bz, sx, sz int) {
 	axis := AxisX
 	if sx == 0 {
 		axis = AxisZ
 	}
 	portal := p.portalFor(axis)
-	// Each pass sets every frame and portal block first, as BDS's setBlock with flag 2
-	// (no neighbour update), and only then updates the neighbours of all of them in the
-	// same order (sub_CE5EAC0 after the pass). A portal told of a neighbour while the
-	// frame is half built would find it not whole and break.
 	for range buildPasses {
 		for l := range frameColumns {
 			for h := -1; h <= frameTop; h++ {
@@ -206,9 +245,6 @@ func (p *Portals) Make(r *world.Region, dim mcdb.Dimension, from mgl32.Vec3, rng
 			}
 		}
 	}
-	rec := Record{Pos: cube.Pos{bx, by, bz}, Span: 2, XA: int8(sx), ZA: int8(sz)} //nolint:gosec // steps are -1, 0 or 1
-	p.Records.Add(dim, rec)
-	return arrivalIn(rec, rec.Pos, -1)
 }
 
 // dirSteps is Java's Teleporter direction k: the step along the portal.

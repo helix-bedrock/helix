@@ -26,8 +26,8 @@ func (p *Player) play() {
 	done := make(chan struct{})
 	defer close(done)
 	p.startFlusher(done)
-	leave := p.enterWorld(spawn, rot)
-	defer leave()
+	p.enterWorld(spawn, rot)
+	defer p.leaveWorld(lastPlace{spawn, rot})
 	p.readLoop(done)
 }
 
@@ -63,28 +63,36 @@ func (p *Player) worldSpawn() (mgl32.Vec3, protocol.BlockPos) {
 // as BDS broadcasts PlayerList.
 func (p *Player) announce() {
 	g := p.s.global
-	g.call(func() {
-		pk := &packet.PlayerList{Entries: []protocol.PlayerListEntry{p.listEntry()}}
-		for _, o := range g.order {
-			if o != p {
-				o.sendNow(pk)
-			}
-		}
-	})
+	g.call(func() { g.join(p) })
 }
 
 // sendJoin sends the join packets in the order BDS 1.26.60 sends them
 // (SyncActorProperty, PlayerFog and the camera packets between
 // them are not sent yet). False if the connection failed.
 func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) bool {
+	s := p.s
+	p.send(s.reg.JigsawStructures, s.reg.VoxelShapes, p.startGame(spawn, worldSpawn, rot))
+	p.send(s.reg.Items.RegistryPacket())
+	p.sendWorldState(worldSpawn)
+	p.sendSessionData()
+	p.sendOwnItems()
+	p.sendEffects()
+	p.send(p.recipesPacket())
+	p.send(p.commandsPacket())
+	p.sendJoinActorData()
+	return p.sendNow()
+}
+
+// startGame is the player's StartGame: who and where it is, and the world it joins.
+func (p *Player) startGame(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) *packet.StartGame {
 	s, lv := p.s, p.s.level
 	var dayTime int64
 	if s.clock != nil {
 		dayTime = int64(s.clock.Time())
 	}
-	p.send(s.reg.JigsawStructures, s.reg.VoxelShapes, &packet.StartGame{
+	return &packet.StartGame{
 		Time:           dayTime,
-		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: spawn, Dimension: p.s.dimensionID(p.dim),
+		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: spawn, Dimension: s.dimensionID(p.dim),
 		Pitch: rot.Pitch, Yaw: rot.Yaw,
 		WorldSeed: lv.Seed, Generator: lv.Generator, WorldGameMode: lv.GameMode, Difficulty: lv.Difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
@@ -93,41 +101,43 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0, Blocks: s.reg.Blocks.Definitions(),
 		RainLevel: s.weather.Rain(), LightningLevel: s.weather.Thunder(),
-	})
-	p.send(s.reg.Items.RegistryPacket())
+	}
+}
 
-	// The adventure settings and abilities are broadcast, so the player
-	// gets its abilities twice, as from BDS.
+// sendWorldState sends the joining player the world's spawn, time, weather and
+// difficulty.
+func (p *Player) sendWorldState(worldSpawn protocol.BlockPos) {
+	s := p.s
 	p.send(&packet.SetSpawnPosition{SpawnType: packet.SpawnTypeWorld, Position: worldSpawn, SpawnPosition: worldSpawn})
 	if s.clock != nil {
 		p.send(s.clockRegistry())
 	}
 	p.sendWeather()
-	p.send(&packet.SetDifficulty{Difficulty: uint32(lv.Difficulty)}, //nolint:gosec // difficulties are small
+	p.send(&packet.SetDifficulty{Difficulty: uint32(s.level.Difficulty)}, //nolint:gosec // difficulties are small
 		&packet.SetCommandsEnabled{Enabled: true})
+}
+
+// sendSessionData sends the joining player its abilities, the game rules, the player
+// list, the registries and its attributes. The adventure settings and abilities are
+// broadcast, so the player gets its abilities twice, as from BDS.
+func (p *Player) sendSessionData() {
+	s := p.s
 	adventure := &packet.UpdateAdventureSettings{AutoJump: true}
 	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
 	p.broadcast(adventure, abilities)
-	list := &packet.PlayerList{}
-	for _, o := range s.global.online() {
-		list.Entries = append(list.Entries, o.listEntry())
-	}
-	p.send(adventure, abilities, &packet.GameRulesChanged{GameRules: lv.GameRules}, list, abilities,
+	p.send(adventure, abilities, &packet.GameRulesChanged{GameRules: s.level.GameRules}, s.global.listPacket(), abilities,
 		s.reg.Biomes.DefinitionPacket(), s.reg.EntityTypes.IdentifiersPacket(),
 		&packet.UpdateAttributes{EntityRuntimeID: p.runtimeID, Attributes: p.attributes.list()},
 		s.reg.Creative.Packet(), s.reg.Trims.Packet())
-	p.sendOwnItems()
-	p.sendEffects()
-	p.send(p.recipesPacket())
-	p.send(p.commandsPacket())
+}
 
-	// BDS sends the player its own synched data on its first tick, then
-	// the next tick the breathing flag once it finds air.
+// sendJoinActorData sends the player its own synched data, as BDS does on its first
+// tick, then the breathing flag BDS sends the next tick once it finds air.
+func (p *Player) sendJoinActorData() {
 	p.send(actorData(p.runtimeID, p.ownMetadata()),
 		actorData(p.runtimeID, protocol.EntityMetadata{
 			protocol.EntityDataKeyFlags: int64(ownFlags | 1<<protocol.EntityDataFlagBreathing),
 		}))
-	return p.sendNow()
 }
 
 // startFlusher starts the goroutine that sends what regions queued for
@@ -155,29 +165,28 @@ func (p *Player) startFlusher(done <-chan struct{}) {
 }
 
 // enterWorld adds the player's viewer and entity to the dimension it was saved in.
-// The returned leave takes them out and saves the player where its region last had
-// it.
-func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) (leave func()) {
-	s := p.s
+// leaveWorld takes them out again.
+func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) {
 	p.zone.pos = spawn
 	p.viewer = p.dim.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
-	removed := make(chan lastPlace, 1)
-	p.removed = removed
+	p.removed = make(chan lastPlace, 1)
 	// Until its first tick, others see where it spawns.
 	p.seen.store(PlayerState{Position: spawn.Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: rot, GameMode: p.gameMode, Level: p.Level()})
 	p.entity = p.dim.AddEntity(p.entityConfig(spawn, rot))
-	return func() {
-		pos := spawn
-		p.entity.Remove()
-		select {
-		case l := <-removed:
-			pos, rot = l.pos, l.rot
-		case <-time.After(removeWait):
-			s.log.Warn("player entity not removed in time; saving the last position read", "name", p.name)
-		}
-		p.save(pos, rot)
-		p.currentViewer().Close()
+}
+
+// leaveWorld takes the player's entity and viewer out of the world and saves the player
+// where its region last had it, or at fallback if the region does not answer in time.
+func (p *Player) leaveWorld(fallback lastPlace) {
+	at := fallback
+	p.entity.Remove()
+	select {
+	case at = <-p.removed:
+	case <-time.After(removeWait):
+		p.s.log.Warn("player entity not removed in time; saving the last position read", "name", p.name)
 	}
+	p.save(at.pos, at.rot)
+	p.currentViewer().Close()
 }
 
 // lastPlace is where the player's entity was when its region took it out.
@@ -192,18 +201,23 @@ func (p *Player) entityConfig(pos mgl32.Vec3, rot world.Rotation) world.EntityCo
 	return world.EntityConfig{
 		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: pos, Rot: rot, Viewer: p.viewer, Owner: p,
 		Spawn: p.spawnPackets, Move: p.movePacket, Think: p.think, Input: p.handleInput,
-		Removed: func(e *world.Entity) {
-			p.StopSleeping()
-			p.leaveChest(nil, false)
-			p.dropLeashes(e.Region())
-			if mv := p.moving; mv != nil {
-				p.moving = nil
-				p.arrive(mv)
-				return
-			}
-			p.removed <- lastPlace{e.Position(), e.Rotation()}
-		},
+		Removed: p.entityRemoved,
 	}
+}
+
+// entityRemoved runs on the region when it takes the player's entity out: it lets go of
+// what the player held there, then finishes a move to another dimension or, when the
+// player leaves, hands back where it was.
+func (p *Player) entityRemoved(e *world.Entity) {
+	p.StopSleeping()
+	p.leaveChest(nil, false)
+	p.dropLeashes(e.Region())
+	if mv := p.moving; mv != nil {
+		p.moving = nil
+		p.arrive(mv)
+		return
+	}
+	p.removed <- lastPlace{e.Position(), e.Rotation()}
 }
 
 // currentViewer is the player's viewer; it changes when the player changes

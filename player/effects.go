@@ -278,72 +278,24 @@ func (p *Player) effectsHurt(src DamageSource) {
 // had one goes back to its base when the last one goes. Max modifiers keep the value
 // within the new maximum.
 func (p *Player) applyEffectModifiers() {
-	var add, mulBase, maxAdd, maxMulBase [len(playerAttributes)]float32
-	var mulTotal, maxMulTotal [len(playerAttributes)]float32
-	for i := range mulTotal {
-		mulTotal[i], maxMulTotal[i] = 1, 1
-	}
-	var valued, maxed uint32
-	for _, e := range p.effects {
-		def, ok := p.s.game.effects[e.ID]
-		if !ok {
-			continue
-		}
-		for _, m := range def.Modifiers {
-			i, ok := attributeIndex(m.Attribute)
-			if !ok {
-				continue
-			}
-			v := m.Amount * float32(e.Amplifier+1)
-			a, mb, mt := &add[i], &mulBase[i], &mulTotal[i]
-			if m.OnMax {
-				a, mb, mt = &maxAdd[i], &maxMulBase[i], &maxMulTotal[i]
-				maxed |= 1 << i
-			} else {
-				valued |= 1 << i
-			}
-			switch m.Operation {
-			case ModifierAdd:
-				*a += v
-			case ModifierMultiplyBase:
-				*mb += v
-			case ModifierMultiplyTotal:
-				*mt *= 1 + v
-			}
-		}
-	}
+	sums := p.sumEffectModifiers()
 	var changed []protocol.Attribute
 	health := false
 	for i := range playerAttributes {
 		bit := uint32(1) << i
-		a := &p.attributes[i]
-		if maxed&bit != 0 || p.effectMaxed&bit != 0 {
-			top := playerAttributes[i].max
-			if a.limit != 0 {
-				top = a.limit
-			}
-			bonus := float32(0)
-			if maxed&bit != 0 {
-				bonus = (top+maxAdd[i])*(1+maxMulBase[i])*maxMulTotal[i] - top
-			}
-			if bonus != a.maxBonus {
-				a.maxBonus = bonus
-				p.attributes.set(i, a.current)
+		if sums.maxed&bit != 0 || p.effectMaxed&bit != 0 {
+			if p.applyMaxModifier(i, &sums) {
 				changed = append(changed, p.attributes.entry(i))
 				health = health || i == attrHealth
 			}
 		}
-		if valued&bit != 0 || p.effectValued&bit != 0 {
-			v := a.base
-			if valued&bit != 0 {
-				v = (a.base + add[i]) * (1 + mulBase[i]) * mulTotal[i]
-			}
-			if p.attributes.set(i, v) {
+		if sums.valued&bit != 0 || p.effectValued&bit != 0 {
+			if p.applyValueModifier(i, &sums) {
 				changed = append(changed, p.attributes.entry(i))
 			}
 		}
 	}
-	p.effectValued, p.effectMaxed = valued, maxed
+	p.effectValued, p.effectMaxed = sums.valued, sums.maxed
 	// While loading there is no entity yet; the join sends every attribute.
 	if p.entity == nil {
 		return
@@ -354,6 +306,83 @@ func (p *Player) applyEffectModifiers() {
 	if health {
 		p.showHealth()
 	}
+}
+
+// modifierSums are the effects' attribute modifiers summed per attribute, for values and
+// for maximums, with a bit per attribute that has any.
+type modifierSums struct {
+	add, mulBase, mulTotal          [len(playerAttributes)]float32
+	maxAdd, maxMulBase, maxMulTotal [len(playerAttributes)]float32
+	valued, maxed                   uint32
+}
+
+// sumEffectModifiers adds up the modifiers of every effect the player has, each times
+// its amplifier plus one.
+func (p *Player) sumEffectModifiers() modifierSums {
+	var m modifierSums
+	for i := range m.mulTotal {
+		m.mulTotal[i], m.maxMulTotal[i] = 1, 1
+	}
+	for _, e := range p.effects {
+		def, ok := p.s.game.effects[e.ID]
+		if !ok {
+			continue
+		}
+		for _, mod := range def.Modifiers {
+			i, ok := attributeIndex(mod.Attribute)
+			if !ok {
+				continue
+			}
+			v := mod.Amount * float32(e.Amplifier+1)
+			a, mb, mt := &m.add[i], &m.mulBase[i], &m.mulTotal[i]
+			if mod.OnMax {
+				a, mb, mt = &m.maxAdd[i], &m.maxMulBase[i], &m.maxMulTotal[i]
+				m.maxed |= 1 << i
+			} else {
+				m.valued |= 1 << i
+			}
+			switch mod.Operation {
+			case ModifierAdd:
+				*a += v
+			case ModifierMultiplyBase:
+				*mb += v
+			case ModifierMultiplyTotal:
+				*mt *= 1 + v
+			}
+		}
+	}
+	return m
+}
+
+// applyMaxModifier sets attribute i's maximum bonus from the sums, none if no effect
+// changes it any more. True if it changed.
+func (p *Player) applyMaxModifier(i int, m *modifierSums) bool {
+	a := &p.attributes[i]
+	top := playerAttributes[i].max
+	if a.limit != 0 {
+		top = a.limit
+	}
+	bonus := float32(0)
+	if m.maxed&(1<<i) != 0 {
+		bonus = (top+m.maxAdd[i])*(1+m.maxMulBase[i])*m.maxMulTotal[i] - top
+	}
+	if bonus == a.maxBonus {
+		return false
+	}
+	a.maxBonus = bonus
+	p.attributes.set(i, a.current)
+	return true
+}
+
+// applyValueModifier sets attribute i's value from its base and the sums, the base alone
+// if no effect changes it any more. True if it changed.
+func (p *Player) applyValueModifier(i int, m *modifierSums) bool {
+	a := &p.attributes[i]
+	v := a.base
+	if m.valued&(1<<i) != 0 {
+		v = (a.base + m.add[i]) * (1 + m.mulBase[i]) * m.mulTotal[i]
+	}
+	return p.attributes.set(i, v)
 }
 
 // visibleEffectsMax is how many effects the visible effects actor data holds.

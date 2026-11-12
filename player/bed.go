@@ -187,22 +187,8 @@ func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, h
 	head := foot.Side(facing.Face())
 	footState := blockuse.BedSet(blocks, blockuse.BedWithFacing(blocks, block, facing), blockuse.BedHead, false)
 	headState := blockuse.BedSet(blocks, footState, blockuse.BedHead, true)
-	for _, at := range [...]cube.Pos{foot, head} {
-		b, ok := r.Block(at, 0)
-		if !ok || !p.s.game.replaceable(p, r, at, b, block) || blocks.Properties(b).Material == registry.MaterialLava {
-			return false
-		}
-		under, okUnder := r.Block(at.Side(cube.FaceDown), 0)
-		if !okUnder || !p.s.attach.Supports(under, cube.FaceUp) {
-			return false
-		}
-	}
-	for y := foot[1] - bedPortalReach; y <= foot[1]+bedPortalReach; y++ {
-		if b, ok := r.Block(cube.Pos{foot[0], y, foot[2]}, 0); ok {
-			if n := blocks.Name(b); n == endPortal || n == endPortalFrame {
-				return false
-			}
-		}
+	if !p.bedFits(r, foot, head, block) || p.endPortalNear(r, foot) {
+		return false
 	}
 	if p.inside(foot, footState) || p.inside(head, headState) {
 		return false
@@ -219,16 +205,7 @@ func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, h
 	}
 	r.SetBlock(head, 0, headState)
 	if blocks.Name(block) == blockuse.Bed {
-		color := uint8(held.Meta & 0xf) //nolint:gosec // masked to a colour
-		for _, at := range [...]cube.Pos{foot, head} {
-			if be, ok := r.BlockEntity(at); ok {
-				if b, isBed := be.(*bedEntity); isBed {
-					b.color = color
-					r.SaveBlockEntity(at)
-					r.SendBlockEntity(at)
-				}
-			}
-		}
+		colourBed(r, uint8(held.Meta&0xf), foot, head) //nolint:gosec // masked to a colour
 	}
 	r.UpdateNeighbours(foot)
 	r.UpdateNeighbours(head)
@@ -237,6 +214,49 @@ func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, h
 		p.useHeld()
 	}
 	return true
+}
+
+// bedFits reports whether both halves of a bed may go at foot and head: each can be built
+// over, holds no lava, and stands on a block that supports it.
+func (p *Player) bedFits(r *world.Region, foot, head cube.Pos, block uint32) bool {
+	blocks := p.s.reg.Blocks
+	for _, at := range [...]cube.Pos{foot, head} {
+		b, ok := r.Block(at, 0)
+		if !ok || !p.s.game.replaceable(p, r, at, b, block) || blocks.Properties(b).Material == registry.MaterialLava {
+			return false
+		}
+		under, okUnder := r.Block(at.Side(cube.FaceDown), 0)
+		if !okUnder || !p.s.attach.Supports(under, cube.FaceUp) {
+			return false
+		}
+	}
+	return true
+}
+
+// endPortalNear reports an end portal or frame in the column within bedPortalReach of foot.
+func (p *Player) endPortalNear(r *world.Region, foot cube.Pos) bool {
+	blocks := p.s.reg.Blocks
+	for y := foot[1] - bedPortalReach; y <= foot[1]+bedPortalReach; y++ {
+		if b, ok := r.Block(cube.Pos{foot[0], y, foot[2]}, 0); ok {
+			if n := blocks.Name(b); n == endPortal || n == endPortalFrame {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// colourBed sets the colour of the bed block entities at both halves and sends them.
+func colourBed(r *world.Region, color uint8, halves ...cube.Pos) {
+	for _, at := range halves {
+		if be, ok := r.BlockEntity(at); ok {
+			if b, isBed := be.(*bedEntity); isBed {
+				b.color = color
+				r.SaveBlockEntity(at)
+				r.SendBlockEntity(at)
+			}
+		}
+	}
 }
 
 // sleepState is where a player is with sleeping. The region owns it; info is a copy for

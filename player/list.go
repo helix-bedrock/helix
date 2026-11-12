@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // global is the global owner (RFC 0002): one goroutine at 20 TPS that never
@@ -119,6 +121,37 @@ func (g *global) remove(p *Player) {
 		}
 	}
 	g.publish()
+}
+
+// join tells every other player on the list of p, as BDS broadcasts PlayerList before
+// the joining player gets StartGame. Global owner only.
+func (g *global) join(p *Player) {
+	pk := &packet.PlayerList{Entries: []protocol.PlayerListEntry{p.listEntry()}}
+	for _, o := range g.order {
+		if o != p {
+			o.sendNow(pk)
+		}
+	}
+}
+
+// leave takes p off the player list and tells everyone left. Global owner only.
+func (g *global) leave(p *Player) {
+	g.remove(p)
+	pk := &packet.PlayerList{Entries: []protocol.PlayerListEntry{{ActionType: protocol.PlayerListActionRemove, UUID: p.uuid}}}
+	for _, o := range g.order {
+		o.sendNow(pk)
+	}
+}
+
+// listPacket is the whole player list as one PlayerList, for a player joining. Runs:
+// anywhere.
+func (g *global) listPacket() *packet.PlayerList {
+	online := g.online()
+	pk := &packet.PlayerList{Entries: make([]protocol.PlayerListEntry, 0, len(online))}
+	for _, o := range online {
+		pk.Entries = append(pk.Entries, o.listEntry())
+	}
+	return pk
 }
 
 func (g *global) publish() {

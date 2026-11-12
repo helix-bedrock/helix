@@ -169,19 +169,15 @@ func (r *Region) planViewer(i int) {
 	v.planCentre, v.planRadius, v.planned = centre, radius, true
 }
 
+// updateViewer brings the viewer's zones up to date on its region's tick: a removed one
+// lets go of its chunks, one moved far is handed to another region, one moved or resized
+// gets new zones, and then the next chunks are sent. False if the viewer left the region.
 func (r *Region) updateViewer(v *Viewer) bool {
 	v.mu.Lock()
 	centre, radius, placed, removed := v.centre, v.radius, v.placed, v.removed
 	v.mu.Unlock()
 	if removed {
-		for pos := range v.held {
-			r.release(pos)
-		}
-		clear(v.held)
-		clear(v.waiting)
-		r.d.mu.Lock()
-		delete(r.d.viewers, v)
-		r.d.mu.Unlock()
+		r.dropViewer(v)
 		return false
 	}
 	if !placed {
@@ -193,39 +189,69 @@ func (r *Region) updateViewer(v *Viewer) bool {
 	}
 	sim := min(r.d.conf.SimulationDistance, radius)
 	if centre != v.lastCentre || radius != v.lastRadius || v.queue == nil {
-		v.lastCentre, v.lastRadius = centre, radius
-		v.netMu.Lock()
-		for pos := range v.known {
-			if dist2(pos, centre) > int64(radius)*int64(radius) {
-				delete(v.known, pos)
-				delete(v.waiting, pos)
-				delete(v.nets, pos)
-			}
-		}
-		v.netMu.Unlock()
-		if v.planned && v.planCentre == centre && v.planRadius == radius {
-			v.queue, v.nextQueue = v.nextQueue, v.queue
-			v.scratch, v.nextScratch = v.nextScratch, v.scratch
-		} else {
-			v.queue = chunksInRadius(v.queue, centre, radius)
-			v.scratch = chunksInRadius(v.scratch, centre, sim)
-		}
-		inSim := make(map[mcdb.ChunkPos]bool, len(v.scratch))
-		for _, pos := range v.scratch {
-			inSim[pos] = true
-			if !v.held[pos] {
-				v.held[pos] = true
-				r.hold(pos)
-			}
-		}
-		for pos := range v.held {
-			if !inSim[pos] {
-				delete(v.held, pos)
-				r.release(pos)
-			}
-		}
+		r.rezone(v, centre, radius, sim)
 	}
 	v.planned = false
+	r.sendQueued(v)
+	if !v.readyDone && simulationSent(v, centre, sim) {
+		v.readyDone = true
+		close(v.ready)
+	}
+	return true
+}
+
+// dropViewer releases every chunk a removed viewer held and forgets it.
+func (r *Region) dropViewer(v *Viewer) {
+	for pos := range v.held {
+		r.release(pos)
+	}
+	clear(v.held)
+	clear(v.waiting)
+	r.d.mu.Lock()
+	delete(r.d.viewers, v)
+	r.d.mu.Unlock()
+}
+
+// rezone gives the viewer its zones around centre: chunks out of the view radius are
+// forgotten, the send queue is rebuilt (or taken from the plan made in parallel), and the
+// simulation zone of radius sim is held and what left it released.
+func (r *Region) rezone(v *Viewer, centre mcdb.ChunkPos, radius, sim int32) {
+	v.lastCentre, v.lastRadius = centre, radius
+	v.netMu.Lock()
+	for pos := range v.known {
+		if dist2(pos, centre) > int64(radius)*int64(radius) {
+			delete(v.known, pos)
+			delete(v.waiting, pos)
+			delete(v.nets, pos)
+		}
+	}
+	v.netMu.Unlock()
+	if v.planned && v.planCentre == centre && v.planRadius == radius {
+		v.queue, v.nextQueue = v.nextQueue, v.queue
+		v.scratch, v.nextScratch = v.nextScratch, v.scratch
+	} else {
+		v.queue = chunksInRadius(v.queue, centre, radius)
+		v.scratch = chunksInRadius(v.scratch, centre, sim)
+	}
+	inSim := make(map[mcdb.ChunkPos]bool, len(v.scratch))
+	for _, pos := range v.scratch {
+		inSim[pos] = true
+		if !v.held[pos] {
+			v.held[pos] = true
+			r.hold(pos)
+		}
+	}
+	for pos := range v.held {
+		if !inSim[pos] {
+			delete(v.held, pos)
+			r.release(pos)
+		}
+	}
+}
+
+// sendQueued sends the viewer up to chunksPerTick chunks from its queue that it does not
+// have: encoded ones at once, the rest asked for and sent when ready.
+func (r *Region) sendQueued(v *Viewer) {
 	sent := 0
 	for n := 0; len(v.queue) > 0 && n < chunksPerTick && len(v.waiting) < maxWaiting; {
 		pos := v.queue[0]
@@ -246,11 +272,6 @@ func (r *Region) updateViewer(v *Viewer) bool {
 	if sent > 0 {
 		v.unflushed = true
 	}
-	if !v.readyDone && simulationSent(v, centre, sim) {
-		v.readyDone = true
-		close(v.ready)
-	}
-	return true
 }
 
 // far reports whether the section of pos is more than MergeDistance

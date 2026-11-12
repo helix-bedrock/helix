@@ -88,10 +88,22 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	for k, v := range o.bucketData() {
 		data[k] = v
 	}
+	o.saveActor(e, data)
+	o.saveMobState(data)
+	o.saveEquipment(data)
+	data["Attributes"] = o.saveAttributes(prevAttrs)
+	o.saveBreeding(data)
+	if o.stand != nil {
+		o.saveArmorStand(data)
+	}
+	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
+}
+
+// saveActor writes Actor::saveWithoutId's fields: ID, place, motion, name and dimension.
+func (o *Mob) saveActor(e *world.Entity, data map[string]any) {
 	pos := e.Position()
 	pitch, yaw, _, _ := o.m.Rotation()
 	vel := o.m.Body().Vel
-	f := o.m.Flags()
 	data["UniqueID"] = e.UniqueID()
 	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
 	data["Rotation"] = []float32{yaw, pitch}
@@ -101,7 +113,7 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	} else {
 		delete(data, mobKeyCustomName)
 	}
-	data[mobKeyCustomNameVisible] = boolByte(f.Has(mob.FlagAlwaysShowName))
+	data[mobKeyCustomNameVisible] = boolByte(o.m.Flags().Has(mob.FlagAlwaysShowName))
 	data["OnGround"] = boolByte(o.m.Body().OnGround)
 	if _, ok := data["FallDistance"]; !ok {
 		data["FallDistance"] = float32(0)
@@ -109,6 +121,12 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	if r := e.Region(); r != nil {
 		data["LastDimensionId"] = int32(o.s.dimensionID(r.Dimension()))
 	}
+}
+
+// saveMobState writes the mob's flag bytes, actor data values, persistence, fire, air,
+// spawn facts and target.
+func (o *Mob) saveMobState(data map[string]any) {
+	f := o.m.Flags()
 	for _, k := range mobFlagKeys {
 		data[k.key] = boolByte(f.Has(k.flag))
 	}
@@ -119,6 +137,14 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	data[mobKeyFire] = int16(min(o.m.FireTicks(), math.MaxInt16)) //nolint:gosec // clamped
 	air, _ := o.m.Air()
 	data["Air"] = air
+	data[mobKeyDead] = uint8(0)
+	data[mobKeySurface] = boolByte(o.surface)
+	data[mobKeyNaturalSpawn] = boolByte(o.naturalSpawn)
+	data["TargetID"] = int64(o.m.Target())
+}
+
+// saveEquipment writes the mob's hands and armour in BDS's lists.
+func (o *Mob) saveEquipment(data map[string]any) {
 	data[mobKeyMainhand] = []any{o.items.stacks[mob.EquipMainhand].nbt(0, false)}
 	data[mobKeyOffhand] = []any{o.items.stacks[mob.EquipOffhand].nbt(0, false)}
 	armour := make([]any, 0, 5)
@@ -126,16 +152,6 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 		armour = append(armour, o.items.stacks[slot].nbt(0, false))
 	}
 	data[mobKeyArmor] = armour
-	data[mobKeyDead] = uint8(0)
-	data[mobKeySurface] = boolByte(o.surface)
-	data[mobKeyNaturalSpawn] = boolByte(o.naturalSpawn)
-	data["TargetID"] = int64(o.m.Target())
-	data["Attributes"] = o.saveAttributes(prevAttrs)
-	o.saveBreeding(data)
-	if o.stand != nil {
-		o.saveArmorStand(data)
-	}
-	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
 // dataValue is one of the mob's actor data values for its save, 0 when its components wrote

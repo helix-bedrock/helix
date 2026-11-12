@@ -151,33 +151,11 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	}
 	conf.Ticker = s.conf.BlockTicker
 	if conf.Ticker == nil {
-		table, err := connect.New(s.reg.Blocks)
+		circuits, err := s.vanillaTicker(doFireTick)
 		if err != nil {
 			return err
 		}
-		attached, err := attach.New(s.reg.Blocks)
-		if err != nil {
-			return err
-		}
-		rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
-		liquids := liquid.New(s.reg.Blocks)
-		liquids.SetDrops(s.popBlock)
-		s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
-		s.farm.SetSupport(attached.Supports)
-		s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
-		s.fire.SetCampfireWet(s.campfireWet)
-		falls, err := fall.New(s.reg.Blocks, attached.Supports)
-		if err != nil {
-			return err
-		}
-		s.falling = falls
-		circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, fall.NewTicker(falls, s.startFalling, s.destroySnow, attach.NewTicker(attached, s.fallBlock, blockuse.NewTicker(s.reg.Blocks, connect.NewTicker(table, portal.NewTicker(s.portals, s.dimensionOf, s.fire))))))
-		if err != nil {
-			return err
-		}
-		circuits.SetSettings(s.redstone)
 		conf.Ticker = circuits
-		s.circuits = circuits
 	}
 	r, _ := mcdb.Overworld.Range()
 	conf.Generator = s.conf.Generator
@@ -191,7 +169,69 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 		}
 		conf.Generator = g
 	}
-	switch g := conf.Generator.(type) {
+	s.findSurface(conf.Generator, r)
+	if s.farm != nil {
+		if v, ok := conf.Generator.(*generator.Vanilla); ok {
+			s.farm.SetTrees(v)
+		} else {
+			s.farm.SetTrees(generator.NewBackgroundTrees(s.reg, seed, s.log))
+		}
+	}
+	conf.Weather = s.startWeather(conf.Generator)
+	conf.Spawner = mobSpawner{s}
+	d, err := world.New(conf)
+	if err != nil {
+		return err
+	}
+	s.overworld = d
+	conf.Weather = nil
+	return s.openOtherDimensions(conf, typeName, seed)
+}
+
+// vanillaTicker builds vanilla's chain of block tickers, each wrapping the next: redstone,
+// falling blocks, attached blocks, doors and buttons, connections, portals, fire, farming
+// and liquids. It keeps the systems the rest of the server reaches (farm, fire, falling,
+// circuits) and returns the outermost.
+func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
+	table, err := connect.New(s.reg.Blocks)
+	if err != nil {
+		return nil, err
+	}
+	attached, err := attach.New(s.reg.Blocks)
+	if err != nil {
+		return nil, err
+	}
+	falls, err := fall.New(s.reg.Blocks, attached.Supports)
+	if err != nil {
+		return nil, err
+	}
+	liquids := liquid.New(s.reg.Blocks)
+	liquids.SetDrops(s.popBlock)
+	s.farm = farm.NewTicker(s.reg, s.fallBlock, liquids)
+	s.farm.SetSupport(attached.Supports)
+	rules := fire.Rules{DoFireTick: doFireTick, TNTExplodes: s.level.TNTExplodes, Difficulty: s.level.Difficulty}
+	s.fire = fire.NewTicker(s.reg, attached, rules, s.primeTNT, s.farm)
+	s.fire.SetCampfireWet(s.campfireWet)
+	s.falling = falls
+
+	portals := portal.NewTicker(s.portals, s.dimensionOf, s.fire)
+	connections := connect.NewTicker(table, portals)
+	uses := blockuse.NewTicker(s.reg.Blocks, connections)
+	attachments := attach.NewTicker(attached, s.fallBlock, uses)
+	falling := fall.NewTicker(falls, s.startFalling, s.destroySnow, attachments)
+	circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, falling)
+	if err != nil {
+		return nil, err
+	}
+	circuits.SetSettings(s.redstone)
+	s.circuits = circuits
+	return circuits, nil
+}
+
+// findSurface sets the level's surface, where players stand while the spawn has no
+// height: the top of a flat world's layers, or the generator's height at the spawn.
+func (s *Server) findSurface(gen world.Generator, r [2]int) {
+	switch g := gen.(type) {
 	case world.Flat:
 		top := int32(g.Bottom)
 		for _, l := range g.Layers {
@@ -205,17 +245,13 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			s.level.Surface = g.SpawnHeight(sp[0], sp[2])
 		}
 	}
-	if s.farm != nil {
-		if v, ok := conf.Generator.(*generator.Vanilla); ok {
-			s.farm.SetTrees(v)
-		} else {
-			s.farm.SetTrees(generator.NewBackgroundTrees(s.reg, seed, s.log))
-		}
-	}
-	climate, _ := conf.Generator.(weather.Climate)
+}
+
+// startWeather makes the overworld's chunk weather from the generator's climate and gives
+// it to the systems that read it.
+func (s *Server) startWeather(gen world.Generator) *weather.Ticker {
+	climate, _ := gen.(weather.Climate)
 	s.chunkWeather = weather.NewTicker(weather.Config{Registry: s.reg, Weather: s.weather, Climate: climate, Strike: s.strike, Mobs: s.mobsIn})
-	conf.Weather = s.chunkWeather
-	conf.Spawner = mobSpawner{s}
 	if s.fire != nil {
 		s.fire.SetWeather(s.chunkWeather)
 	}
@@ -225,13 +261,7 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	if s.circuits != nil {
 		s.circuits.SetWeather(s.weather)
 	}
-	d, err := world.New(conf)
-	if err != nil {
-		return err
-	}
-	s.overworld = d
-	conf.Weather = nil
-	return s.openOtherDimensions(conf, typeName, seed)
+	return s.chunkWeather
 }
 
 // dimensionOf is BDS's number of an open dimension. Runs: anywhere once the world is

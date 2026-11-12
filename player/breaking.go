@@ -186,7 +186,6 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 	if r == nil {
 		return
 	}
-	g := p.s.game
 	creative := p.creative()
 	hadContinue, predicted, destroyed := false, false, false
 	var predictPos cube.Pos
@@ -195,11 +194,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 		pos := toCube(a.BlockPos)
 		switch a.Action {
 		case protocol.PlayerActionStartBreak:
-			if attack := p.s.circuits.Attack; attack != nil {
-				if b, ok := r.Block(pos, 0); ok {
-					attack(r, pos, b)
-				}
-			}
+			p.attackCircuit(r, pos)
 			if p.startBreak(r, pos, a.Face) {
 				destroyed = true
 			}
@@ -210,10 +205,8 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 			levelEvent(r, cube.Pos{}, mgl32.Vec3{}, levelEventStopCracking, 0)
 		case protocol.PlayerActionPredictDestroyBlock:
 			predicted, predictPos, predictFace = true, pos, a.Face
-			if hadContinue && creative && p.inReach(pos) {
-				if b, ok := r.Block(pos, 0); ok && b != p.s.reg.Blocks.Air() && g.sys.BreakFinish(p, pos) {
-					destroyed = true
-				}
+			if hadContinue && creative && p.creativeDestroy(r, pos) {
+				destroyed = true
 			}
 		case protocol.PlayerActionContinueDestroyBlock:
 			if !creative {
@@ -232,6 +225,28 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 	if predicted && !destroyed {
 		p.resendAround(r, predictPos, predictFace)
 	}
+}
+
+// attackCircuit tells redstone the block at pos was hit, for blocks such as note blocks
+// that answer a hit.
+func (p *Player) attackCircuit(r *world.Region, pos cube.Pos) {
+	attack := p.s.circuits.Attack
+	if attack == nil {
+		return
+	}
+	if b, ok := r.Block(pos, 0); ok {
+		attack(r, pos, b)
+	}
+}
+
+// creativeDestroy breaks the block at pos at once, as a creative player's predicted
+// destroy after a continue does when the block is in reach and not air. True if it broke.
+func (p *Player) creativeDestroy(r *world.Region, pos cube.Pos) bool {
+	if !p.inReach(pos) {
+		return false
+	}
+	b, ok := r.Block(pos, 0)
+	return ok && b != p.s.reg.Blocks.Air() && p.s.game.sys.BreakFinish(p, pos)
 }
 
 // startBreak is BDS's StartDestroyBlock: the crack starts for everyone

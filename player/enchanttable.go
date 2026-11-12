@@ -511,13 +511,7 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	if c.active {
 		return protocol.ItemStackResponseStatusRequestAlreadyInProgress, nil
 	}
-	index := -1
-	for i, o := range p.enchant.options {
-		if o.NetworkID == a.RecipeNetworkID {
-			index = i
-			break
-		}
-	}
+	index := p.enchantOptionIndex(a.RecipeNetworkID)
 	if index < 0 {
 		return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId, nil
 	}
@@ -532,32 +526,14 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	if item.netID != p.enchant.input {
 		return protocol.ItemStackResponseStatusFailedToEnchant, nil
 	}
-	g := p.s.game
 	place := int32(index) + 1 //nolint:gosec // a short list
-	req := g.sys.EnchantRequire(p, option, place)
-	if req.Refuse {
+	req := p.s.game.sys.EnchantRequire(p, option, place)
+	if status := p.checkEnchantRequirement(req, lapis); status != protocol.ItemStackResponseStatusOK {
+		return status, nil
+	}
+	result, levels, taken, ok := p.enchantResult(option, item, req)
+	if !ok {
 		return protocol.ItemStackResponseStatusFailedToEnchant, nil
-	}
-	if req.MinLevel > p.Level() {
-		return protocol.ItemStackResponseStatusInsufficientPlayerLevelToEnchant, nil
-	}
-	if req.Lapis > 0 && (lapis.Empty() || req.Lapis > int32(lapis.Count)) {
-		return protocol.ItemStackResponseStatusFailedToEnchant, nil
-	}
-	result := item
-	result.Count = 1
-	g.applyEnchants(&result, enchantList{lists: option.Enchants})
-	levels, taken := req.Levels, req.Lapis
-	if g.enchantEv.Has() {
-		e := EnchantEvent{Player: p, Option: option, Item: item, Result: result, Levels: levels, Lapis: taken}
-		g.enchantEv.fire(p.s.log, &e)
-		if e.Cancelled() {
-			return protocol.ItemStackResponseStatusFailedToEnchant, nil
-		}
-		if !sameStack(e.Result, result) {
-			st.refresh = true
-		}
-		result, levels, taken = e.Result, e.Levels, e.Lapis
 	}
 	if result.Empty() {
 		return protocol.ItemStackResponseStatusInvalidCraftResultItem, nil
@@ -565,6 +541,66 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	c.active, c.times = true, 1
 	c.after.newSeed, c.after.levels = true, levels
 	c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingInput, slot: enchantInputSlot, item: item, left: 1})
+	p.expectLapis(lapis, taken, place)
+	c.results = append(c.results, craftResult{stack: result, left: int32(result.Count)})
+	// The response only carries a count and an ID, so the client is sent the item the
+	// server made rather than left with what it worked out itself.
+	st.refresh = true
+	return protocol.ItemStackResponseStatusOK, nil
+}
+
+// enchantOptionIndex is the index of the option on show with the network ID id, or -1.
+func (p *Player) enchantOptionIndex(id uint32) int {
+	for i, o := range p.enchant.options {
+		if o.NetworkID == id {
+			return i
+		}
+	}
+	return -1
+}
+
+// checkEnchantRequirement checks the player meets req: not refused, level enough and the
+// lapis there.
+func (p *Player) checkEnchantRequirement(req EnchantRequirement, lapis ItemStack) uint8 {
+	switch {
+	case req.Refuse:
+		return protocol.ItemStackResponseStatusFailedToEnchant
+	case req.MinLevel > p.Level():
+		return protocol.ItemStackResponseStatusInsufficientPlayerLevelToEnchant
+	case req.Lapis > 0 && (lapis.Empty() || req.Lapis > int32(lapis.Count)):
+		return protocol.ItemStackResponseStatusFailedToEnchant
+	}
+	return protocol.ItemStackResponseStatusOK
+}
+
+// enchantResult is the enchanted item, the levels it costs and the lapis taken, after the
+// OnEnchant listeners changed them. False if a listener cancelled.
+func (p *Player) enchantResult(option EnchantOption, item ItemStack, req EnchantRequirement) (result ItemStack, levels, lapis int32, ok bool) {
+	g := p.s.game
+	result = item
+	result.Count = 1
+	g.applyEnchants(&result, enchantList{lists: option.Enchants})
+	levels, lapis = req.Levels, req.Lapis
+	if !g.enchantEv.Has() {
+		return result, levels, lapis, true
+	}
+	e := EnchantEvent{Player: p, Option: option, Item: item, Result: result, Levels: levels, Lapis: lapis}
+	g.enchantEv.fire(p.s.log, &e)
+	if e.Cancelled() {
+		return result, levels, lapis, false
+	}
+	if !sameStack(e.Result, result) {
+		p.requests.refresh = true
+	}
+	return e.Result, e.Levels, e.Lapis, true
+}
+
+// expectLapis records what the craft takes from the lapis slot. The client takes what
+// vanilla would (place, none in creative), so when taken differs it may use anything up
+// to the whole slot; the slot is then set to what was asked and sent again.
+func (p *Player) expectLapis(lapis ItemStack, taken, place int32) {
+	st := &p.requests
+	c := &st.craft
 	clientPays := place
 	if p.creative() {
 		clientPays = 0
@@ -572,8 +608,6 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	taken = max(min(taken, int32(lapis.Count)), 0)
 	switch {
 	case taken != clientPays:
-		// The client takes what vanilla would, so it may use anything up to the whole
-		// slot; the slot is then set to what the plugin asked and sent again.
 		if !lapis.Empty() {
 			c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingMaterial, slot: enchantLapisSlot, item: lapis, left: lapis.Count, upTo: true})
 		}
@@ -582,11 +616,6 @@ func (p *Player) craftEnchant(a *protocol.CraftRecipeStackRequestAction) (uint8,
 	case taken > 0:
 		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerEnchantingMaterial, slot: enchantLapisSlot, item: lapis, left: uint8(taken)}) //nolint:gosec // clamped to the slot
 	}
-	c.results = append(c.results, craftResult{stack: result, left: int32(result.Count)})
-	// The response only carries a count and an ID, so the client is sent the item the
-	// server made rather than left with what it worked out itself.
-	st.refresh = true
-	return protocol.ItemStackResponseStatusOK, nil
 }
 
 // EnchantSeed returns the seed the player's table options come from. Runs: the player's

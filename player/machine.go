@@ -619,8 +619,96 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 		c.craft(r, pos, block)
 		return
 	}
-	slot := -1
-	seen := 0
+	slot := c.randomFullSlot()
+	center := blockCenter(pos)
+	if slot < 0 {
+		playSound(r, pos, soundEvent{name: packet.SoundEventBlockClickFail, pos: center, extra: -1}, nil)
+		return
+	}
+	face, front := s.frontOf(block, pos)
+	if c.machine.dropper && c.pushOne(r, front, slot) {
+		return
+	}
+	if c.machine.dropper && face == cube.FaceDown && s.dropIntoComposter(r, c, slot, front) {
+		return
+	}
+	dir := faceVec(face)
+	d := dispense{r: r, c: c, slot: slot, pos: pos, front: front, face: face, dir: dir, at: center.Add(dir.Mul(ejectReach))}
+	if !c.machine.dropper && s.dispenseSpecial(d) {
+		return
+	}
+	it := c.items[slot]
+	one := it
+	one.Count = 1
+	d.takeOne()
+	if one.Name == nameTNT && !c.machine.dropper && s.level.TNTExplodes {
+		s.dispenseTNT(r, front)
+	} else {
+		s.eject(r, one, pos, dir, d.at)
+	}
+	d.smoke()
+	d.click()
+}
+
+// dispense is one firing of a dispenser or dropper c at pos: the slot it fires from,
+// the block in front, which way it faces and where items come out.
+type dispense struct {
+	r     *world.Region
+	c     *Chest
+	slot  int
+	pos   cube.Pos
+	front cube.Pos
+	face  cube.Face
+	dir   mgl32.Vec3
+	at    mgl32.Vec3
+}
+
+// takeOne takes one item from the slot fired.
+func (d dispense) takeOne() {
+	it := d.c.items[d.slot]
+	it.Count--
+	d.c.Inventory(d.r).SetItem(d.slot, it)
+}
+
+// smoke shows the dispense smoke on the side fired from.
+func (d dispense) smoke() {
+	levelEvent(d.r, d.pos, d.at, levelEventDispenseSmoke, int32(d.dir[0])+3*int32(d.dir[2])+4)
+}
+
+// click plays the dispense click.
+func (d dispense) click() {
+	playSound(d.r, d.pos, soundEvent{name: packet.SoundEventBlockClick, pos: blockCenter(d.pos), extra: -1}, nil)
+}
+
+// dispenseSpecial runs what a dispenser does with an item that has a behaviour of its
+// own: buckets, carts, bone meal, fireworks and projectiles. False if the item has none
+// here, so it is thrown out.
+func (s *Host) dispenseSpecial(d dispense) bool {
+	r, c, it := d.r, d.c, d.c.items[d.slot]
+	click := false
+	switch {
+	case c.useBucket(r, d.front, d.slot, d.at, d.pos, d.dir):
+	case IsCartItem(it.Name) && s.dispenseCart(r, d.front, d.dir, it.Name):
+		d.takeOne()
+		click = true
+	case it.Name == nameBoneMeal:
+		s.dispenseBoneMeal(r, c, d.slot, d.front, d.at)
+	case s.dispenseFirework(r, d.pos, d.face, d.at, it), s.dispenseProjectile(r, d.pos, d.at, d.dir, it.Name):
+		d.takeOne()
+	default:
+		return false
+	}
+	d.smoke()
+	if click {
+		d.click()
+	}
+	return true
+}
+
+// randomFullSlot is a random slot of the machine holding something, each as likely, or
+// -1 if all are empty.
+func (c *Chest) randomFullSlot() int {
+	slot, seen := -1, 0
 	for i := range c.machine.size {
 		if c.items[i].Empty() {
 			continue
@@ -630,70 +718,26 @@ func (s *Host) Dispense(r *world.Region, pos cube.Pos, block uint32) {
 			slot = i
 		}
 	}
-	center := blockCenter(pos)
-	if slot < 0 {
-		playSound(r, pos, soundEvent{name: packet.SoundEventBlockClickFail, pos: center, extra: -1}, nil)
-		return
+	return slot
+}
+
+// dropIntoComposter is BDS's dropper (0xD40C260) facing down onto a composter: it puts
+// one item in and drops nothing, whether or not the composter took it. False if the
+// block below is no composter, so the item is thrown out as usual.
+func (s *Host) dropIntoComposter(r *world.Region, c *Chest, slot int, below cube.Pos) bool {
+	if s.farm == nil {
+		return false
 	}
-	face, front := s.frontOf(block, pos)
+	b, ok := r.Block(below, 0)
+	if !ok || !s.farm.IsComposter(b) {
+		return false
+	}
 	it := c.items[slot]
-	if c.machine.dropper && c.pushOne(r, front, slot) {
-		return
-	}
-	if c.machine.dropper && face == cube.FaceDown && s.farm != nil {
-		if b, ok := r.Block(front, 0); ok && s.farm.IsComposter(b) {
-			// BDS's dropper (0xD40C260) facing down puts one item into a composter under it
-			// and drops nothing, whether or not the composter took it. Facing any other way
-			// it throws the item out as usual.
-			if s.farm.Compost(r, front, it.Name, 1) == 1 {
-				it.Count--
-				c.Inventory(r).SetItem(slot, it)
-			}
-			return
-		}
-	}
-	dir := faceVec(face)
-	at := center.Add(dir.Mul(ejectReach))
-	smoke := int32(dir[0]) + 3*int32(dir[2]) + 4
-	if !c.machine.dropper && c.useBucket(r, front, slot, at, pos, dir) {
-		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-		return
-	}
-	if !c.machine.dropper && IsCartItem(it.Name) && s.dispenseCart(r, front, dir, it.Name) {
+	if s.farm.Compost(r, below, it.Name, 1) == 1 {
 		it.Count--
 		c.Inventory(r).SetItem(slot, it)
-		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-		playSound(r, pos, soundEvent{name: packet.SoundEventBlockClick, pos: center, extra: -1}, nil)
-		return
 	}
-	if !c.machine.dropper && it.Name == nameBoneMeal {
-		s.dispenseBoneMeal(r, c, slot, front, at)
-		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-		return
-	}
-	if !c.machine.dropper && s.dispenseFirework(r, pos, face, at, it) {
-		it.Count--
-		c.Inventory(r).SetItem(slot, it)
-		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-		return
-	}
-	if !c.machine.dropper && s.dispenseProjectile(r, pos, at, dir, it.Name) {
-		it.Count--
-		c.Inventory(r).SetItem(slot, it)
-		levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-		return
-	}
-	one := it
-	one.Count = 1
-	it.Count--
-	c.Inventory(r).SetItem(slot, it)
-	if one.Name == nameTNT && !c.machine.dropper && s.level.TNTExplodes {
-		s.dispenseTNT(r, front)
-	} else {
-		s.eject(r, one, pos, dir, at)
-	}
-	levelEvent(r, pos, at, levelEventDispenseSmoke, smoke)
-	playSound(r, pos, soundEvent{name: packet.SoundEventBlockClick, pos: center, extra: -1}, nil)
+	return true
 }
 
 // eject throws stack out of the machine at pos, as BDS's dispenser throws an item.

@@ -440,17 +440,7 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 		return
 	}
 	impact := (1 - dist/reach) * s.exposure(r, e.Pos, lo, hi) * e.KnockbackScale
-	hurts := float32(math.Abs(float64(e.DamageScale))) > noDamageScale
-	var damage float32
-	if hurts {
-		damage = float32(e.FixedDamage)
-		if !e.HasFixedDamage {
-			damage = ((impact*impact+impact)/2*damageMultiplier*reach + 1) * e.DamageScale
-		}
-		if e.Source != nil && underwater && !e.AllowUnderwater {
-			damage = 0
-		}
-	}
+	hurts, damage := e.damageAt(impact, reach, underwater)
 	var push mgl32.Vec3
 	dir := pos.Sub(e.Pos)
 	if l := dir.Len(); l >= minSpeed && impact != 0 {
@@ -476,12 +466,34 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 		target.BlastPush(push)
 	}
 	if e.NegatesFallDamage {
-		switch t := o.Owner().(type) {
-		case *Player:
-			t.move.fall = 0
-		case *Mob:
-			t.m.Body().FallDistance = 0
-		}
+		clearFall(o)
+	}
+}
+
+// damageAt is the explosion's damage to an entity it reaches with impact, reach being twice
+// its radius: fixed, or BDS's formula, none from a source under water unless allowed.
+// hurts is false when the damage scale is too small to hurt at all.
+func (e *Explosion) damageAt(impact, reach float32, underwater bool) (hurts bool, damage float32) {
+	if float32(math.Abs(float64(e.DamageScale))) <= noDamageScale {
+		return false, 0
+	}
+	damage = float32(e.FixedDamage)
+	if !e.HasFixedDamage {
+		damage = ((impact*impact+impact)/2*damageMultiplier*reach + 1) * e.DamageScale
+	}
+	if e.Source != nil && underwater && !e.AllowUnderwater {
+		damage = 0
+	}
+	return true, damage
+}
+
+// clearFall takes away the fall distance of a player or mob, so it lands unhurt.
+func clearFall(o *world.Entity) {
+	switch t := o.Owner().(type) {
+	case *Player:
+		t.move.fall = 0
+	case *Mob:
+		t.m.Body().FallDistance = 0
 	}
 }
 

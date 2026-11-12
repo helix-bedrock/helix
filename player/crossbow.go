@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -152,11 +153,8 @@ func (p *Player) shootCrossbow(held ItemStack) {
 	}
 	loaded := crossbowCharged(held)
 	n := int(loaded.Count)
-	eyes, rot := p.entity.Position(), p.entity.Rotation()
-	look := lookDirection(rot)
+	look := lookDirection(p.entity.Rotation())
 	firework := loaded.Name == nameFireworkRocket
-	creative := p.creative()
-	pierce := heldEnchant(held, enchantPiercing)
 	for i := range n {
 		dir := look
 		if n != 1 {
@@ -165,37 +163,16 @@ func (p *Player) shootCrossbow(held ItemStack) {
 			dir = mgl32.Vec3{look[0]*c + look[2]*s, look[1], look[2]*c - look[0]*s}
 		}
 		if firework {
-			one := loaded
-			one.Count = 1
-			f := p.s.LaunchFirework(r.Dimension(), eyes, dir, one, nil)
-			f.shot, f.shooter = true, p
+			p.shootCrossbowRocket(r, loaded, dir)
 			continue
 		}
-		spec, ok := p.s.projectileSpec(nameArrow, arrowGroupCrossbow)
-		if !ok {
+		if !p.shootCrossbowArrow(r, held, loaded, dir, n != 1 && i != 1) {
 			return
-		}
-		t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), dir, spec.Power, p)
-		t.critical = true
-		t.pierce = pierce
-		// BDS (0xC9CD650) gives the arrow the loaded arrow's potion; its effects wait for the
-		// potion table, but the arrow keeps its aux so a tipped one is picked up tipped.
-		if loaded.Meta > 0 {
-			t.item = ItemStack{Name: nameArrow, Meta: loaded.Meta, Count: 1}
-		}
-		if creative || (n != 1 && i != 1) {
-			t.pickup = arrowPickupCreative
 		}
 	}
 	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventCrossbowShoot, pos: p.AttachPos(AttachWeapon), extra: -1, entity: "minecraft:player"}, nil)
-	inv := &p.inventory
-	bow := &inv.main[inv.held]
-	bow.Tag = cloneTag(bow.Tag)
-	delete(bow.Tag, crossbowChargedTag)
-	if len(bow.Tag) == 0 {
-		bow.Tag = nil
-	}
-	if !creative {
+	p.unloadCrossbow()
+	if !p.creative() {
 		wear := int32(crossbowWearArrow)
 		if firework || n >= 2 {
 			wear = crossbowWearMore
@@ -204,6 +181,47 @@ func (p *Player) shootCrossbow(held ItemStack) {
 	}
 	p.sendHeld()
 	p.flush()
+}
+
+// shootCrossbowRocket launches one of the loaded rockets free along dir.
+func (p *Player) shootCrossbowRocket(r *world.Region, loaded ItemStack, dir mgl32.Vec3) {
+	one := loaded
+	one.Count = 1
+	f := p.s.LaunchFirework(r.Dimension(), p.entity.Position(), dir, one, nil)
+	f.shot, f.shooter = true, p
+}
+
+// shootCrossbowArrow shoots one critical arrow along dir with the crossbow's arrow
+// definition and Piercing; a side arrow of Multishot (side) cannot be picked up. False if
+// arrows have no definition.
+func (p *Player) shootCrossbowArrow(r *world.Region, held, loaded ItemStack, dir mgl32.Vec3, side bool) bool {
+	spec, ok := p.s.projectileSpec(nameArrow, arrowGroupCrossbow)
+	if !ok {
+		return false
+	}
+	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, p.entity.Position(), p.entity.Rotation()), dir, spec.Power, p)
+	t.critical = true
+	t.pierce = heldEnchant(held, enchantPiercing)
+	// BDS (0xC9CD650) gives the arrow the loaded arrow's potion; its effects wait for the
+	// potion table, but the arrow keeps its aux so a tipped one is picked up tipped.
+	if loaded.Meta > 0 {
+		t.item = ItemStack{Name: nameArrow, Meta: loaded.Meta, Count: 1}
+	}
+	if p.creative() || side {
+		t.pickup = arrowPickupCreative
+	}
+	return true
+}
+
+// unloadCrossbow takes the charge out of the held crossbow.
+func (p *Player) unloadCrossbow() {
+	inv := &p.inventory
+	bow := &inv.main[inv.held]
+	bow.Tag = cloneTag(bow.Tag)
+	delete(bow.Tag, crossbowChargedTag)
+	if len(bow.Tag) == 0 {
+		bow.Tag = nil
+	}
 }
 
 // cloneTag copies a tag so a change does not reach other copies of the stack.

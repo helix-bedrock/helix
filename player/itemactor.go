@@ -154,47 +154,42 @@ func (i *ItemActor) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
-// loadEntity is the world's EntityLoader: it brings back items, as BDS loads
-// their Age and Item, with no pick-up delays. Anything else stays saved until
-// the engine runs it.
+// loadEntity is the world's EntityLoader: it brings back every entity kind the engine
+// runs, each from its BDS save. Anything else stays saved until the engine runs it.
 func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bool {
 	id, _ := saved.Data["identifier"].(string)
-	if id == xpOrbIdentifier {
+	switch {
+	case id == itemIdentifier:
+		return s.loadItem(r, at, saved)
+	case id == xpOrbIdentifier:
 		return s.loadOrb(r, at, saved)
-	}
-	if id == nameTNT {
+	case id == nameTNT:
 		return s.loadTNT(r, at, saved)
-	}
-	if id == fallingBlockID {
+	case id == fallingBlockID:
 		return s.loadFallingBlock(r, at, saved)
-	}
-	if IsCartItem(id) {
+	case IsCartItem(id):
 		return s.loadCart(r, at, saved, id)
-	}
-	if id == nameBoat || id == nameChestBoat {
+	case id == nameBoat || id == nameChestBoat:
 		return s.loadBoat(r, at, saved, id)
-	}
-	if id == cushionID {
+	case id == cushionID:
 		return s.loadCushion(r, at, saved)
-	}
-	if id == paintingID {
+	case id == paintingID:
 		return s.loadPainting(r, at, saved)
-	}
-	if id == leashKnotID {
+	case id == leashKnotID:
 		return s.loadKnot(r, at, saved)
-	}
-	if isProjectile(id) {
+	case isProjectile(id):
 		return s.loadProjectile(r, at, saved, id)
-	}
-	if id == nameAreaEffectCloud {
+	case id == nameAreaEffectCloud:
 		return s.loadCloud(r, at, saved)
-	}
-	if s.CanSpawnMob(id) {
+	case s.CanSpawnMob(id):
 		return s.loadMob(r, at, saved, id)
 	}
-	if id != itemIdentifier {
-		return false
-	}
+	return false
+}
+
+// loadItem brings back an item entity, as BDS loads its Age and Item, with no pick-up
+// delays.
+func (s *Host) loadItem(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bool {
 	item, ok := saved.Data["Item"].(map[string]any)
 	pos, okPos := floats(saved.Data["Pos"])
 	if !ok || !okPos || len(pos) != 3 {

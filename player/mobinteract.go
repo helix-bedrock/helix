@@ -96,19 +96,15 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 		p.s.log.Debug("mob interact", "err", err)
 		return
 	}
+	p.runInteraction(r, o, it)
+	p.flush()
+}
+
+// runInteraction does the item work of a minecraft:interact that applied: spawn_items,
+// play_sounds, hurt_item, transform_to_item or use_item, and swing.
+func (p *Player) runInteraction(r *world.Region, o *Mob, it interaction) {
 	at := o.entity.Position()
-	if it.SpawnItems != nil && it.SpawnItems.Table != "" && p.s.entityLoot != nil {
-		y := float32(spawnItemsYOffset)
-		if it.SpawnItems.YOffset != nil {
-			y = *it.SpawnItems.YOffset
-		}
-		from := at.Add(mgl32.Vec3{0, y, 0})
-		for _, d := range p.s.entityLoot.Roll(it.SpawnItems.Table, o.lootContext(r), nil) {
-			for _, st := range p.s.lootStacks(d) {
-				p.s.spawnInteractDrop(r, st, from)
-			}
-		}
-	}
+	p.spawnInteractItems(r, o, it)
 	for _, name := range it.sounds() {
 		playSound(r, feetBlock(at), soundEvent{name: name, pos: at, extra: -1, entity: o.m.Type()}, nil)
 	}
@@ -126,7 +122,24 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 			ActionType: packet.AnimateActionSwingArm, EntityRuntimeID: p.runtimeID, SwingSource: packet.AnimateSwingSourceInteract,
 		}, p.viewer)
 	}
-	p.flush()
+}
+
+// spawnInteractItems rolls the interaction's spawn_items table and throws the items out
+// above the mob.
+func (p *Player) spawnInteractItems(r *world.Region, o *Mob, it interaction) {
+	if it.SpawnItems == nil || it.SpawnItems.Table == "" || p.s.entityLoot == nil {
+		return
+	}
+	y := float32(spawnItemsYOffset)
+	if it.SpawnItems.YOffset != nil {
+		y = *it.SpawnItems.YOffset
+	}
+	from := o.entity.Position().Add(mgl32.Vec3{0, y, 0})
+	for _, d := range p.s.entityLoot.Roll(it.SpawnItems.Table, o.lootContext(r), nil) {
+		for _, st := range p.s.lootStacks(d) {
+			p.s.spawnInteractDrop(r, st, from)
+		}
+	}
 }
 
 // spawnInteractDrop throws out one item of an interaction's spawn_items at from: the item's

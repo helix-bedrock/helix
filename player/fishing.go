@@ -384,27 +384,13 @@ func (h *FishingHook) tick(e *world.Entity) {
 		return
 	}
 	if h.target != nil {
-		te := livingEntity(h.target)
-		if te == nil || te.Region() != r || h.target.Dead() {
+		var ok bool
+		if pos, ok = h.hangOnTarget(r); !ok {
 			h.remove()
 			return
 		}
-		pos, h.rot = te.Position(), te.Rotation()
-		if m, ok := h.target.(Moving); ok {
-			h.vel = m.Velocity()
-		}
 	} else {
-		h.setGravity(true)
-		moved := false
-		if !h.inGround {
-			moved = h.hitCheck(r, pos)
-		}
-		if !moved && h.target == nil {
-			pos = h.move(r, pos)
-			if h.waterShare(r, pos) > 0 {
-				h.fish(r, pos)
-			}
-		}
+		pos = h.flyOrFish(r, pos)
 	}
 	if !h.ownerHolds(r, pos) {
 		h.remove()
@@ -417,6 +403,38 @@ func (h *FishingHook) tick(e *world.Entity) {
 		}
 	}
 	e.Apply(world.Movement{Pos: pos, Rot: h.rot, OnGround: h.onGround, Tick: e.Tick()})
+}
+
+// hangOnTarget follows the entity the hook is in: its position, rotation and speed. False
+// if the target is gone, dead or in another region.
+func (h *FishingHook) hangOnTarget(r *world.Region) (mgl32.Vec3, bool) {
+	te := livingEntity(h.target)
+	if te == nil || te.Region() != r || h.target.Dead() {
+		return mgl32.Vec3{}, false
+	}
+	h.rot = te.Rotation()
+	if m, ok := h.target.(Moving); ok {
+		h.vel = m.Velocity()
+	}
+	return te.Position(), true
+}
+
+// flyOrFish is the free hook's part of the tick: the hit check, then, if it hit nothing,
+// the move and, in water, fishing. It returns where the hook is now.
+func (h *FishingHook) flyOrFish(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
+	h.setGravity(true)
+	moved := false
+	if !h.inGround {
+		moved = h.hitCheck(r, pos)
+	}
+	if moved || h.target != nil {
+		return pos
+	}
+	pos = h.move(r, pos)
+	if h.waterShare(r, pos) > 0 {
+		h.fish(r, pos)
+	}
+	return pos
 }
 
 // float is the start of the tick (BDS's _updateGravity inlined): the drag, lava taking the
@@ -630,64 +648,83 @@ func (h *FishingHook) fish(r *world.Region, pos mgl32.Vec3) {
 		return
 	}
 	h.lureSpeed = h.lureSpeedAt(r, pos)
-	rid := h.entity.RuntimeID()
 	switch {
 	case h.untilHooked > 0:
-		h.untilHooked -= h.lureSpeed
-		if h.untilHooked > 0 {
-			h.fishAngle += float32(rand.NormFloat64()) * hookAngleStep //nolint:gosec // gameplay randomness
-			// BDS turns the angle to degrees, then takes the sine of that as radians.
-			deg := h.fishAngle * radianToDegrees
-			fx := float32(math.Sin(float64(deg))) * float32(h.untilHooked) * hookFishStep
-			fz := float32(math.Cos(float64(deg))) * float32(h.untilHooked) * hookFishStep
-			h.entity.Send(actorData(rid, protocol.EntityMetadata{
-				protocol.EntityDataKeyFishX: fx, protocol.EntityDataKeyFishZ: fz, protocol.EntityDataKeyFishAngle: deg,
-			}))
-			at := cube.Pos{itemFloor(pos[0] + fx), itemFloor(pos[1]), itemFloor(pos[2] + fz)}
-			if m, _ := liquidAt(h.s.reg, r, at); m == registry.MaterialWater {
-				h.entity.Send(actorEvent(rid, packet.ActorEventFishhookFishPosition))
-			}
-			return
-		}
-		h.biting = rand.Int32N(hookBiteRand) + hookBiteBase //nolint:gosec // gameplay randomness
-		h.entity.Send(actorEvent(rid, packet.ActorEventFishhookHookTime))
-		// The event's own handling on the server: the hook dips and splashes.
-		h.vel[1] -= hookBiteDip
-		playSound(r, floorPos(pos), soundEvent{name: packet.SoundEventSplash, pos: pos, extra: -1, entity: nameFishingHook}, nil)
+		h.fishComing(r, pos)
 	case h.untilLured > 0:
-		h.untilLured -= h.lureSpeed
-		chance := float32(hookTeaseBase)
-		switch l := h.untilLured; {
-		case l < 20:
-			chance += float32(20-l) * 0.05
-		case l < 40:
-			chance += float32(40-l) * 0.02
-		case l < 60:
-			chance += float32(60-l) * 0.01
-		}
-		if chance > rand.Float32() { //nolint:gosec // gameplay randomness
-			a := float64(rand.Float32()*360) * radianToDegrees  //nolint:gosec // gameplay randomness
-			dist := rand.Float32()*hookTeaseMore + hookTeaseFar //nolint:gosec // gameplay randomness
-			fx := float32(math.Sin(a))*dist*hookFishStep + pos[0]
-			fz := float32(math.Cos(a))*dist*hookFishStep + pos[2]
-			h.entity.Send(actorData(rid, protocol.EntityMetadata{protocol.EntityDataKeyFishX: fx, protocol.EntityDataKeyFishZ: fz}))
-			h.entity.Send(actorEvent(rid, packet.ActorEventFishhookTease))
-		}
-		if h.untilLured <= 0 {
-			h.fishAngle = rand.Float32() * 360                       //nolint:gosec // gameplay randomness
-			h.untilHooked = rand.Int32N(hookComeRand) + hookComeBase //nolint:gosec // gameplay randomness
-		}
+		h.lureTease(pos)
 	default:
-		lure := int32(0)
-		if h.owner != nil {
-			lure = heldEnchant(h.owner.inventory.Held(), enchantLure)
-		}
-		h.untilLured = hookLureBase - hookLurePerLevel*lure + rand.Int32N(hookLureRand) //nolint:gosec // gameplay randomness
-		if h.waterAnimalsNear(r, pos) {
-			h.untilLured = int32(math.Floor(float64(h.untilLured) * hookLureCrowdCut))
-		}
-		h.untilLured = 20 * max(h.untilLured, 1)
+		h.newLureTime(r, pos)
 	}
+}
+
+// fishComing moves the fish on toward the hook with its trail of bubbles; once it
+// arrives, it bites: the hook dips and splashes.
+func (h *FishingHook) fishComing(r *world.Region, pos mgl32.Vec3) {
+	rid := h.entity.RuntimeID()
+	h.untilHooked -= h.lureSpeed
+	if h.untilHooked > 0 {
+		h.fishAngle += float32(rand.NormFloat64()) * hookAngleStep //nolint:gosec // gameplay randomness
+		// BDS turns the angle to degrees, then takes the sine of that as radians.
+		deg := h.fishAngle * radianToDegrees
+		fx := float32(math.Sin(float64(deg))) * float32(h.untilHooked) * hookFishStep
+		fz := float32(math.Cos(float64(deg))) * float32(h.untilHooked) * hookFishStep
+		h.entity.Send(actorData(rid, protocol.EntityMetadata{
+			protocol.EntityDataKeyFishX: fx, protocol.EntityDataKeyFishZ: fz, protocol.EntityDataKeyFishAngle: deg,
+		}))
+		at := cube.Pos{itemFloor(pos[0] + fx), itemFloor(pos[1]), itemFloor(pos[2] + fz)}
+		if m, _ := liquidAt(h.s.reg, r, at); m == registry.MaterialWater {
+			h.entity.Send(actorEvent(rid, packet.ActorEventFishhookFishPosition))
+		}
+		return
+	}
+	h.biting = rand.Int32N(hookBiteRand) + hookBiteBase //nolint:gosec // gameplay randomness
+	h.entity.Send(actorEvent(rid, packet.ActorEventFishhookHookTime))
+	// The event's own handling on the server: the hook dips and splashes.
+	h.vel[1] -= hookBiteDip
+	playSound(r, floorPos(pos), soundEvent{name: packet.SoundEventSplash, pos: pos, extra: -1, entity: nameFishingHook}, nil)
+}
+
+// lureTease counts the lure time down, with teasing bubbles more likely as it runs out;
+// when it ends a fish starts coming.
+func (h *FishingHook) lureTease(pos mgl32.Vec3) {
+	rid := h.entity.RuntimeID()
+	h.untilLured -= h.lureSpeed
+	chance := float32(hookTeaseBase)
+	switch l := h.untilLured; {
+	case l < 20:
+		chance += float32(20-l) * 0.05
+	case l < 40:
+		chance += float32(40-l) * 0.02
+	case l < 60:
+		chance += float32(60-l) * 0.01
+	}
+	if chance > rand.Float32() { //nolint:gosec // gameplay randomness
+		a := float64(rand.Float32()*360) * radianToDegrees  //nolint:gosec // gameplay randomness
+		dist := rand.Float32()*hookTeaseMore + hookTeaseFar //nolint:gosec // gameplay randomness
+		fx := float32(math.Sin(a))*dist*hookFishStep + pos[0]
+		fz := float32(math.Cos(a))*dist*hookFishStep + pos[2]
+		h.entity.Send(actorData(rid, protocol.EntityMetadata{protocol.EntityDataKeyFishX: fx, protocol.EntityDataKeyFishZ: fz}))
+		h.entity.Send(actorEvent(rid, packet.ActorEventFishhookTease))
+	}
+	if h.untilLured <= 0 {
+		h.fishAngle = rand.Float32() * 360                       //nolint:gosec // gameplay randomness
+		h.untilHooked = rand.Int32N(hookComeRand) + hookComeBase //nolint:gosec // gameplay randomness
+	}
+}
+
+// newLureTime picks the next lure time: shorter with Lure on the rod, cut when water
+// animals crowd the hook.
+func (h *FishingHook) newLureTime(r *world.Region, pos mgl32.Vec3) {
+	lure := int32(0)
+	if h.owner != nil {
+		lure = heldEnchant(h.owner.inventory.Held(), enchantLure)
+	}
+	h.untilLured = hookLureBase - hookLurePerLevel*lure + rand.Int32N(hookLureRand) //nolint:gosec // gameplay randomness
+	if h.waterAnimalsNear(r, pos) {
+		h.untilLured = int32(math.Floor(float64(h.untilLured) * hookLureCrowdCut))
+	}
+	h.untilLured = 20 * max(h.untilLured, 1)
 }
 
 // waterAnimalsNear reports a water animal within hookLureCrowd of the hook's box.

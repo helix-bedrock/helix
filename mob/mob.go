@@ -377,43 +377,59 @@ func (m *Mob) think() (remove bool) {
 // refresh rebuilds the mob from its definition's components, as BDS's reload: goals,
 // navigation, movement, attributes and size.
 func (m *Mob) refresh() {
-	t := m.tester(nil)
-	m.inst.Refresh(t, func(comps definition.Group) {
-		order := m.inst.Order()
-		m.readAttributes(comps)
-		if n, _, ok, err := component.Navigation(order, comps); ok {
-			if err != nil {
-				m.rt.Log.Debug("mob navigation", "type", m.typ, "err", err)
-			}
-			m.nv = n
-			nm := m.navMob()
-			m.nv.Init(&nm)
-		} else {
-			m.nv = nil
-		}
-		if mv, ok, err := component.ReadMovement(order, comps); ok {
-			if err != nil {
-				m.rt.Log.Debug("mob movement", "type", m.typ, "err", err)
-			}
-			m.movement, m.hasMove = mv, true
-			m.ctl.MaxTurn = mv.MaxTurn
-		} else {
-			m.hasMove = false
-		}
-		ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
-		m.readStates(ctx, comps)
-		m.scale = 1
-		if m.states != nil && m.states.Scale != nil {
-			m.scale = m.states.Scale.Value
-		}
-		m.readSensors(ctx, comps)
-		goals, warnings := m.rt.Goals.Build(ctx, order, comps)
-		for _, w := range warnings {
-			m.rt.Log.Debug("mob goal", "type", m.typ, "warning", w)
-		}
-		goals.Apply(&m.sel)
-	})
+	m.inst.Refresh(m.tester(nil), m.rebuild)
 	m.flagsChanged()
+}
+
+// rebuild reads the mob's parts from its active components comps: attributes,
+// navigation, movement, states, sensors and goals.
+func (m *Mob) rebuild(comps definition.Group) {
+	order := m.inst.Order()
+	m.readAttributes(comps)
+	m.readNavigation(order, comps)
+	m.readMovement(order, comps)
+	ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
+	m.readStates(ctx, comps)
+	m.scale = 1
+	if m.states != nil && m.states.Scale != nil {
+		m.scale = m.states.Scale.Value
+	}
+	m.readSensors(ctx, comps)
+	goals, warnings := m.rt.Goals.Build(ctx, order, comps)
+	for _, w := range warnings {
+		m.rt.Log.Debug("mob goal", "type", m.typ, "warning", w)
+	}
+	goals.Apply(&m.sel)
+}
+
+// readNavigation sets up the mob's navigation from its components; none leaves it
+// without.
+func (m *Mob) readNavigation(order []string, comps definition.Group) {
+	n, _, ok, err := component.Navigation(order, comps)
+	if !ok {
+		m.nv = nil
+		return
+	}
+	if err != nil {
+		m.rt.Log.Debug("mob navigation", "type", m.typ, "err", err)
+	}
+	m.nv = n
+	nm := m.navMob()
+	m.nv.Init(&nm)
+}
+
+// readMovement reads the mob's movement component; none leaves it unable to move.
+func (m *Mob) readMovement(order []string, comps definition.Group) {
+	mv, ok, err := component.ReadMovement(order, comps)
+	if !ok {
+		m.hasMove = false
+		return
+	}
+	if err != nil {
+		m.rt.Log.Debug("mob movement", "type", m.typ, "err", err)
+	}
+	m.movement, m.hasMove = mv, true
+	m.ctl.MaxTurn = mv.MaxTurn
 }
 
 // readAttributes reads the attribute components the minimal hookup uses.
