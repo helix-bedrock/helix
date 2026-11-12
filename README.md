@@ -10,7 +10,8 @@
 [![Minecraft](https://img.shields.io/badge/minecraft-v1.26.60_(Bedrock)-black)](https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs)
 [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-in_development-orange)](STATUS.md)
+[![Status](https://img.shields.io/badge/status-in_development-orange)](https://helixbedrock.com/progress/)
+[![Website](https://img.shields.io/badge/website-helixbedrock.com-2ea44f)](https://helixbedrock.com)
 
 </div>
 
@@ -60,28 +61,33 @@ commands while real ones are built: `/gamemode`, `/damageitem` (wear the held it
 
 ## Roadmap
 
-What works today and what is left is in [STATUS.md](STATUS.md).
+Helix is **in early development and not ready for real servers yet**. The road to a stable release:
+
+1. ✅ Engine core: networking, world storage, regions, terrain (done, Oct to Nov 2026).
+2. 🟡 Every vanilla mechanic, one-to-one with BDS (in progress, aiming for summer 2027).
+3. ⬜ Plugin API and custom content (2027 to 2028).
+4. ⬜ Testing on real servers, then a stable release (around 2028).
+
+Live progress, by feature: [helixbedrock.com/progress](https://helixbedrock.com/progress/). Engine
+notes with API names: [STATUS.md](STATUS.md). Updated 2026-11-12.
 
 | Part | State |
 |---|---|
 | Networking and login (NetherNet, RakNet, Xbox Live, encryption, resource packs) | ✅ done |
 | World storage (BDS's format, pluggable stores) | ✅ done |
 | Registry (blocks, items, biomes, entities, creative items, recipes) | ✅ done |
-| Chunk loading, sending and saving, tickets | ✅ done |
-| Regions (parallel ticking, merge and split) | ✅ done |
-| Block ticks (random and scheduled) | 🟡 ticks run; many blocks' tick behaviour added, not all yet |
-| Players (spawn, movement, seeing each other, abilities, attributes) | 🟡 in progress |
-| Inventory, chests, shulker boxes, furnaces, crafting, smithing | ✅ from BDS's code; basic use checked in game, not every case |
-| Enchanting tables, anvils, grindstones, repairing in the crafting grid | 🟡 written from BDS's code; enchanting reported working in game |
-| Banners, looms, shields with banners | 🟡 written from BDS's code, not tested in game |
-| Vanilla terrain generation ([worldgen](https://github.com/helix-bedrock/worldgen)) | ✅ overworld hooked up, world types in `server.properties`; checked in game |
-| Redstone ([redstone](https://github.com/helix-bedrock/redstone)), pistons, hoppers, TNT | ✅ works in game; written from BDS's code, not fully tested against BDS |
-| Rails and minecarts (plain, chest, hopper, TNT) | ✅ works in game |
-| Player combat, health, hunger, death, shields, totems | ✅ checked in game, not every case |
-| Projectiles | 🟡 bows and arrows work; snowballs, eggs and ender pearls do not work yet |
-| Riding, world time | 🧪 written from BDS's code, not tested in game |
-| Command system and `/give` | 🧪 written from BDS's code, not tested in game |
-| Mobs ([entity](https://github.com/helix-bedrock/entity)), other vanilla commands, UI | ⬜ not started |
+| Chunks, regions (parallel ticking, merge and split), light, weather, day cycle | ✅ done |
+| Vanilla terrain ([worldgen](https://github.com/helix-bedrock/worldgen)), the Nether and the End, portals | ✅ works in game |
+| Players: movement, health, hunger, combat, shields, totems, elytra, beds | ✅ works in game |
+| Inventory, containers, crafting, smithing, enchanting, anvils | ✅ works in game |
+| Redstone ([redstone](https://github.com/helix-bedrock/redstone)), pistons, observers, TNT, rails and minecarts | ✅ works in game |
+| Farming, plants, falling blocks, fire, fishing, bundles, fireworks | ✅ works in game |
+| Mobs ([entity](https://github.com/helix-bedrock/entity)): spawning, fighting, equipment, drops | 🟡 works in game; behaviour still being checked against BDS |
+| Potions, effects, brewing, crossbows, tridents, mace, breeding, leads, spawners, armour stands | 🧪 built, being tested in game |
+| Command system, selectors, `/give`, `/summon`, `/teleport`, `/effect` | 🟡 works; most vanilla commands still to add |
+| Villages and trading, raids, Ender Dragon, Wither, structure loot, maps, beacons | ⬜ not started |
+| Load testing (400 players in one region, heavy redstone, mass entities) | ⬜ not started |
+| Plugin API (WASM plugins, sandbox, custom content) | ⬜ not started |
 
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
 updates, Helix will be updated to the new version and gain everything the update adds. The project
