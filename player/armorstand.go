@@ -189,13 +189,9 @@ func (p *Player) equipArmorStand(r *world.Region, o *Mob, n int) {
 	inv := &p.inventory
 	switch {
 	case p.creative() && !held.Empty() && worn.Empty():
-		one := held
-		one.Count = 1
-		o.setItem(slot, one)
+		o.setItem(slot, splitOne(held))
 	case !held.Empty() && held.Count >= 2:
-		one := held
-		one.Count = 1
-		o.setItem(slot, one)
+		o.setItem(slot, splitOne(held))
 		if !p.creative() {
 			held.Count--
 			inv.main[inv.held] = held
@@ -438,4 +434,51 @@ func (s *Host) entityIn(r *world.Region, lo, hi mgl32.Vec3) bool {
 		}
 	}
 	return false
+}
+
+// splitOne is one item of s as a stack of its own. Its tags are copied, not shared: the
+// item left in the hand is worn and renamed in place, and that must not change the one on
+// the stand.
+func splitOne(s ItemStack) ItemStack {
+	s.Count = 1
+	if s.Tag != nil {
+		s.Tag = cloneNBT(s.Tag)
+	}
+	return s
+}
+
+// cloneNBT deep copies an NBT compound: nested compounds and lists are copied too.
+func cloneNBT(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = cloneNBTValue(v)
+	}
+	return out
+}
+
+// cloneNBTValue deep copies one NBT value; numbers and strings are values already.
+func cloneNBTValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		return cloneNBT(t)
+	case []any:
+		l := make([]any, len(t))
+		for i, x := range t {
+			l[i] = cloneNBTValue(x)
+		}
+		return l
+	case []map[string]any:
+		l := make([]map[string]any, len(t))
+		for i, x := range t {
+			l[i] = cloneNBT(x)
+		}
+		return l
+	case []int32:
+		return append([]int32(nil), t...)
+	case []byte:
+		return append([]byte(nil), t...)
+	case []int64:
+		return append([]int64(nil), t...)
+	}
+	return v
 }

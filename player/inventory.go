@@ -51,6 +51,8 @@ const (
 	ContainerBrewingStand
 	// ContainerStonecutter is a stonecutter's screen, its input in the player's UI slots.
 	ContainerStonecutter
+	// ContainerBarrel has 27 slots.
+	ContainerBarrel
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

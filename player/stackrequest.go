@@ -345,13 +345,20 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 		r.stack = &inv.ui[slot]
 	case protocol.ContainerEnchantingInput, protocol.ContainerEnchantingMaterial, protocol.ContainerAnvilInput, protocol.ContainerAnvilMaterial,
 		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional,
-		protocol.ContainerLoomInput, protocol.ContainerLoomDye, protocol.ContainerLoomMaterial:
+		protocol.ContainerLoomInput, protocol.ContainerLoomDye, protocol.ContainerLoomMaterial,
+		protocol.ContainerStonecutterInput:
 		if !p.window.holds(container, slot) {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]
 	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox:
 		if int(slot) >= len(inv.open) {
+			return r, false
+		}
+		r.stack = &inv.open[slot]
+	case protocol.ContainerBarrel:
+		// A barrel's slots, named only while a barrel is the open window.
+		if p.window.kind != ContainerBarrel || int(slot) >= len(inv.open) {
 			return r, false
 		}
 		r.stack = &inv.open[slot]

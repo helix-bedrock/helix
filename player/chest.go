@@ -283,6 +283,8 @@ func (c *Chest) Kind() ContainerKind {
 		return c.machine.furnace.kind
 	case c.machine.brewing:
 		return ContainerBrewingStand
+	case c.machine.barrel:
+		return ContainerBarrel
 	}
 	return ContainerDispenser
 }
