@@ -49,6 +49,8 @@ const (
 	ContainerChestBoat
 	// ContainerBrewingStand has five slots: the ingredient, three bottles and the fuel.
 	ContainerBrewingStand
+	// ContainerStonecutter is a stonecutter's screen, its input in the player's UI slots.
+	ContainerStonecutter
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

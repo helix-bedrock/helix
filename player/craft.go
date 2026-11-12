@@ -162,6 +162,9 @@ func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, 
 	if p.window.kind == ContainerEnchantingTable {
 		return p.craftEnchant(a)
 	}
+	if p.window.kind == ContainerStonecutter {
+		return p.craftStonecut(a)
+	}
 	if u, ok := p.s.Recipes().Special(a.RecipeNetworkID); ok && p.hasRecipe(a.RecipeNetworkID) {
 		return p.craftSpecial(a, u)
 	}

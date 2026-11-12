@@ -94,6 +94,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useGrindstone(r, u)
 	case loomBlock:
 		return p.useLoom(r, u)
+	case stonecutterBlock:
+		return p.useStonecutter(r, u)
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
 		return p.useAnvil(r, u)
 	}
