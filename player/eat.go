@@ -309,10 +309,11 @@ func (p *Player) tickUsing() {
 	}
 	u.left--
 	if u.crossbow {
-		// BDS's useTimeDepleted (0xC9B0E70) lets go by itself once the draw is done.
-		if u.left <= 0 {
-			p.letGo()
-		}
+		// BDS's useTimeDepleted (0xC9B0E70) lets go by itself once the draw is done. Helix
+		// waits for the client to let go instead: stopping the use here clears the player's
+		// using flag while the button is still down, and the client then starts a new use
+		// that shoots the crossbow it just loaded.
+		u.left = max(u.left, 0)
 		return
 	}
 	if u.bow {
