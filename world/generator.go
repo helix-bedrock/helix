@@ -27,6 +27,38 @@ type ColumnGenerator interface {
 	GenerateColumn(pos mcdb.ChunkPos, col *chunk.Column) error
 }
 
+// GeneratedMob is a mob generation placed in a chunk (a village's villagers, an
+// outpost's pillagers), for the server to spawn on the chunk's first tick.
+type GeneratedMob struct {
+	// Identifier is the entity type, Event the spawn event that picks its
+	// component groups (empty for the definition's own).
+	Identifier, Event string
+	// X, Y, Z are its feet, Yaw its facing in degrees.
+	X, Y, Z float32
+	Yaw     float32
+	// Persistent marks a mob that never despawns, as BDS sets on every mob a
+	// structure places.
+	Persistent bool
+	// Source names what placed it ("jigsaw" for village pieces, "structure").
+	Source string
+}
+
+// MobGenerator is a Generator whose chunks hold mobs. TakeMobs returns the
+// mobs of the chunk at pos that GenerateColumn made, and forgets them, so each
+// is handed out once. It may be called from any goroutine.
+type MobGenerator interface {
+	TakeMobs(pos mcdb.ChunkPos) []GeneratedMob
+}
+
+// GeneratedMobs takes the mobs the dimension's generator placed in the chunk at
+// pos (see MobGenerator); nil when it places none. Runs: anywhere.
+func (d *Dimension) GeneratedMobs(pos mcdb.ChunkPos) []GeneratedMob {
+	if g, ok := d.conf.Generator.(MobGenerator); ok {
+		return g.TakeMobs(pos)
+	}
+	return nil
+}
+
 // Spawner is a Generator that knows where a player can stand: the Y of the
 // block above the ground of the column at x, z. Joining players start there
 // while the world has not placed its spawn. It may be called from any

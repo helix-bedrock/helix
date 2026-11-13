@@ -32,12 +32,19 @@ type Vanilla struct {
 	// worldgen marks waterlogged.
 	water, air uint32
 	pool       sync.Pool
+	// mobs are the structure mobs of generated chunks, until their first tick.
+	mobs mobStash
 }
 
 var (
 	_ world.ColumnGenerator = (*Vanilla)(nil)
 	_ world.Spawner         = (*Vanilla)(nil)
+	_ world.MobGenerator    = (*Vanilla)(nil)
 )
+
+// TakeMobs is world.MobGenerator's: the villagers, golems, animals, pillagers and
+// other mobs the chunk's structures placed.
+func (v *Vanilla) TakeMobs(pos mcdb.ChunkPos) []world.GeneratedMob { return v.mobs.take(pos) }
 
 // NewVanilla builds the vanilla overworld for seed over the server's own
 // blocks and biomes: worldgen places the registry's state IDs, so a block a
@@ -148,6 +155,7 @@ func (v *Vanilla) fill(pos mcdb.ChunkPos, c *chunk.Chunk, col *chunk.Column) {
 	if col == nil {
 		return
 	}
+	v.mobs.put(pos, wc.Entities)
 	for _, be := range wc.BlockEntities {
 		col.BlockEntities = append(col.BlockEntities, chunk.BlockEntity{
 			Pos: cube.Pos{int(be.X), int(be.Y), int(be.Z)}, Data: be.Data,
@@ -160,7 +168,7 @@ func (v *Vanilla) fill(pos mcdb.ChunkPos, c *chunk.Chunk, col *chunk.Column) {
 			Pos: cube.Pos{int(t.X), int(t.Y), int(t.Z)}, Block: t.Block, Tick: col.Tick + int64(t.Delay),
 		})
 	}
-	wc.BlockEntities, wc.Ticks = wc.BlockEntities[:0], wc.Ticks[:0]
+	wc.BlockEntities, wc.Entities, wc.Ticks = wc.BlockEntities[:0], wc.Entities[:0], wc.Ticks[:0]
 }
 
 // SpawnHeight is the Y above the highest block of the column at x, z that

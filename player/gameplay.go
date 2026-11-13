@@ -107,6 +107,8 @@ type Systems struct {
 	// Items in the world.
 	DropItem DropItemFunc
 	PickUp   PickUpFunc
+	// StructureMob spawns a mob a generated structure placed, on its chunk's first tick.
+	StructureMob StructureMobFunc
 	// ItemLifetime is how many ticks old items vanish at, from the start. It
 	// can change while running with Host.SetItemLifetime.
 	ItemLifetime int32
@@ -460,6 +462,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.UseBlock = vanillaUseBlock
 	sys.DropItem = vanillaDropItem
 	sys.PickUp = vanillaPickUp
+	sys.StructureMob = vanillaStructureMob
 	sys.ItemLifetime = itemLifetime
 	sys.MoveFlags = vanillaMoveFlags
 	sys.Jump = vanillaJump

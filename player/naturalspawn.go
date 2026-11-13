@@ -101,6 +101,7 @@ func (s *Host) SpawnTick(r *world.Region, pos mcdb.ChunkPos) {
 // PopulationSpawn gives a newly generated chunk its first herd, BDS's post-process spawn.
 // Runs: owner of the region.
 func (s *Host) PopulationSpawn(r *world.Region, pos mcdb.ChunkPos) {
+	s.spawnStructureMobs(r, pos)
 	if rs := s.regionSpawn(r); rs != nil {
 		rs.st.PostProcess(&rs.w, &rs.lv, &rs.rnd, pos[0], pos[1])
 		rs.done()

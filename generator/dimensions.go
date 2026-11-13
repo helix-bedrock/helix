@@ -21,9 +21,17 @@ type Nether struct {
 	cache *nether.Cache
 	air   uint32
 	pool  sync.Pool
+	// mobs are the structure mobs of generated chunks, until their first tick.
+	mobs mobStash
 }
 
-var _ world.ColumnGenerator = (*Nether)(nil)
+var (
+	_ world.ColumnGenerator = (*Nether)(nil)
+	_ world.MobGenerator    = (*Nether)(nil)
+)
+
+// TakeMobs is world.MobGenerator's: the mobs the chunk's structures placed.
+func (n *Nether) TakeMobs(pos mcdb.ChunkPos) []world.GeneratedMob { return n.mobs.take(pos) }
 
 // NewNether builds the vanilla Nether for seed over the server's own blocks and biomes.
 func NewNether(reg *registry.Registry, seed int64) (*Nether, error) {
@@ -62,8 +70,9 @@ func (n *Nether) fill(pos mcdb.ChunkPos, c *chunk.Chunk, col *chunk.Column) {
 	copyColumn(c, n.air, nether.Height, wc.Block, wc.Biome)
 	if col != nil {
 		col.BlockEntities = appendBlockEntities(col.BlockEntities, wc.BlockEntities)
+		n.mobs.put(pos, wc.Entities)
 	}
-	wc.BlockEntities = wc.BlockEntities[:0]
+	wc.BlockEntities, wc.Entities = wc.BlockEntities[:0], wc.Entities[:0]
 }
 
 // End is BDS 1.26.60's End from the worldgen library: the main island with its
