@@ -707,17 +707,26 @@ const (
 // setBedSpawn makes the bed with its head at head the player's respawn point. False if it
 // already was.
 func (p *Player) setBedSpawn(head cube.Pos) bool {
-	if p.spawn.set && p.spawn.pos == head {
+	if p.spawn.set && p.spawn.dim == spawnOverworld && p.spawn.pos == head {
 		return false
 	}
-	p.spawn.set, p.spawn.pos = true, head
+	p.spawn = spawnPointState{set: true, pos: head, stand: head, dim: spawnOverworld}
 	return true
 }
 
-// spawnPointState is a player's own respawn point, a bed.
+// The dimensions a respawn point is kept in (BDS's SpawnDimension).
+const (
+	spawnOverworld int32 = 0
+	spawnNether    int32 = 1
+)
+
+// spawnPointState is a player's own respawn point: a bed in the overworld or a respawn
+// anchor in the Nether. pos is the block (SpawnBlockPosition), stand where the player stood
+// when it was set (SpawnX/Y/Z; a bed keeps its own position there).
 type spawnPointState struct {
-	set bool
-	pos cube.Pos
+	set        bool
+	pos, stand cube.Pos
+	dim        int32
 }
 
 // loadSpawn reads the respawn point BDS saved.
@@ -725,8 +734,19 @@ func (p *Player) loadSpawn(data map[string]any) {
 	x, okX := data[spawnBlockX].(int32)
 	y, okY := data[spawnBlockY].(int32)
 	z, okZ := data[spawnBlockZ].(int32)
-	if okX && okY && okZ && x != unsetSpawn {
-		p.spawn.set, p.spawn.pos = true, cube.Pos{int(x), int(y), int(z)}
+	if !okX || !okY || !okZ || x == unsetSpawn {
+		return
+	}
+	p.spawn = spawnPointState{set: true, pos: cube.Pos{int(x), int(y), int(z)}}
+	p.spawn.stand = p.spawn.pos
+	sx, okX := data[spawnX].(int32)
+	sy, okY := data[spawnY].(int32)
+	sz, okZ := data[spawnZ].(int32)
+	if okX && okY && okZ && sx != unsetSpawn {
+		p.spawn.stand = cube.Pos{int(sx), int(sy), int(sz)}
+	}
+	if d, ok := data[spawnDimTag].(int32); ok {
+		p.spawn.dim = d
 	}
 }
 
@@ -738,17 +758,18 @@ func (p *Player) saveSpawn(data map[string]any) {
 		}
 		return
 	}
-	x, y, z := int32(p.spawn.pos[0]), int32(p.spawn.pos[1]), int32(p.spawn.pos[2]) //nolint:gosec // block coordinates fit int32
-	data[spawnX], data[spawnY], data[spawnZ] = x, y, z
+	x, y, z := int32(p.spawn.pos[0]), int32(p.spawn.pos[1]), int32(p.spawn.pos[2])          //nolint:gosec // block coordinates fit int32
+	sx, sy, sz := int32(p.spawn.stand[0]), int32(p.spawn.stand[1]), int32(p.spawn.stand[2]) //nolint:gosec // block coordinates fit int32
+	data[spawnX], data[spawnY], data[spawnZ] = sx, sy, sz
 	data[spawnBlockX], data[spawnBlockY], data[spawnBlockZ] = x, y, z
-	data[spawnDimTag] = int32(0)
+	data[spawnDimTag] = p.spawn.dim
 	data[spawnForcedTag] = uint8(0)
 }
 
 // bedRespawn is where a dead player comes back at its bed: a place to get up beside it. False
 // if it has no bed or the bed is gone, which forgets it.
 func (p *Player) bedRespawn(r *world.Region) (mgl32.Vec3, bool) {
-	if !p.spawn.set || r == nil {
+	if !p.spawn.set || p.spawn.dim != spawnOverworld || r == nil {
 		return mgl32.Vec3{}, false
 	}
 	b, ok := r.Block(p.spawn.pos, 0)

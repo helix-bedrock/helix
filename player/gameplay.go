@@ -308,7 +308,7 @@ type gameState struct {
 }
 
 func newGameState() *gameState {
-	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, potions: map[int32]*Potion{}, blocks: map[string]BlockBehaviour{nameTNT: tntBlock{}}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), motives: slices.Clone(vanillaMotives[:]), out: &gameplay{}}
+	return &gameState{enchanting: newEnchanting(), enchants: map[int16]*Enchantment{}, effects: map[int32]*Effect{}, potions: map[int32]*Potion{}, blocks: map[string]BlockBehaviour{nameTNT: tntBlock{}, nameRespawnAnchor: &respawnAnchorBlock{}}, dropRules: map[string]loot.Rule{}, tuning: vanillaTuning(exhaustionValues{}), motives: slices.Clone(vanillaMotives[:]), out: &gameplay{}}
 }
 
 // Systems returns the breaking and placing steps to replace or wrap. Not

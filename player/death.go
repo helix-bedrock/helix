@@ -192,6 +192,9 @@ func handlePlayerAction(p *Player, pk *packet.PlayerAction) {
 	if pk.ActionType != protocol.PlayerActionRespawn || pk.EntityRuntimeID != p.runtimeID || p.respawn != respawnWaitAction || !p.dead() {
 		return
 	}
+	if p.respawnAtAnchor() {
+		return
+	}
 	if p.dim != p.s.overworld && p.s.overworld != nil {
 		// Death outside the overworld respawns there: the body resets where it is,
 		// then the player moves across.
@@ -202,8 +205,14 @@ func handlePlayerAction(p *Player, pk *packet.PlayerAction) {
 	p.s.game.sys.Respawn(p, p.respawnPoint())
 }
 
-// respawnPoint is where a dead player comes back: beside its bed, else the world spawn.
+// respawnPoint is where a dead player comes back: beside its anchor when it is in the
+// anchor's Nether, beside its bed, else the world spawn.
 func (p *Player) respawnPoint() mgl32.Vec3 {
+	if p.dim == p.s.nether {
+		if at, ok := p.anchorSpot(p.entity.Region(), false); ok {
+			return at
+		}
+	}
 	if at, ok := p.bedRespawn(p.entity.Region()); ok {
 		return at
 	}

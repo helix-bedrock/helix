@@ -285,12 +285,13 @@ func (p *Player) leaveEnd() { p.toOverworldSpawn(false) }
 // respawn or a portal.
 func (p *Player) toOverworldSpawn(respawn bool) {
 	spawn, _ := p.worldSpawn()
-	if p.spawn.set {
+	bedSpawn := p.spawn.set && p.spawn.dim == spawnOverworld
+	if bedSpawn {
 		bed := p.spawn.pos
 		spawn = mgl32.Vec3{float32(bed[0]) + 0.5, float32(bed[1]) + 1 + eyeHeight, float32(bed[2]) + 0.5}
 	}
 	p.changeDimension(&dimMove{to: p.s.overworld, eyes: spawn, rot: p.entity.Rotation(), respawn: respawn, arrive: func(r *world.Region) bool {
-		if !p.spawn.set {
+		if !bedSpawn {
 			return true
 		}
 		if _, ok := r.Block(p.spawn.pos, 0); !ok && p.portal.waited < arrivalWaitTicks {
