@@ -64,7 +64,10 @@ type Level struct {
 	// DoEntityDrops is whether broken entities such as cushions leave their item.
 	DoEntityDrops             bool
 	PlayersSleepingPercentage int32
-	GameRules                 []protocol.GameRule
+	// SpawnRadius is the spawnradius game rule: how far around the world spawn a player
+	// without a bed respawns.
+	SpawnRadius int32
+	GameRules   []protocol.GameRule
 }
 
 // HostConfig is what the server gives the players.

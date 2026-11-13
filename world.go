@@ -135,6 +135,7 @@ func levelOf(ldat *leveldat.Data) player.Level {
 		MobGriefing:               ldat.MobGriefing,
 		DoMobSpawning:             ldat.DoMobSpawning,
 		PlayersSleepingPercentage: ldat.PlayersSleepingPercentage,
+		SpawnRadius:               ldat.SpawnRadius,
 		GameRules:                 gameRules(ldat),
 	}
 }

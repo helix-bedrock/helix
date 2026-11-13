@@ -292,6 +292,9 @@ func (p *Player) toOverworldSpawn(respawn bool) {
 	}
 	p.changeDimension(&dimMove{to: p.s.overworld, eyes: spawn, rot: p.entity.Rotation(), respawn: respawn, arrive: func(r *world.Region) bool {
 		if !bedSpawn {
+			if respawn {
+				p.teleportFeet(p.worldRespawn(r).Sub(mgl32.Vec3{0, eyeHeight, 0}), p.entity.Rotation())
+			}
 			return true
 		}
 		if _, ok := r.Block(p.spawn.pos, 0); !ok && p.portal.waited < arrivalWaitTicks {

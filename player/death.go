@@ -206,7 +206,7 @@ func handlePlayerAction(p *Player, pk *packet.PlayerAction) {
 }
 
 // respawnPoint is where a dead player comes back: beside its anchor when it is in the
-// anchor's Nether, beside its bed, else the world spawn.
+// anchor's Nether, beside its bed, else a safe place around the world spawn.
 func (p *Player) respawnPoint() mgl32.Vec3 {
 	if p.dim == p.s.nether {
 		if at, ok := p.anchorSpot(p.entity.Region(), false); ok {
@@ -216,8 +216,7 @@ func (p *Player) respawnPoint() mgl32.Vec3 {
 	if at, ok := p.bedRespawn(p.entity.Region()); ok {
 		return at
 	}
-	spawn, _ := p.worldSpawn()
-	return spawn
+	return p.worldRespawn(p.entity.Region())
 }
 
 // vanillaRespawn is BDS's respawn as far as built: the body resets, the
