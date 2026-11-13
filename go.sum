@@ -32,6 +32,8 @@ github.com/helix-bedrock/entity v0.0.0-20261111212216-3f4a8f7e2e2f h1:5epoHsUvoW
 github.com/helix-bedrock/entity v0.0.0-20261111212216-3f4a8f7e2e2f/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
 github.com/helix-bedrock/entity v0.0.0-20261112024018-5b772ffd83b9 h1:llTyKI7L4rhO9NdEyQKS4aM5Dtpx6m2u15J767/ZYpw=
 github.com/helix-bedrock/entity v0.0.0-20261112024018-5b772ffd83b9/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
+github.com/helix-bedrock/entity v0.0.0-20261113173324-985e07555c2c h1:aOiXBaUb1F9C0dRQuBYRrpmE97jaC8HNWjBMjUIwru8=
+github.com/helix-bedrock/entity v0.0.0-20261113173324-985e07555c2c/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
 github.com/helix-bedrock/helix-data v0.0.0-20261110171137-8dbf6f6c7041 h1:m8YQdejDcO9xa1sKezQ94EukTLJazk0TEKIkmGV+lcg=
 github.com/helix-bedrock/helix-data v0.0.0-20261110171137-8dbf6f6c7041/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261111163835-5b826b40dc16 h1:QXGhVwMUWh8gYTDLbwOuPl15/Klilz9I9SPntQhIqY8=
@@ -40,6 +42,8 @@ github.com/helix-bedrock/helix-data v0.0.0-20261111172239-f5daf03453a3 h1:hTCT1k
 github.com/helix-bedrock/helix-data v0.0.0-20261111172239-f5daf03453a3/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261113023821-8fe0cfff6245 h1:fccXCPgXp64Cxgt8i87HUD7zTjqPnbswnEeff4ApLl0=
 github.com/helix-bedrock/helix-data v0.0.0-20261113023821-8fe0cfff6245/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
+github.com/helix-bedrock/helix-data v0.0.0-20261113172848-93c1ab2c3e2f h1:a0j4SFmcLHjt9lCzIkfTGMhR/L7K7meJtbPyoSiVGKk=
+github.com/helix-bedrock/helix-data v0.0.0-20261113172848-93c1ab2c3e2f/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41 h1:XTa1sWqYUCqhxDdAGL9+vldnHfNIR5/VascyZWb9qYg=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41/go.mod h1:VnXHxKcm+E0FTmpjyXwTMPweBUqZ/QNDRABUVjSwRRE=
 github.com/helix-bedrock/protocol v0.0.0-20261110170100-e596cacb3f4a h1:raHrBN5pmPK5BCsvo3XdD872FRJbDaI+fB/NLRDgGNE=

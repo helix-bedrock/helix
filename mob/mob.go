@@ -59,7 +59,9 @@ type Runtime struct {
 	Env    Env
 	// Goals maps goal components to factories; vanilla's by default.
 	Goals *component.Registry
-	Log   *slog.Logger
+	// Villages is the village system dwellers belong to, nil for none (dweller.go).
+	Villages Villages
+	Log      *slog.Logger
 	// parser reads definitions; parsed definitions are cached by type.
 	parser *definition.Parser
 	defs   map[string]*definition.Definition
@@ -218,6 +220,11 @@ type Mob struct {
 	// scale is minecraft:scale's value, the size the client draws the mob at (a rabbit 0.6,
 	// babies their group's own).
 	scale float32
+	// dw is the DwellerComponent's state and the trade window's player (dweller.go);
+	// trade the trade components' state (trade.go); pathNodes scratch for PathNodes.
+	dw        dweller
+	trade     tradeState
+	pathNodes []behavior.Pos
 	// moveSpeed is the speed the move control last chose (BDS's Mob::mSpeed), kept between
 	// ticks so walking speeds up a tenth at a time.
 	moveSpeed float32
@@ -249,7 +256,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	}
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, id: behavior.ID(uniqueID), rid: runtimeID,
-		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID,
+		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,
@@ -357,6 +364,7 @@ func (m *Mob) think() (remove bool) {
 		return true
 	}
 	m.sensorTick()
+	m.dwellerTick()
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw
 	m.lookSet = false
 	m.noActionTime++

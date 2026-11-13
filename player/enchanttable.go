@@ -186,6 +186,10 @@ type craftAfter struct {
 	materialLeft uint8
 	// anvilWear gives the anvil on show its chance to wear.
 	anvilWear bool
+	// trade is the villager offer traded, its index plus one (0 for none), tradeTimes how
+	// often.
+	trade      int
+	tradeTimes uint8
 }
 
 // afterCraft does what the request's craft left to do.
@@ -208,6 +212,9 @@ func (p *Player) afterCraft(a craftAfter) {
 		if r := p.entity.Region(); r != nil {
 			p.s.game.sys.AnvilWear(p, r, p.window.pos)
 		}
+	}
+	if a.trade > 0 {
+		p.afterTrade(a.trade-1, a.tradeTimes)
 	}
 	if a.experience > 0 && p.entity != nil {
 		if r := p.entity.Region(); r != nil {
@@ -275,6 +282,10 @@ func (w *windowState) holds(container, slot byte) bool {
 		return w.kind == ContainerCartography && slot == cartographyInputSlot
 	case protocol.ContainerCartographyAdditional:
 		return w.kind == ContainerCartography && slot == cartographyAdditionalSlot
+	case protocol.ContainerTradeTwoIngredientOne:
+		return w.kind == ContainerTrade && slot == tradeSlotA
+	case protocol.ContainerTradeTwoIngredientTwo:
+		return w.kind == ContainerTrade && slot == tradeSlotB
 	}
 	return false
 }

@@ -32,7 +32,17 @@ const (
 	opShoot
 	opBreed
 	opDropLeash
+	opDwellerTick
+	opDoor
+	opDoorEvent
+	opCarried
 )
+
+// ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
+// its Hooks: the item in the mob's main hand changed for show only.
+type ShowHooks interface {
+	Carried(m *Mob)
+}
 
 // op is one queued change. Only the fields its kind uses are set.
 type op struct {
@@ -146,6 +156,16 @@ func (m *Mob) run(o op) {
 		if m.hooks != nil {
 			m.hooks.LeashDropped(m, o.n != 0)
 		}
+	case opCarried:
+		if h, ok := m.hooks.(ShowHooks); ok {
+			h.Carried(m)
+		}
+	case opDwellerTick:
+		m.runDwellerTick(r)
+	case opDoor:
+		env.SetDoorOpen(r, o.pos, o.n != 0)
+	case opDoorEvent:
+		env.LevelEventData(r, o.n, o.at, int32(o.amount))
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r

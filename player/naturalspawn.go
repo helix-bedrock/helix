@@ -92,6 +92,9 @@ type regionSpawnKey struct{}
 // SpawnTick runs the natural spawner on a ticking chunk, BDS's spawner tick for one chunk.
 // Runs: owner of the region.
 func (s *Host) SpawnTick(r *world.Region, pos mcdb.ChunkPos) {
+	if s.villages != nil {
+		s.villages.chunkTick(r, pos)
+	}
 	if rs := s.regionSpawn(r); rs != nil {
 		rs.st.TickChunk(&rs.w, &rs.lv, &rs.rnd, pos[0], pos[1])
 		rs.done()

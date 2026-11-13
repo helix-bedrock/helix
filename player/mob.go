@@ -11,6 +11,7 @@ import (
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/helix/village"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -35,6 +36,10 @@ func (s *Host) setUpMobs() {
 		if err := s.mobs.Parse(t.Name, t.Definition); err != nil {
 			s.log.Debug("entity definition not read", "type", t.Name, "err", err)
 		}
+	}
+	s.setUpVillages(village.Vanilla())
+	if err := s.loadTradeTables(); err != nil {
+		s.log.Error("trade tables not read", "err", err)
 	}
 	if err := s.setUpSpawning(); err != nil {
 		s.log.Error("natural mob spawning off", "err", err)
@@ -72,6 +77,8 @@ type Mob struct {
 	naturalSpawn bool
 	// stand is an armour stand's own state, nil for any other mob (armorstand.go).
 	stand *armorStand
+	// trades are a villager's offers (trade.go), nil without a trade table.
+	trades *villagerTrades
 }
 
 // Entity returns the mob's entity.
@@ -238,6 +245,7 @@ func (m *Mob) apply(e *world.Entity) {
 	if m.stand != nil {
 		m.tickArmorStand(e.Region())
 	}
+	m.tickTrades(e.Region())
 	b := m.m.Body()
 	pitch, yaw, head, _ := m.m.Rotation()
 	if !e.Apply(world.Movement{Pos: mglVec(b.Pos), Rot: world.Rotation{Pitch: pitch, Yaw: yaw, HeadYaw: head}, OnGround: b.OnGround, Tick: e.Tick()}) {
@@ -247,6 +255,7 @@ func (m *Mob) apply(e *world.Entity) {
 }
 
 func (m *Mob) remove(e *world.Entity) {
+	m.closeTrade()
 	m.gone = true
 	e.Remove()
 }

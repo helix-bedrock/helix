@@ -93,6 +93,7 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	o.saveEquipment(data)
 	data["Attributes"] = o.saveAttributes(prevAttrs)
 	o.saveBreeding(data)
+	o.saveTrades(data)
 	if o.stand != nil {
 		o.saveArmorStand(data)
 	}
@@ -248,6 +249,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 		o.loadArmorStand(saved.Data)
 	}
 	o.loadBreeding(saved.Data)
+	o.loadTrades(saved.Data)
 	surface, _ := saved.Data[mobKeySurface].(uint8)
 	natural, _ := saved.Data[mobKeyNaturalSpawn].(uint8)
 	o.surface, o.naturalSpawn = surface != 0, natural != 0

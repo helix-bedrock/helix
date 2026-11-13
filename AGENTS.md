@@ -383,6 +383,24 @@ sibling library folders, so unreleased library changes are used.
 - `player/living.go`: `Living`, what players and mobs share for the world's hazards (`TakeDamage`, fire timer, `Wet`, blast box). Fire and lava blocks, burning, cactus and berry bushes (`Host.tickHazards`), landing (`Host.landed` for mobs; players keep `Systems.Fall`), lightning, explosions and projectiles hurt any `Living`. A new hazard is written against `Living` so it hurts mobs as well as players. Mobs also push each other and are pushed by players (`mob/push.go`, entity's `Mob::pushActors`).
 - `player/mobequip.go`: mob equipment and death drops: the minecraft:equipment table rolled once when a mob is created (not loaded), items put where BDS's Actor::equip puts them, MobEquipment/MobArmourEquipment, shooter shots at the target (`Mob.Shoot`), equipment drop chances, minecraft:loot and experience_reward on death (doMobLoot). `loot/entity.go` rolls entity loot tables as BDS 1.26.60 (`EntityTables`, `EntityContext`, `SpecialMultiplier`); `mob/equipment.go` is the mob's view of its slots and the ranged-attack hooks.
 - `player/mobsave.go`: mobs saved with their chunk in BDS 1.26.60's actor format (Actor::saveWithoutId and Mob's fields: identifier, definitions, UniqueID, Pos, Rotation, Motion, CustomName, Persistent, flag bytes, actor data values, Fire, Air, Mainhand/Offhand/Armor, Attributes); fields Helix does not run are kept from the loaded data and written back; `loadEntity` loads every type the mob runtime runs. Age (Age, GrowthPaused), breeding (InLove, LoveCause, BreedCooldown) and LeasherID are saved; anger timers and effects are not yet. Every dimension now has the entity loader and the block entities. `player/spawner.go`: monster spawners (`MobSpawner` block entity, BDS's BaseMobSpawner tick, save fields and defaults; spawns pass the entity library's `spawn.CheckSpawnRules`) and spawn eggs (on a spawner they set its mob in any game mode, elsewhere they spawn the mob facing the player). Name tags: `player/mobinteract.go`'s `nameMob` and `mob.Mob.Name` (BDS's NameableComponent: name, can-show flag, persistent, name_actions). `mob/breed.go` + `player/mobbreed.go`: feeding (ageable then breedable, BDS order), mating in Apply (babies through Hooks.Born, persistent; on_bred experience), leads on mobs. `player/leashknot.go`: leash knots on fences and walls (tie leashed mobs on use, break on hit/use or when the fence goes).
+- `village`: BDS 1.26.60's villages: the POI table (`Table`, `Vanilla`: beds, bells, the 13 job
+  sites with their weights and become_X events), one `Manager` per dimension (POI scans of 32x8x32
+  around dwellers, 1024 blocks a tick; beds found villages, bells and job sites join one within 64
+  blocks), each village ticked by the region holding its centre chunk (`ChunkTick`, from the
+  Host's chunk spawn tick): POIs whose block went, inactive dwellers, and on ticks where
+  tick % 30 == 15 the claims (first free bed and bell; job sites by preferred profession, else a
+  weighted random pick). Losing a job site makes a villager not locked into its trades (trade tier
+  and experience 0) run become_unskilled; goals read villages through published snapshots.
+  Villages are not saved yet. `mob/dweller.go` is the mob side (Dweller, Sleeper, Worker,
+  Indoorer, Hider, DoorUser, PlayerTrader), `player/village.go` the Host's glue.
+  `player/trade.go`: villager trading as BDS's EconomyTradeableComponent: offers generated from
+  the trade tables (all tiers at once, num_to_select per group, filters, enchanted books priced by
+  enchant_book_for_trading), priced when the window opens (demand, Hero of the Village), the
+  window (UpdateTrade, the trade slots in the UI, CraftRecipe and CraftRecipeAuto by offer net
+  ID), notifyTrade (uses, experience, tiers, riches, orbs), the daily restock on
+  trade_resupply, saved as BDS's Offers/Riches/TradeTier/TradeExperience. Offers go with the
+  economy_trade_table component, so a reroll is the component's removal. Not built: curing
+  discounts, the level-up Regeneration, random_dye, exploration maps, item pick-up and sharing.
 - `player/pushout.go`: BDS's push out of blocks, which only items and experience orbs run; `Properties.PushesOut` and `Stairs` are the block facts it reads.
 - `ride`: riding for anything rideable: seats, seat offset, who may get on, links, where a rider lands. It knows nothing of carts or players: a vehicle keeps a `ride.Vehicle`, a rider implements `ride.Rider`, and `player/riding.go` is the player's side of it (the `vehicle` interface, `mount`, `letOff`).
 - `connect`: the arms of fences, panes, bars and trip wire, kept in their block states since 1.26, from helix-data's rules, and stair corners (`stairs.go`, BDS's corner rule).

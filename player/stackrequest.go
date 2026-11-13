@@ -394,7 +394,8 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 	case protocol.ContainerEnchantingInput, protocol.ContainerEnchantingMaterial, protocol.ContainerAnvilInput, protocol.ContainerAnvilMaterial,
 		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional,
 		protocol.ContainerLoomInput, protocol.ContainerLoomDye, protocol.ContainerLoomMaterial,
-		protocol.ContainerStonecutterInput, protocol.ContainerCartographyInput, protocol.ContainerCartographyAdditional:
+		protocol.ContainerStonecutterInput, protocol.ContainerCartographyInput, protocol.ContainerCartographyAdditional,
+		protocol.ContainerTradeTwoIngredientOne, protocol.ContainerTradeTwoIngredientTwo:
 		if !p.window.holds(container, slot) {
 			return r, false
 		}

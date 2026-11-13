@@ -58,6 +58,9 @@ const (
 	ContainerCartography
 	// ContainerLectern is a lectern's book screen, with no slots.
 	ContainerLectern
+	// ContainerTrade is a villager's trade window, its two ingredients in the player's UI
+	// slots.
+	ContainerTrade
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

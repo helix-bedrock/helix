@@ -32,6 +32,8 @@ type windowState struct {
 	// cart is the minecart whose slots are open, if a cart's are; boat the chest boat's.
 	cart *Minecart
 	boat *Boat
+	// trader is the villager whose trade window is open.
+	trader *Mob
 }
 
 // nextID moves to the next window ID.
@@ -136,7 +138,10 @@ func (p *Player) showWindow(r *world.Region, o *windowOpening) {
 func (p *Player) closeWindow(r *world.Region, serverSide bool) {
 	w := &p.window
 	was := *w
-	w.open, w.kind, w.inv, w.cart, w.boat = false, ContainerNone, nil, nil, nil
+	w.open, w.kind, w.inv, w.cart, w.boat, w.trader = false, ContainerNone, nil, nil, nil, nil
+	if was.trader != nil && was.trader.trades != nil && was.trader.trades.player == p {
+		was.trader.endTrade()
+	}
 	p.inventory.open = nil
 	if serverSide {
 		p.sendNow(&packet.ContainerClose{WindowID: w.id, ContainerType: containerTypeNone, ServerSide: true})

@@ -55,6 +55,12 @@ type Env interface {
 	DayTime() int32
 	// GameRule is a boolean game rule by its lower case name; false if there is none.
 	GameRule(name string) (value, ok bool)
+	// RainingAt reports rain falling on pos: the weather, the biome and the sky.
+	RainingAt(r *world.Region, pos cube.Pos) bool
+	// SetDoorOpen opens or closes the door at p as a mob does, with its sound.
+	SetDoorOpen(r *world.Region, p behavior.Pos, open bool)
+	// LevelEventData sends the level event at p with a number as its data.
+	LevelEventData(r *world.Region, id int32, p behavior.Vec3, data int32)
 	// Mob is the mob with the unique ID in r, nil when there is none. It is only called
 	// outside the think phase.
 	Mob(r *world.Region, id behavior.ID) *Mob

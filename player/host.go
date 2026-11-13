@@ -168,6 +168,12 @@ type Host struct {
 	itemLifetime atomic.Int32
 	// mobs runs every mob from its entity definition.
 	mobs *mob.Runtime
+	// villages runs the villages of every dimension (village.go).
+	villages *villages
+	// tradeTables are the trade tables by path; tradeIDs numbers trade offers for the
+	// network (trade.go).
+	tradeTables map[string]*tradeTable
+	tradeIDs    atomic.Int32
 	// spawning is the natural mob spawner; nil when its data did not load.
 	spawning *spawning
 	// mobScratch holds the mob runtime's entity scan buffers (mobScratch).

@@ -41,6 +41,8 @@ type craftState struct {
 	results []craftResult
 	// after is what the craft does once the whole request has passed.
 	after craftAfter
+	// trade is a villager trade under way (trade.go).
+	trade *tradeCraft
 }
 
 // expectedSlot is a grid slot and how many of its items must still be consumed.
@@ -156,6 +158,9 @@ func (p *Player) recipeFor(id uint32) (*crafting.Recipe, uint8) {
 // craftRecipe is a craft by hand: the grid must fit the recipe, and each item in it
 // must be consumed once per craft by the actions that follow.
 func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, []slotRef) {
+	if p.window.kind == ContainerTrade {
+		return p.craftTrade(a.RecipeNetworkID, a.NumberOfCrafts, false), nil
+	}
 	if p.window.kind == ContainerSmithingTable {
 		return p.craftSmithing(a)
 	}
@@ -206,6 +211,9 @@ func (p *Player) craftRecipe(a *protocol.CraftRecipeStackRequestAction) (uint8, 
 // craftAuto is a craft from the recipe book: the recipe's ingredients must be
 // consumed from the grid or the inventory, and the results come after that.
 func (p *Player) craftAuto(a *protocol.AutoCraftRecipeStackRequestAction) (uint8, []slotRef) {
+	if p.window.kind == ContainerTrade {
+		return p.craftTrade(a.RecipeNetworkID, a.NumberOfCrafts, true), nil
+	}
 	c := &p.requests.craft
 	if _, _, _, ok := p.craftGrid(); !ok {
 		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
@@ -362,6 +370,9 @@ func (p *Player) consumeAction(a *protocol.ConsumeStackRequestAction) (uint8, []
 // consumed checks items taken out against what the craft expects.
 func (p *Player) consumed(src slotRef, used ItemStack) uint8 {
 	c := &p.requests.craft
+	if c.trade != nil {
+		return p.consumedTrade(src, used)
+	}
 	if c.auto {
 		return p.consumedAnywhere(src, used)
 	}
@@ -432,6 +443,9 @@ func (p *Player) finishCraft() uint8 {
 		if e.left != 0 {
 			return protocol.ItemStackResponseStatusExpectedAnywhereItemNotFullyConsumed
 		}
+	}
+	if c.trade != nil && !c.trade.done() {
+		return protocol.ItemStackResponseStatusExpectedItemSlotNotFullyConsumed
 	}
 	return protocol.ItemStackResponseStatusOK
 }

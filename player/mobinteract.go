@@ -83,6 +83,9 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	if p.bucketMob(r, o) {
 		return
 	}
+	if p.openTrade(r, o) {
+		return
+	}
 	raw, ok := o.m.Interact(actorOf(p.entity))
 	if !ok {
 		// BDS's order after minecraft:interact: ageable, breedable, leashable.
