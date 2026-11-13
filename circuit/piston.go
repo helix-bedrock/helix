@@ -173,8 +173,11 @@ func (t *Ticker) loadPiston(saved map[string]any) *pistonEntity {
 	return e
 }
 
-// TickBlockEntity is BDS's piston tick: the power read, the start or end of a move,
-// then the arm's step.
+// TickBlockEntity is BDS's piston tick (0xd3d5f00): the power read, the start or end
+// of a move, then the arm's step. BDS reads the power and starts or ends a move only
+// on the tick after the circuits evaluate, when its counter has reached the interval;
+// the arm steps every tick. So a block a piston sets down is always in place for the
+// next evaluation, and signal can go through it before a sticky piston pulls it back.
 func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	t := e.t
 	block, ok := r.Block(pos, 0)
@@ -183,7 +186,8 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	}
 	dir := t.facingOf(block)
 	e.last = e.progress
-	strength := t.circuitOf(r).sys.Strength(toPos(pos))
+	sys := t.circuitOf(r).sys
+	strength := sys.Strength(toPos(pos))
 	if e.newState == pistonExpanding && e.state != pistonExpanding && strength == 0 {
 		e.newState = e.state
 	}
@@ -192,33 +196,53 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		e.lastState = e.state
 	}
 	moving := e.state == pistonExpanding || e.state == pistonRetracting
-	switch {
-	case strength > 0 && e.state == pistonRetracted && e.newState == pistonRetracted:
-		e.newState = pistonExpanding
-	case strength <= 0 && e.state == pistonExpanded && e.newState == pistonExpanded:
-		e.newState = pistonRetracting
-	}
-	if e.newState != e.state {
-		if !e.change(r, pos, block, dir) {
-			return
-		}
-		moving = true
-	}
-	switch e.state {
-	case pistonExpanding:
-		e.progress = min(e.progress+e.t.settings.Get().Piston.Step, 1)
-		if e.progress >= 1 {
-			e.newState = pistonExpanded
-		}
-	case pistonRetracting:
-		e.progress = max(e.progress-e.t.settings.Get().Piston.Step, 0)
-		if e.progress <= 0 {
-			e.newState = pistonRetracted
+	if !sys.SignalTick() {
+		e.readPower(strength)
+		e.settle()
+		if e.newState != e.state {
+			if !e.change(r, pos, block, dir) {
+				return
+			}
+			moving = true
 		}
 	}
+	e.step()
 	if moving {
 		r.SendBlockEntity(pos)
 		e.pushEntities(r, pos, dir)
+	}
+}
+
+// readPower asks for a move when the power is on or off. Without a component (-1)
+// BDS leaves the piston as it is.
+func (e *pistonEntity) readPower(strength int16) {
+	switch {
+	case strength < 0:
+	case strength > 0 && e.state == pistonRetracted && e.newState == pistonRetracted:
+		e.newState = pistonExpanding
+	case strength == 0 && e.state == pistonExpanded && e.newState == pistonExpanded:
+		e.newState = pistonRetracting
+	}
+}
+
+// settle asks for the end of a move whose arm has gone all the way.
+func (e *pistonEntity) settle() {
+	switch {
+	case e.state == pistonRetracting && e.progress <= 0:
+		e.progress, e.newState = 0, pistonRetracted
+	case e.state == pistonExpanding && e.progress >= 1:
+		e.progress, e.newState = 1, pistonExpanded
+	}
+}
+
+// step moves the arm on, every tick.
+func (e *pistonEntity) step() {
+	step := e.t.settings.Get().Piston.Step
+	switch e.state {
+	case pistonExpanding:
+		e.progress = min(e.progress+step, 1)
+	case pistonRetracting:
+		e.progress = max(e.progress-step, 0)
 	}
 }
 
