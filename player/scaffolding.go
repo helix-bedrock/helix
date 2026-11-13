@@ -69,3 +69,15 @@ func scaffoldTop(r *world.Region, f *fall.Table, from cube.Pos) (cube.Pos, bool)
 	}
 	return at, at[1] <= top
 }
+
+// climbableBlock is BDS 1.26.60's climbable check (0xBFA8720): the block's climbable flag,
+// or scaffolding, or powder snow, which BDS names by type instead of flagging. A player in
+// one climbs, so its fall distance is cleared.
+func (s *Host) climbableBlock(b uint32) bool {
+	blocks := s.reg.Blocks
+	if blocks.Properties(b).Climbable {
+		return true
+	}
+	name := blocks.Name(b)
+	return name == nameScaffolding || name == namePowderSnow
+}

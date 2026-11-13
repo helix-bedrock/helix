@@ -208,7 +208,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 	m.HeadInWater = p.water(r, eyes)
 	m.InWater = m.HeadInWater || p.water(r, feet)
 	if b, ok := r.Block(feet, 0); ok {
-		m.Climbing = p.s.reg.Blocks.Properties(b).Climbable
+		m.Climbing = p.s.climbableBlock(b)
 	}
 	p.move.climbing, p.move.inWater, p.move.onGround = m.Climbing, m.InWater, m.OnGround
 	sys := p.s.game.sys
