@@ -113,6 +113,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if isCandleBlock(name) {
 		return p.useCandle(r, u)
 	}
+	if isShelfBlock(name) {
+		return p.useShelf(r, u)
+	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)
 	}
