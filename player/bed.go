@@ -178,6 +178,7 @@ func (p *Player) placeBed(r *world.Region, clicked cube.Pos, face int32, held It
 
 // tryBed is BedItem's placing at one foot position (sub_C9D2BC0): the head goes the way the
 // player looks, both halves must be free and held from below, and no end portal may be near.
+// Unlike a block, nothing checks for entities in the way: BDS places a bed over the placer.
 func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, held ItemStack) bool {
 	if !p.inReach(clicked) {
 		return false
@@ -188,9 +189,6 @@ func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, h
 	footState := blockuse.BedSet(blocks, blockuse.BedWithFacing(blocks, block, facing), blockuse.BedHead, false)
 	headState := blockuse.BedSet(blocks, footState, blockuse.BedHead, true)
 	if !p.bedFits(r, foot, head, block) || p.endPortalNear(r, foot) {
-		return false
-	}
-	if p.inside(foot, footState) || p.inside(head, headState) {
 		return false
 	}
 	if g := p.s.game; g.placeEv.Has() {
