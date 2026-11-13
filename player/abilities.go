@@ -300,3 +300,18 @@ func (a *Abilities) save(data map[string]any) {
 	data["playerPermissionsLevel"] = int32(a.Permission)
 	data["permissionsLevel"] = int32(a.CommandPermission)
 }
+
+// flyInput takes the client's start and stop flying, as BDS does: starting is kept when the
+// player may fly, and otherwise its abilities go back to it so it stops; stopping is always
+// kept. Without this the server's flying flag stays off, and the next abilities update (an
+// /op, a game mode) drops a flying player to the ground. Runs: the player's region.
+func (p *Player) flyInput(start, stop bool) {
+	switch {
+	case stop:
+		p.abilities.SetFlag(AbilityLayerBase, AbilityFlying, false)
+	case start && p.abilities.Flag(AbilityMayFly):
+		p.abilities.SetFlag(AbilityLayerBase, AbilityFlying, true)
+	case start:
+		p.send(&packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)})
+	}
+}

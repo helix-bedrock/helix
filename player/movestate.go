@@ -162,6 +162,7 @@ func (p *Player) sendActorFlags() {
 // simulation belongs to the anti-cheat module), so it takes the states the
 // client's simulation reached too.
 func vanillaMoveFlags(p *Player, in protocol.InputFlags) {
+	p.flyInput(in.Load(packet.InputFlagStartFlying), in.Load(packet.InputFlagStopFlying))
 	for f, fl := range moveFlagInputs {
 		if MoveFlag(f) == MoveGliding {
 			p.glideInput(in.Load(fl.start), in.Load(fl.stop))
