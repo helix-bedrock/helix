@@ -154,8 +154,10 @@ type breather struct {
 func (b breather) Alive() bool { return !b.p.dead() }
 
 // Breath is BDS's medium (sub_7370980) at the player's breathing point: the definition's
-// block lists, then water or lava in either layer, then a solid block whose box holds the
-// point. BDS reads the block's own shape for the last; Helix reads its collision boxes.
+// block lists, then water or lava in either layer, then a block BDS's breathing check calls
+// solid (registry Suffocates: not glass, ice, leaves or slabs) whose collision bounds, one box
+// around all of its boxes as BDS takes them, hold the point. A crawling or swimming player's
+// breathing point stays at standing eye height, as BDS's does.
 func (b breather) Breath(breathe, nonBreathe []string) state.Medium {
 	s := b.p.s
 	at := b.p.AttachPos(AttachBreathing)
@@ -179,16 +181,30 @@ func (b breather) Breath(breathe, nonBreathe []string) state.Medium {
 			return state.MediumLava
 		}
 	}
-	if !s.reg.Blocks.Properties(block).SolidMaterial {
+	if !s.reg.Blocks.Properties(block).Suffocates {
 		return state.MediumAir
 	}
 	in := at.Sub(mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])})
-	for _, box := range s.boxesAt(b.r, pos, block) {
-		if in[0] >= box[0] && in[0] <= box[3] && in[1] >= box[1] && in[1] <= box[4] && in[2] >= box[2] && in[2] <= box[5] {
-			return state.MediumSolid
-		}
+	if lo, hi, ok := boxBounds(s.boxesAt(b.r, pos, block)); ok &&
+		in[0] >= lo[0] && in[0] <= hi[0] && in[1] >= lo[1] && in[1] <= hi[1] && in[2] >= lo[2] && in[2] <= hi[2] {
+		return state.MediumSolid
 	}
 	return state.MediumAir
+}
+
+// boxBounds is the one box around every box, as BDS's block shape for the breathing check;
+// false when there are none.
+func boxBounds[B ~[6]float32](boxes []B) (lo, hi mgl32.Vec3, ok bool) {
+	for i, box := range boxes {
+		if i == 0 {
+			lo, hi = mgl32.Vec3{box[0], box[1], box[2]}, mgl32.Vec3{box[3], box[4], box[5]}
+			continue
+		}
+		for k := 0; k < 3; k++ {
+			lo[k], hi[k] = min(lo[k], box[k]), max(hi[k], box[k+3])
+		}
+	}
+	return lo, hi, len(boxes) > 0
 }
 
 // descriptorsHave reports name among block descriptors, which may leave out minecraft:.

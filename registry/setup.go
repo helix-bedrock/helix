@@ -75,6 +75,9 @@ type Properties struct {
 	HalfSlab bool
 	// SolidMaterial is set when the block's material is solid.
 	SolidMaterial bool
+	// Suffocates is set when BDS's breathing check calls the block solid: a mob or player
+	// whose breathing point is inside its shape has no air. Not glass, ice, leaves, slabs.
+	Suffocates bool
 	// Precipitation is what rain and snow do at the block (BDS's precipitation behaviour):
 	// fall through, stop, settle as snow on top or snowlog it.
 	Precipitation data.Precipitation
