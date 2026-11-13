@@ -399,6 +399,12 @@ func (e *pistonEntity) walk(r *world.Region, pos, at cube.Pos, reached, move pis
 		}
 	}
 	e.attached = append(e.attached, at)
+	// Past the limit the push fails whatever else the walk finds, so stop here: a
+	// blocked piston walks again every redstone tick, and a full walk of a big slime
+	// blob or a long line is a way to lag the server. Helix's own rule; same result.
+	if len(e.attached) > t.settings.Get().Piston.PushLimit {
+		return false
+	}
 	if !rules.sticky[name] {
 		return e.walk(r, pos, at.Side(pistonFaces[move]), move, move)
 	}
