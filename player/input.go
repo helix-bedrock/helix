@@ -169,6 +169,9 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleLecternUpdate); err != nil {
 		return err
 	}
+	if err := Handle(s, handleBookEdit); err != nil {
+		return err
+	}
 	if err := Handle(s, handleMapInfoRequest); err != nil {
 		return err
 	}

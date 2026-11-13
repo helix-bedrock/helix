@@ -348,7 +348,9 @@ sibling library folders, so unreleased library changes are used.
   (`Lectern` block entity saved as BDS's "Lectern", `LecternAt`; a book and quill or written book
   goes on an empty one, clicking one with a book opens window type 25, LecternUpdate sets the
   page and gives a redstone pulse through `circuit/lectern.go`, hitting or breaking it knocks the
-  book off, the comparator reads how far through the book it is). `player/lightningrod.go` and
+  book off, the comparator reads how far through the book it is). `player/book.go`: writing in
+  books and quills and signing them (BookEdit on the packet's inventory slot: replace, add, delete
+  and swap pages, 50 at most; signing makes one written book with author, xuid, title, generation 0). `player/lightningrod.go` and
   `weather/rod.go`: lightning rods (a strike goes to the nearest rod within 64 blocks that is
   open to the sky and rained on; a struck rod gives power for 8 ticks, `circuit/lightningrod.go`;
   the strike cleans oxidation off the copper it stands on and copper around it, `player/copper.go`;
