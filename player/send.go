@@ -21,6 +21,9 @@ func (p *Player) send(pks ...packet.Packet) bool {
 		if p.traceSends.Load() > 0 && p.traceSends.Add(-1) >= 0 {
 			p.s.log.Debug("packet to player", "name", p.name, "packet", describePacket(pk))
 		}
+		if mv, ok := pk.(*packet.MovePlayer); ok && mv.Mode == packet.MoveModeTeleport && mv.EntityRuntimeID == p.runtimeID {
+			p.teleportWait.start()
+		}
 		if err := p.conn.WritePacket(pk); err != nil {
 			p.logSendError(err, pk)
 			return false

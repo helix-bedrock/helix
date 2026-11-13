@@ -174,7 +174,9 @@ sibling library folders, so unreleased library changes are used.
   ordered input queue (network goroutine to region tick, bounded, two
   swapped buffers), drained in the region's player input phase through
   the frozen handlers; vanilla's PlayerAuthInput handler hands movement
-  to the movement hook. `join.go`: the join in BDS's order and the read
+  to the movement hook; after a MovePlayer teleport its input is skipped until the client
+  acknowledges it (InputFlagHandledTeleport, or 40 inputs at most: `teleportwait.go`, Helix's
+  own rule), so input sent before the teleport does not pull the player back. `join.go`: the join in BDS's order and the read
   loop. `send.go`: every packet to a player goes through `send` /
   `sendNow`, which check the write and log the first failure (a closed
   connection at debug level). `data.go`: the player's BDS data, loaded

@@ -192,6 +192,10 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		// Input from before a dimension change is for the old dimension.
 		return
 	}
+	if p.teleportWait.holds(pk.InputData.Load(packet.InputFlagHandledTeleport)) {
+		// Sent before the client took the teleport: it would put the player back.
+		return
+	}
 	sys := p.s.game.sys
 	if !p.dead() {
 		if actions, ok := pk.BlockActions.Value(); ok {

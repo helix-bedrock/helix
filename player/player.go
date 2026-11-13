@@ -76,6 +76,8 @@ type Player struct {
 	input inputQueue
 	// clientTicks times the client's PlayerAuthInput packets for TPS.
 	clientTicks clientTicks
+	// teleportWait holds movement back until the client took a teleport (teleportwait.go).
+	teleportWait teleportWait
 	// batch is the packets think took for this tick's handleInput; thought is set when it
 	// did. locals is the state Local keeps.
 	batch   []packet.Packet
