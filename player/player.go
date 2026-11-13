@@ -57,6 +57,8 @@ type Player struct {
 	skin      protocol.Skin
 	ids       mcdb.PlayerIDs
 	uniqueID  int64
+	// mapIndex numbers the maps the player makes, BDS's map_name_index. Not saved yet.
+	mapIndex int32
 	runtimeID uint64
 	// sendErrLogged is set by the first failed send, so a dead connection
 	// is logged once.

@@ -37,6 +37,10 @@ func (s *Host) inRain(r *world.Region, top mgl32.Vec3) bool {
 
 // globalTick is what the global owner runs each tick: sleeping, then the weather.
 func (s *Host) globalTick() {
+	s.globalTicks++
+	if s.globalTicks%mapSaveTicks == 0 {
+		s.saveMaps()
+	}
 	s.sleepTick()
 	if s.weather != nil {
 		s.weather.Tick()

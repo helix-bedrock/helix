@@ -383,6 +383,7 @@ func (s *Server) newHost() (*player.Host, error) {
 		Portals:      s.portals,
 		OnEnterEnd:   s.enterEnd,
 		Store:        s.playerStore,
+		WorldStore:   s.worldStore,
 		Level:        s.level,
 		ViewDistance: s.conf.ViewDistance,
 		MaxPlayers:   s.conf.MaxPlayers,

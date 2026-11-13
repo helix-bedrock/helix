@@ -271,6 +271,10 @@ func (w *windowState) holds(container, slot byte) bool {
 		return w.kind == ContainerLoom && slot == loomMaterialSlot
 	case protocol.ContainerStonecutterInput:
 		return w.kind == ContainerStonecutter && slot == stonecutterSlot
+	case protocol.ContainerCartographyInput:
+		return w.kind == ContainerCartography && slot == cartographyInputSlot
+	case protocol.ContainerCartographyAdditional:
+		return w.kind == ContainerCartography && slot == cartographyAdditionalSlot
 	}
 	return false
 }

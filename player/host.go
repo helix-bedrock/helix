@@ -80,6 +80,9 @@ type HostConfig struct {
 	// region: the server builds the exit portal the first time.
 	OnEnterEnd func()
 	Store      mcdb.PlayerStore
+	// WorldStore holds the world's level keys, where maps are saved; nil keeps maps in
+	// memory only.
+	WorldStore mcdb.WorldStore
 	Level      Level
 	// ViewDistance is the largest view radius in chunks a player gets.
 	ViewDistance int32
@@ -169,6 +172,11 @@ type Host struct {
 	spawning *spawning
 	// mobScratch holds the mob runtime's entity scan buffers (mobScratch).
 	mobScratch sync.Pool
+	// maps is every loaded map; mapPalette what blocks and biomes draw on them.
+	maps       *mapStore
+	mapPalette *mapPalette
+	// globalTicks counts the global owner's ticks, for saving maps.
+	globalTicks uint64
 	// tuning is the live value of every Tune.
 	tuning atomic.Pointer[tuneTable]
 	wg     sync.WaitGroup
@@ -219,6 +227,10 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		entityLoot:   t.entityLoot,
 		foods:        foodTable(conf.Registry.Items),
 	}
+	if h.mapPalette, err = loadMapPalette(conf.Registry); err != nil {
+		return nil, err
+	}
+	h.maps = newMapStore(conf.WorldStore)
 	h.global = newGlobal(h.panicked)
 	h.setUpCommands()
 	h.setUpMobs()
@@ -407,6 +419,7 @@ func (h *Host) Close(reason int32) {
 	h.Kick(reason)
 	h.wg.Wait()
 	h.global.close()
+	h.saveMaps()
 }
 
 // isClosed reports whether err only says the connection was closed.

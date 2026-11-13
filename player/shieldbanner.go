@@ -129,6 +129,8 @@ func (p *Player) craftSpecial(a *protocol.CraftRecipeStackRequestAction, recipe 
 		result = p.shieldBannerResult
 	case repairItemRecipe:
 		result = p.craftRepairResult
+	case mapExtendRecipe, mapCloneRecipe, mapUpgradeRecipe:
+		result = p.mapRecipeResult(recipe)
 	default:
 		return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId, nil
 	}

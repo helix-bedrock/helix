@@ -190,6 +190,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 	if p.throwItem(held) {
 		return true
 	}
+	if p.useEmptyMap(held) {
+		return true
+	}
 	if held.Name == nameFireworkRocket {
 		return p.useFirework(held)
 	}

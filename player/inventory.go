@@ -53,6 +53,9 @@ const (
 	ContainerStonecutter
 	// ContainerBarrel has 27 slots.
 	ContainerBarrel
+	// ContainerCartography is a cartography table's screen, its map and addition in the
+	// player's UI slots.
+	ContainerCartography
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

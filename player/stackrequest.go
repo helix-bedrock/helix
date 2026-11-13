@@ -313,6 +313,9 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 	case *protocol.CraftCreativeStackRequestAction:
 		return p.craftCreative(a)
 	case *protocol.CraftRecipeOptionalStackRequestAction:
+		if p.window.kind == ContainerCartography {
+			return p.craftCartographyName(a)
+		}
 		return p.craftAnvil(a)
 	case *protocol.CraftGrindstoneRecipeStackRequestAction:
 		return p.craftGrindstone(a)
@@ -386,7 +389,7 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 	case protocol.ContainerEnchantingInput, protocol.ContainerEnchantingMaterial, protocol.ContainerAnvilInput, protocol.ContainerAnvilMaterial,
 		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional,
 		protocol.ContainerLoomInput, protocol.ContainerLoomDye, protocol.ContainerLoomMaterial,
-		protocol.ContainerStonecutterInput:
+		protocol.ContainerStonecutterInput, protocol.ContainerCartographyInput, protocol.ContainerCartographyAdditional:
 		if !p.window.holds(container, slot) {
 			return r, false
 		}

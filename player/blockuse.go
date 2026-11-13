@@ -97,6 +97,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useLoom(r, u)
 	case stonecutterBlock:
 		return p.useStonecutter(r, u)
+	case cartographyBlock:
+		return p.useCartography(r, u)
 	case nameCake:
 		return p.useCake(r, u)
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
@@ -110,6 +112,9 @@ func vanillaUseBlock(u *BlockUse) bool {
 	}
 	if isCandleBlock(name) {
 		return p.useCandle(r, u)
+	}
+	if isShelfBlock(name) {
+		return p.useShelf(r, u)
 	}
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) {
 		return blockuse.Usable(blocks, u.Block)

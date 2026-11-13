@@ -128,6 +128,7 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickPickup()
 	p.tickChest()
 	p.tickUILeftovers()
+	p.tickMaps()
 	p.s.checkVoid(p.entity)
 	p.publishState()
 }
@@ -163,6 +164,12 @@ func vanillaHandlers(s *Setup) error {
 		return err
 	}
 	if err := Handle(s, handleBlockActorData); err != nil {
+		return err
+	}
+	if err := Handle(s, handleMapInfoRequest); err != nil {
+		return err
+	}
+	if err := Handle(s, handleMapCreateLockedCopy); err != nil {
 		return err
 	}
 	if err := Handle(s, handleRespawn); err != nil {
