@@ -336,7 +336,9 @@ sibling library folders, so unreleased library changes are used.
   explode, calmed by water around it; respawning takes a charge and stands the player by BDS's
   search on solid blocks, helix-data's `bds/block_solid.json`; only a player who dies in the
   Nether respawns at it, as BDS checks the spawn against the dimension of death). `player/shelf.go`: shelves (`Shelf` block entity saved as BDS's "Shelf",
-  `ShelfAt`; clicking the front swaps the held item with a slot; powered row swaps not built). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
+  `ShelfAt`; clicking the front swaps the held item with a slot; a powered one swaps its whole row, up to
+  three shelves facing the same way, with the hotbar: `player/shelfrow.go`, rows linked by
+  `circuit/shelf.go` on power changes; BDS's row repair without a power change is not ported). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
   Ticker removes a half whose other half went. `player/cushion.go`: cushions (`Cushion`, placing,
   breaking, the rest check, riders kept across leaving and restarts as `LinksTag`, `reseat` on join).
 - `player/void.go`: the void as BDS's OutOfWorldSystem (below the dimension's min height minus 16; `Systems.OutOfWorld`, `Systems.Void`, `OnVoid`, `TuneVoidDamage`, `OutOfWorlder` for an owner's own answer). Every entity's tick calls `Host.checkVoid`; a new entity kind calls it too.

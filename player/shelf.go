@@ -13,9 +13,9 @@ import (
 // slot swap 0xD5224A0, ShelfBlockActor (type 59, saved as "Shelf") with its save 0xD3E4D70
 // and load 0xD3E49A0, and the drop on destroy 0xD522160.
 //
-// Built: a shelf that is not powered swaps the held item with the slot clicked on its front.
-// Not built: a powered shelf swapping a whole row of shelves with the hotbar (the
-// powered_shelf_type chain), and the comparator signal.
+// Built: a shelf that is not powered swaps the held item with the slot clicked on its front;
+// a powered one swaps its whole row with the hotbar (shelfrow.go). Not built: the
+// comparator signal.
 const (
 	shelfEntityID    = "Shelf"
 	shelfSlots       = 3
@@ -135,7 +135,7 @@ func (p *Player) useShelf(r *world.Region, u *BlockUse) bool {
 		return false
 	}
 	if powered, _ := states[stateShelfPower].(uint8); powered != 0 {
-		return false
+		return p.swapShelfRow(r, u.Pos, states)
 	}
 	slot, ok := shelfSlot(front, shelfClick(u))
 	if !ok {

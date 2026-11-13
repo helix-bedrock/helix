@@ -108,6 +108,7 @@ const (
 	kindDetectorRail
 	kindJukebox
 	kindBell
+	kindShelf
 )
 
 // kindOf returns the class of the block called name.
@@ -168,6 +169,8 @@ func kindOf(name string) kind {
 		return kindTrapdoor
 	case strings.HasSuffix(name, "fence_gate"):
 		return kindGate
+	case isShelf(name):
+		return kindShelf
 	}
 	return kindNone
 }
@@ -775,6 +778,11 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetStrength(onOff(bitState(states, stateToggle)))
 			comp.SetAllowUp(true)
 		}
+	case kindShelf:
+		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
+			comp.SetStrength(onOff(bitState(states, statePowered)))
+			comp.SetAllowUp(true)
+		}
 	case kindDispenser:
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetStrength(onOff(bitState(states, stateTriggered)))
@@ -898,6 +906,8 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 		}
 	case kindHopper:
 		t.setByCircuit(c, pos, t.with(block, stateToggle, flag(on)))
+	case kindShelf:
+		t.shelfPower(c, pos, block, on)
 	case kindPoweredRail, kindPlainRail:
 		t.railPower(c, pos, block, strength, first)
 	case kindNote:
