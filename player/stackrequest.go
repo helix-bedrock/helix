@@ -90,7 +90,7 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 	for _, req := range pk.Requests {
 		r := p.stackRequest(req)
 		if r.Status != protocol.ItemStackResponseStatusOK {
-			p.s.log.Debug("item stack request refused", "name", p.name, "status", r.Status, "request", describeStackRequest(req))
+			p.s.log.Debug("item stack request refused", "name", p.name, "status", r.Status, "request", describeStackRequest(req), "server", p.describeServerSlots(req))
 		}
 		resp.Responses = append(resp.Responses, r)
 	}
