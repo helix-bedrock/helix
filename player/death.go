@@ -159,7 +159,7 @@ func (p *Player) tickRespawn() {
 		p.send(&packet.Respawn{Position: p.entity.Position(), State: packet.RespawnStateSearchingForSpawn})
 		p.respawn = respawnWaitClient
 	case respawnFind:
-		spawn := p.respawnPoint()
+		spawn := p.respawnShown()
 		p.moveZones(spawn)
 		p.send(&packet.Respawn{Position: spawn, State: packet.RespawnStateSearchingForSpawn},
 			&packet.Respawn{Position: spawn, State: packet.RespawnStateReadyToSpawn})
@@ -217,6 +217,26 @@ func (p *Player) respawnPoint() mgl32.Vec3 {
 		return at
 	}
 	return p.worldRespawn(p.entity.Region())
+}
+
+// respawnShown is where the respawn sequence first puts a player with a bed spawn, as BDS's
+// respawn state machine (sub_BCED800 state 7) does: the saved spawn position (SpawnX/Z)
+// raised to the top of its column, solid blocks, water and leaves counted, so a tower over
+// it (where the player stood when it slept) puts the player on its top until the respawn
+// action stands it beside the bed. Without a bed spawn, or with the column not loaded
+// here, it is the respawn point.
+func (p *Player) respawnShown() mgl32.Vec3 {
+	r := p.entity.Region()
+	if !p.spawn.set || p.spawn.dim != spawnOverworld || p.dim != p.s.overworld || r == nil {
+		return p.respawnPoint()
+	}
+	q := respawnSearch{s: p.s, r: r}
+	stand := p.spawn.stand
+	top, ok := q.surface(stand[0], stand[2])
+	if !ok {
+		return p.respawnPoint()
+	}
+	return mgl32.Vec3{float32(stand[0]) + 0.5, float32(top) + eyeHeight, float32(stand[2]) + 0.5}
 }
 
 // vanillaRespawn is BDS's respawn as far as built: the body resets, the

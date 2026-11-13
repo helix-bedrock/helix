@@ -705,12 +705,16 @@ const (
 )
 
 // setBedSpawn makes the bed with its head at head the player's respawn point. False if it
-// already was.
+// already was. Where the player stands is kept too (floored, feet rounded up), as BDS's
+// setSpawnPoint (sub_BCF6300) keeps it in SpawnX/Y/Z: a respawn first shows the top of
+// that column, so a tower where the player stood shows it on the tower.
 func (p *Player) setBedSpawn(head cube.Pos) bool {
 	if p.spawn.set && p.spawn.dim == spawnOverworld && p.spawn.pos == head {
 		return false
 	}
-	p.spawn = spawnPointState{set: true, pos: head, stand: head, dim: spawnOverworld}
+	feet := p.entity.Position().Sub(mgl32.Vec3{0, playerEyeHeight, 0})
+	stand := cube.Pos{int(math.Floor(float64(feet[0]))), int(math.Ceil(float64(feet[1]))), int(math.Floor(float64(feet[2])))}
+	p.spawn = spawnPointState{set: true, pos: head, stand: stand, dim: spawnOverworld}
 	return true
 }
 
@@ -722,7 +726,7 @@ const (
 
 // spawnPointState is a player's own respawn point: a bed in the overworld or a respawn
 // anchor in the Nether. pos is the block (SpawnBlockPosition), stand where the player stood
-// when it was set (SpawnX/Y/Z; a bed keeps its own position there).
+// when it was set (SpawnX/Y/Z).
 type spawnPointState struct {
 	set        bool
 	pos, stand cube.Pos
