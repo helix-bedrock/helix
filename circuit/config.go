@@ -152,11 +152,12 @@ type TNTConfig struct {
 	BlastFuseMin, BlastFuseMax int32
 }
 
-// DefaultConfig returns BDS 1.26.60's numbers.
+// DefaultConfig returns BDS 1.26.60's numbers, except Rules.LoadRadius (see
+// helixRules).
 func DefaultConfig() Config {
 	return Config{
 		Interval: redstone.DefaultInterval,
-		Rules:    redstone.DefaultRules(),
+		Rules:    helixRules(),
 		Hopper: HopperConfig{
 			MoveCooldown: 4, PickupCooldown: 4, FirstItemCooldown: 4, ItemsPerMove: 1, ChainDepth: 50,
 			PickupLow: 0.625, PickupHigh: 2, PickupInset: 0.0001,
@@ -232,4 +233,18 @@ func (s *Settings) Get() *Config { return s.now.Load() }
 func (s *Settings) Set(c Config) {
 	c = c.sane()
 	s.now.Store(&c)
+}
+
+// helixRules are BDS's circuit numbers with LoadRadius 0. BDS evaluates a chunk's
+// components only while every chunk within 32 blocks is loaded, and keeps the chunks of
+// each player's view distance loaded, so every chunk of its simulation distance (4 by
+// default) passes. Helix keeps only the simulation zone loaded and releases the rest, so
+// with BDS's 32 the outer two chunks of every zone never evaluated: half of any machine
+// more than a chunk or two from its player stood still. With 0 a chunk evaluates while it
+// is loaded, which is every chunk BDS's ticks reach; paths that run into a chunk not
+// loaded already wait for it.
+func helixRules() redstone.Rules {
+	r := redstone.DefaultRules()
+	r.LoadRadius = 0
+	return r
 }
