@@ -117,11 +117,11 @@ type Hooks interface {
 	FlagsChanged(m *Mob)
 	// Shoot fires the projectile def (aux value aux) at the target as minecraft:shooter
 	// does, at power when above 0, playing sound (a level sound event, NoSound for none).
-	Shoot(m *Mob, target behavior.ID, def string, aux int32, power float32, sound int)
+	Shoot(m *Mob, target behavior.ID, def string, aux int32, power float64, sound int)
 	// ActorEvent sends an actor event about the mob.
 	ActorEvent(m *Mob, id int)
 	// Hurt hurts the mob through the engine's hurt (its packets included) with no attacker.
-	Hurt(m *Mob, amount float32, cause int)
+	Hurt(m *Mob, amount float64, cause int)
 	// Born makes the baby of a mating beside the parent m (BDS's
 	// ActorFactory::createBornActor) and returns it as the mob runtime sees it, nil when
 	// none was made. It runs in m's Apply.
@@ -146,7 +146,7 @@ type Mob struct {
 	// geneEvents is set until a new (not loaded) mob's genetics have run their birth events.
 	geneEvents bool
 	// savedHealth is a restored health the first rebuild puts in place of the default, 0 for none.
-	savedHealth float32
+	savedHealth float64
 	families    []string
 	sel         goal.Selector
 	nv          *nav.Navigation
@@ -161,17 +161,17 @@ type Mob struct {
 	body        physics.Body
 	flags       path.ActorFlags
 
-	pitch, yaw, headYaw, bodyYaw float32
-	prevPitch, prevYaw           float32
+	pitch, yaw, headYaw, bodyYaw float64
+	prevPitch, prevYaw           float64
 
-	health, maxHealth                   float32
-	speed, underwaterSpeed, followRange float32
-	attackDamage                        float32
+	health, maxHealth                   float64
+	speed, underwaterSpeed, followRange float64
+	attackDamage                        float64
 
 	target, lastHurtBy, lastHurtMob behavior.ID
 	lastHurtTick                    uint64
 	lastHurtStamp                   int32
-	lastHurtAmount                  float32
+	lastHurtAmount                  float64
 	hurtTime                        int32
 	// playerHitTime counts down from playerHitTicks after a player hurt the mob: Molang's
 	// query.last_hit_by_player.
@@ -217,10 +217,10 @@ type Mob struct {
 	data []DataValue
 	// scale is minecraft:scale's value, the size the client draws the mob at (a rabbit 0.6,
 	// babies their group's own).
-	scale float32
+	scale float64
 	// moveSpeed is the speed the move control last chose (BDS's Mob::mSpeed), kept between
 	// ticks so walking speeds up a tenth at a time.
-	moveSpeed float32
+	moveSpeed float64
 
 	// rnd is the mob's own random, seeded from its ID, so what it draws does not depend on
 	// which mobs think on which core.
@@ -236,13 +236,13 @@ type Mob struct {
 
 // New makes a mob of the type at pos. method is how it came to be (spawned, born, loaded),
 // which picks the event its definition runs first.
-func (rt *Runtime) New(typ string, uniqueID int64, runtimeID uint64, pos behavior.Vec3, yaw float32, hooks Hooks, method definition.InitMethod) (*Mob, error) {
+func (rt *Runtime) New(typ string, uniqueID int64, runtimeID uint64, pos behavior.Vec3, yaw float64, hooks Hooks, method definition.InitMethod) (*Mob, error) {
 	return rt.NewWithEvent(typ, uniqueID, runtimeID, pos, yaw, hooks, method, "")
 }
 
 // NewWithEvent is New with the event a mob starts with when method is
 // definition.InitEvent, as an identifier such as minecraft:pillager<event> asks.
-func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, pos behavior.Vec3, yaw float32, hooks Hooks, method definition.InitMethod, initEvent string) (*Mob, error) {
+func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, pos behavior.Vec3, yaw float64, hooks Hooks, method definition.InitMethod, initEvent string) (*Mob, error) {
 	def, ok := rt.defs[typ]
 	if !ok {
 		return nil, fmt.Errorf("mob: no definition for %s", typ)
@@ -282,12 +282,12 @@ func (m *Mob) Body() *physics.Body { return &m.body }
 func (m *Mob) Flags() *path.ActorFlags { return &m.flags }
 
 // Rotation is the mob's pitch, yaw, head yaw and body yaw.
-func (m *Mob) Rotation() (pitch, yaw, headYaw, bodyYaw float32) {
+func (m *Mob) Rotation() (pitch, yaw, headYaw, bodyYaw float64) {
 	return m.pitch, m.yaw, m.headYaw, m.bodyYaw
 }
 
 // Scale is the size the client draws the mob at, from minecraft:scale (1 without it).
-func (m *Mob) Scale() float32 {
+func (m *Mob) Scale() float64 {
 	if m.scale <= 0 {
 		return 1
 	}
@@ -295,34 +295,34 @@ func (m *Mob) Scale() float32 {
 }
 
 // Size is the mob's collision width and height.
-func (m *Mob) Size() (w, h float32) { return m.body.Width, m.body.Height }
+func (m *Mob) Size() (w, h float64) { return m.body.Width, m.body.Height }
 
 // MaxHealth is the health attribute's maximum.
-func (m *Mob) MaxHealth() float32 { return m.maxHealth }
+func (m *Mob) MaxHealth() float64 { return m.maxHealth }
 
 // HealthValue is the mob's health.
-func (m *Mob) HealthValue() float32 { return m.health }
+func (m *Mob) HealthValue() float64 { return m.health }
 
 // SetHealth sets the health straight, between 0 and the maximum, with no hurt or death
 // handling: for actors that run their own damage, as BDS's armour stand burns its health
 // attribute down.
-func (m *Mob) SetHealth(h float32) { m.health = min(max(h, 0), m.maxHealth) }
+func (m *Mob) SetHealth(h float64) { m.health = min(max(h, 0), m.maxHealth) }
 
 // AttackDamage is the attack component's damage.
-func (m *Mob) AttackDamage() float32 { return m.attackDamage }
+func (m *Mob) AttackDamage() float64 { return m.attackDamage }
 
 // MovementSpeed is the movement attribute.
-func (m *Mob) MovementSpeed() float32 { return m.speed }
+func (m *Mob) MovementSpeed() float64 { return m.speed }
 
 // Dead reports a mob with no health left.
 func (m *Mob) Dead() bool { return m.health <= 0 }
 
-func (m *Mob) setSize(w, h float32) {
+func (m *Mob) setSize(w, h float64) {
 	m.body.Width, m.body.Height = w, h
 	m.body.Box = boxAt(m.body.Pos, w, h)
 }
 
-func boxAt(p path.Vec3, w, h float32) path.Box {
+func boxAt(p path.Vec3, w, h float64) path.Box {
 	return path.Box{Min: path.Vec3{X: p.X - w/2, Y: p.Y, Z: p.Z - w/2}, Max: path.Vec3{X: p.X + w/2, Y: p.Y + h, Z: p.Z + w/2}}
 }
 
@@ -460,14 +460,14 @@ func (m *Mob) readAttributes(comps definition.Group) {
 			Damage json.RawMessage `json:"damage"`
 		}
 		if json.Unmarshal(raw, &a) == nil {
-			var rg behavior.Range[float32]
+			var rg behavior.Range[float64]
 			if rg.UnmarshalJSON(a.Damage) == nil {
 				m.attackDamage = rg.Max
 			}
 		}
 	}
 	if raw, ok := comps["minecraft:collision_box"]; ok {
-		var b struct{ Width, Height float32 }
+		var b struct{ Width, Height float64 }
 		if json.Unmarshal(raw, &b) == nil {
 			m.setSize(b.Width, b.Height)
 		}
@@ -496,18 +496,18 @@ func (m *Mob) readAttributes(comps definition.Group) {
 }
 
 // attribute reads an attribute component: value and max, value as a number or a range.
-func attribute(raw json.RawMessage) (v, mx float32, ok bool) {
+func attribute(raw json.RawMessage) (v, mx float64, ok bool) {
 	if raw == nil {
 		return 0, 0, false
 	}
 	var a struct {
 		Value json.RawMessage `json:"value"`
-		Max   *float32        `json:"max"`
+		Max   *float64        `json:"max"`
 	}
 	if json.Unmarshal(raw, &a) != nil || a.Value == nil {
 		return 0, 0, false
 	}
-	var rg behavior.Range[float32]
+	var rg behavior.Range[float64]
 	if rg.UnmarshalJSON(a.Value) != nil {
 		return 0, 0, false
 	}
@@ -596,9 +596,9 @@ func (m *Mob) moveControl() {
 func (m *Mob) lookControl() {
 	if m.look.Has {
 		d := path.Vec3{X: m.look.Pos.X - m.body.Pos.X, Y: m.look.Pos.Y - (m.body.Pos.Y + m.eyeHeight()), Z: m.look.Pos.Z - m.body.Pos.Z}
-		yaw := float32(math.Atan2(float64(d.Z), float64(d.X)))*180/math.Pi - 90
-		h := float32(math.Sqrt(float64(d.X*d.X + d.Z*d.Z)))
-		pitch := -float32(math.Atan2(float64(d.Y), float64(h))) * 180 / math.Pi
+		yaw := float64(math.Atan2(float64(d.Z), float64(d.X)))*180/math.Pi - 90
+		h := float64(math.Sqrt(float64(d.X*d.X + d.Z*d.Z)))
+		pitch := -float64(math.Atan2(float64(d.Y), float64(h))) * 180 / math.Pi
 		m.headYaw = approach(m.headYaw, yaw, m.look.YawSpeed)
 		m.pitch = approach(m.pitch, pitch, m.look.PitchSpeed)
 		m.look.Has = false
@@ -648,9 +648,9 @@ func (m *Mob) physicsTick() {
 func (m *Mob) liquidPush() {
 	lava, water := m.body.LiquidBoxes()
 	push := liquid.Push(m.v.blocks.reg, m.v.r, blockArea(lava), blockArea(water))
-	m.body.Vel.X += float32(push[0])
-	m.body.Vel.Y += float32(push[1])
-	m.body.Vel.Z += float32(push[2])
+	m.body.Vel.X += float64(push[0])
+	m.body.Vel.Y += float64(push[1])
+	m.body.Vel.Z += float64(push[2])
 }
 
 // blockArea is the blocks a box covers.
@@ -695,7 +695,7 @@ func (m *Mob) headInWater() bool {
 	if depth >= liquidFalling {
 		depth = 0
 	}
-	return float32(p.Y)+1-float32(depth)/liquidLevels > eyes.Y
+	return float64(p.Y)+1-float64(depth)/liquidLevels > eyes.Y
 }
 
 // The liquid depths: liquidFalling and above is falling liquid, a full block; liquidLevels
@@ -705,10 +705,10 @@ const (
 	liquidLevels  = 9
 )
 
-func (m *Mob) eyeHeight() float32 { return m.body.Height * 0.85 }
+func (m *Mob) eyeHeight() float64 { return m.body.Height * 0.85 }
 
-func wrap(d float32) float32 {
-	d = float32(math.Mod(float64(d), 360))
+func wrap(d float64) float64 {
+	d = float64(math.Mod(float64(d), 360))
 	if d >= 180 {
 		d -= 360
 	}
@@ -718,19 +718,19 @@ func wrap(d float32) float32 {
 	return d
 }
 
-func approach(from, to, step float32) float32 {
+func approach(from, to, step float64) float64 {
 	d := wrap(to - from)
 	return from + max(-step, min(step, d))
 }
 
-func clampAround(v, centre, limit float32) float32 {
+func clampAround(v, centre, limit float64) float64 {
 	d := wrap(v - centre)
 	return centre + max(-limit, min(limit, d))
 }
 
 // Hurt takes damage from the attacker (NoID for none) with a cause. It applies BDS's hurt
 // time: within it only damage above the last hurt counts. It reports the damage dealt.
-func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float32 {
+func (m *Mob) Hurt(amount float64, by behavior.ID, cause int, tick uint64) float64 {
 	if m.Dead() || amount <= 0 {
 		return 0
 	}

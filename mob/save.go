@@ -21,7 +21,7 @@ func (m *Mob) Stack() []definition.StackEntry { return m.inst.Stack() }
 
 // Restore puts back what a save holds before the mob's first tick: its group stack and its
 // health (0 keeps the definition's). Runs: before the mob is in the world.
-func (m *Mob) Restore(stack []definition.StackEntry, health float32) {
+func (m *Mob) Restore(stack []definition.StackEntry, health float64) {
 	m.inst.SetStack(stack)
 	m.savedHealth = health
 }
@@ -64,7 +64,7 @@ func (m *Mob) Name(name string) bool {
 }
 
 // SetRotation puts back a saved yaw and pitch before the first tick.
-func (m *Mob) SetRotation(yaw, pitch float32) {
+func (m *Mob) SetRotation(yaw, pitch float64) {
 	m.yaw, m.headYaw, m.bodyYaw, m.prevYaw = yaw, yaw, yaw, yaw
 	m.pitch, m.prevPitch = pitch, pitch
 }

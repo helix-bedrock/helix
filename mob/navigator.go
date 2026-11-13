@@ -16,7 +16,7 @@ func (p pathfinder) settings() *path.Settings {
 	m := p.m
 	return &path.Settings{
 		Box: m.body.Box, Width: m.body.Width, Height: m.body.Height, Pos: m.body.Pos,
-		MinY: float32(pathWorld{&m.v}.MinY()), StepHeight: max(1.2, m.body.MaxAutoStep),
+		MinY: float64(pathWorld{&m.v}.MinY()), StepHeight: max(1.2, m.body.MaxAutoStep),
 		Swim: m.flags.Has(nav.ActorCanSwim), Fly: m.flags.Has(nav.ActorCanFly), Walk: m.flags.Has(nav.ActorCanWalk),
 		InWater: m.body.WasInWater, MobGriefing: m.rt.Env.MobGriefing(),
 	}
@@ -37,13 +37,13 @@ func (p pathfinder) PathToMob(pos path.Vec3) *path.Path {
 	return p.m.finder.FindPath(pathWorld{&p.m.v}, p.settings(), p.flags(), pos, p.m.followRange)
 }
 
-func (n *navigator) MoveTo(p behavior.Vec3, speed float32) bool {
+func (n *navigator) MoveTo(p behavior.Vec3, speed float64) bool {
 	m := n.m
 	nm := m.navMob()
 	return m.nv.MoveTo(pathWorld{&m.v}, &nm, pathfinder{m}, p, speed)
 }
 
-func (n *navigator) MoveToActor(a behavior.Actor, speed float32) bool {
+func (n *navigator) MoveToActor(a behavior.Actor, speed float64) bool {
 	m := n.m
 	nm := m.navMob()
 	return m.nv.MoveToMob(pathWorld{&m.v}, &nm, pathfinder{m}, a.Pos(), speed)
@@ -88,7 +88,7 @@ func (n *navigator) PathStart() (behavior.Pos, bool) {
 
 func (n *navigator) Held() bool                   { p, _ := n.m.nv.Path(); return p != nil }
 func (n *navigator) SetEndOffset(o behavior.Vec3) { n.m.nv.EndOffset = o }
-func (n *navigator) SetLastNodeReach(d2 float32)  { n.m.nv.SetLastNodeReach(d2) }
+func (n *navigator) SetLastNodeReach(d2 float64)  { n.m.nv.SetLastNodeReach(d2) }
 func (n *navigator) Done() bool                   { return n.m.nv.Done() }
 
 func (n *navigator) Stop() {
@@ -101,7 +101,7 @@ func (n *navigator) Flags() uint32     { return uint32(n.m.nv.Flags) }
 func (n *navigator) SetFlags(f uint32) { n.m.nv.Flags = nav.Flags(f) }
 
 // SetSpeed changes the speed of the path being followed: the next follow takes it.
-func (n *navigator) SetSpeed(s float32) {
+func (n *navigator) SetSpeed(s float64) {
 	m := n.m
 	if p, _ := m.nv.Path(); p != nil {
 		nm := m.navMob()

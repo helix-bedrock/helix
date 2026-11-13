@@ -128,7 +128,7 @@ func tickFireworks(w *World, n, tick int) {
 // startMobs spawns n cows at random spots.
 func startMobs(_ context.Context, w *World, n int) error {
 	for range n {
-		if _, ok := w.Host.SpawnMob(w.Dim, "minecraft:cow", world.Vec64(w.RandomSpot(0)), w.Rand.Float32()*360); !ok {
+		if _, ok := w.Host.SpawnMob(w.Dim, "minecraft:cow", world.Vec64(w.RandomSpot(0)), float64(w.Rand.Float32()*360)); !ok {
 			return errors.New("sim: cows cannot be spawned")
 		}
 	}

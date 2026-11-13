@@ -37,8 +37,8 @@ type Env interface {
 	// SkyDarken is BDS's sky darkening in r's dimension, 0 to 11.
 	SkyDarken(r *world.Region) int32
 	// Rain and Thunder are the dimension's weather levels, 0 to 1.
-	Rain(r *world.Region) float32
-	Thunder(r *world.Region) float32
+	Rain(r *world.Region) float64
+	Thunder(r *world.Region) float64
 	// LevelEvent sends the level event at p with the block name as data.
 	LevelEvent(r *world.Region, id int32, p behavior.Vec3, block string)
 	// BreakBlock breaks the block at p as broken by the entity.
@@ -100,8 +100,8 @@ func (v *view) boxesAt(dst []path.Box, p path.Pos) []path.Box {
 	b := v.block(p, 0)
 	for _, bx := range v.env.Boxes(v.r, cube.Pos{int(p.X), int(p.Y), int(p.Z)}, b) {
 		dst = append(dst, path.Box{
-			Min: path.Vec3{X: float32(p.X) + bx[0], Y: float32(p.Y) + bx[1], Z: float32(p.Z) + bx[2]},
-			Max: path.Vec3{X: float32(p.X) + bx[3], Y: float32(p.Y) + bx[4], Z: float32(p.Z) + bx[5]},
+			Min: path.Vec3{X: float64(p.X) + float64(bx[0]), Y: float64(p.Y) + float64(bx[1]), Z: float64(p.Z) + float64(bx[2])},
+			Max: path.Vec3{X: float64(p.X) + float64(bx[3]), Y: float64(p.Y) + float64(bx[4]), Z: float64(p.Z) + float64(bx[5])},
 		})
 	}
 	return dst
@@ -111,7 +111,7 @@ func overlap(a, b path.Box) bool {
 	return a.Min.X < b.Max.X && a.Max.X > b.Min.X && a.Min.Y < b.Max.Y && a.Max.Y > b.Min.Y && a.Min.Z < b.Max.Z && a.Max.Z > b.Min.Z
 }
 
-func floor32(f float32) int32 { return int32(math.Floor(float64(f))) }
+func floor32(f float64) int32 { return int32(math.Floor(float64(f))) }
 
 // cells calls fn for each block cell b touches.
 func cells(b path.Box, fn func(p path.Pos) bool) {
@@ -150,8 +150,8 @@ func (w pathWorld) CollisionBox(b path.Block, p path.Pos) path.Box {
 		}
 	}
 	return path.Box{
-		Min: path.Vec3{X: float32(p.X) + out[0], Y: float32(p.Y) + out[1], Z: float32(p.Z) + out[2]},
-		Max: path.Vec3{X: float32(p.X) + out[3], Y: float32(p.Y) + out[4], Z: float32(p.Z) + out[5]},
+		Min: path.Vec3{X: float64(p.X) + float64(out[0]), Y: float64(p.Y) + float64(out[1]), Z: float64(p.Z) + float64(out[2])},
+		Max: path.Vec3{X: float64(p.X) + float64(out[3]), Y: float64(p.Y) + float64(out[4]), Z: float64(p.Z) + float64(out[5])},
 	}
 }
 
@@ -197,14 +197,14 @@ func (w pathWorld) SwimClear(a, b path.Vec3) bool { _, hit := w.clip(a, b); retu
 // block's collision box. A simple DDA, not yet BDS's clip.
 func (v *view) clip(a, b path.Vec3) (path.Vec3, bool) {
 	d := path.Vec3{X: b.X - a.X, Y: b.Y - a.Y, Z: b.Z - a.Z}
-	l := float32(math.Sqrt(float64(d.X*d.X + d.Y*d.Y + d.Z*d.Z)))
+	l := float64(math.Sqrt(float64(d.X*d.X + d.Y*d.Y + d.Z*d.Z)))
 	if l == 0 {
 		return a, false
 	}
 	steps := int(min(l*4, 800)) + 1
 	var buf [8]path.Box
 	for i := 0; i <= steps; i++ {
-		t := float32(i) / float32(steps)
+		t := float64(i) / float64(steps)
 		p := path.Vec3{X: a.X + d.X*t, Y: a.Y + d.Y*t, Z: a.Z + d.Z*t}
 		cell := path.Pos{X: floor32(p.X), Y: floor32(p.Y), Z: floor32(p.Z)}
 		for _, bx := range v.boxesAt(buf[:0], cell) {
@@ -287,8 +287,8 @@ func (w goalWorld) Players(dst []behavior.Actor) []behavior.Actor { return w.env
 func (w goalWorld) DefaultGameMode() int                          { return w.env.DefaultGameMode() }
 func (w goalWorld) Peaceful() bool                                { return w.env.Difficulty() == 0 }
 
-func (w goalWorld) Brightness(p behavior.Pos) float32 {
-	return float32(w.r.Brightness(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, uint8(min(max(w.env.SkyDarken(w.r), 0), 15)))) / 15 //nolint:gosec // clamped
+func (w goalWorld) Brightness(p behavior.Pos) float64 {
+	return float64(w.r.Brightness(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, uint8(min(max(w.env.SkyDarken(w.r), 0), 15)))) / 15 //nolint:gosec // clamped
 }
 
 func (w goalWorld) Block(p behavior.Pos) behavior.Block { return w.blocks.Goal(w.block(p, 0)) }
@@ -300,7 +300,7 @@ func (w goalWorld) Clip(a, b behavior.Vec3) (behavior.Vec3, bool) {
 	return w.clip(a, b)
 }
 func (w goalWorld) IsDay() bool        { return w.env.SkyDarken(w.r) < 4 }
-func (w goalWorld) RainLevel() float32 { return w.env.Rain(w.r) }
+func (w goalWorld) RainLevel() float64 { return w.env.Rain(w.r) }
 
 func (w goalWorld) AboveTopSolid(x, z int32) int32 {
 	rg := w.r.Dimension().Range()
@@ -364,7 +364,7 @@ func (w goalWorld) BlockState(p behavior.Pos, state string) (int32, bool) {
 }
 
 func (w goalWorld) ChestOpen(behavior.Pos) bool { return false }
-func (w goalWorld) ThunderLevel() float32       { return w.env.Rain(w.r) * w.env.Thunder(w.r) }
+func (w goalWorld) ThunderLevel() float64       { return w.env.Rain(w.r) * w.env.Thunder(w.r) }
 func (w goalWorld) SetBlock(p behavior.Pos, b behavior.PlacedBlock, by behavior.ID) {
 	w.m.do(op{kind: opSetBlock, pos: p, placed: b, id: by})
 }
@@ -382,7 +382,7 @@ func (w goalWorld) BaseGameAtLeast(int, int, int) bool          { return true }
 // match.
 type Random struct {
 	r        *rand.Rand
-	gauss    float32
+	gauss    float64
 	hasGauss bool
 }
 
@@ -400,13 +400,13 @@ func (r *Random) NextInt(n int32) int32 {
 }
 
 // NextFloat returns a number in [0, 1).
-func (r *Random) NextFloat() float32 { return r.r.Float32() }
+func (r *Random) NextFloat() float64 { return float64(r.r.Float32()) }
 
 // NextBool returns true half the time.
 func (r *Random) NextBool() bool { return r.r.IntN(2) == 1 }
 
 // NextGaussian returns a normal number, keeping the second of each pair.
-func (r *Random) NextGaussian() float32 {
+func (r *Random) NextGaussian() float64 {
 	if r.hasGauss {
 		r.hasGauss = false
 		return r.gauss
@@ -416,8 +416,8 @@ func (r *Random) NextGaussian() float32 {
 		s := a*a + b*b
 		if s < 1 && s != 0 {
 			m := math.Sqrt(-2 * math.Log(s) / s)
-			r.gauss, r.hasGauss = float32(b*m), true
-			return float32(a * m)
+			r.gauss, r.hasGauss = float64(b*m), true
+			return float64(a * m)
 		}
 	}
 }

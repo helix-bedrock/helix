@@ -71,7 +71,7 @@ func (l lootRandom) Float() float32 {
 	if l.r == nil {
 		return rand.Float32() //nolint:gosec // gameplay randomness
 	}
-	return l.r.NextFloat()
+	return float32(l.r.NextFloat())
 }
 
 // lootContext is what the mob's loot rolls depend on.
@@ -106,7 +106,7 @@ func (m *Mob) equipFromTable(r *world.Region) {
 	}
 	for _, c := range cfg.SlotDropChance {
 		if slot, ok := mob.EquipSlotByName(c.Slot); ok {
-			m.items.drop[slot] = c.DropChance
+			m.items.drop[slot] = float32(c.DropChance)
 		}
 	}
 	m.sendEquipment()
@@ -356,7 +356,7 @@ func (m *Mob) dropExperience(r *world.Region) {
 // that speed (45 degrees up when none does). power above 0 replaces the projectile's own.
 // The arrow's aux value (a stray's slowness arrow) is not carried yet, and the shot has no
 // owner, so the mob is not its attacker.
-func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power float32, sound int) {
+func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power float64, sound int) {
 	r := m.entity.Region()
 	if r == nil || m.gone {
 		return
@@ -371,7 +371,7 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 	}
 	eyes := mglVec(m.m.Eyes())
 	_, yaw, head, _ := m.m.Rotation()
-	from := projectileEyes(spec, eyes, world.Rotation{Yaw: yaw, HeadYaw: head})
+	from := projectileEyes(spec, eyes, world.Rotation{Yaw: float32(yaw), HeadYaw: float32(head)})
 	tp, box := t.Pos(), t.Box()
 	dx, dz := float32(float64(tp.X)-from[0]), float32(float64(tp.Z)-from[2])
 	dy := float32(float64((box.Min.Y+box.Max.Y)/2) - from[1])
@@ -381,7 +381,7 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 	}
 	speed := power
 	if speed <= 0 {
-		speed = float32(spec.Power)
+		speed = float64(spec.Power)
 	}
 	start := mgl64.Vec3{from[0] + float64(dx/h), from[1], from[2] + float64(dz/h)}
 	dir := mgl64.Vec3{float64(dx), float64(dy), float64(dz)}.Normalize()

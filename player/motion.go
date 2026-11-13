@@ -76,7 +76,7 @@ func (m *Mob) Velocity() mgl64.Vec3 {
 // SetVelocity replaces the mob's speed; those who see it follow its moves. Runs: the
 // mob's region.
 func (m *Mob) SetVelocity(v mgl64.Vec3) {
-	m.m.SetVelocity(behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])})
+	m.m.SetVelocity(behavior.Vec3{X: float64(v[0]), Y: float64(v[1]), Z: float64(v[2])})
 }
 
 // Pull sets the mob's speed toward to (see [PullVelocity]). Mobs riding something are not

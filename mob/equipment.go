@@ -137,7 +137,7 @@ func (m *Mob) DeathExperience() int32 {
 	if m.states == nil || m.states.ExperienceReward == nil {
 		return 0
 	}
-	var sum float32
+	var sum float64
 	for _, src := range m.states.ExperienceReward.OnDeath {
 		if e, err := parseMolang(src); err == nil {
 			sum += e.eval(m)
@@ -201,7 +201,7 @@ func (m *Mob) RestartAngry() {
 
 // RangedAttack is Actor::performRangedAttack, which in BDS only sends a gameplay event: the
 // shot itself is Shoot's.
-func (m *Mob) RangedAttack(behavior.Actor, float32) {}
+func (m *Mob) RangedAttack(behavior.Actor, float64) {}
 
 var _ behavior.Ranged = (*Mob)(nil)
 

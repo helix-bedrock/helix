@@ -27,7 +27,7 @@ func (m *Mob) Born(_ *mob.Mob, b state.Birth) behavior.Actor {
 		return nil
 	}
 	_, yaw, _, _ := m.m.Rotation()
-	baby, ok := m.s.newMob(b.Baby, m.entity.Position(), yaw, definition.InitBorn, "")
+	baby, ok := m.s.newMob(b.Baby, m.entity.Position(), float64(yaw), definition.InitBorn, "")
 	if !ok {
 		return nil
 	}

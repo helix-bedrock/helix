@@ -248,7 +248,7 @@ type knotActor struct {
 func (a knotActor) ID() behavior.ID    { return a.id }
 func (a knotActor) Pos() behavior.Vec3 { return a.pos }
 func (a knotActor) Box() behavior.Box {
-	h := float32(leashKnotSize / 2)
+	h := float64(leashKnotSize / 2)
 	return behavior.Box{
 		Min: behavior.Vec3{X: a.pos.X - h, Y: a.pos.Y, Z: a.pos.Z - h},
 		Max: behavior.Vec3{X: a.pos.X + h, Y: a.pos.Y + leashKnotSize*2, Z: a.pos.Z + h},
@@ -268,13 +268,13 @@ func (a knotActor) Vehicle() behavior.ID               { return behavior.NoID }
 func (a knotActor) Owner() behavior.ID                 { return behavior.NoID }
 func (a knotActor) Team() int                          { return 0 }
 func (a knotActor) Dimension() int                     { return 0 }
-func (a knotActor) HeadRotation() (pitch, yaw float32) { return 0, 0 }
-func (a knotActor) BodyYaw() float32                   { return 0 }
+func (a knotActor) HeadRotation() (pitch, yaw float64) { return 0, 0 }
+func (a knotActor) BodyYaw() float64                   { return 0 }
 func (a knotActor) Invulnerable() bool                 { return true }
 func (a knotActor) HasHealth() bool                    { return false }
 func (a knotActor) Targetable() bool                   { return false }
 func (a knotActor) Monster() bool                      { return false }
-func (a knotActor) ArmourCoverage() float32            { return 0 }
+func (a knotActor) ArmourCoverage() float64            { return 0 }
 func (a knotActor) WearsHeadOf(string) bool            { return false }
 func (a knotActor) Target() behavior.ID                { return behavior.NoID }
 func (a knotActor) HijacksMount() bool                 { return false }

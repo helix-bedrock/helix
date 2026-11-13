@@ -154,7 +154,7 @@ func (s *Host) fillSpawnLevel(r *world.Region, lv *spawn.Level) {
 		Difficulty:  uint8(min(max(s.level.Difficulty, 0), 3)), //nolint:gosec // clamped
 		Time:        r.CurrentTick(),
 		SkyDarken:   uint8(min(max(s.SkyDarken(r), 0), 15)), //nolint:gosec // clamped
-		Rain:        s.Rain(r), Thunder: s.Thunder(r),
+		Rain:        float64(s.Rain(r)), Thunder: float64(s.Thunder(r)),
 		TickRange: r.Dimension().SimulationDistance(),
 	}
 	if s.clock != nil {
@@ -180,7 +180,7 @@ func (s *spawnRand) Int(n int32) int32 {
 	return s.r.Int32N(n)
 }
 
-func (s *spawnRand) Float() float32 { return s.r.Float32() }
+func (s *spawnRand) Float() float64 { return float64(s.r.Float32()) }
 
 // spawnWorld answers the spawner about one region during one chunk's spawner tick.
 type spawnWorld struct {
@@ -230,7 +230,7 @@ func (w *spawnWorld) TickedRecently(cx, cz int32) bool {
 
 // NearestPlayer finds the nearest player of the region, by its eye position as BDS keeps a
 // player's position.
-func (w *spawnWorld) NearestPlayer(p path.Vec3, maxDist float32) (path.Vec3, bool) {
+func (w *spawnWorld) NearestPlayer(p path.Vec3, maxDist float64) (path.Vec3, bool) {
 	w.list = w.r.AppendEntities(w.list[:0])
 	best, found := maxDist*maxDist, false
 	var at path.Vec3
@@ -240,9 +240,9 @@ func (w *spawnWorld) NearestPlayer(p path.Vec3, maxDist float32) (path.Vec3, boo
 			continue
 		}
 		v := e.Position()
-		dx, dy, dz := float32(v[0]-float64(p.X)), float32(v[1]-float64(p.Y)), float32(v[2]-float64(p.Z))
+		dx, dy, dz := float64(v[0]-float64(p.X)), float64(v[1]-float64(p.Y)), float64(v[2]-float64(p.Z))
 		if d := dx*dx + dy*dy + dz*dz; d <= best {
-			best, found, at = d, true, path.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}
+			best, found, at = d, true, path.Vec3{X: float64(v[0]), Y: float64(v[1]), Z: float64(v[2])}
 		}
 	}
 	return at, found
@@ -273,7 +273,7 @@ func (w *spawnWorld) EntitiesIn(b path.Box) int {
 			bx = a.Box()
 		} else {
 			v := e.Position()
-			bx = behavior.Box{Min: behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}, Max: behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}}
+			bx = behavior.Box{Min: behavior.Vec3{X: float64(v[0]), Y: float64(v[1]), Z: float64(v[2])}, Max: behavior.Vec3{X: float64(v[0]), Y: float64(v[1]), Z: float64(v[2])}}
 		}
 		if bx.Min.X <= b.Max.X && bx.Max.X >= b.Min.X && bx.Min.Y <= b.Max.Y && bx.Max.Y >= b.Min.Y && bx.Min.Z <= b.Max.Z && bx.Max.Z >= b.Min.Z {
 			n++
@@ -294,7 +294,7 @@ func (w *spawnWorld) NewMob(identifier string, pos path.Vec3, surface bool) spaw
 	if event != "" {
 		method = definition.InitEvent
 	}
-	o, ok := w.s.newMob(typ, mgl64.Vec3{float64(pos.X), float64(pos.Y), float64(pos.Z)}, w.rnd.Float()*360, method, event)
+	o, ok := w.s.newMob(typ, mgl64.Vec3{float64(pos.X), float64(pos.Y), float64(pos.Z)}, float64(w.rnd.Float()*360), method, event)
 	if !ok {
 		return nil
 	}

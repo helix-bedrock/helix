@@ -37,7 +37,7 @@ func (m *Mob) pushActors() {
 
 // touches reports a, grown by reach on x and z as Mob::pushActors grows the pusher's box,
 // overlapping b.
-func touches(a, b behavior.Box, reach float32) bool {
+func touches(a, b behavior.Box, reach float64) bool {
 	return a.Min.X-reach < b.Max.X && a.Max.X+reach > b.Min.X &&
 		a.Min.Y < b.Max.Y && a.Max.Y > b.Min.Y &&
 		a.Min.Z-reach < b.Max.Z && a.Max.Z+reach > b.Min.Z
@@ -65,7 +65,7 @@ func (pushWorld) PushableByEntity(a behavior.Actor) *state.PushableByEntity {
 	return nil
 }
 
-func (pushWorld) PushThrough(behavior.Actor) float32     { return 0 }
+func (pushWorld) PushThrough(behavior.Actor) float64     { return 0 }
 func (pushWorld) SameVehicle(_, _ behavior.Actor) bool   { return false }
 func (pushWorld) PrevVehicle(behavior.Actor) behavior.ID { return behavior.NoID }
 func (pushWorld) ClearPrevVehicle(behavior.Actor)        {}

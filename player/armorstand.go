@@ -267,7 +267,7 @@ func (o *Mob) standHurt(by *Player, cause DamageCause) float32 {
 
 // standBurn takes health off; at none the stand drops what it holds and goes.
 func (o *Mob) standBurn(r *world.Region, amount float32) float32 {
-	h := o.m.HealthValue() - amount
+	h := o.m.HealthValue() - float64(amount)
 	if h <= 0 {
 		o.standDropEquipment(r)
 		o.remove(o.entity)
@@ -409,7 +409,7 @@ func (p *Player) placeArmorStand(r *world.Region, clicked cube.Pos, face int32) 
 	}
 	yaw = float32(math.Floor(float64((yaw-180+22.5)/45))) * 45
 	pos := blockVec(at).Add(mgl64.Vec3{0.5, 0, 0.5})
-	if _, ok := p.s.SpawnMob(r.Dimension(), armorStandID, pos, yaw); !ok {
+	if _, ok := p.s.SpawnMob(r.Dimension(), armorStandID, pos, float64(yaw)); !ok {
 		return false
 	}
 	if !p.creative() {

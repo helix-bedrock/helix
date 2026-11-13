@@ -107,7 +107,7 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		v, ok := intComponent(comps(m, s), variantComponents[test.Name])
 		return ok && definition.Compare(op, v, rawInt(test.Value)), true
 	case "y_rotation":
-		yaw := float32(math.Remainder(float64(a.BodyYaw()), 360))
+		yaw := float64(math.Remainder(float64(a.BodyYaw()), 360))
 		return definition.Compare(op, yaw, rawFloat(test.Value)), true
 	case "is_moving":
 		moving := m != nil && m.moving()
@@ -170,7 +170,7 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		h, ok := r.Height(at[0], at[2])
 		return ok && definition.CompareBool(op, at[1]+1 < h, rawBool(test.Value, true)), true
 	case "is_brightness":
-		b := float32(r.Brightness(at.Add(cube.Pos{0, 1, 0}), uint8(min(max(env.SkyDarken(r), 0), 15)))) / 15 //nolint:gosec // clamped
+		b := float64(r.Brightness(at.Add(cube.Pos{0, 1, 0}), uint8(min(max(env.SkyDarken(r), 0), 15)))) / 15 //nolint:gosec // clamped
 		return definition.Compare(op, b, rawFloat(test.Value)), true
 	case "in_block":
 		id, _ := r.Block(at, 0)
@@ -232,12 +232,12 @@ func itemWithoutAux(v string) (string, bool) {
 }
 
 // nearestPlayer is the distance to the nearest player of the region.
-func (t tester) nearestPlayer(p behavior.Vec3) (float32, bool) {
+func (t tester) nearestPlayer(p behavior.Vec3) (float64, bool) {
 	r := t.m.v.r
 	if r == nil {
 		return 0, false
 	}
-	best, found := float32(math.MaxFloat32), false
+	best, found := math.MaxFloat64, false
 	for _, pl := range t.m.rt.Env.Players(r, nil) {
 		if d := dist(p, pl.Pos()); d < best {
 			best, found = d, true
@@ -280,7 +280,7 @@ func intComponent(c definition.Group, name string) (int32, bool) {
 		return 0, false
 	}
 	var v struct {
-		Value *float32 `json:"value"`
+		Value *float64 `json:"value"`
 	}
 	if json.Unmarshal(raw, &v) != nil || v.Value == nil {
 		return 0, false
@@ -290,7 +290,7 @@ func intComponent(c definition.Group, name string) (int32, bool) {
 
 // weatherIs is the weather tests' values: clear, precipitation (rain or snow), rain, snow
 // and thunderstorm. Rain and snow are not told apart by biome yet.
-func weatherIs(v string, rain, thunder float32) bool {
+func weatherIs(v string, rain, thunder float64) bool {
 	switch v {
 	case "clear":
 		return rain <= 0
@@ -309,9 +309,9 @@ func domainOr(test *definition.Test, def string) string {
 	return def
 }
 
-func dist(a, b behavior.Vec3) float32 {
+func dist(a, b behavior.Vec3) float64 {
 	dx, dy, dz := a.X-b.X, a.Y-b.Y, a.Z-b.Z
-	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+	return float64(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 }
 
 // rawInt reads a number or a numeric string as an integer.

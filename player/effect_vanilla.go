@@ -379,7 +379,7 @@ func oozingDied(p *Player, _ int32) {
 	}
 	at := p.feet().Add(mgl64.Vec3{0, oozingLift, 0})
 	for range oozingSlimes {
-		if m, ok := p.s.SpawnMob(d, nameSlime, at, p.rng.Float32()*360); ok {
+		if m, ok := p.s.SpawnMob(d, nameSlime, at, float64(p.rng.Float32()*360)); ok {
 			m.m.RunEvent(oozingEvent)
 		}
 	}
@@ -398,7 +398,7 @@ func infestedHurt(p *Player, _ int32, _ DamageSource) {
 		yaw := p.rng.Float32() * 360
 		turn := float64(p.rng.Float32())*math.Pi - math.Pi/2
 		view := p.viewVector()
-		m, ok := p.s.SpawnMob(d, nameSilverfish, at, yaw)
+		m, ok := p.s.SpawnMob(d, nameSilverfish, at, float64(yaw))
 		if !ok {
 			continue
 		}

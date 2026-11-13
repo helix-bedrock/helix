@@ -168,7 +168,7 @@ func fireCause(c DamageCause) bool {
 
 // TakeDamage hurts the mob through its damage sensors and hurt time.
 func (m *Mob) TakeDamage(damage float32, src DamageSource) bool {
-	return m.hurt(damage, src.Attacker, src.Cause) > 0
+	return m.hurt(float64(damage), src.Attacker, src.Cause) > 0
 }
 
 // Dead reports the mob out of health or gone.
@@ -216,7 +216,7 @@ func (m *Mob) BlastPush(push mgl64.Vec3) {
 		return
 	}
 	b := m.m.Body()
-	b.Vel = behavior.Vec3{X: b.Vel.X + float32(push[0]), Y: b.Vel.Y + float32(push[1]), Z: b.Vel.Z + float32(push[2])}
+	b.Vel = behavior.Vec3{X: b.Vel.X + push[0], Y: b.Vel.Y + push[1], Z: b.Vel.Z + push[2]}
 	m.entity.Send(&packet.SetActorMotion{EntityRuntimeID: m.entity.RuntimeID(), Velocity: world.Vec32(mglVec(b.Vel)), Tick: m.entity.Tick()})
 }
 
@@ -227,7 +227,7 @@ func (m *Mob) tickHazards(r *world.Region) {
 	moved := mglVec(b.Pos).Sub(mglVec(b.PrevPos))
 	m.s.tickHazards(r, m, mglVec(box.Min), mglVec(box.Max), moved)
 	if b.Landed && !m.Dead() {
-		m.s.landed(r, m, mglVec(b.Pos), b.LandedFall, m.m.Type())
+		m.s.landed(r, m, mglVec(b.Pos), float32(b.LandedFall), m.m.Type())
 	}
 }
 

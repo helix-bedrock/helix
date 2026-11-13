@@ -165,7 +165,7 @@ func (s stateMob) Despawn() { s.despawned = true }
 // Heal adds health up to the maximum.
 func (s stateMob) Heal(n int32) {
 	if n > 0 && !s.Dead() {
-		s.health = min(s.health+float32(n), s.maxHealth)
+		s.health = min(s.health+float64(n), s.maxHealth)
 	}
 }
 
@@ -173,7 +173,7 @@ func (s stateMob) Heal(n int32) {
 func (s stateMob) ActorEvent(id int) { s.do(op{kind: opActorEvent, n: int32(id)}) } //nolint:gosec // an event number
 
 // Hurt deals damage of a cause to the mob itself, at Apply, through the engine's hurt.
-func (s stateMob) Hurt(cause int, amount float32) {
+func (s stateMob) Hurt(cause int, amount float64) {
 	s.do(op{kind: opHurt, n: int32(cause), amount: amount}) //nolint:gosec // a cause number
 }
 

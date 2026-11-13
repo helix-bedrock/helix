@@ -45,7 +45,7 @@ type op struct {
 	name   string
 	placed behavior.PlacedBlock
 	then   behavior.AttackResult
-	amount float32
+	amount float64
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -167,9 +167,9 @@ type Snapshot struct {
 	box           behavior.Box
 	alive         bool
 	flags         path.ActorFlags
-	headPitch     float32
-	headYaw       float32
-	bodyYaw       float32
+	headPitch     float64
+	headYaw       float64
+	bodyYaw       float64
 	monster       bool
 	target        behavior.ID
 	lastHurtBy    behavior.ID
@@ -178,7 +178,7 @@ type Snapshot struct {
 	dimension     int
 	families      []string
 	comps         definition.Group
-	health        float32
+	health        float64
 	inWater       bool
 	underWater    bool
 	inLava        bool
@@ -230,13 +230,13 @@ func (s *Snapshot) Vehicle() behavior.ID               { return behavior.NoID }
 func (s *Snapshot) Owner() behavior.ID                 { return behavior.NoID }
 func (s *Snapshot) Team() int                          { return 0 }
 func (s *Snapshot) Dimension() int                     { return s.dimension }
-func (s *Snapshot) HeadRotation() (pitch, yaw float32) { return s.headPitch, s.headYaw }
-func (s *Snapshot) BodyYaw() float32                   { return s.bodyYaw }
+func (s *Snapshot) HeadRotation() (pitch, yaw float64) { return s.headPitch, s.headYaw }
+func (s *Snapshot) BodyYaw() float64                   { return s.bodyYaw }
 func (s *Snapshot) Invulnerable() bool                 { return false }
 func (s *Snapshot) HasHealth() bool                    { return true }
 func (s *Snapshot) Targetable() bool                   { return !s.flags.Has(behavior.FlagCannotTarget) }
 func (s *Snapshot) Monster() bool                      { return s.monster }
-func (s *Snapshot) ArmourCoverage() float32            { return 0 }
+func (s *Snapshot) ArmourCoverage() float64            { return 0 }
 func (s *Snapshot) WearsHeadOf(string) bool            { return false }
 func (s *Snapshot) Target() behavior.ID                { return s.target }
 func (s *Snapshot) HijacksMount() bool                 { return false }

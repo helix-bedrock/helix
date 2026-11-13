@@ -30,13 +30,13 @@ func (m *Mob) Riders() []behavior.ID              { return nil }
 func (m *Mob) Vehicle() behavior.ID               { return behavior.NoID }
 func (m *Mob) Owner() behavior.ID                 { return behavior.NoID }
 func (m *Mob) Team() int                          { return 0 }
-func (m *Mob) HeadRotation() (pitch, yaw float32) { return m.pitch, m.headYaw }
-func (m *Mob) BodyYaw() float32                   { return m.bodyYaw }
+func (m *Mob) HeadRotation() (pitch, yaw float64) { return m.pitch, m.headYaw }
+func (m *Mob) BodyYaw() float64                   { return m.bodyYaw }
 func (m *Mob) Invulnerable() bool                 { return false }
 func (m *Mob) HasHealth() bool                    { return true }
 func (m *Mob) Targetable() bool                   { return !m.flags.Has(behavior.FlagCannotTarget) }
 func (m *Mob) Monster() bool                      { return slices.Contains(m.families, "monster") }
-func (m *Mob) ArmourCoverage() float32            { return 0 }
+func (m *Mob) ArmourCoverage() float64            { return 0 }
 func (m *Mob) WearsHeadOf(string) bool            { return false }
 func (m *Mob) Target() behavior.ID                { return m.target }
 func (m *Mob) HijacksMount() bool                 { return false }
@@ -72,10 +72,10 @@ func (m *Mob) SetFlag(n int, on bool) {
 
 // WalkTargetValue is PathfinderMob's: 0 everywhere in the minimal hookup (animals preferring
 // grass and monsters darkness is not ported yet).
-func (m *Mob) WalkTargetValue(behavior.Pos) float32 { return 0 }
+func (m *Mob) WalkTargetValue(behavior.Pos) float64 { return 0 }
 
 // LookAt points the look control at p unless a goal already did this tick.
-func (m *Mob) LookAt(p behavior.Vec3, yawMax, pitchMax float32) {
+func (m *Mob) LookAt(p behavior.Vec3, yawMax, pitchMax float64) {
 	if m.lookSet {
 		return
 	}
@@ -84,7 +84,7 @@ func (m *Mob) LookAt(p behavior.Vec3, yawMax, pitchMax float32) {
 }
 
 func (m *Mob) LookBusy() bool                    { return m.lookSet }
-func (m *Mob) MaxHeadXRot() float32              { return 40 }
+func (m *Mob) MaxHeadXRot() float64              { return 40 }
 func (m *Mob) LastHurtBy() (behavior.ID, uint64) { return m.lastHurtBy, m.lastHurtTick }
 func (m *Mob) ClearLastHurtBy()                  { m.lastHurtBy = behavior.NoID }
 func (m *Mob) LastDamageCause() int              { return m.lastCause }
@@ -133,11 +133,11 @@ func (m *Mob) NoActionTime() int32                  { return m.noActionTime }
 func (m *Mob) ResetFlock()                          {}
 func (m *Mob) SetPersistSit(bool)                   {}
 func (m *Mob) HelmetEmpty() bool                    { return true }
-func (m *Mob) Speed() float32                       { return m.speed }
-func (m *Mob) UnderwaterSpeed() float32             { return m.underwaterSpeed }
-func (m *Mob) FollowRange() float32                 { return m.followRange }
-func (m *Mob) PrevRotation() (pitch, yaw float32)   { return m.prevPitch, m.prevYaw }
-func (m *Mob) SetYaw(yaw float32)                   { m.yaw = yaw }
+func (m *Mob) Speed() float64                       { return m.speed }
+func (m *Mob) UnderwaterSpeed() float64             { return m.underwaterSpeed }
+func (m *Mob) FollowRange() float64                 { return m.followRange }
+func (m *Mob) PrevRotation() (pitch, yaw float64)   { return m.prevPitch, m.prevYaw }
+func (m *Mob) SetYaw(yaw float64)                   { m.yaw = yaw }
 func (m *Mob) Breathable() bool                     { return true }
 func (m *Mob) AirSupply() int16                     { return 300 }
 func (m *Mob) VerticalCollision() bool              { return m.body.VerticalCollision }
@@ -172,7 +172,7 @@ func (m *Mob) Move(v behavior.Vec3) {
 // MoveWanted reports the move control's wanted position.
 func (m *Mob) MoveWanted() (wanted, ok bool) { return m.ctl.HasWanted, m.hasMove }
 
-func (m *Mob) SetMoveWanted(p behavior.Vec3, speed float32) {
+func (m *Mob) SetMoveWanted(p behavior.Vec3, speed float64) {
 	if m.hasMove {
 		m.ctl.SetWantedPosition(p, speed)
 	}
@@ -245,7 +245,7 @@ func (m *Mob) StandingOn() behavior.Pos {
 	probe := path.Box{Min: path.Vec3{X: b.Min.X, Y: y, Z: b.Min.Z}, Max: path.Vec3{X: b.Max.X, Y: y, Z: b.Max.Z}}
 	m.standBoxes = physWorld{&m.v}.CollisionBoxes(m.standBoxes[:0], probe)
 	cx, cz := (b.Min.X+b.Max.X)/2, (b.Min.Z+b.Max.Z)/2
-	best, found := float32(0), false
+	best, found := float64(0), false
 	var at path.Vec3
 	for _, bx := range m.standBoxes {
 		dx, dz := (bx.Min.X+bx.Max.X)/2-cx, (bx.Min.Z+bx.Max.Z)/2-cz

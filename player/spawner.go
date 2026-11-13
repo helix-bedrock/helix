@@ -78,7 +78,7 @@ type MobSpawner struct {
 	// The saved fields, by their BDS names.
 	delay, minDelay, maxDelay, count, maxNearby, playerRange, spawnRange int32
 	entity                                                               string
-	width, height, scale                                                 float32
+	width, height, scale                                                 float64
 	// saved is the data it was loaded with, written back for the fields not run here.
 	saved map[string]any
 }
@@ -107,9 +107,9 @@ func (s *Host) loadSpawner(saved map[string]any) *MobSpawner {
 	short("MaxNearbyEntities", &m.maxNearby)
 	short("RequiredPlayerRange", &m.playerRange)
 	short("SpawnRange", &m.spawnRange)
-	f := func(key string, dst *float32) {
+	f := func(key string, dst *float64) {
 		if v, ok := saved[key].(float32); ok {
-			*dst = v
+			*dst = float64(v)
 		}
 	}
 	f("DisplayEntityWidth", &m.width)
@@ -148,9 +148,9 @@ func (m *MobSpawner) SaveData(pos cube.Pos) map[string]any {
 	data["MaxNearbyEntities"] = int16(m.maxNearby)     //nolint:gosec // BDS saves shorts
 	data["RequiredPlayerRange"] = int16(m.playerRange) //nolint:gosec // BDS saves shorts
 	data["SpawnRange"] = int16(m.spawnRange)           //nolint:gosec // BDS saves shorts
-	data["DisplayEntityWidth"] = m.width
-	data["DisplayEntityHeight"] = m.height
-	data["DisplayEntityScale"] = m.scale
+	data["DisplayEntityWidth"] = float32(m.width)
+	data["DisplayEntityHeight"] = float32(m.height)
+	data["DisplayEntityScale"] = float32(m.scale)
 	return data
 }
 
@@ -214,11 +214,11 @@ func (m *MobSpawner) playerNear(r *world.Region, pos cube.Pos) bool {
 
 // spot draws one spawn spot, false when its block is taken or it is too far by blocks.
 func (m *MobSpawner) spot(r *world.Region, pos cube.Pos) (mgl64.Vec3, bool) {
-	rng := float32(m.spawnRange)
-	x := float32(pos[0]) + (rand.Float32()-rand.Float32())*rng + 0.5 //nolint:gosec // gameplay randomness
-	y := float32(pos[1] + rand.IntN(3) - 1)                          //nolint:gosec // gameplay randomness
-	z := float32(pos[2]) + (rand.Float32()-rand.Float32())*rng + 0.5 //nolint:gosec // gameplay randomness
-	at := mgl64.Vec3{float64(x), float64(y), float64(z)}
+	rng := float64(m.spawnRange)
+	x := float64(pos[0]) + float64(rand.Float32()-rand.Float32())*rng + 0.5 //nolint:gosec // gameplay randomness
+	y := float64(pos[1] + rand.IntN(3) - 1)                                 //nolint:gosec // gameplay randomness
+	z := float64(pos[2]) + float64(rand.Float32()-rand.Float32())*rng + 0.5 //nolint:gosec // gameplay randomness
+	at := mgl64.Vec3{x, y, z}
 	b := feetBlock(at)
 	if sg := m.s.spawning; sg != nil {
 		if id, ok := r.Block(b, 0); !ok || sg.blocks.Block(id).Flags&spawn.FlagSolidBlocking != 0 {
@@ -231,8 +231,8 @@ func (m *MobSpawner) spot(r *world.Region, pos cube.Pos) (mgl64.Vec3, bool) {
 
 // nearbyCount counts the spawner's type in BDS's box around it.
 func (m *MobSpawner) nearbyCount(r *world.Region, pos cube.Pos) int32 {
-	side := float32(m.spawnRange) * 2
-	px, py, pz := float32(pos[0]), float32(pos[1]), float32(pos[2])
+	side := float64(m.spawnRange) * 2
+	px, py, pz := float64(pos[0]), float64(pos[1]), float64(pos[2])
 	typ := spawnerType(m.entity)
 	sc := m.s.scratch()
 	defer sc.done()
@@ -267,7 +267,7 @@ func (m *MobSpawner) spawnAt(r *world.Region, pos cube.Pos, at mgl64.Vec3) bool 
 		return false
 	}
 	defer rs.done()
-	sm := rs.w.NewMob(m.entity, path.Vec3{X: float32(at[0]), Y: float32(at[1]), Z: float32(at[2])}, true)
+	sm := rs.w.NewMob(m.entity, path.Vec3{X: float64(at[0]), Y: float64(at[1]), Z: float64(at[2])}, true)
 	if sm == nil {
 		return false
 	}
@@ -333,9 +333,9 @@ func (p *Player) useSpawnEgg(r *world.Region, clicked cube.Pos, face int32, held
 	pos := clicked.Side(cube.Face(face))
 	at := blockVec(pos).Add(mgl64.Vec3{0.5, 0, 0.5})
 	d := p.entity.Position().Sub(at)
-	var yaw float32
+	var yaw float64
 	if d[0]*d[0]+d[2]*d[2] > 1e-7 {
-		yaw = float32(math.Atan2(float64(d[2]), float64(d[0])))*180/math.Pi - 90
+		yaw = float64(math.Atan2(float64(d[2]), float64(d[0])))*180/math.Pi - 90
 	}
 	o, ok := p.s.newMob(typ, at, yaw, definition.InitSpawned, "")
 	if !ok {

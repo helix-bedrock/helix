@@ -192,14 +192,14 @@ func (o *Mob) bucketData() map[string]any {
 		bucketIdentifier:  o.Type(),
 		bucketDefinitions: defs,
 		bucketAttributes: []any{map[string]any{
-			"Name": attrHealthName, "Current": o.m.HealthValue(), "Max": o.m.MaxHealth(),
+			"Name": attrHealthName, "Current": float32(o.m.HealthValue()), "Max": float32(o.m.MaxHealth()),
 		}},
 	}
 }
 
 // restoreBucketData reads what bucketData wrote: the group stack after the base and the
 // health, 0 for none.
-func restoreBucketData(tag map[string]any) ([]definition.StackEntry, float32) {
+func restoreBucketData(tag map[string]any) ([]definition.StackEntry, float64) {
 	var stack []definition.StackEntry
 	if defs, ok := tag[bucketDefinitions].([]any); ok {
 		for i, d := range defs {
@@ -210,11 +210,11 @@ func restoreBucketData(tag map[string]any) ([]definition.StackEntry, float32) {
 			stack = append(stack, definition.StackEntry{Group: s[1:], Added: s[0] == '+'})
 		}
 	}
-	var health float32
+	var health float64
 	if attrs, ok := tag[bucketAttributes].([]any); ok {
 		for _, a := range attrs {
 			if m, ok := a.(map[string]any); ok && m["Name"] == attrHealthName {
-				health = nbtFloat(m["Current"])
+				health = float64(nbtFloat(m["Current"]))
 			}
 		}
 	}
