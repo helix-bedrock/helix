@@ -252,6 +252,7 @@ func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
 	uses := blockuse.NewTicker(s.reg.Blocks, connections)
 	attachments := attach.NewTicker(attached, s.fallBlock, uses)
 	falling := fall.NewTicker(falls, s.startFalling, s.destroySnow, attachments)
+	falling.SetBreak(s.fallBlock)
 	circuits, err := circuit.NewTicker(s.reg, attached, s.fallBlock, falling)
 	if err != nil {
 		return nil, err

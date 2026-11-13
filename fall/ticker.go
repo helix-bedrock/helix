@@ -18,7 +18,13 @@ type Ticker struct {
 	t       *Table
 	start   StartFunc
 	destroy DestroyFunc
+	// brk breaks a settled scaffolding nothing holds up, with its drops.
+	brk DestroyFunc
 }
+
+// SetBreak sets what breaks a scaffolding that lost its hold: the block goes with its drops
+// and its neighbours are told. Call it before the server starts ticking.
+func (k *Ticker) SetBreak(fn DestroyFunc) { k.brk = fn }
 
 // NewTicker returns a Ticker that makes falling blocks with start, removes unheld snow
 // with destroy, and hands everything else to next.
@@ -32,8 +38,13 @@ func (k *Ticker) Table() *Table { return k.t }
 // Placed is FallingBlock's onPlace listener: a look in 2 ticks. A snow layer does not look
 // when placed (TopSnowBlock's listener only does for a flag the snow layer is not built with).
 func (k *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8) {
-	if layer == 0 && k.t.Kind(block) == Block {
-		r.ScheduleTick(pos, block, delayPlaced, 0)
+	if layer == 0 {
+		switch k.t.Kind(block) {
+		case Block:
+			r.ScheduleTick(pos, block, delayPlaced, 0)
+		case Scaffold:
+			k.scaffoldPlaced(r, pos, block)
+		}
 	}
 	k.BlockTicker.Placed(r, pos, block, layer)
 }
@@ -55,6 +66,8 @@ func (k *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			if below {
 				r.ScheduleTick(pos, block, delayBelow, 0)
 			}
+		case Scaffold:
+			k.scaffoldNeighbour(r, pos, block)
 		}
 	}
 	k.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
@@ -67,6 +80,8 @@ func (k *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		k.tickBlock(r, pos)
 	case Snow:
 		k.tickSnow(r, pos, block)
+	case Scaffold:
+		k.tickScaffold(r, pos, block)
 	default:
 		k.BlockTicker.QueuedTick(r, pos, block)
 	}

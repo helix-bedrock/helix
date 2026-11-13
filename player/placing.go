@@ -214,6 +214,9 @@ func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, cli
 	if IsBoatItem(held.Name) {
 		return p.placeBoat(r, clicked, face, click, held), true
 	}
+	if held.Name == scaffoldingItem {
+		return p.placeScaffolding(r, clicked, face, click, held), true
+	}
 	return false, false
 }
 

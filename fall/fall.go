@@ -35,6 +35,9 @@ const (
 	// Snow is BDS's TopSnowBlock: it only looks again when the block right under it
 	// changes, falls through leaves too, and lands by adding its layers to snow below.
 	Snow
+	// Scaffold is BDS's ScaffoldingBlock: it falls or breaks once nothing holds it up
+	// (scaffolding.go).
+	Scaffold
 )
 
 // BDS's tick delays: onPlace and a neighbour other than the one below wait 2 ticks, the
@@ -105,6 +108,9 @@ type stateInfo struct {
 	// noSnow is ice and barrier material, which never hold snow.
 	noSnow   bool
 	material uint8
+	// stability and checked are a scaffolding state's stability and stability_check.
+	stability int8
+	checked   bool
 }
 
 // SupportFunc reports whether block holds something on face, as BDS's
@@ -119,6 +125,8 @@ type Table struct {
 	support SupportFunc
 	// snow is the snow layer by height, and covered the same with covered_bit set.
 	snow, covered [snowLayers]uint32
+	// scaffold is the scaffolding state by stability and stability_check.
+	scaffold [scaffoldLoose + 1][2]uint32
 }
 
 // New reads the rules for every block state. support tells which blocks hold a snow layer
@@ -161,9 +169,13 @@ func New(blocks *registry.Blocks, support SupportFunc) (*Table, error) {
 			h, _ := states[stateHeight].(int32)
 			c, _ := states[stateCovered].(uint8)
 			in.snowHeight, in.covered = int8(min(max(h, 0), snowFull))+1, c != 0 //nolint:gosec // clamped
+		case name == nameScaffolding:
+			in.kind = Scaffold
+			in.stability, in.checked = scaffoldStates(blocks.States(b))
 		}
 		t.info[id] = in
 	}
+	t.findScaffolds()
 	for h := range snowLayers {
 		for c := range uint8(2) {
 			id, ok := blocks.StateID(nameSnowLayer, map[string]any{stateHeight: int32(h), stateCovered: c}) //nolint:gosec // h is at most 7
