@@ -19,8 +19,12 @@ const (
 	// joinLine connects along the block's direction, as a repeater.
 	joinLine
 	// joinFacing connects where the block's facing points the way wire runs: an
-	// observer's or a piston's back.
+	// observer's back.
 	joinFacing
+	// joinNotFront connects on every side but the one the block points at, as BDS's
+	// PistonBlock::shouldConnectToRedstone (0xd551180): a piston facing up or down
+	// takes wire on all four.
+	joinNotFront
 )
 
 // joinOf is how wire connects to the block called name. Levers, buttons, plates
@@ -35,8 +39,10 @@ func joinOf(name string) join {
 		return joinAll
 	case nameRepeater, nameRepeaterOff:
 		return joinLine
-	case "minecraft:observer", "minecraft:piston", "minecraft:sticky_piston":
+	case "minecraft:observer":
 		return joinFacing
+	case "minecraft:piston", "minecraft:sticky_piston":
+		return joinNotFront
 	}
 	switch {
 	case strings.HasSuffix(name, "_button"), strings.HasSuffix(name, "_pressure_plate"),

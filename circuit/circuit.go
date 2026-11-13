@@ -637,6 +637,8 @@ func (t *Ticker) joinsWire(block uint32, f redstone.Face) bool {
 			return faceFromIndex(v) == f
 		}
 		return observerFace(states) == f
+	case joinNotFront:
+		return t.pistonFront(block) != f.Opposite()
 	}
 	return false
 }

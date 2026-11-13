@@ -614,3 +614,8 @@ func (t *Ticker) armNeighbour(r *world.Region, pos cube.Pos, block uint32) {
 		t.fall(r, pos, block)
 	}
 }
+
+// pistonFront is the way a piston or arm block points, as a circuit face.
+func (t *Ticker) pistonFront(block uint32) redstone.Face {
+	return redstone.Face(pistonFaces[t.facingOf(block)]) //nolint:gosec // faces fit
+}
