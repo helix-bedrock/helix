@@ -81,6 +81,11 @@ func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 	}
 	first := d.TriggerType != protocol.TriggerTypeSimulationTick
 	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, first) {
+		// The client took what it predicted from its hand; the server kept it, so the slot
+		// goes back too or the client shows it gone until the inventory is next sent.
+		if held := p.inventory.Held(); held.Count > 0 {
+			p.sendHeld()
+		}
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 		// What is thrown or drawn does not need the air: aimed at a block it still goes.
 		if held := p.inventory.Held(); first && (throwable(held.Name) != "" || held.Name == nameBow || held.Name == nameCrossbow || held.Name == nameFishingRod) {
