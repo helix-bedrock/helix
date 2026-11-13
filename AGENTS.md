@@ -405,7 +405,10 @@ sibling library folders, so unreleased library changes are used.
   tick % 30 == 15 the claims (first free bed and bell; job sites by preferred profession, else a
   weighted random pick). Losing a job site makes a villager not locked into its trades (trade tier
   and experience 0) run become_unskilled; goals read villages through published snapshots.
-  Villages are not saved yet. `mob/dweller.go` is the mob side (Dweller, Sleeper, Worker,
+  Villages are saved as BDS saves them (`village/save.go`: the VILLAGE_<dim>_<uuid>_INFO,
+  DWELLERS, POI and PLAYERS keys, RAID deleted; loaded when a dimension's manager is made,
+  saved every 600 ticks and on close), and dwellers save DwellingUniqueID and
+  PreferredProfession. `mob/dweller.go` is the mob side (Dweller, Sleeper, Worker,
   Indoorer, Hider, DoorUser, PlayerTrader), `player/village.go` the Host's glue.
   `player/trade.go`: villager trading as BDS's EconomyTradeableComponent: offers generated from
   the trade tables (all tiers at once, num_to_select per group, filters, enchanted books priced by

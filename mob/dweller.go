@@ -3,6 +3,7 @@ package mob
 import (
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/helix/village"
@@ -41,9 +42,11 @@ const (
 // dweller is the mob's DwellerComponent state.
 type dweller struct {
 	village *village.Village
-	pois    [3]behavior.POI
-	has     [3]bool
-	fails   [3]int32
+	// villageID is the village's UUID, kept from the save until the village is found.
+	villageID uuid.UUID
+	pois      [3]behavior.POI
+	has       [3]bool
+	fails     [3]int32
 	// profession is the preferred profession a claim set, "" to use the component's.
 	profession string
 	// timer counts down to the next dweller update.
@@ -203,7 +206,20 @@ func (m *Mob) SetPOI(kind village.Kind, p behavior.POI, ok bool) {
 }
 
 // SetVillage sets the mob's village.
-func (m *Mob) SetVillage(v *village.Village) { m.dw.village = v }
+func (m *Mob) SetVillage(v *village.Village) {
+	m.dw.village = v
+	if v != nil {
+		m.dw.villageID = v.ID
+	} else {
+		m.dw.villageID = uuid.Nil
+	}
+}
+
+// VillageID is the UUID of the mob's village (DwellingUniqueID), uuid.Nil for none.
+func (m *Mob) VillageID() uuid.UUID { return m.dw.villageID }
+
+// SetVillageID sets the village a loaded mob belonged to; its next dweller update joins it.
+func (m *Mob) SetVillageID(id uuid.UUID) { m.dw.villageID = id }
 
 var _ village.Dweller = (*Mob)(nil)
 

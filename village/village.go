@@ -78,6 +78,9 @@ type Dweller interface {
 	SetPOI(kind Kind, p behavior.POI, ok bool)
 	// SetVillage tells the mob its village, nil for none.
 	SetVillage(v *Village)
+	// VillageID is the village the mob saved it belonged to (DwellingUniqueID), uuid.Nil
+	// for none: after a reload it joins that village again.
+	VillageID() uuid.UUID
 }
 
 // POI is one point of interest a village holds.
@@ -108,6 +111,9 @@ type member struct {
 	// lostJob is set when its job site went while it was not loaded: the job loss runs
 	// once it is found.
 	lostJob bool
+	// role is the dweller role's index; pos is where it last was (last_saved_pos).
+	role uint8
+	pos  cube.Pos
 }
 
 // Village is one village: its POIs and dwellers. Its fields are the manager's, under the
@@ -245,6 +251,10 @@ type Manager struct {
 	// list is the villages as published, for goals reading while mobs think.
 	list atomic.Pointer[[]*Village]
 	rnd  func(n int32) int32
+	// now is the latest world tick the manager ran on, saved as the village's Tick.
+	now int64
+	// removed are villages removed since the last save, whose keys the save deletes.
+	removed []uuid.UUID
 }
 
 // NewManager makes a dimension's village manager. rnd draws a number in [0, n).
@@ -333,6 +343,7 @@ func (m *Manager) ChunkTick(r *world.Region, pos mcdb.ChunkPos) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := r.CurrentTick()
+	m.now = now
 	if q, ok := m.current(); ok && q.pos[0]>>4 == int(pos[0]) && q.pos[2]>>4 == int(pos[1]) && m.tick != now {
 		m.tick = now
 		m.scanStep(r)
@@ -443,10 +454,19 @@ func (m *Manager) DwellerTick(r *world.Region, d Dweller, findPOI, migrate bool)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := r.CurrentTick()
+	m.now = now
 	v := m.byDweller[d.ID()]
-	if v == nil && migrate {
-		if v, _ = m.closest(d.Pos(), joinRange); v != nil {
-			v.members = append(v.members, &member{id: d.ID(), seen: now})
+	if v == nil {
+		if id := d.VillageID(); id != uuid.Nil {
+			v = m.village(id)
+		}
+		if v == nil && migrate {
+			v, _ = m.closest(d.Pos(), joinRange)
+		}
+		if v != nil {
+			if v.member(d.ID()) == nil {
+				v.members = append(v.members, &member{id: d.ID(), seen: now, role: roleIndex(d.Role())})
+			}
 			m.byDweller[d.ID()] = v
 		}
 	}
@@ -468,6 +488,7 @@ func (m *Manager) sync(r *world.Region, d Dweller, v *Village, now int64) {
 	}
 	c := v.centre()
 	p := d.Pos()
+	mem.pos = blockOf(p)
 	if dx, dz := c.X-p.X, c.Z-p.Z; dx*dx+dz*dz <= (v.radius()+nearRange)*(v.radius()+nearRange) {
 		mem.seen = now
 	}
@@ -599,6 +620,7 @@ func (m *Manager) removeVillage(r *world.Region, i int) {
 		}
 	}
 	m.villages = slices.Delete(m.villages, i, i+1)
+	m.removed = append(m.removed, v.ID)
 }
 
 // claim hands free POIs to the dwellers loaded in r (_claimUnclaimedPOIs, then

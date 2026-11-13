@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/mob"
@@ -14,9 +15,11 @@ import (
 )
 
 // Villages (package village) as the Host runs them: one manager per dimension, ticked with
-// the chunks, the POI table read per block state, and the mobs as dwellers. Villages are
-// not saved yet: after a restart dwellers find their POIs again within seconds, and a
-// villager keeps its profession through its saved component groups.
+// the chunks, the POI table read per block state, and the mobs as dwellers. A dimension's
+// villages are read from the world when its manager is made, and saved every 600 ticks, as
+// BDS saves each village, and when the server closes. A dweller saves its village's UUID,
+// RewardPlayersOnFirstFounding and its preferred profession (DwellerComponent, 1.26.60
+// 0x723F7E0).
 
 // villages is the Host's village system.
 type villages struct {
@@ -55,14 +58,85 @@ func (v *villages) Manager(r *world.Region) *village.Manager {
 		mgr, _ := m.(*village.Manager)
 		return mgr
 	}
-	m, _ := v.managers.LoadOrStore(d, village.NewManager(villageEnv{v}, v.table, func(n int32) int32 {
+	m, loaded := v.managers.LoadOrStore(d, village.NewManager(villageEnv{v}, v.table, func(n int32) int32 {
 		if n <= 0 {
 			return 0
 		}
 		return rand.Int32N(n) //nolint:gosec // gameplay randomness
 	}))
 	mgr, _ := m.(*village.Manager)
+	if !loaded && mgr != nil {
+		if st := v.store(); st != nil {
+			if err := mgr.Load(st, mcdb.Dimension(v.s.dimensionID(d))); err != nil {
+				v.s.log.Error("load villages", "err", err)
+			}
+		}
+	}
 	return mgr
+}
+
+// store is the world's level store, nil when the world keeps none.
+func (v *villages) store() village.Store {
+	if v.s.maps == nil || v.s.maps.store == nil {
+		return nil
+	}
+	return v.s.maps.store
+}
+
+// saveVillages saves the villages of every dimension. Runs: anywhere.
+func (s *Host) saveVillages() {
+	if s.villages == nil {
+		return
+	}
+	st := s.villages.store()
+	if st == nil {
+		return
+	}
+	s.villages.managers.Range(func(k, m any) bool {
+		d, _ := k.(*world.Dimension)
+		if mgr, ok := m.(*village.Manager); ok && d != nil {
+			if err := mgr.Save(st, mcdb.Dimension(s.dimensionID(d))); err != nil {
+				s.log.Error("save villages", "err", err)
+			}
+		}
+		return true
+	})
+}
+
+// The dweller's own save keys (DwellerComponent::addAdditionalSaveData).
+const (
+	dwellerKeyVillage    = "DwellingUniqueID"
+	dwellerKeyReward     = "RewardPlayersOnFirstFounding"
+	dwellerKeyProfession = "PreferredProfession"
+)
+
+// saveDweller writes a dweller's village UUID, its founding reward flag (kept as loaded)
+// and its preferred profession when it has one.
+func (o *Mob) saveDweller(data map[string]any) {
+	if !o.m.IsDweller() {
+		return
+	}
+	data[dwellerKeyVillage] = o.m.VillageID().String()
+	if _, ok := data[dwellerKeyReward].(uint8); !ok {
+		data[dwellerKeyReward] = uint8(0)
+	}
+	if p := o.m.Profession(); p != "" {
+		data[dwellerKeyProfession] = p
+	} else {
+		delete(data, dwellerKeyProfession)
+	}
+}
+
+// loadDweller reads them back: the mob joins its village again on its next dweller update.
+func (o *Mob) loadDweller(data map[string]any) {
+	if s, ok := data[dwellerKeyVillage].(string); ok {
+		if id, err := uuid.Parse(s); err == nil {
+			o.m.SetVillageID(id)
+		}
+	}
+	if p, ok := data[dwellerKeyProfession].(string); ok {
+		o.m.SetProfession(p)
+	}
 }
 
 // chunkTick runs the village work of a ticking chunk. Runs: owner of the region.

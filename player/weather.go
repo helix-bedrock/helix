@@ -40,6 +40,7 @@ func (s *Host) globalTick() {
 	s.globalTicks++
 	if s.globalTicks%mapSaveTicks == 0 {
 		s.saveMaps()
+		s.saveVillages()
 	}
 	s.sleepTick()
 	if s.weather != nil {

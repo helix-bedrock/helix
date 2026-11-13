@@ -426,6 +426,7 @@ func (h *Host) Close(reason int32) {
 	h.wg.Wait()
 	h.global.close()
 	h.saveMaps()
+	h.saveVillages()
 }
 
 // isClosed reports whether err only says the connection was closed.

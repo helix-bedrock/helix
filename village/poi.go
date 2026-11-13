@@ -105,6 +105,16 @@ func (t *Table) Lookup(block string) (*Def, bool) {
 	return d, ok
 }
 
+// find is a POI of the table with the name and kind, nil for none.
+func (t *Table) find(name string, kind Kind) *Def {
+	for _, d := range t.byBlock {
+		if d.Name == name && d.Kind == kind {
+			return d
+		}
+	}
+	return nil
+}
+
 func full(name string) string {
 	if !strings.Contains(name, ":") {
 		return "minecraft:" + name
