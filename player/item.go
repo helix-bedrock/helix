@@ -128,7 +128,11 @@ func itemFromNetwork(reg *registry.Registry, st protocol.ItemStack) ItemStack {
 	if !ok || st.Count == 0 {
 		return ItemStack{}
 	}
-	s := ItemStack{Name: t.Name, Meta: int16(st.MetadataValue), Count: uint8(min(st.Count, 255)), Tag: maps.Clone(st.NBTData)} //nolint:gosec // aux values are int16
+	s := ItemStack{Name: t.Name, Meta: int16(st.MetadataValue), Count: uint8(min(st.Count, 255))} //nolint:gosec // aux values are int16
+	// An empty tag is no tag: items are told apart by their tags.
+	if len(st.NBTData) != 0 {
+		s.Tag = maps.Clone(st.NBTData)
+	}
 	if st.BlockRuntimeID != 0 {
 		if id, ok := reg.Blocks.HashToRuntimeID(uint32(st.BlockRuntimeID)); ok { //nolint:gosec // hashes are sent as int32
 			s.Block = map[string]any{"name": reg.Blocks.Name(id), "states": reg.Blocks.States(id), "version": reg.Blocks.Version(id)}

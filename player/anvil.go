@@ -216,6 +216,10 @@ func withTag(s ItemStack, key string, value any) ItemStack {
 	} else {
 		tag[key] = value
 	}
+	// An empty tag is no tag, so the item still stacks with untagged ones.
+	if len(tag) == 0 {
+		tag = nil
+	}
 	s.Tag = tag
 	return s
 }
