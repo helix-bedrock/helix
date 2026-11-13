@@ -2,11 +2,10 @@ package player
 
 import "image/color"
 
-// Player indexes, as BDS hands them out (GameplayUserManager::_getNewPlayerId, named in
-// the 1.21.3 build; 1.26.60 reads the same data 27): a joining player gets the lowest index no other
-// online player has, from 1, since its own unset index 0 already counts as taken. The
-// index is synched actor data 27; clients colour the player on maps and the locator bar
-// by it.
+// Player indexes, as BDS 1.26.60 hands them out when a player is added to the level
+// (0xCE31BB0): the lowest index no user on the list holds, counting the joining player's
+// own unset index 0, so the first player gets 1. The index is synched actor data 27;
+// clients colour the player on maps and the locator bar by it.
 
 // freeIndex is the lowest index from 1 that no other player on the list holds. Global
 // owner only.
