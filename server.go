@@ -4,13 +4,13 @@
 package helix
 
 import (
-	"github.com/helix-bedrock/helix/liquid"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/helix-bedrock/helix/liquid"
 	"log/slog"
 	"net"
 	"runtime/debug"
@@ -419,19 +419,22 @@ func (s *Server) hookCircuits(host *player.Host) {
 	c.SetCartBox(host.CartBox)
 	c.SetPowerTNT(host.PowerTNT)
 	host.SetCircuitHooks(player.CircuitHooks{
-		Use:          c.UseBlock,
-		Attack:       c.AttackBlock,
-		JukeboxPower: c.SetJukeboxPower,
-		RingBell:     c.RingBell,
-		WindBell:     c.WindBell,
-		Destroy:      c.DestroyBlock,
-		ChestViewers: c.SetChestViewers,
-		CartOnRail:   c.CartOnRail,
-		HitTarget:    c.HitTarget,
-		StrikeRod:    c.StrikeRod,
-		PulseLectern: c.PulseLectern,
-		Signal:       c.Signal,
+		Use:           c.UseBlock,
+		Attack:        c.AttackBlock,
+		JukeboxPower:  c.SetJukeboxPower,
+		RingBell:      c.RingBell,
+		WindBell:      c.WindBell,
+		Destroy:       c.DestroyBlock,
+		ChestViewers:  c.SetChestViewers,
+		CartOnRail:    c.CartOnRail,
+		HitTarget:     c.HitTarget,
+		StrikeRod:     c.StrikeRod,
+		PulseLectern:  c.PulseLectern,
+		ActivateSculk: c.ActivateSculkSensor,
+		SculkInput:    c.SculkInput,
+		Signal:        c.Signal,
 	})
+	c.SetSculk(circuit.SculkHooks{SensorQuiet: host.SculkSensorQuiet, ShriekerTick: host.ShriekerTick})
 	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
 		d.SetBlockEntities(c.Entities(d.BlockEntityMaker()))
 	}

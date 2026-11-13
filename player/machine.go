@@ -444,6 +444,11 @@ type CircuitHooks struct {
 	StrikeRod func(r *world.Region, pos cube.Pos) bool
 	// PulseLectern is a page turned on the lectern at pos, false if it is no lectern.
 	PulseLectern func(r *world.Region, pos cube.Pos) bool
+	// ActivateSculk turns the sculk sensor at pos on with power, false if it is no sensor or
+	// is already on.
+	ActivateSculk func(r *world.Region, pos cube.Pos, power int32) bool
+	// SculkInput is the power going into the calibrated sculk sensor at pos from behind.
+	SculkInput func(r *world.Region, pos cube.Pos) int32
 	// CartOnRail is a minecart in the block at pos.
 	CartOnRail func(r *world.Region, pos cube.Pos)
 	// Signal is the strength of the circuit part at pos, -1 for none: what an armour

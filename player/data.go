@@ -39,6 +39,7 @@ func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 	p.loadSpawn(data)
 	p.loadFogs(data)
 	p.loadAir(data)
+	p.warden.load(data)
 	if seed, isInt := data[enchantSeedTag].(int32); isInt {
 		p.enchant.seed, p.enchant.seeded = seed, true
 	}
@@ -108,6 +109,7 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	p.saveSpawn(data)
 	p.saveFogs(data)
 	p.saveAir(data)
+	p.warden.save(data)
 	if p.enchant.seeded {
 		data[enchantSeedTag] = p.enchant.seed
 	}

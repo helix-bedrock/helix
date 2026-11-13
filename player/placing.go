@@ -458,6 +458,7 @@ func vanillaPlace(pl *Placement) bool {
 		r.UpdateNeighbours(pl.Pos)
 	}
 	playSound(r, pl.Pos, p.s.blockSound(packet.SoundEventPlace, blockCenter(pl.Pos), pl.Block), nil)
+	p.s.postBlockGameEvent(r, gameEventBlockPlace, pl.Pos, p, pl.Block, true)
 	if !p.creative() {
 		p.useHeld()
 	}

@@ -311,6 +311,12 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == lecternBlock {
 		return &Lectern{s: e.s}
 	}
+	switch e.s.reg.Blocks.Name(block) {
+	case sculkSensorBlock, calibratedBlock:
+		return e.s.newSculkSensor(e.s.reg.Blocks.Name(block) == calibratedBlock)
+	case sculkShriekerBlock:
+		return &SculkShrieker{s: e.s, l: vibrationListener{rng: shriekerRange}}
+	}
 	if e.s.reg.Blocks.Name(block) == enchantingTable {
 		return &enchantTableEntity{}
 	}
@@ -363,6 +369,12 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == lecternEntityID {
 		return e.s.loadLectern(saved), true
+	}
+	switch id {
+	case sculkSensorID, calibratedSensorID:
+		return e.s.loadSculkSensor(saved, id == calibratedSensorID), true
+	case sculkShriekerID:
+		return e.s.loadShrieker(saved), true
 	}
 	if id == bannerEntityID {
 		return e.s.loadBanner(saved), true

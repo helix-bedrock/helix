@@ -173,8 +173,10 @@ type Dimension struct {
 	randomTickSpeed atomic.Int32
 	// entityLoader turns saved entities into live ones.
 	entityLoader atomic.Pointer[EntityLoader]
-	// blockEntities makes block entities.
-	blockEntities atomic.Pointer[BlockEntities]
+	// blockEntities makes block entities; listenerStates marks the states whose block entity
+	// hears game events, made with it.
+	blockEntities  atomic.Pointer[BlockEntities]
+	listenerStates atomic.Pointer[[]bool]
 	// tickObserver is SetTickObserver's function.
 	tickObserver atomic.Pointer[TickObserver]
 
@@ -207,6 +209,8 @@ type Chunk struct {
 	// positions of those that tick, in the order they came.
 	blockEntities   map[cube.Pos]BlockEntity
 	tickingEntities []cube.Pos
+	// listeners are the positions of those that hear game events, in the order they came.
+	listeners []cube.Pos
 	// tickedAt is the region pass (Region.ticks) the chunk last ticked in, neverTicked if it
 	// has not ticked since it loaded. It counts the region's own ticks, not the world tick:
 	// the world tick follows the wall clock, so a region tick that runs late would skip a

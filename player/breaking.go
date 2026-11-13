@@ -418,6 +418,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	}
 	g.sys.Exhaust(p, p.Tuning(TuneExhaustMine))
 	levelEvent(r, pos, blockCenter(pos), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
+	p.s.postBlockGameEvent(r, gameEventBlockDestroy, pos, p, b.Block, true)
 	p.s.throwDrops(r, drops)
 	p.s.SpawnExperience(r, blockVec(pos), xp)
 	p.brk.broken++

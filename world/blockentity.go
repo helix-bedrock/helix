@@ -74,7 +74,14 @@ type BlockEntities interface {
 
 // SetBlockEntities sets who makes block entities. Set it before any player
 // joins: chunks loaded earlier keep theirs saved. Runs: anywhere.
-func (d *Dimension) SetBlockEntities(b BlockEntities) { d.blockEntities.Store(&b) }
+func (d *Dimension) SetBlockEntities(b BlockEntities) {
+	d.blockEntities.Store(&b)
+	listens := make([]bool, d.conf.Blocks.Count())
+	for id := range listens {
+		_, listens[id] = b.New(uint32(id)).(GameEventListener) //nolint:gosec // state IDs fit
+	}
+	d.listenerStates.Store(&listens)
+}
 
 // BlockEntityMaker returns who makes block entities now, or nil, so another can
 // wrap it. Runs: anywhere.
@@ -114,6 +121,7 @@ func (s savedBlockEntity) NetworkData(cube.Pos) map[string]any { return savedNet
 func (r *Region) loadBlockEntities(c *Chunk) {
 	saved := c.col.BlockEntities
 	c.col.BlockEntities = nil
+	defer r.addListeners(c)
 	if len(saved) == 0 {
 		return
 	}
@@ -132,6 +140,50 @@ func (r *Region) loadBlockEntities(c *Chunk) {
 	}
 }
 
+// addListeners gives every block of the chunk whose block entity hears game events one, if it
+// has none: generation places sculk sensors and shriekers without them, where BDS's setBlock
+// makes one. Only sub chunks whose palette holds such a state are walked.
+func (r *Region) addListeners(c *Chunk) {
+	m, l := r.d.blockEntities.Load(), r.d.listenerStates.Load()
+	if m == nil || l == nil {
+		return
+	}
+	listens := *l
+	for i, sub := range c.col.Chunk.Sub() {
+		if sub == nil || sub.Empty() || !paletteListens(sub.Layer(0).Palette(), listens) {
+			continue
+		}
+		baseY := int(c.col.Chunk.SubY(int16(i))) //nolint:gosec // sub chunk indices fit
+		for x := range 16 {
+			for y := range 16 {
+				for z := range 16 {
+					b := sub.Block(byte(x), byte(y), byte(z), 0) //nolint:gosec // local coordinates fit
+					if int(b) >= len(listens) || !listens[b] {
+						continue
+					}
+					pos := cube.Pos{int(c.pos[0])<<4 + x, baseY + y, int(c.pos[1])<<4 + z}
+					if _, ok := c.blockEntities[pos]; ok {
+						continue
+					}
+					if be := (*m).New(b); be != nil {
+						c.addBlockEntity(pos, be)
+					}
+				}
+			}
+		}
+	}
+}
+
+// paletteListens reports a state in the palette whose block entity hears game events.
+func paletteListens(p *chunk.Palette, listens []bool) bool {
+	for i := range p.Len() {
+		if v := p.Value(uint16(i)); int(v) < len(listens) && listens[v] { //nolint:gosec // palette indices fit
+			return true
+		}
+	}
+	return false
+}
+
 // addBlockEntity puts be in the chunk in place of any other at pos.
 func (c *Chunk) addBlockEntity(pos cube.Pos, be BlockEntity) {
 	c.removeBlockEntity(pos)
@@ -145,6 +197,9 @@ func (c *Chunk) addBlockEntity(pos cube.Pos, be BlockEntity) {
 	if _, ok := be.(BlockEntityTicker); ok {
 		c.tickingEntities = append(c.tickingEntities, pos)
 	}
+	if _, ok := be.(GameEventListener); ok {
+		c.listeners = append(c.listeners, pos)
+	}
 }
 
 // removeBlockEntity takes the block entity at pos out of the chunk.
@@ -156,6 +211,9 @@ func (c *Chunk) removeBlockEntity(pos cube.Pos) (BlockEntity, bool) {
 	delete(c.blockEntities, pos)
 	if i := slices.Index(c.tickingEntities, pos); i >= 0 {
 		c.tickingEntities = slices.Delete(c.tickingEntities, i, i+1)
+	}
+	if i := slices.Index(c.listeners, pos); i >= 0 {
+		c.listeners = slices.Delete(c.listeners, i, i+1)
 	}
 	return be, true
 }

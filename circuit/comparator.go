@@ -115,13 +115,12 @@ func signalOf(name string) signal {
 		return signalAnchor
 	case nameDetectorRail:
 		return signalDetectorRail
-	case nameJukebox, nameCrafter, nameLectern, nameBookshelf:
+	case nameJukebox, nameCrafter, nameLectern, nameBookshelf, nameSculkSensor, nameCalibrated:
 		return signalEntity
 	case "minecraft:frame", "minecraft:glow_frame":
 		return signalFrame
 	case "minecraft:command_block", "minecraft:chain_command_block",
-		"minecraft:repeating_command_block", "minecraft:creaking_heart",
-		"minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
+		"minecraft:repeating_command_block", "minecraft:creaking_heart":
 		return signalUnbuilt
 	}
 	switch {

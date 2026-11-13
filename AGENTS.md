@@ -356,6 +356,20 @@ sibling library folders, so unreleased library changes are used.
   open to the sky and rained on; a struck rod gives power for 8 ticks, `circuit/lightningrod.go`;
   the strike cleans oxidation off the copper it stands on and copper around it, `player/copper.go`;
   Channeling tridents on a rod call lightning). Copper ageing, axes and waxing are not built.
+- Game events (vibrations): `world/gameevent.go` is BDS's dispatcher (`Region.PostGameEvent`, a
+  `GameEvent` passed by value; block entities that are `GameEventListener`s are kept per chunk and
+  hear events within their range and 16 blocks; listeners in other regions' chunks do not hear;
+  chunks that load give listener blocks without a block entity one, as generation places sculk
+  without). `player/gameevent.go`: BDS 1.26.60's event IDs, flags and frequencies, the ignore
+  checks (sneaking, wool and carpet dampers), `Host.postGameEvent`; posted so far: block place
+  and destroy by players, players walking or swimming (BDS's movement tracking, three times the
+  distance per step), landing (hit_ground), standing on sculk. Mobs, projectiles, doors,
+  containers, explosions and the other events are not posted yet. `player/sculk.go`: sculk
+  sensors and calibrated sensors (`SculkSensor`: the vibration selector and flight, wool
+  occlusion, power by distance, amethyst resonance, comparator reads the frequency, calibrated
+  input from behind) and shriekers (`SculkShrieker`: warnings through each player's warden
+  tracker, saved as BDS's Warden* keys, the shriek, darkness, the warden summoned at level 4);
+  `circuit/sculk.go` is their block phases and power.
 - `player/void.go`: the void as BDS's OutOfWorldSystem (below the dimension's min height minus 16; `Systems.OutOfWorld`, `Systems.Void`, `OnVoid`, `TuneVoidDamage`, `OutOfWorlder` for an owner's own answer). Every entity's tick calls `Host.checkVoid`; a new entity kind calls it too.
 - `player/explosion.go`: BDS's explosion as a struct anyone can run (`Explosion`, `Host.Explode`, `Systems.Explode`, `OnExplosionStart` (before anything), `OnExplosion` (once the blocks are known, `Keep`), `OnExplosionHit` (per entity reached), what set it off (`Kind`, `FromBlock`, `Block`, `BlockPos`, `Attacker`), block behaviour `Exploded`, entity owner `Blastable`). `player/primedtnt.go`: lit TNT (`PrimedTNT`, `Host.SpawnTNT`, `OnTNTPrime`, saved with its chunk) and vanilla's TNT block as a block behaviour.
 - `circuit/config.go`: `Config`, every number redstone runs by, BDS's by default (`DefaultConfig`), and `Settings`, which holds it for the regions to read while `Server.SetRedstone` swaps it. A new redstone number goes here, not in a constant. The circuit library's own numbers are `redstone.Rules`.

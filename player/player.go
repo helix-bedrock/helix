@@ -108,6 +108,9 @@ type Player struct {
 	effectValued, effectMaxed uint32
 	brk                       breakState
 	move                      moveState
+	// steps tracks walking for vibrations, warden the shriekers' warnings (sculk.go).
+	steps  vibrationSteps
+	warden wardenTracker
 	// vehicle is what the player sits on, riding whether others see it so.
 	vehicle vehicle
 	riding  bool

@@ -111,6 +111,8 @@ const (
 	kindShelf
 	kindRod
 	kindLectern
+	kindSculk
+	kindShrieker
 )
 
 // kindOf returns the class of the block called name.
@@ -156,6 +158,10 @@ func kindOf(name string) kind {
 		return kindTNT
 	case nameJukebox:
 		return kindJukebox
+	case nameSculkSensor, nameCalibrated:
+		return kindSculk
+	case nameShrieker:
+		return kindShrieker
 	}
 	if k, ok := railKind(name); ok {
 		return k
@@ -193,7 +199,7 @@ func componentKind(k kind) redstone.Kind {
 	case kindComparator:
 		return redstone.KindComparator
 	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook, kindJukebox,
-		kindRod, kindLectern:
+		kindRod, kindLectern, kindSculk:
 		return redstone.KindProducer
 	case kindObserver:
 		return redstone.KindPulse
@@ -225,7 +231,9 @@ type Ticker struct {
 	moving  uint32
 	// dispense fires dispensers and droppers. Set before any player joins.
 	dispense DispenseFunc
-	fall     FallFunc
+	// sculk is what the player package does for sculk blocks.
+	sculk SculkHooks
+	fall  FallFunc
 	// These are by block state. They are made once and only read, as regions tick
 	// in parallel.
 	power []redstone.Power
@@ -686,6 +694,10 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		t.rodTick(r, pos, block)
 	case kindLectern:
 		t.lecternTick(t.circuitOf(r), pos, block)
+	case kindSculk:
+		t.sculkTick(r, pos, block)
+	case kindShrieker:
+		t.shriekerTick(r, pos, block)
 	default:
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
@@ -853,6 +865,8 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 		t.rodComponent(c, p, states)
 	case kindLectern:
 		t.lecternComponent(c, p, states)
+	case kindSculk:
+		t.sculkComponent(c, p, name, states)
 	}
 }
 
