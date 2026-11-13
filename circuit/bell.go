@@ -75,7 +75,12 @@ func (e *bellEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	if e.ticks >= e.t.settings.Get().Bell.RingTicks {
 		e.ringing, e.ticks = false, 0
 	}
-	if e.t.circuitOf(r).sys.Strength(toPos(pos)) <= 0 {
+	// BDS (0xd43c410) reads the power only on the tick after the circuits evaluate.
+	sys := e.t.circuitOf(r).sys
+	if sys.SignalTick() {
+		return
+	}
+	if sys.Strength(toPos(pos)) <= 0 {
 		e.powered = false
 		return
 	}

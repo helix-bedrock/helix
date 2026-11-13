@@ -494,6 +494,13 @@ func (t *Ticker) AttackBlock(r *world.Region, pos cube.Pos, block uint32) {
 	}
 }
 
+// RedstoneTick reports whether this is the tick after the circuits of r evaluated, the
+// only tick BDS's piston, bell, lectern and hopper ticks act on (their check that the
+// circuit counter has reached the interval). Runs: owner of the region.
+func (t *Ticker) RedstoneTick(r *world.Region) bool {
+	return !t.circuitOf(r).sys.SignalTick()
+}
+
 // Signal is the strength of the circuit part at pos, -1 when there is none, as BDS's
 // armour stand reads its block's component. Runs: owner of the region.
 func (t *Ticker) Signal(r *world.Region, pos cube.Pos) int32 {

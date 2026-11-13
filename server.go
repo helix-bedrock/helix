@@ -433,6 +433,7 @@ func (s *Server) hookCircuits(host *player.Host) {
 		ActivateSculk: c.ActivateSculkSensor,
 		SculkInput:    c.SculkInput,
 		Signal:        c.Signal,
+		RedstoneTick:  c.RedstoneTick,
 	})
 	c.SetSculk(circuit.SculkHooks{SensorQuiet: host.SculkSensorQuiet, ShriekerTick: host.ShriekerTick})
 	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {

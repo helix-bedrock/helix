@@ -132,10 +132,14 @@ func (s *Host) frontOf(block uint32, pos cube.Pos) (cube.Face, cube.Pos) {
 	return f, pos.Side(f)
 }
 
-// tickHopper is BDS's hopper tick: once per world tick; the hoppers this one feeds
-// first, so an item goes all the way down a chain the same way each tick; then the
-// move, unless the hopper is turned off.
+// tickHopper is BDS's hopper tick: once per world tick, and only on the tick after
+// the circuits evaluate (0xd415f10), so the cooldown counts every other game tick; the
+// hoppers this one feeds first, so an item goes all the way down a chain the same way
+// each tick; then the move, unless the hopper is turned off.
 func (c *Chest) tickHopper(r *world.Region, pos cube.Pos, depth int) {
+	if gate := c.s.circuits.RedstoneTick; gate != nil && !gate(r) {
+		return
+	}
 	now := r.CurrentTick()
 	if c.lastTick >= now {
 		return
@@ -454,6 +458,9 @@ type CircuitHooks struct {
 	// Signal is the strength of the circuit part at pos, -1 for none: what an armour
 	// stand takes its pose from.
 	Signal func(r *world.Region, pos cube.Pos) int32
+	// RedstoneTick reports whether this is the tick after r's circuits evaluated, the only
+	// tick BDS's hoppers act on. Nil means every tick.
+	RedstoneTick func(r *world.Region) bool
 }
 
 // SetCircuitHooks sets what redstone answers for. Call it before any player joins.
