@@ -6,7 +6,6 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -66,7 +65,7 @@ type ItemActor struct {
 	s      *Host
 	entity *world.Entity
 	stack  ItemStack
-	vel    mgl64.Vec3
+	vel    mgl32.Vec3
 
 	age, pickupDelay, throwTime int32
 	onGround, taken             bool
@@ -102,32 +101,32 @@ func (i *ItemActor) Entity() *world.Entity { return i.entity }
 
 // SpawnItem adds stack to the dimension as an item lying at pos, moving at vel blocks per
 // tick, which may be picked up after the drop delay a player's drop has. Runs: anywhere.
-func (s *Host) SpawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl64.Vec3) *ItemActor {
+func (s *Host) SpawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec3) *ItemActor {
 	return s.spawnItem(d, stack, pos, vel, world.Rotation{}, dropPickupDelay, 0)
 }
 
 // spawnItem adds an item to the dimension.
-func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl64.Vec3, rot world.Rotation, pickupDelay, throwTime int32) *ItemActor {
+func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec3, rot world.Rotation, pickupDelay, throwTime int32) *ItemActor {
 	i := s.newItem(stack, vel, pickupDelay, throwTime)
 	i.addTo(d, pos, rot)
 	return i
 }
 
 // newItem builds an item that is not in the world yet.
-func (s *Host) newItem(stack ItemStack, vel mgl64.Vec3, pickupDelay, throwTime int32) *ItemActor {
+func (s *Host) newItem(stack ItemStack, vel mgl32.Vec3, pickupDelay, throwTime int32) *ItemActor {
 	// A stack in the world has no slot, so no network ID the client names.
 	stack.netID = 0
 	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime, health: itemHealth}
 }
 
 // addTo puts the item in the dimension.
-func (i *ItemActor) addTo(d *world.Dimension, pos mgl64.Vec3, rot world.Rotation) {
+func (i *ItemActor) addTo(d *world.Dimension, pos mgl32.Vec3, rot world.Rotation) {
 	// Random, since items saved by an earlier run keep their IDs.
 	i.entity = d.AddEntity(i.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), i.s.runtimeIDs.Add(1), pos, rot)) //nolint:gosec // an entity ID, not a secret
 }
 
 // config is the item's entity.
-func (i *ItemActor) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
+func (i *ItemActor) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: i, Spawn: i.spawnPackets, Move: i.movePacket, Think: i.think, Input: i.tick, Save: i.saveEntity,
@@ -152,8 +151,8 @@ func (i *ItemActor) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	data["Health"] = int16(i.health) //nolint:gosec // at most what it was saved with
 	data["identifier"] = itemIdentifier
-	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
-	data["Motion"] = []float32{float32(i.vel[0]), float32(i.vel[1]), float32(i.vel[2])}
+	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Motion"] = []float32{i.vel[0], i.vel[1], i.vel[2]}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data["OnGround"] = onGround
 	data["Age"] = int16(min(i.age, math.MaxInt16)) //nolint:gosec // clamped: a plugin's lifetime can outlast the saved field
@@ -211,7 +210,7 @@ func (s *Host) loadItem(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) b
 		i.health = int32(h)
 	}
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
-		i.vel = mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}
+		i.vel = mgl32.Vec3{v[0], v[1], v[2]}
 	}
 	var rot world.Rotation
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
@@ -221,7 +220,7 @@ func (s *Host) loadItem(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) b
 	i.age = int32(age)
 	onGround, _ := saved.Data["OnGround"].(uint8)
 	i.onGround = onGround != 0
-	i.entity = r.AddLoadedEntity(at, i.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, rot))
+	i.entity = r.AddLoadedEntity(at, i.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
 	if s.game != nil && s.game.itemLoadEv.Has() {
 		s.game.itemLoadEv.fire(s.log, &ItemLoadEvent{Item: i})
 	}
@@ -275,7 +274,7 @@ func (i *ItemActor) movePacket(e *world.Entity) packet.Packet {
 		flags = packet.MoveFlagOnGround
 	}
 	return &packet.MoveActorAbsolute{
-		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), float32(rot.HeadYaw)},
+		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw},
 	}
 }
 
@@ -322,18 +321,18 @@ func (i *ItemActor) tick(e *world.Entity) {
 
 // liquidForces applies water's and lava's pull to the velocity. It returns
 // whether gravity applies and whether the item is in water.
-func (i *ItemActor) liquidForces(r *world.Region, pos mgl64.Vec3) (gravity, inWater bool) {
+func (i *ItemActor) liquidForces(r *world.Region, pos mgl32.Vec3) (gravity, inWater bool) {
 	at := floorPos(pos)
 	k, falling := liquidAt(i.s.reg, r, at)
 	if k == 0 || falling {
 		return true, k == registry.MaterialWater
 	}
-	drag := float64(itemWaterDrag)
+	drag := float32(itemWaterDrag)
 	if k == registry.MaterialLava {
 		drag = itemLavaDrag
 	}
 	y := i.vel[1] + itemBuoyancyAdd
-	i.vel = mgl64.Vec3{i.vel[0] * drag, (itemBuoyancyTarget-y)*itemBuoyancyRate + y, i.vel[2] * drag}
+	i.vel = mgl32.Vec3{i.vel[0] * drag, (itemBuoyancyTarget-y)*itemBuoyancyRate + y, i.vel[2] * drag}
 	return false, k == registry.MaterialWater
 }
 
@@ -355,10 +354,10 @@ func liquidAt(reg *registry.Registry, r *world.Region, pos cube.Pos) (material u
 }
 
 // mergeNearby joins the item with the items around it.
-func (i *ItemActor) mergeNearby(r *world.Region, pos mgl64.Vec3) {
+func (i *ItemActor) mergeNearby(r *world.Region, pos mgl32.Vec3) {
 	// Both boxes count: BDS grows this item's box by the reach and takes every item
 	// whose box it touches.
-	reach := float64(2*itemHalfSize + itemMergeReach)
+	reach := float32(2*itemHalfSize + itemMergeReach)
 	var buf [16]*world.Entity
 	for _, o := range r.AppendEntitiesIn(buf[:0], pos[0]-reach, pos[2]-reach, pos[0]+reach, pos[2]+reach) {
 		other, ok := o.Owner().(*ItemActor)
@@ -376,7 +375,7 @@ func (i *ItemActor) mergeNearby(r *world.Region, pos mgl64.Vec3) {
 
 // boxesApart reports whether two item positions are further apart than d on
 // any axis.
-func boxesApart(a, b mgl64.Vec3, d float64) bool {
+func boxesApart(a, b mgl32.Vec3, d float32) bool {
 	for n := range 3 {
 		if diff := a[n] - b[n]; diff > d || diff < -d {
 			return true
@@ -425,7 +424,7 @@ func (i *ItemActor) think(e *world.Entity) {
 	i.applyFlow(r, pos)
 	gravity, inWater := i.liquidForces(r, pos)
 	// BDS looks from the bottom of the box; its position is half the box above that.
-	i.pushOut(r, e, mgl64.Vec3{pos[0], pos[1] - itemHalfSize, pos[2]}, pos)
+	i.pushOut(r, e, mgl32.Vec3{pos[0], pos[1] - itemHalfSize, pos[2]}, pos)
 	st := thought{ok: true, inWater: inWater}
 	st.rest = i.onGround && i.vel.Dot(i.vel) <= itemRestSpeed && !inWater && i.age%itemRestTicks != 0
 	if !st.rest {
@@ -458,31 +457,31 @@ func (i *ItemActor) moveAndDrag(r *world.Region, e *world.Entity) {
 }
 
 // place puts the item where its move took it and applies the drag.
-func (i *ItemActor) place(r *world.Region, e *world.Entity, pos mgl64.Vec3, hitY bool) {
+func (i *ItemActor) place(r *world.Region, e *world.Entity, pos mgl32.Vec3, hitY bool) {
 	onGround := hitY && i.vel[1] < 0
 	if hitY {
 		i.vel[1] = 0
 	}
 	i.onGround = onGround
 	if !e.Apply(world.Movement{Pos: pos, Rot: e.Rotation(), OnGround: onGround, Tick: e.Tick()}) {
-		i.vel = mgl64.Vec3{}
+		i.vel = mgl32.Vec3{}
 		return
 	}
-	drag := float64(itemAirDrag)
+	drag := float32(itemAirDrag)
 	if hitY {
 		drag = itemGroundDrag
 		below := cube.Pos{itemFloor(pos[0]), itemFloor(pos[1]-itemHalfSize) - 1, itemFloor(pos[2])}
 		if b, ok := r.Block(below, 0); ok && b != i.s.reg.Blocks.Air() {
-			drag = float64(i.s.reg.Blocks.Properties(b).Friction * itemAirDrag)
+			drag = i.s.reg.Blocks.Properties(b).Friction * itemAirDrag
 		}
 	}
-	i.vel = mgl64.Vec3{i.vel[0] * drag, i.vel[1] * itemAirDrag, i.vel[2] * drag}
+	i.vel = mgl32.Vec3{i.vel[0] * drag, i.vel[1] * itemAirDrag, i.vel[2] * drag}
 }
 
 // collide returns where the item ends up, clipping y, then x, then z against
 // the blocks, and stops the velocity on x and z where it hit. hitY reports a
 // hit on the y axis; the caller still needs the velocity's sign.
-func (i *ItemActor) collide(r *world.Region, pos mgl64.Vec3) (out mgl64.Vec3, hitY bool) {
+func (i *ItemActor) collide(r *world.Region, pos mgl32.Vec3) (out mgl32.Vec3, hitY bool) {
 	if i.noClip {
 		return pos.Add(i.vel), false
 	}
@@ -502,24 +501,24 @@ func (i *ItemActor) collide(r *world.Region, pos mgl64.Vec3) (out mgl64.Vec3, hi
 
 // clip returns how far of d the item's box can move along axis before it
 // hits a block. A block not loaded stops it.
-func (i *ItemActor) clip(r *world.Region, pos mgl64.Vec3, axis int, d float64) float64 {
+func (i *ItemActor) clip(r *world.Region, pos mgl32.Vec3, axis int, d float32) float32 {
 	return i.s.clipMove(r, pos, itemHalfSize, axis, d)
 }
 
 // clipMove returns how far of d a box half across around pos can move along axis before
 // it hits a block. A block not loaded stops it.
-func (s *Host) clipMove(r *world.Region, pos mgl64.Vec3, half float64, axis int, d float64) float64 {
+func (s *Host) clipMove(r *world.Region, pos mgl32.Vec3, half float32, axis int, d float32) float32 {
 	if d == 0 {
 		return 0
 	}
-	lo := mgl64.Vec3{pos[0] - half, pos[1] - half, pos[2] - half}
-	hi := mgl64.Vec3{pos[0] + half, pos[1] + half, pos[2] + half}
+	lo := mgl32.Vec3{pos[0] - half, pos[1] - half, pos[2] - half}
+	hi := mgl32.Vec3{pos[0] + half, pos[1] + half, pos[2] + half}
 	return s.clipSweep(r, lo, hi, axis, d)
 }
 
 // clipSweep returns how far of d the box from lo to hi can move along axis before it hits
 // a block. A block not loaded stops it.
-func (s *Host) clipSweep(r *world.Region, lo, hi mgl64.Vec3, axis int, d float64) float64 {
+func (s *Host) clipSweep(r *world.Region, lo, hi mgl32.Vec3, axis int, d float32) float32 {
 	sweepLo, sweepHi := lo, hi
 	if d < 0 {
 		sweepLo[axis] += d
@@ -533,7 +532,7 @@ func (s *Host) clipSweep(r *world.Region, lo, hi mgl64.Vec3, axis int, d float64
 				if !ok {
 					return 0
 				}
-				origin := mgl64.Vec3{float64(x), float64(y), float64(z)}
+				origin := mgl32.Vec3{float32(x), float32(y), float32(z)}
 				for _, box := range s.boxesFor(r, cube.Pos{x, y, z}, b, lo, hi) {
 					d = clipBox(lo, hi, origin, box, axis, d)
 				}
@@ -544,7 +543,7 @@ func (s *Host) clipSweep(r *world.Region, lo, hi mgl64.Vec3, axis int, d float64
 }
 
 // clipSkin is how far a box may overlap a block's box and still count as touching it.
-// Entities keep their centre, so the box worked out from it is off by float64 rounding:
+// Entities keep their centre, so the box worked out from it is off by float32 rounding:
 // TNT lit on a block with its top at y=64 has feet at 63.999996, inside the block,
 // which would then not stop it and it fell through.
 const clipSkin = 1e-3
@@ -552,27 +551,26 @@ const clipSkin = 1e-3
 // clipBox shortens d if the box lo..hi moving along axis hits box, a block's
 // collision box at origin. A box it is already inside, by more than clipSkin, does
 // not stop it.
-func clipBox(lo, hi, origin mgl64.Vec3, box registry.Box, axis int, d float64) float64 {
-	bLo, bHi := origin.Add(mgl64.Vec3{float64(box[0]), float64(box[1]), float64(box[2])}), origin.Add(mgl64.Vec3{float64(box[3]), float64(box[4]), float64(box[5])})
+func clipBox(lo, hi, origin mgl32.Vec3, box registry.Box, axis int, d float32) float32 {
 	for n := range 3 {
-		if n != axis && (hi[n] <= bLo[n]+clipSkin || lo[n] >= bHi[n]-clipSkin) {
+		if n != axis && (hi[n] <= origin[n]+box[n]+clipSkin || lo[n] >= origin[n]+box[n+3]-clipSkin) {
 			return d
 		}
 	}
 	if d > 0 {
-		if gap := bLo[axis] - hi[axis]; gap >= -clipSkin && gap < d {
+		if gap := origin[axis] + box[axis] - hi[axis]; gap >= -clipSkin && gap < d {
 			return max(gap, 0)
 		}
 		return d
 	}
-	if gap := bHi[axis] - lo[axis]; gap <= clipSkin && gap > d {
+	if gap := origin[axis] + box[axis+3] - lo[axis]; gap <= clipSkin && gap > d {
 		return min(gap, 0)
 	}
 	return d
 }
 
-func itemFloor(f float64) int { return int(math.Floor(f)) }
+func itemFloor(f float32) int { return int(math.Floor(float64(f))) }
 
-func floorPos(p mgl64.Vec3) cube.Pos {
+func floorPos(p mgl32.Vec3) cube.Pos {
 	return cube.Pos{itemFloor(p[0]), itemFloor(p[1]), itemFloor(p[2])}
 }

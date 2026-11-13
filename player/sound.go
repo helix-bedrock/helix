@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -12,7 +12,7 @@ import (
 type soundEvent struct {
 	// name is the sound, a packet.SoundEvent constant.
 	name string
-	pos  mgl64.Vec3
+	pos  mgl32.Vec3
 	// extra is the sound's data: a block's network hash for block sounds, -1 for none.
 	extra int32
 	// entity is the type of the entity making it, "" for none.
@@ -21,7 +21,7 @@ type soundEvent struct {
 
 // packet is the sound as the client gets it.
 func (s soundEvent) packet() *packet.LevelSoundEvent {
-	return &packet.LevelSoundEvent{SoundType: s.name, Position: world.Vec32(s.pos), ExtraData: s.extra, EntityType: s.entity}
+	return &packet.LevelSoundEvent{SoundType: s.name, Position: s.pos, ExtraData: s.extra, EntityType: s.entity}
 }
 
 // handleLevelSoundEvent is a sound the client says it made, such as a sweet berry bush
@@ -65,12 +65,12 @@ func playSound(r *world.Region, at cube.Pos, s soundEvent, except *world.Viewer)
 }
 
 // blockSound is a sound a block makes, carrying the block as BDS sends it.
-func (s *Host) blockSound(name string, pos mgl64.Vec3, block uint32) soundEvent {
+func (s *Host) blockSound(name string, pos mgl32.Vec3, block uint32) soundEvent {
 	return soundEvent{name: name, pos: pos, extra: int32(s.reg.Blocks.Hash(block))} //nolint:gosec // hashes are sent as int32
 }
 
 // blockCenter is the middle of the block at pos, where most block sounds play.
-func blockCenter(pos cube.Pos) mgl64.Vec3 { return blockVec(pos).Add(mgl64.Vec3{0.5, 0.5, 0.5}) }
+func blockCenter(pos cube.Pos) mgl32.Vec3 { return blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}) }
 
 // by is the sound made by an entity of the given type.
 func (s soundEvent) by(entity string) soundEvent {

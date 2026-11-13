@@ -4,7 +4,7 @@ import (
 	"maps"
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/helix/mob"
@@ -105,9 +105,9 @@ func (o *Mob) saveActor(e *world.Entity, data map[string]any) {
 	pitch, yaw, _, _ := o.m.Rotation()
 	vel := o.m.Body().Vel
 	data["UniqueID"] = e.UniqueID()
-	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
-	data["Rotation"] = []float32{float32(yaw), float32(pitch)}
-	data["Motion"] = []float32{float32(vel.X), float32(vel.Y), float32(vel.Z)}
+	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Rotation"] = []float32{yaw, pitch}
+	data["Motion"] = []float32{vel.X, vel.Y, vel.Z}
 	if name := o.m.NameTag(); name != "" {
 		data[mobKeyCustomName] = name
 	} else {
@@ -181,10 +181,10 @@ func (o *Mob) dataValue(key uint32, asByte bool) any {
 // others it holds.
 func (o *Mob) saveAttributes(prev any) []any {
 	health := map[string]any{
-		"Name": attrHealthName, "Base": float32(o.m.MaxHealth()), "Current": float32(o.m.HealthValue()), "Max": float32(o.m.MaxHealth()),
-		"Min": float32(0), "DefaultMax": float32(o.m.MaxHealth()), "DefaultMin": float32(0),
+		"Name": attrHealthName, "Base": o.m.MaxHealth(), "Current": o.m.HealthValue(), "Max": o.m.MaxHealth(),
+		"Min": float32(0), "DefaultMax": o.m.MaxHealth(), "DefaultMin": float32(0),
 	}
-	speed := float32(o.m.MovementSpeed())
+	speed := o.m.MovementSpeed()
 	movement := map[string]any{
 		"Name": "minecraft:movement", "Base": speed, "Current": speed, "Max": float32(math.MaxFloat32),
 		"Min": float32(0), "DefaultMax": float32(math.MaxFloat32), "DefaultMin": float32(0),
@@ -215,16 +215,16 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
 		yaw, pitch = v[0], v[1]
 	}
-	feet := mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}
-	o, ok := s.newMobID(saved.ID, typ, feet, float64(yaw), definition.InitLoaded, "")
+	feet := mgl32.Vec3{pos[0], pos[1], pos[2]}
+	o, ok := s.newMobID(saved.ID, typ, feet, yaw, definition.InitLoaded, "")
 	if !ok {
 		return false
 	}
 	o.saved = maps.Clone(saved.Data)
 	o.m.Restore(restoreBucketData(saved.Data))
-	o.m.SetRotation(float64(yaw), float64(pitch))
+	o.m.SetRotation(yaw, pitch)
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
-		o.m.SetVelocity(behavior.Vec3{X: float64(v[0]), Y: float64(v[1]), Z: float64(v[2])})
+		o.m.SetVelocity(behavior.Vec3{X: v[0], Y: v[1], Z: v[2]})
 	}
 	if fire, _ := saved.Data[mobKeyFire].(int16); fire > 0 {
 		o.m.SetFireTicks(int32(fire))

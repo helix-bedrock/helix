@@ -3,8 +3,6 @@ package player
 import (
 	"math"
 	"testing"
-
-	"github.com/go-gl/mathgl/mgl64"
 )
 
 // tunedPlayer is a test player on a Host with vanilla's defaults, where one was set
@@ -101,7 +99,7 @@ func TestTuningChangesDamage(t *testing.T) {
 	}
 	p.SetTuning(TuneKnockbackPush, 0)
 	p.SetTuning(TuneKnockbackLift, 0)
-	if v := p.knockbackStep(mgl64.Vec3{}, 1, 0, p.Tuning(TuneKnockbackPush), p.Tuning(TuneKnockbackLift)); v[0] != 0 || v[1] != 0 {
+	if v := p.knockbackStep([3]float32{}, 1, 0, p.Tuning(TuneKnockbackPush), p.Tuning(TuneKnockbackLift)); v[0] != 0 || v[1] != 0 {
 		t.Errorf("no knockback = %v", v)
 	}
 }

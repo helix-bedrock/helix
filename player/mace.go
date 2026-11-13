@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -61,7 +61,7 @@ func (p *Player) maceSmash(r *world.Region, target *world.Entity) {
 	}
 	v := p.Velocity()
 	p.move.fall = 0
-	p.SetVelocity(mgl64.Vec3{v[0], 0, v[2]})
+	p.SetVelocity(mgl32.Vec3{v[0], 0, v[2]})
 	p.showSmash(r, target, fall)
 	p.smashPush(r, target)
 }
@@ -99,7 +99,7 @@ func (p *Player) smashPush(r *world.Region, target *world.Entity) {
 	if !ok {
 		return
 	}
-	reach := mgl64.Vec3{maceReach, maceReach, maceReach}
+	reach := mgl32.Vec3{maceReach, maceReach, maceReach}
 	lo, hi = lo.Sub(reach), hi.Add(reach)
 	for _, o := range r.AppendEntitiesIn(nil, lo[0], lo[2], hi[0], hi[2]) {
 		if o == target || o == p.entity {
@@ -116,11 +116,11 @@ func (p *Player) smashPush(r *world.Region, target *world.Entity) {
 		d := pos.Sub(target.Position())
 		dist := d.Len()
 		push := (maceReach - dist) * macePush
-		var dx, dz float64
+		var dx, dz float32
 		if dist >= minPushDist {
 			dx, dz = d[0]/dist, d[2]/dist
 		}
-		m.SetVelocity(m.Velocity().Add(mgl64.Vec3{dx * push, maceLift, dz * push}))
+		m.SetVelocity(m.Velocity().Add(mgl32.Vec3{dx * push, maceLift, dz * push}))
 	}
 }
 
@@ -140,7 +140,7 @@ func smashPushes(o *world.Entity) bool {
 const minPushDist = 0.0001
 
 // liquidAtFeet reports water or lava in the block at a position.
-func (s *Host) liquidAtFeet(r *world.Region, at mgl64.Vec3) bool {
+func (s *Host) liquidAtFeet(r *world.Region, at mgl32.Vec3) bool {
 	liq, ok := s.liquidIn(r, feetBlock(at))
 	if !ok {
 		return false

@@ -3,7 +3,7 @@ package circuit
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/redstone"
 	"github.com/helix-bedrock/world/cube"
@@ -23,8 +23,8 @@ const (
 // targetOffCentre is how far a hit is from the centre of the face it landed on. The face is
 // the axis it is furthest along, so that axis is left out. BDS takes the first two others:
 // on an edge or corner, where axes tie, that leaves fewer.
-func targetOffCentre(pos cube.Pos, hit mgl64.Vec3) float32 {
-	d := [3]float32{float32(hit[0] - float64(pos[0]) - 0.5), float32(hit[1] - float64(pos[1]) - 0.5), float32(hit[2] - float64(pos[2]) - 0.5)}
+func targetOffCentre(pos cube.Pos, hit mgl32.Vec3) float32 {
+	d := [3]float32{hit[0] - float32(pos[0]) - 0.5, hit[1] - float32(pos[1]) - 0.5, hit[2] - float32(pos[2]) - 0.5}
 	far := max(abs32(d[0]), abs32(d[1]), abs32(d[2]))
 	var left [2]float32
 	n := 0
@@ -41,7 +41,7 @@ func targetOffCentre(pos cube.Pos, hit mgl64.Vec3) float32 {
 }
 
 // targetSignal is the power a hit gives: 15 near the centre of a face, always at least 1.
-func targetSignal(pos cube.Pos, hit mgl64.Vec3) int32 {
+func targetSignal(pos cube.Pos, hit mgl32.Vec3) int32 {
 	power := int32((targetSpan - targetOffCentre(pos, hit)) * targetSteps / targetSpan)
 	return min(max(power, 1), fullPower)
 }
@@ -50,7 +50,7 @@ func targetSignal(pos cube.Pos, hit mgl64.Vec3) int32 {
 // TargetBlock::onProjectileHit: power by how near the centre, for longer if it was an arrow
 // or trident. A hit while it is on starts the wait again. A player's hand does nothing to a
 // target in BDS. False if the block is not a target. Runs: owner of the region.
-func (t *Ticker) HitTarget(r *world.Region, pos cube.Pos, hit mgl64.Vec3, arrow bool) bool {
+func (t *Ticker) HitTarget(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool {
 	block, ok := r.Block(pos, 0)
 	if !ok || t.kind(block) != kindTarget {
 		return false

@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -166,8 +166,8 @@ func (f *ItemFrame) Take(r *world.Region, pos cube.Pos, drop, sound bool) {
 	item := f.item
 	f.item, f.rotation = ItemStack{}, 0
 	if drop && f.dropChance > 0 && f.dropChance >= rand.Float32() { //nolint:gosec // a drop, not a secret
-		at := blockVec(pos).Add(mgl64.Vec3{frameDropFromCorner, frameDropFromCorner, frameDropFromCorner})
-		f.s.spawnItem(r.Dimension(), item, at, mgl64.Vec3{}, world.Rotation{}, frameDropDelay, 0)
+		at := blockVec(pos).Add(mgl32.Vec3{frameDropFromCorner, frameDropFromCorner, frameDropFromCorner})
+		f.s.spawnItem(r.Dimension(), item, at, mgl32.Vec3{}, world.Rotation{}, frameDropDelay, 0)
 	}
 	f.setMapBit(r, pos)
 	if sound {
@@ -185,8 +185,8 @@ func (f *ItemFrame) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	item := f.item
 	f.item = ItemStack{}
 	if f.dropChance > 0 && f.dropChance >= rand.Float32() { //nolint:gosec // a drop, not a secret
-		at := blockVec(pos).Add(mgl64.Vec3{frameDropFromCorner, frameDropFromCorner, frameDropFromCorner})
-		f.s.spawnItem(r.Dimension(), item, at, mgl64.Vec3{}, world.Rotation{}, frameDropDelay, 0)
+		at := blockVec(pos).Add(mgl32.Vec3{frameDropFromCorner, frameDropFromCorner, frameDropFromCorner})
+		f.s.spawnItem(r.Dimension(), item, at, mgl32.Vec3{}, world.Rotation{}, frameDropDelay, 0)
 	}
 }
 

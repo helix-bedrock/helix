@@ -32,8 +32,6 @@ github.com/helix-bedrock/entity v0.0.0-20261111212216-3f4a8f7e2e2f h1:5epoHsUvoW
 github.com/helix-bedrock/entity v0.0.0-20261111212216-3f4a8f7e2e2f/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
 github.com/helix-bedrock/entity v0.0.0-20261112024018-5b772ffd83b9 h1:llTyKI7L4rhO9NdEyQKS4aM5Dtpx6m2u15J767/ZYpw=
 github.com/helix-bedrock/entity v0.0.0-20261112024018-5b772ffd83b9/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
-github.com/helix-bedrock/entity v0.0.0-20261113010237-483bee1229a9 h1:bmwXZ83lMB3yzmwh06QbKuzjuaMvviPn2fsgqyQzx64=
-github.com/helix-bedrock/entity v0.0.0-20261113010237-483bee1229a9/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
 github.com/helix-bedrock/helix-data v0.0.0-20261110171137-8dbf6f6c7041 h1:m8YQdejDcO9xa1sKezQ94EukTLJazk0TEKIkmGV+lcg=
 github.com/helix-bedrock/helix-data v0.0.0-20261110171137-8dbf6f6c7041/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261111163835-5b826b40dc16 h1:QXGhVwMUWh8gYTDLbwOuPl15/Klilz9I9SPntQhIqY8=

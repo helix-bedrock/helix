@@ -3,7 +3,7 @@ package player
 import (
 	"sync"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -205,13 +205,13 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		}
 	}
 	before := flatSpeed(p.move.velocity)
-	p.move.velocity = world.Vec64(pk.Delta)
+	p.move.velocity = pk.Delta
 	p.move.forward = pk.MoveVector[1]
 	if p.vehicle != nil && pk.InputData.Load(packet.InputFlagStartSneaking) {
 		letOff(p.vehicle, p)
 	}
 	collided := pk.InputData.Load(packet.InputFlagVerticalCollision)
-	var from mgl64.Vec3
+	var from mgl32.Vec3
 	if p.entity != nil {
 		from = p.entity.Position()
 	}
@@ -230,13 +230,13 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		if id, has := pk.ClientPredictedVehicle.Value(); has && id == b.entity.UniqueID() {
 			predicted = true
 		}
-		b.drive(p, world.Vec64(pk.Position), float64(yaw), predicted)
+		b.drive(p, pk.Position, yaw, predicted)
 	}
 	if p.vehicle != nil {
-		pos = world.Vec32(p.seatPosition())
+		pos = p.seatPosition()
 	}
 	p.s.handlers.movement(p, world.Movement{
-		Pos: world.Vec64(pos), Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
+		Pos: pos, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
 		OnGround: collided, Tick: pk.Tick,
 	})
 	if p.entity != nil {
@@ -251,7 +251,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 }
 
 // moveTo is a movement the server decides.
-func moveTo(pos mgl64.Vec3, rot world.Rotation, tick uint64) world.Movement {
+func moveTo(pos mgl32.Vec3, rot world.Rotation, tick uint64) world.Movement {
 	return world.Movement{Pos: pos, Rot: rot, Tick: tick}
 }
 

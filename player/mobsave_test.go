@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/chunk"
@@ -14,7 +14,7 @@ import (
 func TestMobSavesAndLoads(t *testing.T) {
 	p, d, y := cartWorld(t, "minecraft:stone", nil)
 	p.s.setUpMobs()
-	o, ok := p.s.SpawnMob(d, "minecraft:cow", mgl64.Vec3{10.5, float64(y) + 1, 10.5}, 30)
+	o, ok := p.s.SpawnMob(d, "minecraft:cow", mgl32.Vec3{10.5, float32(y) + 1, 10.5}, 30)
 	if !ok {
 		t.Skip("no cow definition")
 	}

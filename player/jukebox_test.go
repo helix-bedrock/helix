@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -77,7 +77,7 @@ func TestDiscTable(t *testing.T) {
 // One who comes late is sent the song from where it has got to, and one too far away is not.
 func TestJukeboxSongForLateAndFar(t *testing.T) {
 	e := &jukeboxEntity{handle: 7, ticks: 200}
-	centre := mgl64.Vec3{0.5, 0.5, 0.5}
+	centre := mgl32.Vec3{0.5, 0.5, 0.5}
 	late := e.songPacket("record.cat", centre, false)
 	if v, ok := late.PlaybackPositionSeconds.Value(); !ok || v != 10 {
 		t.Errorf("late start %v %v", v, ok)
@@ -99,7 +99,7 @@ func TestJukeboxReachesPlayer(t *testing.T) {
 	}
 	at := cube.Pos{3, 0, 3}
 	p.flush = func() {}
-	p.entity = d.AddEntity(world.EntityConfig{UniqueID: 2, RuntimeID: p.s.runtimeIDs.Add(1), Pos: mgl64.Vec3{4, 0, 5}, Owner: p})
+	p.entity = d.AddEntity(world.EntityConfig{UniqueID: 2, RuntimeID: p.s.runtimeIDs.Add(1), Pos: mgl32.Vec3{4, 0, 5}, Owner: p})
 	waitRegion(t, d, func(*world.Region) bool { return p.entity.Region() != nil })
 	onRegion(d, func(r *world.Region) {
 		e := &jukeboxEntity{s: p.s}

@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"sync"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/helix/daytime"
@@ -81,12 +81,12 @@ func (m *Mob) Entity() *world.Entity { return m.entity }
 func (m *Mob) Type() string { return m.m.Type() }
 
 // Health is the mob's health.
-func (m *Mob) Health() float64 { return float64(m.m.HealthValue()) }
+func (m *Mob) Health() float32 { return m.m.HealthValue() }
 
 // SpawnMob adds a mob of the type with its feet at pos, as a spawned mob (its definition's
 // minecraft:entity_spawned event runs). False if the type has no definition. Runs:
 // anywhere.
-func (s *Host) SpawnMob(d *world.Dimension, typ string, pos mgl64.Vec3, yaw float64) (*Mob, bool) {
+func (s *Host) SpawnMob(d *world.Dimension, typ string, pos mgl32.Vec3, yaw float32) (*Mob, bool) {
 	if s.mobs == nil {
 		return nil, false
 	}
@@ -100,19 +100,19 @@ func (s *Host) SpawnMob(d *world.Dimension, typ string, pos mgl64.Vec3, yaw floa
 
 // newMob makes a mob that is not in the world yet: its definition runs once add puts it
 // there. initEvent is the event to start with when method is definition.InitEvent.
-func (s *Host) newMob(typ string, pos mgl64.Vec3, yaw float64, method definition.InitMethod, initEvent string) (*Mob, bool) {
+func (s *Host) newMob(typ string, pos mgl32.Vec3, yaw float32, method definition.InitMethod, initEvent string) (*Mob, bool) {
 	uid := itemUniqueIDBase | rand.Int64N(itemUniqueIDBase) //nolint:gosec // an entity ID, not a secret
 	return s.newMobID(uid, typ, pos, yaw, method, initEvent)
 }
 
 // newMobID is newMob with the unique ID given, as a saved mob keeps its own.
-func (s *Host) newMobID(uid int64, typ string, pos mgl64.Vec3, yaw float64, method definition.InitMethod, initEvent string) (*Mob, bool) {
+func (s *Host) newMobID(uid int64, typ string, pos mgl32.Vec3, yaw float32, method definition.InitMethod, initEvent string) (*Mob, bool) {
 	if s.mobs == nil {
 		return nil, false
 	}
 	o := &Mob{s: s, needEquip: method != definition.InitLoaded}
 	rid := s.runtimeIDs.Add(1)
-	m, err := s.mobs.NewWithEvent(typ, uid, rid, vec(pos), float64(yaw), o, method, initEvent)
+	m, err := s.mobs.NewWithEvent(typ, uid, rid, vec(pos), yaw, o, method, initEvent)
 	if err != nil {
 		return nil, false
 	}
@@ -127,25 +127,23 @@ func (s *Host) newMobID(uid int64, typ string, pos mgl64.Vec3, yaw float64, meth
 func (o *Mob) add(d *world.Dimension) {
 	pos := mglVec(o.m.Pos())
 	_, yaw, head, _ := o.m.Rotation()
-	rot := world.Rotation{Yaw: float32(yaw), HeadYaw: float32(head)}
+	rot := world.Rotation{Yaw: yaw, HeadYaw: head}
 	o.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	o.moves.head = true
 	o.entity = d.AddEntity(o.config(pos, rot))
 }
 
 // config is the mob's entity, saved with its chunk.
-func (o *Mob) config(pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
+func (o *Mob) config(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: int64(o.m.ID()), RuntimeID: o.m.RuntimeID(), Pos: pos, Rot: rot,
 		Owner: o, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply, Save: o.saveEntity,
 	}
 }
 
-func vec(p mgl64.Vec3) behavior.Vec3 {
-	return behavior.Vec3{X: float64(p[0]), Y: float64(p[1]), Z: float64(p[2])}
-}
+func vec(p mgl32.Vec3) behavior.Vec3 { return behavior.Vec3{X: p[0], Y: p[1], Z: p[2]} }
 
-func mglVec(p behavior.Vec3) mgl64.Vec3 { return mgl64.Vec3{float64(p.X), float64(p.Y), float64(p.Z)} }
+func mglVec(p behavior.Vec3) mgl32.Vec3 { return mgl32.Vec3{p.X, p.Y, p.Z} }
 
 // metadata is the mob's actor data: flags, size, air, its target's unique ID (0 for none,
 // as Mob::setTarget writes it) and what its components wrote.
@@ -184,11 +182,11 @@ func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 	pitch, yaw, head, body := m.m.Rotation()
 	return m.spawnEquipment([]packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: m.m.Type(),
-		Position: world.Vec32(e.Position()), Velocity: world.Vec32(mglVec(m.m.Body().Vel)),
-		Pitch: float32(pitch), Yaw: float32(yaw), HeadYaw: float32(head), BodyYaw: float32(body),
+		Position: e.Position(), Velocity: mglVec(m.m.Body().Vel),
+		Pitch: pitch, Yaw: yaw, HeadYaw: head, BodyYaw: body,
 		Attributes: []protocol.AttributeValue{
-			{Name: "minecraft:health", Value: float32(m.m.HealthValue()), Max: float32(m.m.MaxHealth())},
-			{Name: "minecraft:movement", Value: float32(m.m.MovementSpeed()), Max: math.MaxFloat32},
+			{Name: "minecraft:health", Value: m.m.HealthValue(), Max: m.m.MaxHealth()},
+			{Name: "minecraft:movement", Value: m.m.MovementSpeed(), Max: math.MaxFloat32},
 		},
 		EntityMetadata: m.metadata(),
 	}})
@@ -242,7 +240,7 @@ func (m *Mob) apply(e *world.Entity) {
 	}
 	b := m.m.Body()
 	pitch, yaw, head, _ := m.m.Rotation()
-	if !e.Apply(world.Movement{Pos: mglVec(b.Pos), Rot: world.Rotation{Pitch: float32(pitch), Yaw: float32(yaw), HeadYaw: float32(head)}, OnGround: b.OnGround, Tick: e.Tick()}) {
+	if !e.Apply(world.Movement{Pos: mglVec(b.Pos), Rot: world.Rotation{Pitch: pitch, Yaw: yaw, HeadYaw: head}, OnGround: b.OnGround, Tick: e.Tick()}) {
 		m.m.SetPos(vec(e.Position()))
 		b.Vel = behavior.Vec3{}
 	}
@@ -258,41 +256,41 @@ func (m *Mob) OutOfWorld(_ *Host, e *world.Entity) { m.remove(e) }
 
 // hurt takes damage from an attacker (nil for none), shows the hurt or death and pushes
 // the mob away from the attacker. It reports the damage taken.
-func (m *Mob) hurt(amount float64, by *Player, cause DamageCause) float64 {
+func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 	r := m.entity.Region()
 	if r == nil || m.gone {
 		return 0
 	}
 	if m.stand != nil {
-		return float64(m.standHurt(by, cause))
+		return m.standHurt(by, cause)
 	}
 	id := behavior.NoID
 	if by != nil && by.entity != nil {
 		id = behavior.ID(by.entity.UniqueID())
 		m.lastPlayer = by
 	}
-	dealt := m.m.Hurt(float64(amount), id, int(cause), uint64(max(r.CurrentTick(), 0))) //nolint:gosec // clamped
+	dealt := m.m.Hurt(amount, id, int(cause), uint64(max(r.CurrentTick(), 0))) //nolint:gosec // clamped
 	if dealt <= 0 {
 		return 0
 	}
 	m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventHurt))
 	if by != nil && by.entity != nil {
 		away := m.entity.Position().Sub(by.feet())
-		v := by.knockbackStep(mglVec(m.m.Body().Vel), float32(away[0]), float32(away[2]), by.Tuning(TuneKnockbackPush), by.Tuning(TuneKnockbackLift))
+		v := by.knockbackStep(mglVec(m.m.Body().Vel), away[0], away[2], by.Tuning(TuneKnockbackPush), by.Tuning(TuneKnockbackLift))
 		m.m.Knock(vec(v))
-		m.entity.Send(&packet.SetActorMotion{EntityRuntimeID: m.entity.RuntimeID(), Velocity: world.Vec32(v), Tick: m.entity.Tick()})
+		m.entity.Send(&packet.SetActorMotion{EntityRuntimeID: m.entity.RuntimeID(), Velocity: v, Tick: m.entity.Tick()})
 	}
 	if m.m.Dead() && !m.died {
 		m.died = true
 		m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventDeath))
 		m.dropOnDeath(r)
 	}
-	return float64(dealt)
+	return dealt
 }
 
 // feet is where the player stands: its entity's position is its eyes.
-func (p *Player) feet() mgl64.Vec3 {
-	return p.entity.Position().Sub(mgl64.Vec3{0, playerEyeHeight, 0})
+func (p *Player) feet() mgl32.Vec3 {
+	return p.entity.Position().Sub(mgl32.Vec3{0, playerEyeHeight, 0})
 }
 
 // --- mob.Hooks ---
@@ -312,16 +310,16 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	if !ok || p.entity == nil || p.dead() {
 		return false, false
 	}
-	h := NewHit(p, float32(m.m.AttackDamage()), DamageSource{Cause: DamageEntityAttack})
+	h := NewHit(p, m.m.AttackDamage(), DamageSource{Cause: DamageEntityAttack})
 	if !p.s.game.sys.TakeHit(h) {
 		return false, false
 	}
 	if !p.dead() {
 		away := p.feet().Sub(m.entity.Position())
 		resist := max(1-p.attributes.get(attrKnockbackResistance), 0) * p.Tuning(TuneKnockbackTakenScale)
-		vel := p.knockbackStep(p.move.velocity, float32(away[0]), float32(away[2]), p.Tuning(TuneKnockbackPush)*resist, p.Tuning(TuneKnockbackLift)*resist)
+		vel := p.knockbackStep(p.move.velocity, away[0], away[2], p.Tuning(TuneKnockbackPush)*resist, p.Tuning(TuneKnockbackLift)*resist)
 		p.move.velocity = vel
-		p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: world.Vec32(vel), Tick: p.entity.Tick()})
+		p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: vel, Tick: p.entity.Tick()})
 		p.flush()
 	}
 	return true, p.dead()
@@ -363,7 +361,7 @@ func (m *Mob) ActorEvent(_ *mob.Mob, id int) {
 }
 
 // Hurt is damage the mob's own state deals it (drowning, burning, hurt_on_condition).
-func (m *Mob) Hurt(_ *mob.Mob, amount float64, cause int) {
+func (m *Mob) Hurt(_ *mob.Mob, amount float32, cause int) {
 	if m.entity == nil {
 		return
 	}
@@ -405,11 +403,11 @@ func (p *Player) useOnMob(d *protocol.UseItemOnEntityTransactionData) bool {
 		return true
 	}
 	pos := p.entity.Position()
-	limit := float64(attackRange)
+	limit := float32(attackRange)
 	if p.creative() {
 		limit = attackRangeCreative
 	}
-	if pos.Sub(world.Vec64(d.Position)).Len() > attackFromRange || pos.Sub(o.entity.Position()).Len() > limit {
+	if pos.Sub(d.Position).Len() > attackFromRange || pos.Sub(o.entity.Position()).Len() > limit {
 		return true
 	}
 	p.attackMob(o)
@@ -432,7 +430,7 @@ func (p *Player) attackMob(o *Mob) {
 	sound := packet.SoundEventAttackNoDamage
 	if h != nil {
 		critical := h.Critical()
-		if o.hurt(float64(h.addBonuses(h.Base)), p, DamageEntityAttack) > 0 {
+		if o.hurt(h.addBonuses(h.Base), p, DamageEntityAttack) > 0 {
 			sound = packet.SoundEventAttackStrong
 			if critical {
 				sound = packet.SoundEventAttackCritical
@@ -561,7 +559,7 @@ func (s *Host) Entities(r *world.Region, dst []behavior.Actor, self behavior.ID,
 	sc := s.scratch()
 	defer sc.done()
 	// Look a little wider than b: entity positions are their feet or eyes, not their box.
-	sc.list = r.AppendEntitiesIn(sc.list, float64(b.Min.X-2), float64(b.Min.Z-2), float64(b.Max.X+2), float64(b.Max.Z+2))
+	sc.list = r.AppendEntitiesIn(sc.list, b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
 	for _, e := range sc.list {
 		a := actorOf(e)
 		if a == nil || a.ID() == self {
@@ -606,23 +604,23 @@ func (s *Host) SkyDarken(r *world.Region) int32 {
 	if s.clock == nil {
 		return 0
 	}
-	return daytime.SkyDarken(s.clock.Time(), s.clock.Cycle(), float32(s.Rain(r)), float32(s.Thunder(r)))
+	return daytime.SkyDarken(s.clock.Time(), s.clock.Cycle(), s.Rain(r), s.Thunder(r))
 }
 
 // Rain is the overworld's rain level; other dimensions have none.
-func (s *Host) Rain(r *world.Region) float64 {
+func (s *Host) Rain(r *world.Region) float32 {
 	if s.weather == nil || r.Dimension() != s.overworld {
 		return 0
 	}
-	return float64(s.weather.Rain())
+	return s.weather.Rain()
 }
 
 // Thunder is the overworld's thunder level.
-func (s *Host) Thunder(r *world.Region) float64 {
+func (s *Host) Thunder(r *world.Region) float32 {
 	if s.weather == nil || r.Dimension() != s.overworld {
 		return 0
 	}
-	return float64(s.weather.Thunder())
+	return s.weather.Thunder()
 }
 
 // LevelEvent sends a level event with the block's network hash as data.
@@ -670,7 +668,7 @@ func (s *Host) SetBlock(r *world.Region, p behavior.Pos, b behavior.PlacedBlock,
 // Particle spawns a named particle effect for the players near it.
 func (s *Host) Particle(r *world.Region, name string, p behavior.Vec3) {
 	pos := mglVec(p)
-	r.Broadcast(vecPos(pos), &packet.SpawnParticleEffect{Dimension: byte(s.dimensionID(r.Dimension())), EntityUniqueID: -1, Position: world.Vec32(pos), ParticleName: name}, nil) //nolint:gosec // dimension IDs fit a byte
+	r.Broadcast(vecPos(pos), &packet.SpawnParticleEffect{Dimension: byte(s.dimensionID(r.Dimension())), EntityUniqueID: -1, Position: pos, ParticleName: name}, nil) //nolint:gosec // dimension IDs fit a byte
 }
 
 // --- players as the mob runtime sees them ---
@@ -684,8 +682,8 @@ func (a playerActor) Pos() behavior.Vec3 { return vec(a.p.feet()) }
 func (a playerActor) Box() behavior.Box {
 	f := a.p.feet()
 	return behavior.Box{
-		Min: behavior.Vec3{X: float64(f[0] - playerWidth/2), Y: float64(f[1]), Z: float64(f[2] - playerWidth/2)},
-		Max: behavior.Vec3{X: float64(f[0] + playerWidth/2), Y: float64(f[1] + playerHeight), Z: float64(f[2] + playerWidth/2)},
+		Min: behavior.Vec3{X: f[0] - playerWidth/2, Y: f[1], Z: f[2] - playerWidth/2},
+		Max: behavior.Vec3{X: f[0] + playerWidth/2, Y: f[1] + playerHeight, Z: f[2] + playerWidth/2},
 	}
 }
 func (a playerActor) Eyes() behavior.Vec3 { return vec(a.p.entity.Position()) }
@@ -704,16 +702,16 @@ func (a playerActor) Vehicle() behavior.ID  { return behavior.NoID }
 func (a playerActor) Owner() behavior.ID    { return behavior.NoID }
 func (a playerActor) Team() int             { return 0 }
 func (a playerActor) Dimension() int        { return int(a.p.s.dimensionID(a.p.dim)) }
-func (a playerActor) HeadRotation() (pitch, yaw float64) {
+func (a playerActor) HeadRotation() (pitch, yaw float32) {
 	r := a.p.entity.Rotation()
-	return float64(r.Pitch), float64(r.HeadYaw)
+	return r.Pitch, r.HeadYaw
 }
-func (a playerActor) BodyYaw() float64                  { return float64(a.p.entity.Rotation().Yaw) }
+func (a playerActor) BodyYaw() float32                  { return a.p.entity.Rotation().Yaw }
 func (a playerActor) Invulnerable() bool                { return a.p.invulnerable() }
 func (a playerActor) HasHealth() bool                   { return true }
 func (a playerActor) Targetable() bool                  { return true }
 func (a playerActor) Monster() bool                     { return false }
-func (a playerActor) ArmourCoverage() float64           { return 0 }
+func (a playerActor) ArmourCoverage() float32           { return 0 }
 func (a playerActor) WearsHeadOf(string) bool           { return false }
 func (a playerActor) Target() behavior.ID               { return behavior.NoID }
 func (a playerActor) HijacksMount() bool                { return false }

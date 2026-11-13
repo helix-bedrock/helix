@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/helix/registry"
@@ -192,14 +192,14 @@ func (o *Mob) bucketData() map[string]any {
 		bucketIdentifier:  o.Type(),
 		bucketDefinitions: defs,
 		bucketAttributes: []any{map[string]any{
-			"Name": attrHealthName, "Current": float32(o.m.HealthValue()), "Max": float32(o.m.MaxHealth()),
+			"Name": attrHealthName, "Current": o.m.HealthValue(), "Max": o.m.MaxHealth(),
 		}},
 	}
 }
 
 // restoreBucketData reads what bucketData wrote: the group stack after the base and the
 // health, 0 for none.
-func restoreBucketData(tag map[string]any) ([]definition.StackEntry, float64) {
+func restoreBucketData(tag map[string]any) ([]definition.StackEntry, float32) {
 	var stack []definition.StackEntry
 	if defs, ok := tag[bucketDefinitions].([]any); ok {
 		for i, d := range defs {
@@ -210,11 +210,11 @@ func restoreBucketData(tag map[string]any) ([]definition.StackEntry, float64) {
 			stack = append(stack, definition.StackEntry{Group: s[1:], Added: s[0] == '+'})
 		}
 	}
-	var health float64
+	var health float32
 	if attrs, ok := tag[bucketAttributes].([]any); ok {
 		for _, a := range attrs {
 			if m, ok := a.(map[string]any); ok && m["Name"] == attrHealthName {
-				health = float64(nbtFloat(m["Current"]))
+				health = nbtFloat(m["Current"])
 			}
 		}
 	}
@@ -263,7 +263,7 @@ func (p *Player) landTarget(r *world.Region, clicked cube.Pos, face int32) (cube
 // spawnBucketMob is BDS's mob out of a bucket (0xC99A3F0): from the bucket's data if it has
 // any, else a new one (with the table's event), at the middle of the block's floor.
 func (s *Host) spawnBucketMob(r *world.Region, b mobBucket, held ItemStack, pos cube.Pos) {
-	at := blockVec(pos).Add(mgl64.Vec3{0.5, 0, 0.5})
+	at := blockVec(pos).Add(mgl32.Vec3{0.5, 0, 0.5})
 	if _, ok := held.Tag[bucketDefinitions]; ok {
 		o, ok := s.newMob(b.mob, at, 0, definition.InitLoaded, "")
 		if !ok {

@@ -4,7 +4,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
@@ -30,9 +30,9 @@ type vehicle interface {
 	// rideEntity is the entity riders are linked to.
 	rideEntity() *world.Entity
 	// rideMoved is how far it went in its last tick.
-	rideMoved() mgl64.Vec3
+	rideMoved() mgl32.Vec3
 	// rideTop is the height of the top of its box.
-	rideTop() float64
+	rideTop() float32
 }
 
 // RideID is the player's unique ID, for links.
@@ -47,9 +47,9 @@ func (p *Player) RideBody() ride.Body {
 }
 
 // seatPosition is where the player's seat puts it. The server decides this, not the client.
-func (p *Player) seatPosition() mgl64.Vec3 {
+func (p *Player) seatPosition() mgl32.Vec3 {
 	e := p.vehicle.rideEntity()
-	return ride.Position(e.Position(), float64(e.Rotation().Yaw), p.vehicle.riders().SeatOffset(p))
+	return ride.Position(e.Position(), e.Rotation().Yaw, p.vehicle.riders().SeatOffset(p))
 }
 
 // mount seats a player, as RideableComponent's interaction does, and says whether it could.
@@ -79,7 +79,7 @@ func letOff(v vehicle, p *Player) {
 		return
 	}
 	e := v.rideEntity()
-	var seat mgl64.Vec3
+	var seat mgl32.Vec3
 	if p.entity != nil {
 		seat = p.seatPosition()
 	}
@@ -97,13 +97,13 @@ func letOff(v vehicle, p *Player) {
 	if r == nil {
 		return
 	}
-	at := ride.Exit(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), e.Position(), v.rideMoved(), seat, float64(v.rideTop()))
+	at := ride.Exit(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), e.Position(), v.rideMoved(), seat, v.rideTop())
 	if seats.Rules().ExitAbove {
-		at = ride.ExitAbove(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), seat, float64(v.rideTop()))
+		at = ride.ExitAbove(rideBlocks{p.s, p.s.reg.Blocks, r}, p.RideBody(), seat, v.rideTop())
 	}
 	if seats.Rules().Dismount == ride.DismountOnTopCenter {
 		pos := e.Position()
-		at = mgl64.Vec3{pos[0], v.rideTop() + p.RideBody().HeightOffset + rideExitUp, pos[2]}
+		at = mgl32.Vec3{pos[0], v.rideTop() + p.RideBody().HeightOffset + rideExitUp, pos[2]}
 	}
 	applyMovement(p, moveTo(at, p.entity.Rotation(), p.entity.Tick()))
 }

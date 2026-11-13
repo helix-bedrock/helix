@@ -5,7 +5,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -131,7 +131,7 @@ func (e *jukeboxEntity) updateHearing(r *world.Region, pos cube.Pos) {
 		return
 	}
 	centre := blockCenter(pos)
-	reach := float64(e.s.viewDistance*blocksInChunk + jukeboxExtraReach)
+	reach := float32(e.s.viewDistance*blocksInChunk + jukeboxExtraReach)
 	e.near = r.AppendEntitiesIn(e.near[:0], centre[0]-reach, centre[2]-reach, centre[0]+reach, centre[2]+reach)
 	started := e.ticks == 0
 	for _, o := range e.near {
@@ -166,9 +166,9 @@ func (e *jukeboxEntity) updateHearing(r *world.Region, pos cube.Pos) {
 
 // songPacket is the song as BDS sends it: at the middle of the block, at full volume and from
 // where it has got to for one who comes late.
-func (e *jukeboxEntity) songPacket(sound string, centre mgl64.Vec3, fromStart bool) *packet.PlaySound {
+func (e *jukeboxEntity) songPacket(sound string, centre mgl32.Vec3, fromStart bool) *packet.PlaySound {
 	pk := &packet.PlaySound{
-		SoundName: sound, Position: world.Vec32(centre), Volume: 1, Pitch: 1, BypassListenerRangeCheck: true,
+		SoundName: sound, Position: centre, Volume: 1, Pitch: 1, BypassListenerRangeCheck: true,
 		Handle: protocol.Option(e.handle),
 	}
 	if !fromStart {
@@ -193,13 +193,13 @@ func (e *jukeboxEntity) stopSong(r *world.Region) {
 }
 
 // hearsAt reports whether a sound at centre is in the player's reach, along the ground.
-func (p *Player) hearsAt(centre mgl64.Vec3) bool {
+func (p *Player) hearsAt(centre mgl32.Vec3) bool {
 	if p.entity == nil {
 		return false
 	}
 	at := p.entity.Position()
 	dx, dz := at[0]-centre[0], at[2]-centre[2]
-	reach := float64(p.viewRadius()*blocksInChunk + jukeboxExtraReach)
+	reach := float32(p.viewRadius()*blocksInChunk + jukeboxExtraReach)
 	return dx*dx+dz*dz <= reach*reach
 }
 
@@ -259,7 +259,7 @@ func (e *jukeboxEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		e.updateHearing(r, pos)
 		r.Broadcast(pos, &packet.SpawnParticleEffect{
 			EntityUniqueID: -1,
-			Position:       world.Vec32(blockVec(pos).Add(mgl64.Vec3{0.5, jukeboxNoteHeight, 0.5})),
+			Position:       blockVec(pos).Add(mgl32.Vec3{0.5, jukeboxNoteHeight, 0.5}),
 			ParticleName:   jukeboxNoteParticle,
 		}, nil)
 		return

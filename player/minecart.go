@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -164,17 +163,17 @@ type Minecart struct {
 	s      *Host
 	spec   *cartSpec
 	entity *world.Entity
-	vel    mgl64.Vec3
+	vel    mgl32.Vec3
 	// next is the move its think step worked out.
 	next thought
 
-	maxSpeed float64
+	maxSpeed float32
 	onGround bool
 	gone     bool
 	flipped  bool
 
 	seats              *ride.Vehicle
-	moved              mgl64.Vec3
+	moved              mgl32.Vec3
 	hurtTime, hurtSide int32
 	integrity          int32
 
@@ -196,13 +195,13 @@ type Minecart struct {
 func (m *Minecart) Entity() *world.Entity { return m.entity }
 
 // Velocity returns its speed in blocks a tick.
-func (m *Minecart) Velocity() mgl64.Vec3 { return m.vel }
+func (m *Minecart) Velocity() mgl32.Vec3 { return m.vel }
 
 // SetVelocity sets its speed in blocks a tick.
-func (m *Minecart) SetVelocity(v mgl64.Vec3) { m.vel = v }
+func (m *Minecart) SetVelocity(v mgl32.Vec3) { m.vel = v }
 
 // SetMaxSpeed sets how fast it may go along one axis.
-func (m *Minecart) SetMaxSpeed(blocksPerTick float64) { m.maxSpeed = blocksPerTick }
+func (m *Minecart) SetMaxSpeed(blocksPerTick float32) { m.maxSpeed = blocksPerTick }
 
 // Rider returns who rides it, if anyone.
 func (m *Minecart) Rider() *Player { return m.rider() }
@@ -224,7 +223,7 @@ func IsCartItem(name string) bool { _, ok := cartSpecs[name]; return ok }
 
 // SpawnMinecart adds the cart whose entity and item is called id. Nil if there is none
 // by that name. Runs: any goroutine.
-func (s *Host) SpawnMinecart(d *world.Dimension, id string, pos mgl64.Vec3) *Minecart {
+func (s *Host) SpawnMinecart(d *world.Dimension, id string, pos mgl32.Vec3) *Minecart {
 	m := s.newCart(id)
 	if m == nil {
 		return nil
@@ -248,7 +247,7 @@ func (s *Host) newCart(id string) *Minecart {
 	return m
 }
 
-func (m *Minecart) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
+func (m *Minecart) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: m, Spawn: m.spawnPackets, Move: m.movePacket, Think: m.think, Input: m.tick, Save: m.saveEntity,
@@ -271,7 +270,7 @@ func (m *Minecart) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	add := &packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: m.spec.id,
-		Position: world.Vec32(e.Position()), Velocity: world.Vec32(m.vel), EntityMetadata: meta,
+		Position: e.Position(), Velocity: m.vel, EntityMetadata: meta,
 	}
 	if m.seats != nil {
 		add.EntityLinks = m.seats.Links(e.UniqueID())
@@ -294,7 +293,7 @@ func (m *Minecart) movePacket(e *world.Entity) packet.Packet {
 		flags = packet.MoveFlagOnGround
 	}
 	return &packet.MoveActorAbsolute{
-		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), float32(rot.HeadYaw)},
+		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw},
 	}
 }
 
@@ -320,7 +319,7 @@ func (m *Minecart) tick(e *world.Entity) {
 	m.moved = pos.Sub(start)
 	rot := m.turn(start, pos, e.Rotation())
 	if !e.Apply(world.Movement{Pos: pos, Rot: rot, OnGround: m.onGround, Tick: e.Tick()}) {
-		m.vel = mgl64.Vec3{}
+		m.vel = mgl32.Vec3{}
 		pos = start
 	}
 	m.pushes(r, e, pos)
@@ -366,7 +365,7 @@ func (m *Minecart) preTick(e *world.Entity) {
 }
 
 // prePhysics is the start of the cart's move: gravity and the slow down on rails.
-func (m *Minecart) prePhysics(r *world.Region, pos mgl64.Vec3) {
+func (m *Minecart) prePhysics(r *world.Region, pos mgl32.Vec3) {
 	m.vel[1] -= cartGravity
 	at := floorPos(pos)
 	if !m.s.railBlock(r, at) && m.s.railBlock(r, at.Side(cube.FaceDown)) {
@@ -380,14 +379,14 @@ func (m *Minecart) prePhysics(r *world.Region, pos mgl64.Vec3) {
 // slowDown is applyNaturalSlowdown: a rider barely slows it, slots slow it by how full
 // they are. It also takes away what gravity gave it.
 func (m *Minecart) slowDown(r *world.Region) {
-	scale := float64(cartSlowEmpty)
+	scale := float32(cartSlowEmpty)
 	switch {
 	case m.chest != nil:
-		scale = cartSlowFull + float64(fullPower-m.chest.ComparatorSignal(r, cube.Pos{}))*cartSlowPerSignal
+		scale = cartSlowFull + float32(fullPower-m.chest.ComparatorSignal(r, cube.Pos{}))*cartSlowPerSignal
 	case m.rider() != nil:
 		scale = cartSlowRidden
 	}
-	m.vel = mgl64.Vec3{m.vel[0] * scale, 0, m.vel[2] * scale}
+	m.vel = mgl32.Vec3{m.vel[0] * scale, 0, m.vel[2] * scale}
 }
 
 // fullPower is the strongest signal a comparator reads.
@@ -405,7 +404,7 @@ func isRailName(name string) bool {
 
 // findRail is MinecartCanSnapOnRailSystem: the rail under the cart, looking as far down as
 // it will fall this tick, stopped by anything solid.
-func (m *Minecart) findRail(r *world.Region, pos mgl64.Vec3) (cube.Pos, uint32, bool) {
+func (m *Minecart) findRail(r *world.Region, pos mgl32.Vec3) (cube.Pos, uint32, bool) {
 	at := floorPos(pos)
 	n := int32(1)
 	if m.vel[1] < 0 {
@@ -434,7 +433,7 @@ func (s *Host) solidBlock(b uint32) bool {
 
 // move is the rail systems around one actor move, in BDS's order: on to the rail, the
 // speed along it, the move itself, back on to the rail and what a powered rail does.
-func (m *Minecart) move(r *world.Region, start mgl64.Vec3) mgl64.Vec3 {
+func (m *Minecart) move(r *world.Region, start mgl32.Vec3) mgl32.Vec3 {
 	rail, block, snapped := m.findRail(r, start)
 	if !snapped {
 		m.vel[0] = clampAbs(m.vel[0], m.maxSpeed)
@@ -477,26 +476,26 @@ func railBit(states map[string]any) bool {
 }
 
 // railLine is BDS's position before a rail move: on the line of the rail, above it.
-func railLine(rail cube.Pos, dir int, pos mgl64.Vec3) mgl64.Vec3 {
+func railLine(rail cube.Pos, dir int, pos mgl32.Vec3) mgl32.Vec3 {
 	ex := railExits[dir]
-	y := float64(rail[1])
+	y := float32(rail[1])
 	if dir >= 2 && dir <= 5 {
 		y++
 	}
-	cx, cz := float64(rail[0])+0.5, float64(rail[2])+0.5
-	ax, az := float64(ex[0])*0.5+cx, float64(ex[2])*0.5+cz
-	dx, dz := float64(ex[3])*0.5+cx-ax, float64(ex[5])*0.5+cz-az
+	cx, cz := float32(rail[0])+0.5, float32(rail[2])+0.5
+	ax, az := float32(ex[0])*0.5+cx, float32(ex[2])*0.5+cz
+	dx, dz := float32(ex[3])*0.5+cx-ax, float32(ex[5])*0.5+cz-az
 	t := railAlong(dx, dz, pos, rail, ax, az)
-	return mgl64.Vec3{dx*t + ax, y + cartOffset + cartAboveRail, dz*t + az}
+	return mgl32.Vec3{dx*t + ax, y + cartOffset + cartAboveRail, dz*t + az}
 }
 
 // railAlong is how far along a rail's line a position is.
-func railAlong(dx, dz float64, pos mgl64.Vec3, rail cube.Pos, ax, az float64) float64 {
+func railAlong(dx, dz float32, pos mgl32.Vec3, rail cube.Pos, ax, az float32) float32 {
 	switch {
 	case dx == 0:
-		return pos[2] - float64(rail[2])
+		return pos[2] - float32(rail[2])
 	case dz == 0:
-		return pos[0] - float64(rail[0])
+		return pos[0] - float32(rail[0])
 	}
 	v := (pos[0]-ax)*dx + (pos[2]-az)*dz
 	return v + v
@@ -505,7 +504,7 @@ func railAlong(dx, dz float64, pos mgl64.Vec3, rail cube.Pos, ax, az float64) fl
 // railSpeed is BDS's calculateMoveVelocity: slopes, the speed turned along the rail, a
 // rider's push, the brake of a rail with no power. It returns the move, which may be
 // slower than the cart's speed.
-func (m *Minecart) railSpeed(dir int, brake *bool) mgl64.Vec3 {
+func (m *Minecart) railSpeed(dir int, brake *bool) mgl32.Vec3 {
 	switch dir {
 	case 2:
 		m.vel[0] -= cartSlopePush
@@ -524,15 +523,15 @@ func (m *Minecart) railSpeed(dir int, brake *bool) mgl64.Vec3 {
 	}
 	speed := min(cartRailSpeedCap, math.Sqrt(vx*vx+vz*vz))
 	length := math.Sqrt(dx*dx + dz*dz)
-	m.vel[0], m.vel[2] = float64(dx*speed/length), float64(dz*speed/length)
+	m.vel[0], m.vel[2] = float32(dx*speed/length), float32(dz*speed/length)
 	if m.riderPush() {
 		*brake = false
 	}
 	if *brake {
 		if m.vel[0]*m.vel[0]+m.vel[2]*m.vel[2] >= cartBrakeMin {
-			m.vel = mgl64.Vec3{m.vel[0] * cartBrake, 0, m.vel[2] * cartBrake}
+			m.vel = mgl32.Vec3{m.vel[0] * cartBrake, 0, m.vel[2] * cartBrake}
 		} else {
-			m.vel = mgl64.Vec3{}
+			m.vel = mgl32.Vec3{}
 		}
 	}
 	x, z := m.vel[0], m.vel[2]
@@ -540,7 +539,7 @@ func (m *Minecart) railSpeed(dir int, brake *bool) mgl64.Vec3 {
 		x *= cartRiddenScale
 		z *= cartRiddenScale
 	}
-	return mgl64.Vec3{clampAbs(x, m.maxSpeed), 0, clampAbs(z, m.maxSpeed)}
+	return mgl32.Vec3{clampAbs(x, m.maxSpeed), 0, clampAbs(z, m.maxSpeed)}
 }
 
 // riderPush is a rider walking forward starting a cart that is almost still, the way it
@@ -554,15 +553,15 @@ func (m *Minecart) riderPush() bool {
 		return false
 	}
 	yaw := float64(p.entity.Rotation().Yaw) * math.Pi / 180
-	m.vel[0] -= float64(math.Sin(yaw)) * cartPushInput
-	m.vel[2] += float64(math.Cos(yaw)) * cartPushInput
+	m.vel[0] -= float32(math.Sin(yaw)) * cartPushInput
+	m.vel[2] += float32(math.Cos(yaw)) * cartPushInput
 	return true
 }
 
 // moveBy is the actor move: stopped by the blocks' collision boxes, Y first.
-func (m *Minecart) moveBy(r *world.Region, pos, step mgl64.Vec3) mgl64.Vec3 {
-	lo := mgl64.Vec3{pos[0] - cartHalfWidth, pos[1] - cartOffset, pos[2] - cartHalfWidth}
-	hi := mgl64.Vec3{pos[0] + cartHalfWidth, lo[1] + cartHeight, pos[2] + cartHalfWidth}
+func (m *Minecart) moveBy(r *world.Region, pos, step mgl32.Vec3) mgl32.Vec3 {
+	lo := mgl32.Vec3{pos[0] - cartHalfWidth, pos[1] - cartOffset, pos[2] - cartHalfWidth}
+	hi := mgl32.Vec3{pos[0] + cartHalfWidth, lo[1] + cartHeight, pos[2] + cartHalfWidth}
 	hitY := false
 	for _, axis := range [...]int{1, 0, 2} {
 		d := m.s.clipSweep(r, lo, hi, axis, step[axis])
@@ -581,19 +580,19 @@ func (m *Minecart) moveBy(r *world.Region, pos, step mgl64.Vec3) mgl64.Vec3 {
 }
 
 // clampAbs holds v to within limit of 0.
-func clampAbs(v, limit float64) float64 { return max(-limit, min(limit, v)) }
+func clampAbs(v, limit float32) float32 { return max(-limit, min(limit, v)) }
 
 // afterRail is BDS's position after a rail move: up or down a slope at its end, the speed
 // the height changed gives, and the speed turned on to the next block's line.
-func (m *Minecart) afterRail(r *world.Region, rail cube.Pos, before mgl64.Vec3, dir int, pos mgl64.Vec3) mgl64.Vec3 {
+func (m *Minecart) afterRail(r *world.Region, rail cube.Pos, before mgl32.Vec3, dir int, pos mgl32.Vec3) mgl32.Vec3 {
 	ex := railExits[dir]
 	fx, fz := cartFloor(pos[0]), cartFloor(pos[2])
 	rx, rz := int32(rail[0]), int32(rail[2]) //nolint:gosec // in the world
 	switch {
 	case (dir == 5 || dir == 2) && fx-rx == ex[0] && fz-rz == ex[2]:
-		pos[1] += float64(ex[1])
+		pos[1] += float32(ex[1])
 	case (dir == 3 || dir == 4) && fx-rx == ex[3] && fz-rz == ex[5]:
-		pos[1] += float64(ex[4])
+		pos[1] += float32(ex[4])
 	}
 	yBefore, okBefore := m.s.railHeight(r, before)
 	yNow, okNow := m.s.railHeight(r, pos)
@@ -607,18 +606,18 @@ func (m *Minecart) afterRail(r *world.Region, rail cube.Pos, before mgl64.Vec3, 
 	}
 	if nx := cartFloor(pos[0]); nx != rx || fz != rz {
 		h := hypot(m.vel[0], m.vel[2])
-		m.vel[0], m.vel[2] = float64(nx-rx)*h, float64(fz-rz)*h
+		m.vel[0], m.vel[2] = float32(nx-rx)*h, float32(fz-rz)*h
 	}
 	return pos
 }
 
-func hypot(x, z float64) float64 { return float64(math.Sqrt(float64(x*x + z*z))) }
+func hypot(x, z float32) float32 { return float32(math.Sqrt(float64(x*x + z*z))) }
 
-func cartFloor(v float64) int32 { return int32(math.Floor(float64(v))) }
+func cartFloor(v float32) int32 { return int32(math.Floor(float64(v))) }
 
 // railHeight is BDS's getPos: the height of the rail at a position, if there is one there
 // or one lower.
-func (s *Host) railHeight(r *world.Region, pos mgl64.Vec3) (float64, bool) {
+func (s *Host) railHeight(r *world.Region, pos mgl32.Vec3) (float32, bool) {
 	at := floorPos(pos)
 	if s.railBlock(r, at.Side(cube.FaceDown)) {
 		at = at.Side(cube.FaceDown)
@@ -628,11 +627,11 @@ func (s *Host) railHeight(r *world.Region, pos mgl64.Vec3) (float64, bool) {
 		return 0, false
 	}
 	ex := railExits[railDir(s.reg.Blocks.States(b))]
-	cx, cy, cz := float64(at[0])+0.5, float64(at[1])+0.5, float64(at[2])+0.5
-	ax, ay, az := float64(ex[0])*0.5+cx, float64(ex[1])*0.5+cy, float64(ex[2])*0.5+cz
-	dx := float64(ex[3])*0.5 + cx - ax
-	dy := float64(ex[4])*0.5 + cy - ay
-	dz := float64(ex[5])*0.5 + cz - az
+	cx, cy, cz := float32(at[0])+0.5, float32(at[1])+0.5, float32(at[2])+0.5
+	ax, ay, az := float32(ex[0])*0.5+cx, float32(ex[1])*0.5+cy, float32(ex[2])*0.5+cz
+	dx := float32(ex[3])*0.5 + cx - ax
+	dy := float32(ex[4])*0.5 + cy - ay
+	dz := float32(ex[5])*0.5 + cz - az
 	rise := dy + dy
 	t := railAlong(dx, dz, pos, at, ax, az)
 	y := t*rise + ay
@@ -685,7 +684,7 @@ func (s *Host) railKickOff(r *world.Region, pos cube.Pos) bool {
 
 // turn is BDS's postNormalTick rotation: it faces the way it moves, and flips over rather
 // than turn right round.
-func (m *Minecart) turn(from, to mgl64.Vec3, rot world.Rotation) world.Rotation {
+func (m *Minecart) turn(from, to mgl32.Vec3, rot world.Rotation) world.Rotation {
 	yaw := rot.Yaw
 	dx, dz := from[0]-to[0], from[2]-to[2]
 	if dx*dx+dz*dz > cartMoved {
@@ -715,15 +714,15 @@ func wrapDegrees(v float32) float32 {
 }
 
 // box is the cart's box at pos.
-func cartBox(pos mgl64.Vec3) (lo, hi mgl64.Vec3) {
-	lo = mgl64.Vec3{pos[0] - cartHalfWidth, pos[1] - cartOffset, pos[2] - cartHalfWidth}
-	return lo, mgl64.Vec3{pos[0] + cartHalfWidth, lo[1] + cartHeight, pos[2] + cartHalfWidth}
+func cartBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
+	lo = mgl32.Vec3{pos[0] - cartHalfWidth, pos[1] - cartOffset, pos[2] - cartHalfWidth}
+	return lo, mgl32.Vec3{pos[0] + cartHalfWidth, lo[1] + cartHeight, pos[2] + cartHalfWidth}
 }
 
 // pushes is what touches the cart: players walking into it push it (BDS's Mob::pushActors
 // from the player's side), and it pushes other carts it runs into along its rail
 // (postNormalTick).
-func (m *Minecart) pushes(r *world.Region, e *world.Entity, pos mgl64.Vec3) {
+func (m *Minecart) pushes(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
 	lo, hi := cartBox(pos)
 	along := m.pushAlong(r, pos)
 	m.near = r.AppendEntitiesIn(m.near[:0], pos[0]-cartScan, pos[2]-cartScan, pos[0]+cartScan, pos[2]+cartScan)
@@ -737,11 +736,11 @@ func (m *Minecart) pushes(r *world.Region, e *world.Entity, pos mgl64.Vec3) {
 				continue
 			}
 			pLo, pHi, _, ok := m.s.EntityBox(o)
-			if !ok || !overlaps(lo.Sub(mgl64.Vec3{cartPushReach, 0, cartPushReach}), hi.Add(mgl64.Vec3{cartPushReach, 0, cartPushReach}), pLo, pHi) {
+			if !ok || !overlaps(lo.Sub(mgl32.Vec3{cartPushReach, 0, cartPushReach}), hi.Add(mgl32.Vec3{cartPushReach, 0, cartPushReach}), pLo, pHi) {
 				continue
 			}
 			at := o.Position()
-			if v, ok := cartPushVec(pos, mgl64.Vec3{at[0], pos[1], at[2]}); ok {
+			if v, ok := cartPushVec(pos, mgl32.Vec3{at[0], pos[1], at[2]}); ok {
 				m.vel = m.vel.Sub(v)
 			}
 		case *Minecart:
@@ -756,43 +755,43 @@ func (m *Minecart) pushes(r *world.Region, e *world.Entity, pos mgl64.Vec3) {
 
 // pushAlong is how far along its rail the cart pushes others: nothing on a curve or off
 // rails.
-func (m *Minecart) pushAlong(r *world.Region, pos mgl64.Vec3) mgl64.Vec3 {
+func (m *Minecart) pushAlong(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
 	at := floorPos(pos)
 	if !m.s.railBlock(r, at) && m.s.railBlock(r, at.Side(cube.FaceDown)) {
 		at = at.Side(cube.FaceDown)
 	}
 	b, ok := r.Block(at, 0)
 	if !ok || !isRailName(m.s.reg.Blocks.Name(b)) {
-		return mgl64.Vec3{}
+		return mgl32.Vec3{}
 	}
 	switch railDir(m.s.reg.Blocks.States(b)) {
 	case 1, 2, 3:
-		return mgl64.Vec3{cartPushAlong, 0, 0}
+		return mgl32.Vec3{cartPushAlong, 0, 0}
 	case 0, 4, 5:
-		return mgl64.Vec3{0, 0, cartPushAlong}
+		return mgl32.Vec3{0, 0, cartPushAlong}
 	}
-	return mgl64.Vec3{}
+	return mgl32.Vec3{}
 }
 
-func overlaps(aLo, aHi, bLo, bHi mgl64.Vec3) bool {
+func overlaps(aLo, aHi, bLo, bHi mgl32.Vec3) bool {
 	return aHi[0] > bLo[0] && aLo[0] < bHi[0] && aHi[1] > bLo[1] && aLo[1] < bHi[1] && aHi[2] > bLo[2] && aLo[2] < bHi[2]
 }
 
 // cartPushVec is the legacy_minecart push between two positions: BDS's direction, scaled
 // down within a block.
-func cartPushVec(self, other mgl64.Vec3) (mgl64.Vec3, bool) {
-	d := mgl64.Vec3{other[0] - self[0], 0, other[2] - self[2]}
+func cartPushVec(self, other mgl32.Vec3) (mgl32.Vec3, bool) {
+	d := mgl32.Vec3{other[0] - self[0], 0, other[2] - self[2]}
 	d2 := d.Dot(d)
 	if d2 < cartPushMin {
-		return mgl64.Vec3{}, false
+		return mgl32.Vec3{}, false
 	}
-	length := float64(math.Sqrt(float64(d2)))
+	length := float32(math.Sqrt(float64(d2)))
 	return d.Mul(min(1, 1/length) / length * cartPush), true
 }
 
 // pushedBy is PushableComponent's minecart rule between carts: only when they meet along
 // the way this one faces, and then they mostly share their speed.
-func (m *Minecart) pushedBy(o *Minecart, oPos mgl64.Vec3) {
+func (m *Minecart) pushedBy(o *Minecart, oPos mgl32.Vec3) {
 	pos := m.entity.Position()
 	v, ok := cartPushVec(pos, oPos)
 	if !ok {
@@ -800,7 +799,7 @@ func (m *Minecart) pushedBy(o *Minecart, oPos mgl64.Vec3) {
 	}
 	yaw := float64(m.entity.Rotation().Yaw) * math.Pi / 180
 	dir := v.Normalize()
-	if math.Abs(dir[0]*math.Cos(yaw)+dir[2]*math.Sin(yaw)) < cartPushAligned {
+	if abs32(dir[0]*float32(math.Cos(yaw))+dir[2]*float32(math.Sin(yaw))) < cartPushAligned {
 		return
 	}
 	m.vel[0], m.vel[2] = m.vel[0]*cartPushKeep, m.vel[2]*cartPushKeep
@@ -822,7 +821,7 @@ func abs32(v float32) float32 {
 // railSensor is RailActivatorSystem: every tick on an activator rail, with no edge. Power
 // throws out a rider, stops a hopper and lights TNT; a rail with no power starts a hopper
 // again. Other blocks do nothing: no vanilla cart sets check_block_types.
-func (m *Minecart) railSensor(r *world.Region, pos mgl64.Vec3) {
+func (m *Minecart) railSensor(r *world.Region, pos mgl32.Vec3) {
 	at := floorPos(pos)
 	if m.s.railBlock(r, at.Side(cube.FaceDown)) {
 		at = at.Side(cube.FaceDown)
@@ -848,7 +847,7 @@ func (m *Minecart) railSensor(r *world.Region, pos mgl64.Vec3) {
 
 // tickHopper is HopperComponent::pullInItems, on HopperSystem's timer: the same pull as a
 // hopper block from where the cart's middle is, then an item lying at the cart.
-func (m *Minecart) tickHopper(r *world.Region, pos mgl64.Vec3) {
+func (m *Minecart) tickHopper(r *world.Region, pos mgl32.Vec3) {
 	if m.hopperOff || m.chest == nil {
 		return
 	}
@@ -858,7 +857,7 @@ func (m *Minecart) tickHopper(r *world.Region, pos mgl64.Vec3) {
 	}
 	m.hopperWait = m.s.redstone.Get().CartHopper.Every - 1
 	lo, hi := cartBox(pos)
-	centre := floorPos(mgl64.Vec3{pos[0], (lo[1] + hi[1]) / 2, pos[2]})
+	centre := floorPos(mgl32.Vec3{pos[0], (lo[1] + hi[1]) / 2, pos[2]})
 	if !m.chest.fullSlots(m.chest.halfSize()) && m.chest.pullOrCollect(r, centre, &m.s.redstone.Get().Hopper) != hopperIdle {
 		return
 	}
@@ -866,9 +865,9 @@ func (m *Minecart) tickHopper(r *world.Region, pos mgl64.Vec3) {
 }
 
 // pickUpAround takes the first item lying within reach of the cart's box.
-func (m *Minecart) pickUpAround(r *world.Region, lo, hi mgl64.Vec3) {
+func (m *Minecart) pickUpAround(r *world.Region, lo, hi mgl32.Vec3) {
 	reach := m.s.redstone.Get().CartHopper.Reach
-	grow := mgl64.Vec3{float64(reach), 0, float64(reach)}
+	grow := mgl32.Vec3{reach, 0, reach}
 	lo, hi = lo.Sub(grow), hi.Add(grow)
 	m.near = r.AppendEntitiesIn(m.near[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range m.near {
@@ -950,7 +949,7 @@ func (m *Minecart) sendHurt(e *world.Entity) {
 
 // Hurt is BDS's Minecart::_hurt: the shake, and it breaks once its integrity is gone or at
 // once for a player in creative, who gets no drops. True if it broke.
-func (m *Minecart) Hurt(r *world.Region, damage float64, by *Player) bool {
+func (m *Minecart) Hurt(r *world.Region, damage float32, by *Player) bool {
 	if m.gone {
 		return false
 	}
@@ -959,7 +958,7 @@ func (m *Minecart) Hurt(r *world.Region, damage float64, by *Player) bool {
 		m.hurtSide = 1
 	}
 	m.hurtTime = cartHurtTime
-	m.integrity = int32(float64(m.integrity) - damage*cartHitScale)
+	m.integrity = int32(float32(m.integrity) - damage*cartHitScale)
 	m.sendHurt(m.entity)
 	creative := by != nil && by.creative()
 	if !creative && m.integrity > 0 {
@@ -987,9 +986,9 @@ func (m *Minecart) Break(r *world.Region, drops bool) {
 			if m.spec.tnt {
 				at[1]++
 			}
-			m.s.spawnItem(r.Dimension(), ItemStack{Name: m.spec.block, Count: 1}, at, mgl64.Vec3{}, world.Rotation{}, cartDropDelay, 0)
+			m.s.spawnItem(r.Dimension(), ItemStack{Name: m.spec.block, Count: 1}, at, mgl32.Vec3{}, world.Rotation{}, cartDropDelay, 0)
 		}
-		m.s.spawnItem(r.Dimension(), ItemStack{Name: nameMinecart, Count: 1}, pos, mgl64.Vec3{}, world.Rotation{}, cartDropDelay, 0)
+		m.s.spawnItem(r.Dimension(), ItemStack{Name: nameMinecart, Count: 1}, pos, mgl32.Vec3{}, world.Rotation{}, cartDropDelay, 0)
 	}
 	m.remove(r)
 }
@@ -1000,14 +999,14 @@ func (m *Minecart) Burn() {
 }
 
 // FallOn is a fall ending: a TNT cart goes off at once after a long one.
-func (m *Minecart) FallOn(distance float64) {
+func (m *Minecart) FallOn(distance float32) {
 	if distance > cartTNTFall {
 		m.prime(0)
 	}
 }
 
 // BlastBox is its box.
-func (m *Minecart) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
+func (m *Minecart) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 	if m.gone || m.entity == nil {
 		return lo, hi, false
 	}
@@ -1016,7 +1015,7 @@ func (m *Minecart) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 }
 
 // BlastHit lights a TNT cart and hurts any other.
-func (m *Minecart) BlastHit(damage float64, _ DamageSource) {
+func (m *Minecart) BlastHit(damage float32, _ DamageSource) {
 	if m.spec.tnt {
 		m.prime(cartTNTFuse)
 		return
@@ -1027,7 +1026,7 @@ func (m *Minecart) BlastHit(damage float64, _ DamageSource) {
 }
 
 // BlastPush adds to its speed.
-func (m *Minecart) BlastPush(push mgl64.Vec3) {
+func (m *Minecart) BlastPush(push mgl32.Vec3) {
 	m.vel = m.vel.Add(push)
 	pushed(m.entity, m.vel)
 }
@@ -1051,7 +1050,7 @@ func (m *Minecart) use(p *Player) {
 func cartRideRules() *ride.Rules {
 	return &ride.Rules{
 		SeatCount: 1, CrouchingSkipInteract: true, PullIn: true,
-		Seats: []ride.Seat{{Position: mgl64.Vec3{0, cartSeatY, 0}}},
+		Seats: []ride.Seat{{Position: mgl32.Vec3{0, cartSeatY, 0}}},
 	}
 }
 
@@ -1060,9 +1059,9 @@ func (m *Minecart) riders() *ride.Vehicle { return m.seats }
 
 func (m *Minecart) rideEntity() *world.Entity { return m.entity }
 
-func (m *Minecart) rideMoved() mgl64.Vec3 { return m.moved }
+func (m *Minecart) rideMoved() mgl32.Vec3 { return m.moved }
 
-func (m *Minecart) rideTop() float64 { return m.entity.Position()[1] - cartOffset + cartHeight }
+func (m *Minecart) rideTop() float32 { return m.entity.Position()[1] - cartOffset + cartHeight }
 
 // settleRiders lets go of riders who have left, died or gone away.
 func (m *Minecart) settleRiders() {
@@ -1174,7 +1173,7 @@ func (p *Player) useOnCart(d *protocol.UseItemOnEntityTransactionData) bool {
 			if !held.Empty() {
 				damage += float32(p.s.game.combat.damage[held.Name])
 			}
-			m.Hurt(r, float64(damage), p)
+			m.Hurt(r, damage, p)
 		}
 	}
 	return true
@@ -1187,7 +1186,7 @@ func (p *Player) placeCart(r *world.Region, clicked cube.Pos, id string) bool {
 		return false
 	}
 	lo := blockVec(clicked)
-	hi := lo.Add(mgl64.Vec3{1, 1, 1})
+	hi := lo.Add(mgl32.Vec3{1, 1, 1})
 	p.touching = r.AppendEntitiesIn(p.touching[:0], lo[0]-cartScan, lo[2]-cartScan, hi[0]+cartScan, hi[2]+cartScan)
 	for _, e := range p.touching {
 		if m, ok := e.Owner().(*Minecart); ok && !m.gone {
@@ -1197,7 +1196,7 @@ func (p *Player) placeCart(r *world.Region, clicked cube.Pos, id string) bool {
 			}
 		}
 	}
-	p.s.SpawnMinecart(r.Dimension(), id, lo.Add(mgl64.Vec3{0.5, 0.5, 0.5}))
+	p.s.SpawnMinecart(r.Dimension(), id, lo.Add(mgl32.Vec3{0.5, 0.5, 0.5}))
 	if !p.creative() {
 		p.useHeld()
 	}
@@ -1206,8 +1205,8 @@ func (p *Player) placeCart(r *world.Region, clicked cube.Pos, id string) bool {
 
 // dispenseCart is BDS's MinecartItem::dispense: a rail in front, or a rail under an empty
 // block in front. False throws the item out as any other.
-func (s *Host) dispenseCart(r *world.Region, front cube.Pos, dir mgl64.Vec3, id string) bool {
-	y := float64(front[1])
+func (s *Host) dispenseCart(r *world.Region, front cube.Pos, dir mgl32.Vec3, id string) bool {
+	y := float32(front[1])
 	if !s.railBlock(r, front) {
 		b, ok := r.Block(front, 0)
 		if !ok || b != s.reg.Blocks.Air() || !s.railBlock(r, front.Side(cube.FaceDown)) {
@@ -1215,8 +1214,8 @@ func (s *Host) dispenseCart(r *world.Region, front cube.Pos, dir mgl64.Vec3, id 
 		}
 		y--
 	}
-	s.SpawnMinecart(r.Dimension(), id, mgl64.Vec3{
-		float64(front[0]) + 0.5 + dir[0]*cartDispenseOut, y + 0.5, float64(front[2]) + 0.5 + dir[2]*cartDispenseOut,
+	s.SpawnMinecart(r.Dimension(), id, mgl32.Vec3{
+		float32(front[0]) + 0.5 + dir[0]*cartDispenseOut, y + 0.5, float32(front[2]) + 0.5 + dir[2]*cartDispenseOut,
 	})
 	return true
 }
@@ -1242,7 +1241,7 @@ func (s *Host) CartBox(e *world.Entity) (int32, bool) {
 // hoppers see containers in the block's space, and stops when fn says so.
 func (s *Host) cartsAt(r *world.Region, pos cube.Pos, skip *Chest, fn func(c *Chest) bool) bool {
 	lo := blockVec(pos)
-	hi := lo.Add(mgl64.Vec3{1, 1, 1})
+	hi := lo.Add(mgl32.Vec3{1, 1, 1})
 	var buf [16]*world.Entity
 	for _, e := range r.AppendEntitiesIn(buf[:0], lo[0]-1, lo[2]-1, hi[0]+1, hi[2]+1) {
 		m, ok := e.Owner().(*Minecart)
@@ -1267,8 +1266,8 @@ func (m *Minecart) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	pos, rot := e.Position(), e.Rotation()
 	data["identifier"] = m.spec.id
-	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
-	data["Motion"] = []float32{float32(m.vel[0]), float32(m.vel[1]), float32(m.vel[2])}
+	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Motion"] = []float32{m.vel[0], m.vel[1], m.vel[2]}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	if m.chest != nil {
 		items := []any{}
@@ -1298,7 +1297,7 @@ func (s *Host) loadCart(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, i
 	}
 	m.saved = maps.Clone(saved.Data)
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
-		m.vel = mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}
+		m.vel = mgl32.Vec3{v[0], v[1], v[2]}
 	}
 	var rot world.Rotation
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
@@ -1318,6 +1317,6 @@ func (s *Host) loadCart(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, i
 		lit, _ := saved.Data[cartKeyLit].(uint8)
 		m.fuse, m.lit = int32(fuse), lit != 0
 	}
-	m.entity = r.AddLoadedEntity(at, m.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, rot))
+	m.entity = r.AddLoadedEntity(at, m.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
 	return true
 }

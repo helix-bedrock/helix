@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -502,7 +502,7 @@ func (p *Player) useSign(r *world.Region, u *BlockUse) bool {
 
 // signItemUsed finishes a change made with an item: the item used up outside creative, the
 // sign saved and shown, and BDS's level event.
-func (p *Player) signItemUsed(r *world.Region, pos cube.Pos, event int32, at mgl64.Vec3) {
+func (p *Player) signItemUsed(r *world.Region, pos cube.Pos, event int32, at mgl32.Vec3) {
 	if !p.creative() {
 		p.useHeld()
 	}

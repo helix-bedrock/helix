@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/direction"
@@ -459,13 +459,13 @@ func TestPlateGoesDownAndComesUp(t *testing.T) {
 	at := cube.Pos{4, surfaceY, 4}
 	on := atomic.Bool{}
 	on.Store(true)
-	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 		if !on.Load() {
 			return lo, hi, false, false
 		}
-		return mgl64.Vec3{4.2, surfaceY, 4.2}, mgl64.Vec3{4.8, surfaceY + 2, 4.8}, true, true
+		return mgl32.Vec3{4.2, surfaceY, 4.2}, mgl32.Vec3{4.8, surfaceY + 2, 4.8}, true, true
 	})
-	id := w.d.AddEntity(world.EntityConfig{UniqueID: 900, RuntimeID: 900, Pos: mgl64.Vec3{4.5, surfaceY, 4.5}})
+	id := w.d.AddEntity(world.EntityConfig{UniqueID: 900, RuntimeID: 900, Pos: mgl32.Vec3{4.5, surfaceY, 4.5}})
 	t.Cleanup(id.Remove)
 	lamp := cube.Pos{4, surfaceY - 1, 5}
 	w.run(func(r *world.Region) {
@@ -565,13 +565,13 @@ func TestTripwireAttachesAndFires(t *testing.T) {
 	})
 	on := atomic.Bool{}
 	on.Store(true)
-	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 		if !on.Load() {
 			return lo, hi, false, false
 		}
-		return mgl64.Vec3{3.2, surfaceY, 4.2}, mgl64.Vec3{3.8, surfaceY + 2, 4.8}, true, true
+		return mgl32.Vec3{3.2, surfaceY, 4.2}, mgl32.Vec3{3.8, surfaceY + 2, 4.8}, true, true
 	})
-	e := w.d.AddEntity(world.EntityConfig{UniqueID: 901, RuntimeID: 901, Pos: mgl64.Vec3{3.5, surfaceY, 4.5}})
+	e := w.d.AddEntity(world.EntityConfig{UniqueID: 901, RuntimeID: 901, Pos: mgl32.Vec3{3.5, surfaceY, 4.5}})
 	t.Cleanup(e.Remove)
 	lamp := cube.Pos{2, surfaceY, 5}
 	w.run(func(r *world.Region) { place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil)) })
@@ -599,11 +599,11 @@ func TestTripwireCutWithoutShearsFires(t *testing.T) {
 
 func TestPistonPushesItems(t *testing.T) {
 	w := openWorld(t)
-	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 		at := e.Position()
-		return mgl64.Vec3{at[0] - 0.125, at[1], at[2] - 0.125}, mgl64.Vec3{at[0] + 0.125, at[1] + 0.25, at[2] + 0.125}, false, true
+		return mgl32.Vec3{at[0] - 0.125, at[1], at[2] - 0.125}, mgl32.Vec3{at[0] + 0.125, at[1] + 0.25, at[2] + 0.125}, false, true
 	})
-	item := w.d.AddEntity(world.EntityConfig{UniqueID: 902, RuntimeID: 902, Pos: mgl64.Vec3{5.5, surfaceY, 4.5}})
+	item := w.d.AddEntity(world.EntityConfig{UniqueID: 902, RuntimeID: 902, Pos: mgl32.Vec3{5.5, surfaceY, 4.5}})
 	t.Cleanup(item.Remove)
 	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(4)})
 	w.run(func(r *world.Region) { place(r, cube.Pos{4, surfaceY, 4}, piston) })
@@ -615,16 +615,16 @@ func TestPistonPushesItems(t *testing.T) {
 // can tell the player's client.
 func TestPistonPushesPlayers(t *testing.T) {
 	w := openWorld(t)
-	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
+	w.circuits.SetEntityBox(func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 		at := e.Position()
-		return mgl64.Vec3{at[0] - 0.3, at[1], at[2] - 0.3}, mgl64.Vec3{at[0] + 0.3, at[1] + 1.8, at[2] + 0.3}, true, true
+		return mgl32.Vec3{at[0] - 0.3, at[1], at[2] - 0.3}, mgl32.Vec3{at[0] + 0.3, at[1] + 1.8, at[2] + 0.3}, true, true
 	})
 	var pushed atomic.Bool
-	w.circuits.SetEntityPush(func(_ *world.Region, e *world.Entity, by mgl64.Vec3) {
+	w.circuits.SetEntityPush(func(_ *world.Region, e *world.Entity, by mgl32.Vec3) {
 		pushed.Store(true)
 		e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()})
 	})
-	player := w.d.AddEntity(world.EntityConfig{UniqueID: 903, RuntimeID: 903, Pos: mgl64.Vec3{5.5, surfaceY, 4.5}})
+	player := w.d.AddEntity(world.EntityConfig{UniqueID: 903, RuntimeID: 903, Pos: mgl32.Vec3{5.5, surfaceY, 4.5}})
 	t.Cleanup(player.Remove)
 	piston := w.state(t, "minecraft:piston", map[string]any{"facing_direction": int32(4)})
 	w.run(func(r *world.Region) { place(r, cube.Pos{4, surfaceY, 4}, piston) })
@@ -771,12 +771,12 @@ func TestHitTargetPowersThenStops(t *testing.T) {
 	w.run(func(r *world.Region) {
 		place(r, at, w.state(t, "minecraft:target", nil))
 		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
-		if w.circuits.HitTarget(r, lamp, mgl64.Vec3{4.5, surfaceY + 1, 5.5}, false) {
+		if w.circuits.HitTarget(r, lamp, mgl32.Vec3{4.5, surfaceY + 1, 5.5}, false) {
 			t.Error("a lamp took a hit as a target")
 		}
 	})
 	w.run(func(r *world.Region) {
-		if !w.circuits.HitTarget(r, at, mgl64.Vec3{4.5, surfaceY + 1, 4.5}, false) {
+		if !w.circuits.HitTarget(r, at, mgl32.Vec3{4.5, surfaceY + 1, 4.5}, false) {
 			t.Error("the target took no hit")
 		}
 	})

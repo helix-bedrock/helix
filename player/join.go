@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -33,7 +33,7 @@ func (p *Player) play() {
 
 // spawnPoint is where the player appears: where it was saved, else the
 // world spawn.
-func (p *Player) spawnPoint() (spawn mgl64.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) {
+func (p *Player) spawnPoint() (spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) {
 	spawn, worldSpawn = p.worldSpawn()
 	p.dim = p.s.overworld
 	if pos, r, ok := p.load(); ok {
@@ -44,7 +44,7 @@ func (p *Player) spawnPoint() (spawn mgl64.Vec3, worldSpawn protocol.BlockPos, r
 }
 
 // worldSpawn is the world's spawn: the eye position there and its block.
-func (p *Player) worldSpawn() (mgl64.Vec3, protocol.BlockPos) {
+func (p *Player) worldSpawn() (mgl32.Vec3, protocol.BlockPos) {
 	lv := p.s.level
 	at := protocol.BlockPos{lv.Spawn[0], lv.Spawn[1], lv.Spawn[2]}
 	if r := p.s.overworld.Range(); int(at[1]) < r[0] || int(at[1]) > r[1] {
@@ -56,7 +56,7 @@ func (p *Player) worldSpawn() (mgl64.Vec3, protocol.BlockPos) {
 			at[1] = lv.Surface
 		}
 	}
-	return mgl64.Vec3{float64(at[0]) + 0.5, float64(at[1]) + eyeHeight, float64(at[2]) + 0.5}, at
+	return mgl32.Vec3{float32(at[0]) + 0.5, float32(at[1]) + eyeHeight, float32(at[2]) + 0.5}, at
 }
 
 // announce tells everyone else of the player before it gets StartGame,
@@ -69,7 +69,7 @@ func (p *Player) announce() {
 // sendJoin sends the join packets in the order BDS 1.26.60 sends them
 // (SyncActorProperty, PlayerFog and the camera packets between
 // them are not sent yet). False if the connection failed.
-func (p *Player) sendJoin(spawn mgl64.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) bool {
+func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) bool {
 	s := p.s
 	p.send(s.reg.JigsawStructures, s.reg.VoxelShapes, p.startGame(spawn, worldSpawn, rot))
 	p.send(s.reg.Items.RegistryPacket())
@@ -84,7 +84,7 @@ func (p *Player) sendJoin(spawn mgl64.Vec3, worldSpawn protocol.BlockPos, rot wo
 }
 
 // startGame is the player's StartGame: who and where it is, and the world it joins.
-func (p *Player) startGame(spawn mgl64.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) *packet.StartGame {
+func (p *Player) startGame(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) *packet.StartGame {
 	s, lv := p.s, p.s.level
 	var dayTime int64
 	if s.clock != nil {
@@ -92,7 +92,7 @@ func (p *Player) startGame(spawn mgl64.Vec3, worldSpawn protocol.BlockPos, rot w
 	}
 	return &packet.StartGame{
 		Time:           dayTime,
-		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: world.Vec32(spawn), Dimension: s.dimensionID(p.dim),
+		EntityUniqueID: p.uniqueID, EntityRuntimeID: p.runtimeID, PlayerGameMode: p.gameMode, PlayerPosition: spawn, Dimension: s.dimensionID(p.dim),
 		Pitch: rot.Pitch, Yaw: rot.Yaw,
 		WorldSeed: lv.Seed, Generator: lv.Generator, WorldGameMode: lv.GameMode, Difficulty: lv.Difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
@@ -166,12 +166,12 @@ func (p *Player) startFlusher(done <-chan struct{}) {
 
 // enterWorld adds the player's viewer and entity to the dimension it was saved in.
 // leaveWorld takes them out again.
-func (p *Player) enterWorld(spawn mgl64.Vec3, rot world.Rotation) {
+func (p *Player) enterWorld(spawn mgl32.Vec3, rot world.Rotation) {
 	p.zone.pos = spawn
 	p.viewer = p.addViewer(p.dim)
 	p.removed = make(chan lastPlace, 1)
 	// Until its first tick, others see where it spawns.
-	p.seen.store(PlayerState{Position: spawn.Sub(mgl64.Vec3{0, eyeHeight, 0}), Rotation: rot, GameMode: p.gameMode, Level: p.Level()})
+	p.seen.store(PlayerState{Position: spawn.Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: rot, GameMode: p.gameMode, Level: p.Level()})
 	p.entity = p.dim.AddEntity(p.entityConfig(spawn, rot))
 }
 
@@ -191,13 +191,13 @@ func (p *Player) leaveWorld(fallback lastPlace) {
 
 // lastPlace is where the player's entity was when its region took it out.
 type lastPlace struct {
-	pos mgl64.Vec3
+	pos mgl32.Vec3
 	rot world.Rotation
 }
 
 // entityConfig is the player's entity at pos. Its removal either finishes a move to
 // another dimension or, when the player leaves, hands back where it was.
-func (p *Player) entityConfig(pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
+func (p *Player) entityConfig(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: pos, Rot: rot, Viewer: p.viewer, Owner: p,
 		Spawn: p.spawnPackets, Move: p.movePacket, Think: p.think, Input: p.handleInput,

@@ -3,7 +3,7 @@ package liquid
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/world/cube"
@@ -69,13 +69,13 @@ func solidAt(blocks *registry.Blocks, r BlockReader, pos cube.Pos) bool {
 // towards shallower neighbours and neighbours with a drop below them, and down along solid
 // walls when it falls. It is a unit vector, or zero. Stairs and slabs letting liquid through
 // only on some sides are not ported.
-func Flow(blocks *registry.Blocks, r BlockReader, pos cube.Pos, material uint8) mgl64.Vec3 {
+func Flow(blocks *registry.Blocks, r BlockReader, pos cube.Pos, material uint8) mgl32.Vec3 {
 	own, ok := depthOf(blocks, r, pos, material)
 	depth := int32(-1)
 	if ok {
 		depth = flatDepth(own)
 	}
-	var f mgl64.Vec3
+	var f mgl32.Vec3
 	// BDS looks at the sides clockwise from north.
 	for _, s := range direction.Clockwise() {
 		side := pos.Side(s)
@@ -90,8 +90,8 @@ func Flow(blocks *registry.Blocks, r BlockReader, pos cube.Pos, material uint8) 
 			continue
 		}
 		to := cube.Pos{}.Side(s)
-		f[0] += float64(to[0] * int(step))
-		f[2] += float64(to[2] * int(step))
+		f[0] += float32(to[0] * int(step))
+		f[2] += float32(to[2] * int(step))
 	}
 	if ok && own >= fallingDepth {
 		for _, s := range direction.Clockwise() {
@@ -106,10 +106,10 @@ func Flow(blocks *registry.Blocks, r BlockReader, pos cube.Pos, material uint8) 
 	return unitOrZero(f)
 }
 
-func unitOrZero(v mgl64.Vec3) mgl64.Vec3 {
-	l := math.Sqrt(v.Dot(v))
+func unitOrZero(v mgl32.Vec3) mgl32.Vec3 {
+	l := float32(math.Sqrt(float64(v.Dot(v))))
 	if l < flowMinLength {
-		return mgl64.Vec3{}
+		return mgl32.Vec3{}
 	}
 	return v.Mul(1 / l)
 }
@@ -119,13 +119,13 @@ func unitOrZero(v mgl64.Vec3) mgl64.Vec3 {
 // block is in water, and only when one of those blocks, or a block beside them, is not a
 // source. The push follows the sum of their flows, at LavaPush or WaterPush. Zero for none.
 // Items look in their whole box for both; mobs in two shrunk boxes.
-func Push(blocks *registry.Blocks, r BlockReader, lava, water Area) mgl64.Vec3 {
+func Push(blocks *registry.Blocks, r BlockReader, lava, water Area) mgl32.Vec3 {
 	for _, m := range [...]struct {
 		material uint8
 		strength float32
 		area     Area
 	}{{registry.MaterialLava, LavaPush, lava}, {registry.MaterialWater, WaterPush, water}} {
-		var sum mgl64.Vec3
+		var sum mgl32.Vec3
 		found, flowing := false, false
 		a := m.area
 		for x := a.Min[0]; x <= a.Max[0]; x++ {
@@ -146,11 +146,11 @@ func Push(blocks *registry.Blocks, r BlockReader, lava, water Area) mgl64.Vec3 {
 			continue
 		}
 		if flowing {
-			return unitOrZero(sum).Mul(float64(m.strength))
+			return unitOrZero(sum).Mul(m.strength)
 		}
-		return mgl64.Vec3{}
+		return mgl32.Vec3{}
 	}
-	return mgl64.Vec3{}
+	return mgl32.Vec3{}
 }
 
 // flowingBeside reports whether a block next to pos holds moving liquid.

@@ -5,7 +5,7 @@ import (
 	"math/bits"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/world"
@@ -209,7 +209,7 @@ func (c *Chest) craft(r *world.Region, pos cube.Pos, block uint32) {
 // throwResults throws what a crafter made out of its front.
 func (c *Chest) throwResults(r *world.Region, pos cube.Pos, face cube.Face, results []ItemStack) {
 	dir := faceVec(face)
-	at := blockVec(pos).Add(mgl64.Vec3{0.5, crafterEjectHeight, 0.5}).Add(dir.Mul(ejectReach))
+	at := blockVec(pos).Add(mgl32.Vec3{0.5, crafterEjectHeight, 0.5}).Add(dir.Mul(ejectReach))
 	levelEvent(r, pos, at, levelEventCrafterCraft, int32(dir[0])+3*int32(dir[2])+4)
 	playSound(r, pos, soundEvent{name: packet.SoundEventCrafterCraft, pos: blockVec(pos), extra: -1}, nil)
 	for _, stack := range results {

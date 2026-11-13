@@ -3,10 +3,9 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/direction"
-	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -104,10 +103,10 @@ func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
 		return
 	}
 	pos := p.entity.Position()
-	if pos.Sub(world.Vec64(d.Position)).Len() > attackFromRange {
+	if pos.Sub(d.Position).Len() > attackFromRange {
 		return
 	}
-	limit := float64(attackRange)
+	limit := float32(attackRange)
 	if p.creative() {
 		limit = attackRangeCreative
 	}
@@ -232,28 +231,27 @@ func vanillaKnockback(target, attacker *Player, extra float32) {
 	}
 	resist := max(1-target.attributes.get(attrKnockbackResistance), 0) * target.Tuning(TuneKnockbackTakenScale) * attacker.Tuning(TuneKnockbackDealtScale)
 	away := target.entity.Position().Sub(attacker.entity.Position())
-	vel := target.knockbackStep(target.move.velocity, float32(away[0]), float32(away[2]), target.Tuning(TuneKnockbackPush)*resist, target.Tuning(TuneKnockbackLift)*resist)
+	vel := target.knockbackStep(target.move.velocity, away[0], away[2], target.Tuning(TuneKnockbackPush)*resist, target.Tuning(TuneKnockbackLift)*resist)
 	if extra > 0 {
 		yaw := direction.Units(attacker.entity.Rotation().Yaw)
 		vel = target.knockbackStep(vel, -direction.Sin(yaw), direction.Cos(yaw), extra*target.Tuning(TuneKnockbackExtraPush)*resist, extra*target.Tuning(TuneKnockbackExtraLift)*resist)
 	}
 	target.move.velocity = vel
-	target.send(&packet.SetActorMotion{EntityRuntimeID: target.runtimeID, Velocity: world.Vec32(vel), Tick: target.entity.Tick()})
+	target.send(&packet.SetActorMotion{EntityRuntimeID: target.runtimeID, Velocity: vel, Tick: target.entity.Tick()})
 	target.flush()
 }
 
 // knockbackStep is one push of BDS's knockback on the player in the direction (x, z).
-func (p *Player) knockbackStep(vel mgl64.Vec3, x, z, push, lift float32) mgl64.Vec3 {
+func (p *Player) knockbackStep(vel mgl32.Vec3, x, z, push, lift float32) mgl32.Vec3 {
 	retain := p.Tuning(TuneKnockbackRetain)
 	var dx, dz float32
 	if l := float32(math.Sqrt(float64(x*x + z*z))); l >= knockbackMinLength {
 		dx, dz = x/l, z/l
 	}
-	v := world.Vec32(vel)
-	return mgl64.Vec3{
-		float64(clampKnockback(v[0]*retain + dx*push)),
-		float64(min(v[1]*retain+lift*p.Tuning(TuneKnockbackLiftScale), p.Tuning(TuneKnockbackCap))),
-		float64(clampKnockback(v[2]*retain + dz*push)),
+	return mgl32.Vec3{
+		clampKnockback(vel[0]*retain + dx*push),
+		min(vel[1]*retain+lift*p.Tuning(TuneKnockbackLiftScale), p.Tuning(TuneKnockbackCap)),
+		clampKnockback(vel[2]*retain + dz*push),
 	}
 }
 

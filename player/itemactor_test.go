@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -41,7 +41,7 @@ func TestItemFallsAndIsTouched(t *testing.T) {
 	p.s.game.sys.PickUp = func(_ *Player, i *ItemActor) { touched.Store(i) }
 	p.attributes = DefaultAttributes()
 	feetY := float32(-60)
-	pos := mgl64.Vec3{8, float64(feetY + eyeHeight), 8}
+	pos := mgl32.Vec3{8, feetY + eyeHeight, 8}
 	p.viewer = d.AddViewer(func(packet.Packet) {}, func() {})
 	defer p.viewer.Close()
 	p.viewer.Move(world.ChunkPos(8, 8), 2)
@@ -49,7 +49,7 @@ func TestItemFallsAndIsTouched(t *testing.T) {
 		UniqueID: 1, RuntimeID: p.s.runtimeIDs.Add(1), Pos: pos, Viewer: p.viewer,
 		Input: func(*world.Entity) { p.tickPickup() },
 	})
-	it := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl64.Vec3{8.5, float64(feetY + 1.12), 8.5}, mgl64.Vec3{}, world.Rotation{}, dropPickupDelay, dropThrowTime)
+	it := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl32.Vec3{8.5, feetY + 1.12, 8.5}, mgl32.Vec3{}, world.Rotation{}, dropPickupDelay, dropThrowTime)
 
 	deadline := time.Now().Add(15 * time.Second)
 	for touched.Load() == nil {
@@ -103,7 +103,7 @@ func TestLiquidFlow(t *testing.T) {
 		t.Fatalf("flow %v, want towards +x", f)
 	}
 	i := &ItemActor{s: p.s}
-	i.applyFlow(w, mgl64.Vec3{0.5, 64.5, 0.5})
+	i.applyFlow(w, mgl32.Vec3{0.5, 64.5, 0.5})
 	if i.vel[0] <= 0 {
 		t.Fatalf("velocity %v, want towards +x", i.vel)
 	}
@@ -136,9 +136,9 @@ func TestItemsMergeInRegion(t *testing.T) {
 	defer v.Close()
 	v.Move(world.ChunkPos(8, 8), 2)
 
-	at := mgl64.Vec3{8.5, -59.875, 8.5}
-	a := p.s.spawnItem(d, ItemStack{Name: "minecraft:coal", Count: 30}, at, mgl64.Vec3{}, world.Rotation{}, chestPickupDelay, 0)
-	b := p.s.spawnItem(d, ItemStack{Name: "minecraft:coal", Count: 33}, at.Add(mgl64.Vec3{0.6, 0, 0.6}), mgl64.Vec3{}, world.Rotation{}, chestPickupDelay, 0)
+	at := mgl32.Vec3{8.5, -59.875, 8.5}
+	a := p.s.spawnItem(d, ItemStack{Name: "minecraft:coal", Count: 30}, at, mgl32.Vec3{}, world.Rotation{}, chestPickupDelay, 0)
+	b := p.s.spawnItem(d, ItemStack{Name: "minecraft:coal", Count: 33}, at.Add(mgl32.Vec3{0.6, 0, 0.6}), mgl32.Vec3{}, world.Rotation{}, chestPickupDelay, 0)
 	var done atomic.Bool
 	d.RunAt(world.ChunkPos(8, 8), func(*world.Region) { a.SetView(func(*Player, *ItemView) {}) })
 	deadline := time.Now().Add(10 * time.Second)

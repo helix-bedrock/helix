@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -39,7 +39,7 @@ func TestDoorStopsWhatMoves(t *testing.T) {
 			}
 		}
 		// From the north, moving south, the panel stops the box.
-		lo, hi := mgl64.Vec3{4.4, float64(y) + 0.3, 3.8}, mgl64.Vec3{4.6, float64(y) + 0.5, 3.95}
+		lo, hi := mgl32.Vec3{4.4, float32(y) + 0.3, 3.8}, mgl32.Vec3{4.6, float32(y) + 0.5, 3.95}
 		if got := p.s.clipSweep(r, lo, hi, 2, 0.5); got > 0.051 {
 			t.Errorf("box went %v through the closed door", got)
 		}
@@ -83,7 +83,7 @@ func TestItemStopsAtClosedDoor(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		blockuse.PlaceDoor(blocks, r, at, door)
 		i = p.s.spawnItem(r.Dimension(), ItemStack{Name: "minecraft:emerald", Count: 1},
-			mgl64.Vec3{4.5, float64(y) + 0.6, 3.5}, mgl64.Vec3{0, 0.1, 0.6}, world.Rotation{}, 0, 0)
+			mgl32.Vec3{4.5, float32(y) + 0.6, 3.5}, mgl32.Vec3{0, 0.1, 0.6}, world.Rotation{}, 0, 0)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return i.entity.Region() != nil && i.onGround })
 	onRegion(d, func(*world.Region) {
@@ -102,17 +102,17 @@ func TestScaffoldingOnlyHoldsFromAbove(t *testing.T) {
 	at := cube.Pos{4, y, 4}
 	top := float32(y) + 1
 	onRegion(d, func(r *world.Region) {
-		above := p.s.boxesFor(r, at, held, mgl64.Vec3{4.4, float64(top), 4.4}, mgl64.Vec3{4.6, float64(top + 0.25), 4.6})
+		above := p.s.boxesFor(r, at, held, mgl32.Vec3{4.4, top, 4.4}, mgl32.Vec3{4.6, top + 0.25, 4.6})
 		if len(above) != 1 {
 			t.Errorf("above: %v", above)
 		}
-		if in := p.s.boxesFor(r, at, held, mgl64.Vec3{4.4, float64(top - 0.5), 4.4}, mgl64.Vec3{4.6, float64(top - 0.25), 4.6}); len(in) != 0 {
+		if in := p.s.boxesFor(r, at, held, mgl32.Vec3{4.4, top - 0.5, 4.4}, mgl32.Vec3{4.6, top - 0.25, 4.6}); len(in) != 0 {
 			t.Errorf("inside: %v", in)
 		}
-		if side := p.s.boxesFor(r, at, held, mgl64.Vec3{6, float64(top), 4.4}, mgl64.Vec3{6.2, float64(top + 0.25), 4.6}); len(side) != 0 {
+		if side := p.s.boxesFor(r, at, held, mgl32.Vec3{6, top, 4.4}, mgl32.Vec3{6.2, top + 0.25, 4.6}); len(side) != 0 {
 			t.Errorf("to the side: %v", side)
 		}
-		if l := p.s.boxesFor(r, at, loose, mgl64.Vec3{4.4, float64(top), 4.4}, mgl64.Vec3{4.6, float64(top + 0.25), 4.6}); len(l) != 0 {
+		if l := p.s.boxesFor(r, at, loose, mgl32.Vec3{4.4, top, 4.4}, mgl32.Vec3{4.6, top + 0.25, 4.6}); len(l) != 0 {
 			t.Errorf("loose: %v", l)
 		}
 		if ray := p.s.boxesAt(r, at, held); len(ray) != 0 {

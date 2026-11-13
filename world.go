@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/circuit"
@@ -505,7 +505,7 @@ func (s *Server) broadcastLevelEvent(event, data int32) {
 }
 
 // strike makes lightning, once players can join.
-func (s *Server) strike(r *world.Region, pos mgl64.Vec3) {
+func (s *Server) strike(r *world.Region, pos mgl32.Vec3) {
 	if h := s.players.Load(); h != nil {
 		h.Strike(r, pos)
 	}
@@ -530,7 +530,7 @@ func (m mobSpawner) PopulationSpawn(r *world.Region, pos mcdb.ChunkPos) {
 }
 
 // mobsIn finds what lightning may strike in a chunk.
-func (s *Server) mobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl64.Vec3) []mgl64.Vec3 {
+func (s *Server) mobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl32.Vec3) []mgl32.Vec3 {
 	if h := s.players.Load(); h != nil {
 		return h.MobsIn(r, pos, dst)
 	}

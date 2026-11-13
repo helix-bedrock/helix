@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -134,7 +134,7 @@ func (p *Player) spawnInteractItems(r *world.Region, o *Mob, it interaction) {
 	if it.SpawnItems.YOffset != nil {
 		y = *it.SpawnItems.YOffset
 	}
-	from := o.entity.Position().Add(mgl64.Vec3{0, float64(y), 0})
+	from := o.entity.Position().Add(mgl32.Vec3{0, y, 0})
 	for _, d := range p.s.entityLoot.Roll(it.SpawnItems.Table, o.lootContext(r), nil) {
 		for _, st := range p.s.lootStacks(d) {
 			p.s.spawnInteractDrop(r, st, from)
@@ -144,17 +144,17 @@ func (p *Player) spawnInteractItems(r *world.Region, o *Mob, it interaction) {
 
 // spawnInteractDrop throws out one item of an interaction's spawn_items at from: the item's
 // spawn speed plus the interaction's push.
-func (s *Host) spawnInteractDrop(r *world.Region, it ItemStack, from mgl64.Vec3) {
-	vel := mgl64.Vec3{
-		float64(dropDrift() + (rand.Float32()-rand.Float32())*spawnPushSide), //nolint:gosec // an item's scatter, not a secret
-		float64(dropUp + rand.Float32()*spawnPushUp),                         //nolint:gosec // an item's scatter, not a secret
-		float64(dropDrift() + (rand.Float32()-rand.Float32())*spawnPushSide), //nolint:gosec // an item's scatter, not a secret
+func (s *Host) spawnInteractDrop(r *world.Region, it ItemStack, from mgl32.Vec3) {
+	vel := mgl32.Vec3{
+		dropDrift() + (rand.Float32()-rand.Float32())*spawnPushSide, //nolint:gosec // an item's scatter, not a secret
+		dropUp + rand.Float32()*spawnPushUp,                         //nolint:gosec // an item's scatter, not a secret
+		dropDrift() + (rand.Float32()-rand.Float32())*spawnPushSide, //nolint:gosec // an item's scatter, not a secret
 	}
 	s.spawnItem(r.Dimension(), s.freshStack(it), from, vel, world.Rotation{}, mobDropDelay, 0)
 }
 
 // feetBlock is the block a position is in.
-func feetBlock(v mgl64.Vec3) cube.Pos {
+func feetBlock(v mgl32.Vec3) cube.Pos {
 	return cube.Pos{int(math.Floor(float64(v[0]))), int(math.Floor(float64(v[1]))), int(math.Floor(float64(v[2])))}
 }
 

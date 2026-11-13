@@ -47,7 +47,7 @@ func vanillaOutOfWorld(_ *Host, e *world.Entity) bool {
 	if r == nil {
 		return false
 	}
-	return e.Position()[1] < float64(r.Dimension().Range()[0]-voidDepth)
+	return e.Position()[1] < float32(r.Dimension().Range()[0]-voidDepth)
 }
 
 // vanillaVoid fires the event, then hands the entity to its owner's OutOfWorld; anything

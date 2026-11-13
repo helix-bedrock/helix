@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -83,7 +82,7 @@ func vanillaTotem(p *Player, src DamageSource) bool {
 	if r := p.entity.Region(); r != nil {
 		at, pos := p.blockPos(), p.entity.Position()
 		r.Broadcast(at, actorEvent(p.runtimeID, packet.ActorEventTalismanActivate), nil)
-		r.Broadcast(at, &packet.LevelEvent{EventType: packet.LevelEventSoundTotemUsed, Position: world.Vec32(pos)}, nil)
+		r.Broadcast(at, &packet.LevelEvent{EventType: packet.LevelEventSoundTotemUsed, Position: pos}, nil)
 	}
 	p.consumeTotem(totem)
 	return true

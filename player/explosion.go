@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -96,7 +96,7 @@ const (
 // what you like and run it with [Host.Explode]. Vanilla's primed TNT is only one user.
 type Explosion struct {
 	// Pos is where it starts; Radius how strong it is.
-	Pos    mgl64.Vec3
+	Pos    mgl32.Vec3
 	Radius float32
 	// Kind is what set it off.
 	Kind ExplosionKind
@@ -139,7 +139,7 @@ type Explosion struct {
 }
 
 // NewExplosion returns BDS's defaults for an explosion that breaks blocks.
-func NewExplosion(pos mgl64.Vec3, radius float32) *Explosion {
+func NewExplosion(pos mgl32.Vec3, radius float32) *Explosion {
 	return &Explosion{
 		Pos: pos, Radius: radius, BreaksBlocks: true, MaxResistance: noResistance, DamageScale: 1, KnockbackScale: 1,
 		Cause: DamageBlockExplosion, Particle: packet.LevelEventParticlesExplosion, Sound: packet.SoundEventExplode,
@@ -182,7 +182,7 @@ type ExplosionHitEvent struct {
 	Player *Player
 	Hurts  bool
 	Damage float32
-	Push   mgl64.Vec3
+	Push   mgl32.Vec3
 }
 
 // OnExplosionHit listens to explosions reaching entities.
@@ -219,11 +219,11 @@ type Exploded interface {
 // Blastable is an entity an explosion reaches: the [world.Entity]'s Owner.
 type Blastable interface {
 	// BlastBox is the entity's box, false if explosions pass it by.
-	BlastBox() (lo, hi mgl64.Vec3, ok bool)
+	BlastBox() (lo, hi mgl32.Vec3, ok bool)
 	// BlastHit is the damage it takes. Called even for 0 damage.
 	BlastHit(damage float32, src DamageSource)
 	// BlastPush adds to its speed.
-	BlastPush(push mgl64.Vec3)
+	BlastPush(push mgl32.Vec3)
 }
 
 // Explode runs an explosion. Runs: owner of the region.
@@ -346,7 +346,7 @@ func (s *Host) blastRays(r *world.Region, e *Explosion) []cube.Pos {
 				if !onGridFace(x) && !onGridFace(y) && !onGridFace(z) {
 					continue
 				}
-				dir := mgl64.Vec3{float64(gridUnit(x)), float64(gridUnit(y)), float64(gridUnit(z))}
+				dir := mgl32.Vec3{gridUnit(x), gridUnit(y), gridUnit(z)}
 				out = s.blastRay(r, e, dir.Mul(1/dir.Len()), seen, out)
 			}
 		}
@@ -363,7 +363,7 @@ func gridUnit(n int) float32 {
 }
 
 // blastRay walks one ray until it fades.
-func (s *Host) blastRay(r *world.Region, e *Explosion, dir mgl64.Vec3, seen map[cube.Pos]struct{}, out []cube.Pos) []cube.Pos {
+func (s *Host) blastRay(r *world.Region, e *Explosion, dir mgl32.Vec3, seen map[cube.Pos]struct{}, out []cube.Pos) []cube.Pos {
 	blocks := s.reg.Blocks
 	left := (rand.Float32()*explosionRandom + explosionBase) * e.Radius //nolint:gosec // an explosion, not a secret
 	at := e.Pos
@@ -404,7 +404,7 @@ func (s *Host) blastRay(r *world.Region, e *Explosion, dir mgl64.Vec3, seen map[
 
 // blastEntities hurts and pushes what is near, the source excepted.
 func (s *Host) blastEntities(r *world.Region, e *Explosion, underwater bool) {
-	reach := 2*float64(e.Radius) + blastReach
+	reach := 2*e.Radius + blastReach
 	x0, x1 := blastEdge(e.Pos[0]-reach), blastEdge(e.Pos[0]+reach)
 	y0, y1 := blastEdge(e.Pos[1]-reach), blastEdge(e.Pos[1]+reach)
 	z0, z1 := blastEdge(e.Pos[2]-reach), blastEdge(e.Pos[2]+reach)
@@ -412,7 +412,7 @@ func (s *Host) blastEntities(r *world.Region, e *Explosion, underwater bool) {
 	if e.Source != nil {
 		center = e.Source.Position()
 	}
-	for _, o := range r.AppendEntitiesIn(nil, float64(x0), float64(z0), float64(x1), float64(z1)) {
+	for _, o := range r.AppendEntitiesIn(nil, x0, z0, x1, z1) {
 		target, ok := o.Owner().(Blastable)
 		if !ok || o == e.Source {
 			continue
@@ -425,26 +425,26 @@ func (s *Host) blastEntities(r *world.Region, e *Explosion, underwater bool) {
 	}
 }
 
-func blastEdge(f float64) float64 { return math.Floor(f) }
+func blastEdge(f float32) float32 { return float32(math.Floor(float64(f))) }
 
 // blastEntity is one entity's damage and knockback. Players are measured from their
 // position, anything else from the near side of its box.
-func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, target Blastable, center, lo, hi mgl64.Vec3, underwater bool) {
+func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, target Blastable, center, lo, hi mgl32.Vec3, underwater bool) {
 	pos := o.Position()
-	dist := mgl64.Vec3{pos[0] - center[0], lo[1] - center[1], pos[2] - center[2]}.Len()
+	dist := mgl32.Vec3{pos[0] - center[0], lo[1] - center[1], pos[2] - center[2]}.Len()
 	if _, player := o.Owner().(*Player); !player {
 		dist = max(0, dist-(hi[0]-lo[0])/2)
 	}
 	reach := 2 * e.Radius
-	if dist/float64(reach) > 1 {
+	if dist/reach > 1 {
 		return
 	}
-	impact := float32(1-dist/float64(reach)) * s.exposure(r, e.Pos, lo, hi) * e.KnockbackScale
+	impact := (1 - dist/reach) * s.exposure(r, e.Pos, lo, hi) * e.KnockbackScale
 	hurts, damage := e.damageAt(impact, reach, underwater)
-	var push mgl64.Vec3
+	var push mgl32.Vec3
 	dir := pos.Sub(e.Pos)
 	if l := dir.Len(); l >= minSpeed && impact != 0 {
-		push = dir.Mul(float64(impact) / l)
+		push = dir.Mul(impact / l)
 	}
 	if s.game.explosionHitEv.Has() {
 		p, _ := o.Owner().(*Player)
@@ -462,7 +462,7 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 		}
 		target.BlastHit(damage, src)
 	}
-	if push != (mgl64.Vec3{}) {
+	if push != (mgl32.Vec3{}) {
 		target.BlastPush(push)
 	}
 	if e.NegatesFallDamage {
@@ -498,18 +498,18 @@ func clearFall(o *world.Entity) {
 }
 
 // exposure is the share of rays from a grid in the box that reach the explosion.
-func (s *Host) exposure(r *world.Region, at, lo, hi mgl64.Vec3) float32 {
+func (s *Host) exposure(r *world.Region, at, lo, hi mgl32.Vec3) float32 {
 	if lo[0] <= at[0] && at[0] <= hi[0] && lo[1] <= at[1] && at[1] <= hi[1] && lo[2] <= at[2] && at[2] <= hi[2] {
 		return 1
 	}
 	size := hi.Sub(lo)
-	stepX, stepY, stepZ := exposureStep(float32(size[0])), exposureStep(float32(size[1])), exposureStep(float32(size[2]))
+	stepX, stepY, stepZ := exposureStep(size[0]), exposureStep(size[1]), exposureStep(size[2])
 	offX, offZ := exposureOffset(stepX), exposureOffset(stepZ)
 	var clear, total int
 	for fx := float32(0); fx <= 1; fx += stepX {
 		for fy := float32(0); fy <= 1; fy += stepY {
 			for fz := float32(0); fz <= 1; fz += stepZ {
-				from := mgl64.Vec3{size[0]*float64(fx) + lo[0] + float64(offX), size[1]*float64(fy) + lo[1], size[2]*float64(fz) + lo[2] + float64(offZ)}
+				from := mgl32.Vec3{size[0]*fx + lo[0] + offX, size[1]*fy + lo[1], size[2]*fz + lo[2] + offZ}
 				if !s.rayBlocked(r, from, at) {
 					clear++
 				}
@@ -528,7 +528,7 @@ func exposureOffset(step float32) float32 {
 
 // rayBlocked walks the blocks from one point to another and reports whether a collision
 // box is in the way. Blocks not loaded do not block.
-func (s *Host) rayBlocked(r *world.Region, from, to mgl64.Vec3) bool {
+func (s *Host) rayBlocked(r *world.Region, from, to mgl32.Vec3) bool {
 	var pos, end, step [3]int
 	var next, delta, a, d [3]float64
 	for n := range 3 {
@@ -703,7 +703,7 @@ func blockExplosionPacket(e *Explosion, smoke []cube.Pos) packet.Packet {
 }
 
 // BlastBox is the player's body, unless spectating. Runs: the player's region.
-func (p *Player) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
+func (p *Player) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 	mode := p.gameMode
 	if mode == GameModeDefault {
 		mode = p.s.level.GameMode
@@ -712,30 +712,30 @@ func (p *Player) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 		return lo, hi, false
 	}
 	at := p.entity.Position()
-	lo = mgl64.Vec3{at[0] - playerHalfWidth, at[1] - eyeHeight, at[2] - playerHalfWidth}
-	return lo, mgl64.Vec3{at[0] + playerHalfWidth, lo[1] + playerHeight, at[2] + playerHalfWidth}, true
+	lo = mgl32.Vec3{at[0] - playerHalfWidth, at[1] - eyeHeight, at[2] - playerHalfWidth}
+	return lo, mgl32.Vec3{at[0] + playerHalfWidth, lo[1] + playerHeight, at[2] + playerHalfWidth}, true
 }
 
 // BlastHit hurts the player.
 func (p *Player) BlastHit(damage float32, src DamageSource) { p.s.game.sys.Hurt(p, damage, src) }
 
 // BlastPush adds to the player's speed: nothing at full knockback resistance.
-func (p *Player) BlastPush(push mgl64.Vec3) {
+func (p *Player) BlastPush(push mgl32.Vec3) {
 	if p.attributes.get(attrKnockbackResistance) >= 1 {
 		return
 	}
 	p.move.velocity = p.move.velocity.Add(push)
-	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: world.Vec32(p.move.velocity), Tick: p.entity.Tick()})
+	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: p.move.velocity, Tick: p.entity.Tick()})
 	p.flush()
 }
 
 // BlastBox is the item's box.
-func (i *ItemActor) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
+func (i *ItemActor) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 	if i.taken || i.entity == nil {
 		return lo, hi, false
 	}
 	at := i.entity.Position()
-	half := mgl64.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
+	half := mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
 	return at.Sub(half), at.Add(half), true
 }
 
@@ -754,7 +754,7 @@ func (i *ItemActor) BlastHit(damage float32, _ DamageSource) {
 }
 
 // BlastPush adds to the item's speed.
-func (i *ItemActor) BlastPush(push mgl64.Vec3) {
+func (i *ItemActor) BlastPush(push mgl32.Vec3) {
 	if i.taken {
 		return
 	}
@@ -763,12 +763,12 @@ func (i *ItemActor) BlastPush(push mgl64.Vec3) {
 }
 
 // BlastBox is the orb's box.
-func (o *XPOrb) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
+func (o *XPOrb) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 	if o.taken || o.body.entity == nil {
 		return lo, hi, false
 	}
 	at := o.body.entity.Position()
-	half := mgl64.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
+	half := mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
 	return at.Sub(half), at.Add(half), true
 }
 
@@ -786,7 +786,7 @@ func (o *XPOrb) BlastHit(damage float32, src DamageSource) {
 }
 
 // BlastPush adds to the orb's speed.
-func (o *XPOrb) BlastPush(push mgl64.Vec3) {
+func (o *XPOrb) BlastPush(push mgl32.Vec3) {
 	if o.taken {
 		return
 	}
@@ -795,6 +795,6 @@ func (o *XPOrb) BlastPush(push mgl64.Vec3) {
 }
 
 // pushed tells those who see an entity its new speed.
-func pushed(e *world.Entity, vel mgl64.Vec3) {
-	e.Send(&packet.SetActorMotion{EntityRuntimeID: e.RuntimeID(), Velocity: world.Vec32(vel), Tick: e.Tick()})
+func pushed(e *world.Entity, vel mgl32.Vec3) {
+	e.Send(&packet.SetActorMotion{EntityRuntimeID: e.RuntimeID(), Velocity: vel, Tick: e.Tick()})
 }

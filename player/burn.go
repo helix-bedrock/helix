@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -70,9 +70,9 @@ func (c burnContact) burning() bool { return c.fire > 0 || c.lavaBurn }
 
 // touching finds what the box lo..hi touches that burns, as BDS's checkInsideBlocks walks the
 // blocks inside the box.
-func (s *Host) touching(r *world.Region, lo, hi mgl64.Vec3) burnContact {
+func (s *Host) touching(r *world.Region, lo, hi mgl32.Vec3) burnContact {
 	var c burnContact
-	shrink := mgl64.Vec3{insideShrink, insideShrink, insideShrink}
+	shrink := mgl32.Vec3{insideShrink, insideShrink, insideShrink}
 	lo, hi = lo.Add(shrink), hi.Sub(shrink)
 	from, to := floorPos(lo), floorPos(hi)
 	blocks := s.reg.Blocks
@@ -100,7 +100,7 @@ func (s *Host) touching(r *world.Region, lo, hi mgl64.Vec3) burnContact {
 				}
 				if m, _ := liquidAt(s.reg, r, pos); m == registry.MaterialLava {
 					c.lava = true
-					if float64(s.liquidTop(r, pos)) > lo[1] {
+					if s.liquidTop(r, pos) > lo[1] {
 						c.lavaBurn = true
 					}
 				}
@@ -191,7 +191,7 @@ func (p *Player) tickBurning() {
 	moved := p.move.moved
 	if p.invulnerable() {
 		// Creative and spectator players take no contact damage.
-		moved = mgl64.Vec3{}
+		moved = mgl32.Vec3{}
 	}
 	c := p.s.touching(r, lo, hi)
 	p.move.inBerry = c.contact == contactBerry
@@ -219,7 +219,7 @@ func (p *Player) showBurning() {
 // item in fire or lava is gone in five ticks.
 func (i *ItemActor) tickBurning(r *world.Region, e *world.Entity, inWater bool) {
 	at := e.Position()
-	half := mgl64.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
+	half := mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize}
 	c := i.s.touching(r, at.Sub(half), at.Add(half))
 	if i.tickContact(e, c); i.taken {
 		return
@@ -284,7 +284,7 @@ func (i *ItemActor) showBurning(e *world.Entity) {
 
 // fizzOut is BDS's sound and smoke of a fire put out by water, for the box lo..hi: the fizz
 // at its middle and the fizz particles from its corner, sized by its width and height.
-func fizzOut(r *world.Region, lo, hi mgl64.Vec3) {
+func fizzOut(r *world.Region, lo, hi mgl32.Vec3) {
 	mid := lo.Add(hi).Mul(0.5)
 	at := floorPos(mid)
 	playSound(r, at, soundEvent{name: packet.SoundEventFizz, pos: mid, extra: -1}, nil)

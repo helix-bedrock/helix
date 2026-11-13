@@ -18,7 +18,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 // Permission is the command permission level a source needs, BDS's levels.
@@ -48,7 +48,7 @@ type Source interface {
 	// Permission is the source's command permission level.
 	Permission() Permission
 	// Position is where the source is, for relative coordinates and selectors.
-	Position() mgl64.Vec3
+	Position() mgl32.Vec3
 	// Rotation is which way the source looks, yaw and pitch in degrees, for ^ coordinates.
 	Rotation() (yaw, pitch float32)
 	// Targets resolves a selector, or a name, as seen from the source.

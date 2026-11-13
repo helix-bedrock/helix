@@ -273,7 +273,7 @@ func (m *Mob) LeashToHolder(id behavior.ID) {
 
 // LeashMaxDistance is the distance at which the leash breaks for a holder, from the preset
 // it would use (10 without one).
-func (m *Mob) LeashMaxDistance(holder behavior.Actor) float64 {
+func (m *Mob) LeashMaxDistance(holder behavior.Actor) float32 {
 	if m.states == nil || m.states.Leashable == nil || m.stateEnv.Self == nil {
 		return state.DefaultLeashPreset().MaxDistance
 	}
@@ -304,7 +304,7 @@ func (s stateMob) LeashHolder() behavior.ID      { return s.leashHolder }
 func (s stateMob) SetLeashHolder(id behavior.ID) { s.Mob.SetLeashHolder(id) }
 
 // Leash is the holder's box centre and the leash's maximum distance (behavior.Mob).
-func (m *Mob) Leash() (behavior.Vec3, float64, bool) {
+func (m *Mob) Leash() (behavior.Vec3, float32, bool) {
 	h := m.leashActor()
 	if h == nil {
 		return behavior.Vec3{}, 0, false

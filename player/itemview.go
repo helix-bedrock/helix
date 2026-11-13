@@ -156,7 +156,7 @@ func (i *ItemActor) addPacket(e *world.Entity, v ItemView) packet.Packet {
 	maps.Copy(meta, nameMetadata(v.Name, i.flags()))
 	return &packet.AddItemActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Item: v.Stack.network(i.s.reg),
-		Position: world.Vec32(e.Position()), Velocity: world.Vec32(i.vel), EntityMetadata: meta,
+		Position: e.Position(), Velocity: i.vel, EntityMetadata: meta,
 	}
 }
 

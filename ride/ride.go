@@ -12,7 +12,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
@@ -32,17 +32,17 @@ const (
 // Seat is one entry of rideable's seats.
 type Seat struct {
 	// Position is where the seat is from the vehicle's position.
-	Position mgl64.Vec3
+	Position mgl32.Vec3
 	// MinRiders and MaxRiders say how many riders the vehicle must have for this seat to
 	// be in use. Both zero means always.
 	MinRiders, MaxRiders int
 	// LockRotation and LockDegrees are lock_rider_rotation.
 	LockRotation bool
-	LockDegrees  float64
+	LockDegrees  float32
 	// Rotates and RotateBy are rotate_rider_by, which BDS may work out from an expression
 	// each tick. The vehicle sets the value.
 	Rotates  bool
-	RotateBy float64
+	RotateBy float32
 }
 
 // Rules is rideable's definition.
@@ -56,7 +56,7 @@ type Rules struct {
 	// PullIn lets the vehicle take those it touches on board.
 	PullIn bool
 	// MaxWidth is passenger_max_width: 0 is no limit, otherwise a rider must be narrower.
-	MaxWidth float64
+	MaxWidth float32
 	// Families is family_types: who may ride. Empty means anyone.
 	Families []string
 	// Seats are the seats in order.
@@ -72,16 +72,16 @@ type Rules struct {
 // Body is what riding needs to know of a rider.
 type Body struct {
 	// HeightOffset is how far its position is above its feet: 1.62 for a player.
-	HeightOffset float64
+	HeightOffset float32
 	// RidingOffset is BDS's offset added to HeightOffset in a seat, -0.4 for a player. A baby
 	// does not take it.
-	RidingOffset float64
+	RidingOffset float32
 	// RidingHeight replaces HeightOffset in a seat when HasRidingHeight is set, as BDS's
 	// RidingHeightComponent does for a few mobs.
-	RidingHeight    float64
+	RidingHeight    float32
 	HasRidingHeight bool
 	// Width and Height are its box.
-	Width, Height float64
+	Width, Height float32
 	// Families are its type_family.
 	Families []string
 }
@@ -97,7 +97,7 @@ type Rider interface {
 // Vehicle is the riders of one vehicle.
 type Vehicle struct {
 	rules  *Rules
-	scale  float64
+	scale  float32
 	riders []Rider
 }
 
@@ -105,7 +105,7 @@ type Vehicle struct {
 func New(rules *Rules) *Vehicle { return &Vehicle{rules: rules, scale: 1} }
 
 // SetScale sets the vehicle's box scale, which seats grow with.
-func (v *Vehicle) SetScale(scale float64) { v.scale = scale }
+func (v *Vehicle) SetScale(scale float32) { v.scale = scale }
 
 // Rules returns its rules.
 func (v *Vehicle) Rules() *Rules { return v.rules }
@@ -192,24 +192,24 @@ func seatFor(seats []Seat, riders, index int) Seat {
 
 // SeatOffset is what BDS keeps as a rider's seat offset: the seat, scaled, with the rider's
 // own height and riding offset added. A rider's position is above its feet.
-func (v *Vehicle) SeatOffset(r Rider) mgl64.Vec3 {
+func (v *Vehicle) SeatOffset(r Rider) mgl32.Vec3 {
 	return offset(v.Seat(r), v.scale, r.RideBody())
 }
 
-func offset(s Seat, scale float64, body Body) mgl64.Vec3 {
+func offset(s Seat, scale float32, body Body) mgl32.Vec3 {
 	height := body.HeightOffset + body.RidingOffset
 	if body.HasRidingHeight {
 		height = body.RidingHeight
 	}
-	return mgl64.Vec3{s.Position[0] * scale, s.Position[1]*scale + height, s.Position[2] * scale}
+	return mgl32.Vec3{s.Position[0] * scale, s.Position[1]*scale + height, s.Position[2] * scale}
 }
 
 // Position is getNewPassengerPosition: where a seat offset puts a rider on a vehicle at pos
 // that has turned to yaw degrees.
-func Position(pos mgl64.Vec3, yaw float64, seatOffset mgl64.Vec3) mgl64.Vec3 {
+func Position(pos mgl32.Vec3, yaw float32, seatOffset mgl32.Vec3) mgl32.Vec3 {
 	sin, cos := math.Sincos(float64(yaw) * -math.Pi / 180)
-	s, c := float64(sin), float64(cos)
-	return mgl64.Vec3{
+	s, c := float32(sin), float32(cos)
+	return mgl32.Vec3{
 		pos[0] + seatOffset[0]*c + seatOffset[2]*s,
 		pos[1] + seatOffset[1],
 		pos[2] + seatOffset[2]*c - seatOffset[0]*s,
@@ -268,10 +268,10 @@ const stillMoved = 0.00009801
 // pos is the vehicle's position, moved how far it just went, and seat where the rider sat.
 // It tries beside the vehicle, then behind and ahead, on the vehicle's level, then a block
 // up and a block down. With nowhere to stand it lands on top of the vehicle, at top.
-func Exit(b Blocks, body Body, pos, moved, seat mgl64.Vec3, top float64) mgl64.Vec3 {
+func Exit(b Blocks, body Body, pos, moved, seat mgl32.Vec3, top float32) mgl32.Vec3 {
 	forward, right := directions(moved)
-	base := mgl64.Vec3{floor(pos[0]) + 0.5, floor(pos[1]), floor(pos[2]) + 0.5}
-	pattern := [...]mgl64.Vec3{
+	base := mgl32.Vec3{floor(pos[0]) + 0.5, floor(pos[1]), floor(pos[2]) + 0.5}
+	pattern := [...]mgl32.Vec3{
 		right,
 		right.Mul(-1),
 		right.Sub(forward),
@@ -281,11 +281,11 @@ func Exit(b Blocks, body Body, pos, moved, seat mgl64.Vec3, top float64) mgl64.V
 		forward.Mul(-1),
 		forward,
 	}
-	for _, layer := range [...]float64{0, 1, -1} {
+	for _, layer := range [...]float32{0, 1, -1} {
 		for _, step := range pattern {
 			step[1] = layer
 			if height, ok := canLand(b, body, base.Add(step)); ok {
-				return mgl64.Vec3{
+				return mgl32.Vec3{
 					seat[0] + step[0],
 					floor(pos[1]) + height + layer + body.HeightOffset + exitUp,
 					seat[2] + step[2],
@@ -293,27 +293,27 @@ func Exit(b Blocks, body Body, pos, moved, seat mgl64.Vec3, top float64) mgl64.V
 			}
 		}
 	}
-	return mgl64.Vec3{pos[0], top + body.HeightOffset + exitUp, pos[2]}
+	return mgl32.Vec3{pos[0], top + body.HeightOffset + exitUp, pos[2]}
 }
 
 // ExitAbove is where a rider of a vehicle with Rules.ExitAbove lands: over its seat,
 // standing on top, the vehicle's top or one or two blocks higher, the first with room for
 // the rider. With room nowhere it stands on top anyway.
-func ExitAbove(b Blocks, body Body, seat mgl64.Vec3, top float64) mgl64.Vec3 {
+func ExitAbove(b Blocks, body Body, seat mgl32.Vec3, top float32) mgl32.Vec3 {
 	half := min(body.Width, 1) * 0.5
 	for up := range 3 {
-		feet := top + float64(up)
-		lo := mgl64.Vec3{seat[0] - half, feet, seat[2] - half}
-		hi := mgl64.Vec3{seat[0] + half, feet + body.Height, seat[2] + half}
+		feet := top + float32(up)
+		lo := mgl32.Vec3{seat[0] - half, feet, seat[2] - half}
+		hi := mgl32.Vec3{seat[0] + half, feet + body.Height, seat[2] + half}
 		if room(b, lo, hi) {
-			return mgl64.Vec3{seat[0], feet + body.HeightOffset + exitUp, seat[2]}
+			return mgl32.Vec3{seat[0], feet + body.HeightOffset + exitUp, seat[2]}
 		}
 	}
-	return mgl64.Vec3{seat[0], top + body.HeightOffset + exitUp, seat[2]}
+	return mgl32.Vec3{seat[0], top + body.HeightOffset + exitUp, seat[2]}
 }
 
 // room reports whether no block's box cuts into lo to hi.
-func room(b Blocks, lo, hi mgl64.Vec3) bool {
+func room(b Blocks, lo, hi mgl32.Vec3) bool {
 	from, to := blockAt(lo), blockAt(hi)
 	for x := from[0]; x <= to[0]; x++ {
 		for y := from[1]; y <= to[1]; y++ {
@@ -329,28 +329,28 @@ func room(b Blocks, lo, hi mgl64.Vec3) bool {
 
 // directions is calculateVehicleDirections: the way it moves along its main axis, and the
 // way to its side. A vehicle at rest counts as going west.
-func directions(moved mgl64.Vec3) (forward, right mgl64.Vec3) {
+func directions(moved mgl32.Vec3) (forward, right mgl32.Vec3) {
 	dx, dz := moved[0], moved[2]
 	if dx*dx+dz*dz <= stillMoved {
-		return mgl64.Vec3{-1, 0, 0}, mgl64.Vec3{0, 0, -1}
+		return mgl32.Vec3{-1, 0, 0}, mgl32.Vec3{0, 0, -1}
 	}
 	if abs(dx) > abs(dz) {
-		forward = mgl64.Vec3{sign(dx), 0, 0}
+		forward = mgl32.Vec3{sign(dx), 0, 0}
 	} else {
-		forward = mgl64.Vec3{0, 0, sign(dz)}
+		forward = mgl32.Vec3{0, 0, sign(dz)}
 	}
-	return forward, mgl64.Vec3{-forward[2], 0, forward[0]}
+	return forward, mgl32.Vec3{-forward[2], 0, forward[0]}
 }
 
 // canLand is the check of one place: there must be a floor, and room for the rider on it.
-func canLand(b Blocks, body Body, at mgl64.Vec3) (float64, bool) {
+func canLand(b Blocks, body Body, at mgl32.Vec3) (float32, bool) {
 	height, ok := floorHeight(b, blockAt(at))
 	if !ok {
 		return 0, false
 	}
 	half := min(body.Width, 1) * 0.5
-	lo := mgl64.Vec3{at[0] - half, at[1] + height, at[2] - half}
-	hi := mgl64.Vec3{at[0] + half, at[1] + height + body.Height, at[2] + half}
+	lo := mgl32.Vec3{at[0] - half, at[1] + height, at[2] - half}
+	hi := mgl32.Vec3{at[0] + half, at[1] + height + body.Height, at[2] + half}
 	from, to := blockAt(lo), blockAt(hi)
 	for x := from[0]; x <= to[0]; x++ {
 		for y := from[1]; y <= to[1]; y++ {
@@ -364,13 +364,13 @@ func canLand(b Blocks, body Body, at mgl64.Vec3) (float64, bool) {
 	return height, true
 }
 
-func blocked(b Blocks, pos cube.Pos, lo, hi mgl64.Vec3) bool {
+func blocked(b Blocks, pos cube.Pos, lo, hi mgl32.Vec3) bool {
 	boxLo, boxHi, ok := bounds(b.Boxes(pos))
 	if !ok {
 		return false
 	}
 	for n := range 3 {
-		corner := float64(pos[n])
+		corner := float32(pos[n])
 		if corner+boxHi[n] <= lo[n] || corner+boxLo[n] >= hi[n] {
 			return false
 		}
@@ -381,7 +381,7 @@ func blocked(b Blocks, pos cube.Pos, lo, hi mgl64.Vec3) bool {
 // floorHeight is calculateBlockFloorHeight: how far above the bottom of pos a rider would
 // stand, if on anything. A block that fills the height of pos is no floor unless it can be
 // landed in; then, as with air, the block below is what counts.
-func floorHeight(b Blocks, pos cube.Pos) (float64, bool) {
+func floorHeight(b Blocks, pos cube.Pos) (float32, bool) {
 	_, hi, ok := bounds(b.Boxes(pos))
 	if ok {
 		if hi[1] < 1 {
@@ -404,34 +404,34 @@ func floorHeight(b Blocks, pos cube.Pos) (float64, bool) {
 }
 
 // bounds is the one box around a block's boxes, which is what BDS's getCollisionShape gives.
-func bounds(boxes []registry.Box) (lo, hi mgl64.Vec3, ok bool) {
+func bounds(boxes []registry.Box) (lo, hi mgl32.Vec3, ok bool) {
 	for i, box := range boxes {
 		for n := range 3 {
-			if i == 0 || float64(box[n]) < lo[n] {
-				lo[n] = float64(box[n])
+			if i == 0 || box[n] < lo[n] {
+				lo[n] = box[n]
 			}
-			if i == 0 || float64(box[n+3]) > hi[n] {
-				hi[n] = float64(box[n+3])
+			if i == 0 || box[n+3] > hi[n] {
+				hi[n] = box[n+3]
 			}
 		}
 	}
 	return lo, hi, len(boxes) > 0
 }
 
-func blockAt(v mgl64.Vec3) cube.Pos {
+func blockAt(v mgl32.Vec3) cube.Pos {
 	return cube.Pos{int(floor(v[0])), int(floor(v[1])), int(floor(v[2]))}
 }
 
-func floor(v float64) float64 { return math.Floor(v) }
+func floor(v float32) float32 { return float32(math.Floor(float64(v))) }
 
-func abs(v float64) float64 {
+func abs(v float32) float32 {
 	if v < 0 {
 		return -v
 	}
 	return v
 }
 
-func sign(v float64) float64 {
+func sign(v float32) float32 {
 	if v < 0 {
 		return -1
 	}

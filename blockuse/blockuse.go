@@ -7,7 +7,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -365,7 +365,7 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 	}
 	setAndUpdate(r, pos, t.blocks.Air())
 	r.Broadcast(pos, &packet.LevelEvent{
-		EventType: packet.LevelEventParticlesDestroyBlock, Position: world.Vec32(centre(pos)),
+		EventType: packet.LevelEventParticlesDestroyBlock, Position: centre(pos),
 		EventData: int32(t.blocks.Hash(block)), //nolint:gosec // hashes are sent as int32
 	}, nil)
 }
@@ -380,14 +380,14 @@ func setAndUpdate(r *world.Region, pos cube.Pos, block uint32) {
 // sound plays a block's sound at its centre to everyone near.
 func sound(blocks *registry.Blocks, r *world.Region, pos cube.Pos, event string, block uint32) {
 	r.Broadcast(pos, &packet.LevelSoundEvent{
-		SoundType: event, Position: world.Vec32(centre(pos)),
+		SoundType: event, Position: centre(pos),
 		ExtraData: int32(blocks.Hash(block)), //nolint:gosec // hashes are sent as int32
 	}, nil)
 }
 
 // centre is the middle of the block at pos.
-func centre(pos cube.Pos) mgl64.Vec3 {
-	return mgl64.Vec3{float64(pos[0]) + 0.5, float64(pos[1]) + 0.5, float64(pos[2]) + 0.5}
+func centre(pos cube.Pos) mgl32.Vec3 {
+	return mgl32.Vec3{float32(pos[0]) + 0.5, float32(pos[1]) + 0.5, float32(pos[2]) + 0.5}
 }
 
 // choose returns a if c, else b.

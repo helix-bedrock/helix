@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -38,7 +38,7 @@ func (s *Host) boxesAt(r *world.Region, pos cube.Pos, b uint32) []registry.Box {
 
 // boxesFor is boxesAt for an entity whose box is lo..hi. BDS asks scaffolding with the entity:
 // it has a box only for one wholly above it (0xD5100A0). Without one it has none.
-func (s *Host) boxesFor(r *world.Region, pos cube.Pos, b uint32, lo, hi mgl64.Vec3) []registry.Box {
+func (s *Host) boxesFor(r *world.Region, pos cube.Pos, b uint32, lo, hi mgl32.Vec3) []registry.Box {
 	blocks := s.reg.Blocks
 	props := blocks.Properties(b)
 	if !props.CollisionComputed {
@@ -50,7 +50,7 @@ func (s *Host) boxesFor(r *world.Region, pos cube.Pos, b uint32, lo, hi mgl64.Ve
 	if stability, _ := blocks.States(b)[stateStability].(int32); stability == scaffoldingLoose {
 		return nil
 	}
-	x, y, z := float64(pos[0]), float64(pos[1]), float64(pos[2])
+	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
 	if lo[1] < y+1-scaffoldingEpsilon || hi[0] <= x || x+1 <= lo[0] || hi[2] <= z || z+1 <= lo[2] {
 		return nil
 	}
@@ -76,11 +76,4 @@ func (s *Host) doorBoxes(r *world.Region, pos cube.Pos, b uint32) []registry.Box
 		return registry.DoorBoxes(blocks.States(other), states)
 	}
 	return registry.DoorBoxes(states, blocks.States(other))
-}
-
-// boxAt is a block's collision box placed at the block at.
-func boxAt(at cube.Pos, box registry.Box) (lo, hi mgl64.Vec3) {
-	base := mgl64.Vec3{float64(at[0]), float64(at[1]), float64(at[2])}
-	return base.Add(mgl64.Vec3{float64(box[0]), float64(box[1]), float64(box[2])}),
-		base.Add(mgl64.Vec3{float64(box[3]), float64(box[4]), float64(box[5])})
 }

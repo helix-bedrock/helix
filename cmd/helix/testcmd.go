@@ -14,7 +14,6 @@ import (
 	"github.com/helix-bedrock/helix/crafting"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/registry"
-	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -87,7 +86,7 @@ func targetTest(p *player.Player, args []string) string {
 					hit[0] += targetTestOff
 					hit[2] += targetTestOff
 				}
-				if p.Host().HitTarget(r, pos, world.Vec64(hit), arrow) {
+				if p.Host().HitTarget(r, pos, hit, arrow) {
 					hits++
 				}
 			}

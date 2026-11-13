@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 // Text is the rest of the line, spaces and all: a chat message, say.
@@ -29,30 +29,30 @@ type Coord struct {
 type Position struct{ X, Y, Z Coord }
 
 // Resolve is the position as seen from a source.
-func (p Position) Resolve(src Source) mgl64.Vec3 {
+func (p Position) Resolve(src Source) mgl32.Vec3 {
 	at := src.Position()
 	if p.X.Local {
 		yaw, pitch := src.Rotation()
 		return localOffset(at, yaw, pitch, p.X.Value, p.Y.Value, p.Z.Value)
 	}
-	return mgl64.Vec3{coordAt(p.X, at[0]), coordAt(p.Y, at[1]), coordAt(p.Z, at[2])}
+	return mgl32.Vec3{coordAt(p.X, at[0]), coordAt(p.Y, at[1]), coordAt(p.Z, at[2])}
 }
 
 // coordAt is one coordinate from where the source is.
-func coordAt(c Coord, from float64) float64 {
+func coordAt(c Coord, from float32) float32 {
 	if c.Relative {
-		return from + c.Value
+		return from + float32(c.Value)
 	}
-	return c.Value
+	return float32(c.Value)
 }
 
 // localOffset moves left, up and forward from a point by where it looks, as ^ does.
-func localOffset(at mgl64.Vec3, yaw, pitch float32, left, up, forward float64) mgl64.Vec3 {
+func localOffset(at mgl32.Vec3, yaw, pitch float32, left, up, forward float64) mgl32.Vec3 {
 	y, p := float64(yaw)*math.Pi/180, float64(pitch)*math.Pi/180
-	fwd := mgl64.Vec3{-math.Sin(y) * math.Cos(p), -math.Sin(p), math.Cos(y) * math.Cos(p)}
-	upv := mgl64.Vec3{-math.Sin(y) * -math.Sin(p), math.Cos(p), math.Cos(y) * -math.Sin(p)}
+	fwd := mgl32.Vec3{float32(-math.Sin(y) * math.Cos(p)), float32(-math.Sin(p)), float32(math.Cos(y) * math.Cos(p))}
+	upv := mgl32.Vec3{float32(-math.Sin(y) * -math.Sin(p)), float32(math.Cos(p)), float32(math.Cos(y) * -math.Sin(p))}
 	lft := upv.Cross(fwd)
-	return at.Add(lft.Mul(left)).Add(upv.Mul(up)).Add(fwd.Mul(forward))
+	return at.Add(lft.Mul(float32(left))).Add(upv.Mul(float32(up))).Add(fwd.Mul(float32(forward)))
 }
 
 // RelativeFloat is one number that may be relative with ~, such as a rotation: BDS's

@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -29,7 +29,7 @@ const (
 // actorMoves is what those who see an actor were last told of its movement: the last move
 // sent and the tick each of them last got one. Runs: owner of the actor's entity.
 type actorMoves struct {
-	pos     mgl64.Vec3
+	pos     mgl32.Vec3
 	rot     world.Rotation
 	ground  bool
 	sentTo  map[*world.Entity]int64
@@ -41,13 +41,13 @@ type actorMoves struct {
 
 // start sets where the actor was spawned, which AddActor told its viewers, and how seldom
 // far players get its moves.
-func (m *actorMoves) start(pos mgl64.Vec3, rot world.Rotation, dropped int32, far float32) {
+func (m *actorMoves) start(pos mgl32.Vec3, rot world.Rotation, dropped int32, far float32) {
 	m.pos, m.rot, m.dropped, m.far = pos, rot, dropped, far
 }
 
 // update is BDS's check of whether a move is worth sending (0xb3c5260, 0x85a4be0): moved
 // more than a hundredth of a block, or turned more than 4 degrees, or come to rest.
-func (m *actorMoves) update(e *world.Entity, vel mgl64.Vec3) {
+func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 	pos, rot := e.Position(), e.Rotation()
 	d := pos.Sub(m.pos)
 	moved, speed := d.Dot(d), vel.Dot(vel)
@@ -71,13 +71,13 @@ func (m *actorMoves) send(e *world.Entity) {
 	ground := e.OnGround()
 	pk := &packet.MoveActorDelta{EntityRuntimeID: e.RuntimeID(), OnGround: ground}
 	if pos[0] != m.pos[0] {
-		pk.PositionX = protocol.Option(float32(pos[0]))
+		pk.PositionX = protocol.Option(pos[0])
 	}
 	if pos[1] != m.pos[1] {
-		pk.PositionY = protocol.Option(float32(pos[1]))
+		pk.PositionY = protocol.Option(pos[1])
 	}
 	if pos[2] != m.pos[2] {
-		pk.PositionZ = protocol.Option(float32(pos[2]))
+		pk.PositionZ = protocol.Option(pos[2])
 	}
 	if rotationByte(rot.Pitch) != rotationByte(m.rot.Pitch) {
 		pk.RotationX = protocol.Option(rot.Pitch)
@@ -98,7 +98,7 @@ func (m *actorMoves) send(e *world.Entity) {
 	e.EachSeer(func(p *world.Entity) {
 		var ticks int64
 		if same {
-			ticks = moveTicks(m.dropped, m.far, float32(pos.Sub(p.Position()).Len()))
+			ticks = moveTicks(m.dropped, m.far, pos.Sub(p.Position()).Len())
 		}
 		if last, ok := m.sentTo[p]; ok && now < last+ticks {
 			return

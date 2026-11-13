@@ -66,7 +66,7 @@ func (b *Blocks) fill(id uint32) {
 	b.path[id] = info
 
 	b.phys[id] = physics.Block{
-		Air: props.Material == materialAir, Material: mat, Friction: float64(props.Friction),
+		Air: props.Material == materialAir, Material: mat, Friction: props.Friction,
 		SoulSand: name == "soul_sand", PowderSnow: name == "powder_snow",
 		Climbable: props.Climbable, StopsDescent: name == "scaffolding",
 		LowJump: name == "honey_block", Restitution: restitution(name),
@@ -122,14 +122,14 @@ func fullBox(boxes []registry.Box) bool {
 	return len(boxes) == 1 && boxes[0] == registry.Box{0, 0, 0, 1, 1, 1}
 }
 
-func shapeTop(boxes []registry.Box) (top, height float64) {
+func shapeTop(boxes []registry.Box) (top, height float32) {
 	if len(boxes) == 0 {
 		return 0, 0
 	}
-	lo := float64(1)
+	lo := float32(1)
 	for _, bx := range boxes {
-		top = max(top, float64(bx[4]))
-		lo = min(lo, float64(bx[1]))
+		top = max(top, bx[4])
+		lo = min(lo, bx[1])
 	}
 	return top, top - lo
 }
@@ -146,13 +146,13 @@ func stateTrue(s map[string]any, key string) bool {
 
 // visualTop is how high the block looks inside its cell: water by its depth, otherwise the
 // top of its collision, or a whole block.
-func visualTop(name string, s map[string]any, top float64) float64 {
+func visualTop(name string, s map[string]any, top float32) float32 {
 	if name == "water" || name == "flowing_water" || name == "lava" || name == "flowing_lava" {
 		depth, _ := s["liquid_depth"].(int32)
 		if depth >= 8 {
 			depth = 0
 		}
-		return 1 - float64(depth+1)/9
+		return 1 - float32(depth+1)/9
 	}
 	if top > 0 {
 		return top
@@ -160,7 +160,7 @@ func visualTop(name string, s map[string]any, top float64) float64 {
 	return 1
 }
 
-func restitution(name string) float64 {
+func restitution(name string) float32 {
 	if name == "slime" {
 		return 1
 	}

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/mcdb"
@@ -49,7 +49,7 @@ func TestItemSavedWithChunk(t *testing.T) {
 
 	at := world.ChunkPos(8, 8)
 	ticket := d.KeepLoaded(world.Chunks(at), true)
-	it := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl64.Vec3{8.5, 40, 8.5}, mgl64.Vec3{}, world.Rotation{}, dropPickupDelay, dropThrowTime)
+	it := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl32.Vec3{8.5, 40, 8.5}, mgl32.Vec3{}, world.Rotation{}, dropPickupDelay, dropThrowTime)
 	time.Sleep(500 * time.Millisecond)
 	ticket.Release()
 

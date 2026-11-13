@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/command"
 	"github.com/helix-bedrock/helix/player"
 	"github.com/helix-bedrock/helix/world"
@@ -176,14 +176,14 @@ func (c tpVictimToEntity) Run(src command.Source, out *command.Output) {
 }
 
 // facingRule is the rotation a victim gets from its own and where it lands (feet).
-type facingRule func(own world.Rotation, feet mgl64.Vec3) world.Rotation
+type facingRule func(own world.Rotation, feet mgl32.Vec3) world.Rotation
 
 // keepRotation leaves the victim facing as it was.
-func keepRotation(own world.Rotation, _ mgl64.Vec3) world.Rotation { return own }
+func keepRotation(own world.Rotation, _ mgl32.Vec3) world.Rotation { return own }
 
 // rotated is yRot and xRot, each kept when left out and ~ from the victim's own.
 func rotated(yRot, xRot command.Optional[command.RelativeFloat]) facingRule {
-	return func(own world.Rotation, _ mgl64.Vec3) world.Rotation {
+	return func(own world.Rotation, _ mgl32.Vec3) world.Rotation {
 		r := own
 		if yRot.Set {
 			r.Yaw = yRot.Value.Resolve(own.Yaw)
@@ -197,9 +197,9 @@ func rotated(yRot, xRot command.Optional[command.RelativeFloat]) facingRule {
 }
 
 // facingPoint turns the victim's eyes at its landing place towards a point.
-func facingPoint(at mgl64.Vec3) facingRule {
-	return func(_ world.Rotation, feet mgl64.Vec3) world.Rotation {
-		d := at.Sub(feet.Add(mgl64.Vec3{0, player.EyeHeight, 0}))
+func facingPoint(at mgl32.Vec3) facingRule {
+	return func(_ world.Rotation, feet mgl32.Vec3) world.Rotation {
+		d := at.Sub(feet.Add(mgl32.Vec3{0, player.EyeHeight, 0}))
 		yaw := float32(math.Atan2(float64(-d[0]), float64(d[2])) * 180 / math.Pi)
 		pitch := float32(-math.Atan2(float64(d[1]), math.Hypot(float64(d[0]), float64(d[2]))) * 180 / math.Pi)
 		return world.Rotation{Yaw: yaw, HeadYaw: yaw, Pitch: pitch}
@@ -207,17 +207,17 @@ func facingPoint(at mgl64.Vec3) facingRule {
 }
 
 // lookTarget is the eyes of the one entity a facing overload looks at.
-func lookTarget(out *command.Output, t command.Targets) (mgl64.Vec3, bool) {
+func lookTarget(out *command.Output, t command.Targets) (mgl32.Vec3, bool) {
 	if len(t.List) != 1 {
 		out.Fail("commands.generic.tooManyTargets")
-		return mgl64.Vec3{}, false
+		return mgl32.Vec3{}, false
 	}
 	p, ok := t.List[0].(*player.Player)
 	if !ok {
 		out.Fail("commands.generic.noTargetMatch")
-		return mgl64.Vec3{}, false
+		return mgl32.Vec3{}, false
 	}
-	return p.State().Position.Add(mgl64.Vec3{0, player.EyeHeight, 0}), true
+	return p.State().Position.Add(mgl32.Vec3{0, player.EyeHeight, 0}), true
 }
 
 // victimsOf are the players to move: those named, or the one running the command.
@@ -286,7 +286,7 @@ func tpEntity(src command.Source, out *command.Output, list []command.Target, de
 }
 
 // moveVictim teleports one player. Runs: the player's region.
-func moveVictim(p *player.Player, dim *world.Dimension, feet mgl64.Vec3, face facingRule) {
+func moveVictim(p *player.Player, dim *world.Dimension, feet mgl32.Vec3, face facingRule) {
 	own := world.Rotation{}
 	if e := p.Entity(); e != nil {
 		own = e.Rotation()

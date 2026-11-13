@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 // AttachPoint is a named point on an entity's body, BDS's ActorLocation. Items, sounds and
@@ -42,23 +42,23 @@ const (
 //   - drop: the eyes, 0.2 down and 0.15 ahead along the yaw.
 //
 // The zero vector if the player is not in a world. Runs: the player's region.
-func (p *Player) AttachPos(a AttachPoint) mgl64.Vec3 {
+func (p *Player) AttachPos(a AttachPoint) mgl32.Vec3 {
 	if p.entity == nil {
-		return mgl64.Vec3{}
+		return mgl32.Vec3{}
 	}
 	eyes := p.entity.Position()
 	switch a {
 	case AttachFeet, AttachExplosion:
-		return eyes.Sub(mgl64.Vec3{0, eyeHeight, 0})
+		return eyes.Sub(mgl32.Vec3{0, eyeHeight, 0})
 	case AttachBody, AttachWeapon:
 		lo, hi, _ := p.BlastBox()
 		return lo.Add(hi).Mul(0.5)
 	case AttachDrop:
 		yaw := float64(p.entity.Rotation().Yaw) * math.Pi / 180
-		return eyes.Add(mgl64.Vec3{
-			float64(-float32(math.Sin(yaw)) * attachDropAhead),
+		return eyes.Add(mgl32.Vec3{
+			-float32(math.Sin(yaw)) * attachDropAhead,
 			-attachDropDown,
-			float64(math.Cos(yaw)) * attachDropAhead,
+			float32(math.Cos(yaw)) * attachDropAhead,
 		})
 	default:
 		return eyes

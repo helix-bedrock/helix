@@ -3,7 +3,7 @@ package player
 import (
 	"maps"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -41,7 +41,7 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 	return []packet.Packet{&packet.AddPlayer{
 		EntityLinks: links,
 		UUID:        p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
-		Position: world.Vec32(pos.Sub(mgl64.Vec3{0, eyeHeight, 0})), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		Position: pos.Sub(mgl32.Vec3{0, eyeHeight, 0}), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		GameType: p.gameMode, EntityMetadata: meta,
 		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().network(p.s.reg),
 		DeviceID: string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
@@ -66,7 +66,7 @@ func (p *Player) broadcast(pks ...packet.Packet) {
 func (p *Player) movePacket(e *world.Entity) packet.Packet {
 	rot := e.Rotation()
 	return &packet.MovePlayer{
-		EntityRuntimeID: p.runtimeID, Position: world.Vec32(e.Position()), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		EntityRuntimeID: p.runtimeID, Position: e.Position(), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeNormal, OnGround: e.OnGround(), Tick: e.Tick(),
 	}
 }
@@ -154,10 +154,10 @@ func (p *Player) ownMetadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyPlayerLastDeathPosition:          protocol.BlockPos{},
 		protocol.EntityDataKeyPlayerLastDeathDimension:         int32(0),
 		protocol.EntityDataKeyPlayerHasDied:                    uint8(0),
-		protocol.EntityDataKeyCollisionBox:                     mgl64.Vec3{playerWidth, playerHeight, 0},
+		protocol.EntityDataKeyCollisionBox:                     mgl32.Vec3{playerWidth, playerHeight, 0},
 		protocol.EntityDataKeyVisibleMobEffects:                p.visibleEffects(),
 		protocol.EntityDataKeyFilteredName:                     "",
-		protocol.EntityDataKeyEnterBedPosition:                 mgl64.Vec3{},
+		protocol.EntityDataKeyEnterBedPosition:                 mgl32.Vec3{},
 		protocol.EntityDataKeySeatThirdPersonCameraRadius:      float32(0),
 		protocol.EntityDataKeySeatCameraRelaxDistanceSmoothing: float32(0),
 		protocol.EntityDataKeyAimAssistPriorityPresetID:        int32(-1),

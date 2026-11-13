@@ -3,7 +3,7 @@ package circuit_test
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -127,9 +127,9 @@ func TestDetectorRailPowersForCart(t *testing.T) {
 		place(r, lamp, w.state(t, "minecraft:redstone_lamp", nil))
 	})
 	present := true
-	cart := mgl64.Vec3{4.5, surfaceY + 0.35, 4.5}
-	w.circuits.SetEntityBox(func(*world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
-		return cart.Sub(mgl64.Vec3{0.49, 0.35, 0.49}), cart.Add(mgl64.Vec3{0.49, 0.35, 0.49}), false, true
+	cart := mgl32.Vec3{4.5, surfaceY + 0.35, 4.5}
+	w.circuits.SetEntityBox(func(*world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+		return cart.Sub(mgl32.Vec3{0.49, 0.35, 0.49}), cart.Add(mgl32.Vec3{0.49, 0.35, 0.49}), false, true
 	})
 	w.circuits.SetCartBox(func(*world.Entity) (int32, bool) { return -1, present })
 	e := w.d.AddEntity(world.EntityConfig{UniqueID: 901, RuntimeID: 901, Pos: cart})

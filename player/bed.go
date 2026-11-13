@@ -5,7 +5,7 @@ import (
 	"math"
 	"sync/atomic"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/direction"
@@ -309,10 +309,10 @@ func (p *Player) useBed(r *world.Region, u *BlockUse) bool {
 	}
 	air := blocks.Air()
 	r.SetBlock(head, 0, air)
-	at := blockVec(head).Add(mgl64.Vec3{0.5, 0.5, 0.5})
+	at := blockVec(head).Add(mgl32.Vec3{0.5, 0.5, 0.5})
 	if b, isB := r.Block(foot, 0); isB && blocks.Name(b) == blockuse.Bed {
 		r.SetBlock(foot, 0, air)
-		at = at.Add(blockVec(foot).Add(mgl64.Vec3{0.5, 0.5, 0.5})).Mul(0.5)
+		at = at.Add(blockVec(foot).Add(mgl32.Vec3{0.5, 0.5, 0.5})).Mul(0.5)
 	}
 	x := NewExplosion(at, bedBlast)
 	x.Fire, x.MaxResistance = true, math.MaxFloat32
@@ -386,7 +386,7 @@ func (p *Player) startSleep(r *world.Region, head cube.Pos, setSpawn bool) int {
 	}
 	feet := p.entity.Position()
 	feet[1] -= playerEyeHeight
-	if math.Abs(feet[0]-float64(head[0])) > bedReachSide || math.Abs(feet[1]-float64(head[1])) > bedReachUp || math.Abs(feet[2]-float64(head[2])) > bedReachSide {
+	if abs32(feet[0]-float32(head[0])) > bedReachSide || abs32(feet[1]-float32(head[1])) > bedReachUp || abs32(feet[2]-float32(head[2])) > bedReachSide {
 		return sleepTooFar
 	}
 	if _, ok := p.s.standUpSpot(r, head, nil); !ok {
@@ -436,7 +436,7 @@ func (p *Player) lieDown(r *world.Region, head cube.Pos) {
 	rot := p.entity.Rotation()
 	rot.Yaw = bedYaw[facing]
 	rot.HeadYaw = rot.Yaw
-	at := mgl64.Vec3{float64(head[0]) + 0.5, float64(head[1]) + float64(height) + playerEyeHeight, float64(head[2]) + 0.5}
+	at := mgl32.Vec3{float32(head[0]) + 0.5, float32(head[1]) + height + playerEyeHeight, float32(head[2]) + 0.5}
 	applyMovement(p, moveTo(at, rot, p.entity.Tick()))
 	p.showSleep()
 }
@@ -480,7 +480,7 @@ func (p *Player) StopSleeping() {
 			if !ok {
 				at = head.Side(cube.FaceUp)
 			}
-			stand := mgl64.Vec3{float64(at[0]) + 0.5, float64(at[1]) + playerEyeHeight, float64(at[2]) + 0.5}
+			stand := mgl32.Vec3{float32(at[0]) + 0.5, float32(at[1]) + playerEyeHeight, float32(at[2]) + 0.5}
 			applyMovement(p, moveTo(stand, p.entity.Rotation(), p.entity.Tick()))
 			if blocks.Name(b) == blockuse.StrawBed {
 				p.s.useUpStrawBed(r, head, b)
@@ -509,7 +509,7 @@ func (s *Host) useUpStrawBed(r *world.Region, head cube.Pos, b uint32) {
 // standUpSpot is BDS's sub_CCD1AB0: the first of standUpSpots, turned for the bed, with
 // something to stand on and room to stand, the safe ones first. from is where the sleeper
 // is, which picks the side to look on first; nil starts on the usual side.
-func (s *Host) standUpSpot(r *world.Region, head cube.Pos, from *mgl64.Vec3) (cube.Pos, bool) {
+func (s *Host) standUpSpot(r *world.Region, head cube.Pos, from *mgl32.Vec3) (cube.Pos, bool) {
 	blocks := s.reg.Blocks
 	b, ok := r.Block(head, 0)
 	if !ok || !blockuse.IsBed(blocks, b) {
@@ -518,7 +518,7 @@ func (s *Host) standUpSpot(r *world.Region, head cube.Pos, from *mgl64.Vec3) (cu
 	facing := blockuse.BedFacing(blocks, b)
 	spots := &standUpSpots
 	if from != nil {
-		cx, cz := float64(head[0])+0.5, float64(head[2])+0.5
+		cx, cz := float32(head[0])+0.5, float32(head[2])+0.5
 		switch facing {
 		case direction.South:
 			if from[0] > cx {
@@ -747,20 +747,20 @@ func (p *Player) saveSpawn(data map[string]any) {
 
 // bedRespawn is where a dead player comes back at its bed: a place to get up beside it. False
 // if it has no bed or the bed is gone, which forgets it.
-func (p *Player) bedRespawn(r *world.Region) (mgl64.Vec3, bool) {
+func (p *Player) bedRespawn(r *world.Region) (mgl32.Vec3, bool) {
 	if !p.spawn.set || r == nil {
-		return mgl64.Vec3{}, false
+		return mgl32.Vec3{}, false
 	}
 	b, ok := r.Block(p.spawn.pos, 0)
 	if !ok || !blockuse.IsBed(p.s.reg.Blocks, b) {
 		if ok {
 			p.spawn.set = false
 		}
-		return mgl64.Vec3{}, false
+		return mgl32.Vec3{}, false
 	}
 	at, found := p.s.standUpSpot(r, p.spawn.pos, nil)
 	if !found {
-		return mgl64.Vec3{}, false
+		return mgl32.Vec3{}, false
 	}
-	return mgl64.Vec3{float64(at[0]) + 0.5, float64(at[1]) + playerEyeHeight, float64(at[2]) + 0.5}, true
+	return mgl32.Vec3{float32(at[0]) + 0.5, float32(at[1]) + playerEyeHeight, float32(at[2]) + 0.5}, true
 }

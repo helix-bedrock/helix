@@ -15,7 +15,7 @@ import (
 func (m *Mob) NameTag() string { return m.nameTag }
 
 // NextFloat draws from the region's random.
-func (m *Mob) NextFloat() float64 {
+func (m *Mob) NextFloat() float32 {
 	if m.v.rnd == nil {
 		return 0
 	}
@@ -104,7 +104,7 @@ func (resolver) HoldsItem(a behavior.Actor, items []string) bool {
 
 // Molang compiles an expression (molang.go). It is evaluated for the mob the resolver is for:
 // every Molang the components hold is about the mob itself.
-func (r resolver) Molang(expr string) (func(behavior.Mob) float64, bool) {
+func (r resolver) Molang(expr string) (func(behavior.Mob) float32, bool) {
 	e, err := parseMolang(expr)
 	if err != nil {
 		r.m.rt.Log.Debug("mob molang", "type", r.m.typ, "expr", expr, "err", err)
@@ -273,8 +273,8 @@ func rawBool(raw json.RawMessage, def bool) bool {
 	return def
 }
 
-func rawFloat(raw json.RawMessage) float64 {
-	var f float64
+func rawFloat(raw json.RawMessage) float32 {
+	var f float32
 	_ = json.Unmarshal(raw, &f)
 	return f
 }

@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 )
 
@@ -10,7 +10,7 @@ import (
 // loading screen) that places it at feet on arrival. A nil dim is the player's own. It
 // reports false while the player is not in the world or already changing dimension.
 // Runs: the player's region (use Run from elsewhere).
-func (p *Player) Teleport(dim *world.Dimension, feet mgl64.Vec3, rot world.Rotation) bool {
+func (p *Player) Teleport(dim *world.Dimension, feet mgl32.Vec3, rot world.Rotation) bool {
 	if p.entity == nil || p.moving != nil {
 		return false
 	}
@@ -21,7 +21,7 @@ func (p *Player) Teleport(dim *world.Dimension, feet mgl64.Vec3, rot world.Rotat
 		p.teleportFeet(feet, rot)
 		return true
 	}
-	p.changeDimension(&dimMove{to: dim, eyes: feet.Add(mgl64.Vec3{0, eyeHeight, 0}), rot: rot, arrive: func(*world.Region) bool {
+	p.changeDimension(&dimMove{to: dim, eyes: feet.Add(mgl32.Vec3{0, eyeHeight, 0}), rot: rot, arrive: func(*world.Region) bool {
 		p.teleportFeet(feet, rot)
 		return true
 	}})

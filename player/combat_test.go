@@ -4,7 +4,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -67,11 +66,11 @@ func TestProtection(t *testing.T) {
 // TestKnockbackStep pins one push: away along the direction, kept to the cap upward.
 func TestKnockbackStep(t *testing.T) {
 	p := testPlayer(t)
-	v := p.knockbackStep(mgl64.Vec3{}, 3, 4, knockbackPush, knockbackPush)
-	if !near(float32(v[0]), 0.24) || !near(float32(v[2]), 0.32) || !near(float32(v[1]), knockbackCap) {
+	v := p.knockbackStep([3]float32{}, 3, 4, knockbackPush, knockbackPush)
+	if !near(v[0], 0.24) || !near(v[2], 0.32) || !near(v[1], knockbackCap) {
 		t.Errorf("push = %v", v)
 	}
-	if v := p.knockbackStep(mgl64.Vec3{}, 0, 0, knockbackPush, 0); v[0] != 0 || v[2] != 0 {
+	if v := p.knockbackStep([3]float32{}, 0, 0, knockbackPush, 0); v[0] != 0 || v[2] != 0 {
 		t.Errorf("no direction = %v", v)
 	}
 }

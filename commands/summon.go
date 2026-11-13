@@ -45,7 +45,7 @@ func (c summonOverload) Run(src command.Source, out *command.Output) {
 	yaw, _ := src.Rotation()
 	p.Run(func(p *player.Player) {
 		if d := p.Dimension(); d != nil {
-			p.Host().SpawnMob(d, typ, pos, float64(yaw))
+			p.Host().SpawnMob(d, typ, pos, yaw)
 		}
 	})
 	out.Success("commands.summon.success")

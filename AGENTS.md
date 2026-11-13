@@ -138,10 +138,6 @@ sibling library folders, so unreleased library changes are used.
   `Dimension.TPS` (mean of its regions); `Server.TPS` is the mean of every
   region, `Player.TPS` the client's own tick rate (its PlayerAuthInput
   arrivals), `Player.RegionTPS` the player's region's. `-testcmds` adds /tps.
-  Positions are 64-bit (`mgl64.Vec3`) on the server, so movement stays exact at millions
-  of blocks out; velocities, rotations, saved NBT (`Pos`, `Motion`) and actor data stay
-  32-bit as in BDS, and packets carry 32-bit. Convert at those edges with `world.Vec32` and
-  `world.Vec64` (`vec.go`); `player.boxAt` gives a block box's corners in 64-bit.
   Generators: `Flat`
   (level.dat's layers), `Empty`, any `Generator`; a `ColumnGenerator` also
   hands over block entities, a `Spawner` answers the spawn height.

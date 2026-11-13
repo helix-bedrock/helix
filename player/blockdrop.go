@@ -4,7 +4,7 @@ import (
 	"maps"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -37,7 +37,7 @@ func (g *gameplay) harvests(b *BreakInfo) bool {
 type BlockDrop struct {
 	Stack ItemStack
 	// Pos is where it appears, Velocity how it moves.
-	Pos, Velocity mgl64.Vec3
+	Pos, Velocity mgl32.Vec3
 	// PickupDelay is how many ticks pass before it can be picked up.
 	PickupDelay int32
 }
@@ -46,8 +46,8 @@ type BlockDrop struct {
 // random spot inside the block, with its usual delay.
 func NewBlockDrop(pos cube.Pos, s ItemStack) BlockDrop {
 	return BlockDrop{
-		Stack: s, Pos: blockVec(pos).Add(mgl64.Vec3{float64(dropOffset()), float64(dropOffset()), float64(dropOffset())}),
-		Velocity: mgl64.Vec3{float64(dropDrift()), dropUp, float64(dropDrift())}, PickupDelay: blockDropDelay,
+		Stack: s, Pos: blockVec(pos).Add(mgl32.Vec3{dropOffset(), dropOffset(), dropOffset()}),
+		Velocity: mgl32.Vec3{dropDrift(), dropUp, dropDrift()}, PickupDelay: blockDropDelay,
 	}
 }
 

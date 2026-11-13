@@ -2,10 +2,10 @@ package player
 
 import (
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/mob"
-	"github.com/helix-bedrock/helix/world"
 )
 
 // Breeding, feeding and leashes on the engine side: the mob package decides (breed.go),
@@ -27,7 +27,7 @@ func (m *Mob) Born(_ *mob.Mob, b state.Birth) behavior.Actor {
 		return nil
 	}
 	_, yaw, _, _ := m.m.Rotation()
-	baby, ok := m.s.newMob(b.Baby, m.entity.Position(), float64(yaw), definition.InitBorn, "")
+	baby, ok := m.s.newMob(b.Baby, m.entity.Position(), yaw, definition.InitBorn, "")
 	if !ok {
 		return nil
 	}

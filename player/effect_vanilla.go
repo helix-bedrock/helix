@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -329,7 +329,7 @@ func windChargedDied(p *Player, _ int32) {
 	if r == nil {
 		return
 	}
-	at := p.feet().Add(mgl64.Vec3{0, playerHeight / 2, 0})
+	at := p.feet().Add(mgl32.Vec3{0, playerHeight / 2, 0})
 	p.s.Explode(r, &Explosion{
 		Pos: at, Radius: windChargedRadius + p.rng.Float32()*windChargedSpread, Kind: ExplosionWindCharge,
 		Source: p.entity, AllowUnderwater: true, MaxResistance: noResistance, KnockbackScale: windChargedKnockback,
@@ -364,7 +364,7 @@ func weavingDied(p *Player, _ int32) {
 			continue
 		}
 		if r.SetBlock(pos, 0, web) {
-			levelEvent(r, pos, mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, packet.LevelEventAnimationSpawnCobweb, 0)
+			levelEvent(r, pos, mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])}, packet.LevelEventAnimationSpawnCobweb, 0)
 			placed++
 		}
 	}
@@ -377,9 +377,9 @@ func oozingDied(p *Player, _ int32) {
 	if d == nil {
 		return
 	}
-	at := p.feet().Add(mgl64.Vec3{0, oozingLift, 0})
+	at := p.feet().Add(mgl32.Vec3{0, oozingLift, 0})
 	for range oozingSlimes {
-		if m, ok := p.s.SpawnMob(d, nameSlime, at, float64(p.rng.Float32()*360)); ok {
+		if m, ok := p.s.SpawnMob(d, nameSlime, at, p.rng.Float32()*360); ok {
 			m.m.RunEvent(oozingEvent)
 		}
 	}
@@ -393,24 +393,24 @@ func infestedHurt(p *Player, _ int32, _ DamageSource) {
 		return
 	}
 	n := 1 + p.rng.IntN(infestedExtra)
-	at := p.feet().Add(mgl64.Vec3{0, playerHeight / 2, 0})
+	at := p.feet().Add(mgl32.Vec3{0, playerHeight / 2, 0})
 	for range n {
 		yaw := p.rng.Float32() * 360
 		turn := float64(p.rng.Float32())*math.Pi - math.Pi/2
 		view := p.viewVector()
-		m, ok := p.s.SpawnMob(d, nameSilverfish, at, float64(yaw))
+		m, ok := p.s.SpawnMob(d, nameSilverfish, at, yaw)
 		if !ok {
 			continue
 		}
-		cos, sin := math.Cos(turn), math.Sin(turn)
+		cos, sin := float32(math.Cos(turn)), float32(math.Sin(turn))
 		x, z := view[0]*infestedSpeed, view[2]*infestedSpeed
-		m.SetVelocity(mgl64.Vec3{x*cos + z*sin, view[1] * infestedSpeed * infestedLift, z*cos - x*sin})
+		m.SetVelocity(mgl32.Vec3{x*cos + z*sin, view[1] * infestedSpeed * infestedLift, z*cos - x*sin})
 	}
 }
 
 // viewVector is the way the player looks, BDS's getViewVector.
-func (p *Player) viewVector() mgl64.Vec3 {
+func (p *Player) viewVector() mgl32.Vec3 {
 	rot := p.entity.Rotation()
-	yaw, pitch := float64(mgl64.DegToRad(float64(rot.Yaw))), float64(mgl64.DegToRad(float64(rot.Pitch)))
-	return mgl64.Vec3{float64(-math.Sin(yaw) * math.Cos(pitch)), float64(-math.Sin(pitch)), float64(math.Cos(yaw) * math.Cos(pitch))}
+	yaw, pitch := float64(mgl32.DegToRad(rot.Yaw)), float64(mgl32.DegToRad(rot.Pitch))
+	return mgl32.Vec3{float32(-math.Sin(yaw) * math.Cos(pitch)), float32(-math.Sin(pitch)), float32(math.Cos(yaw) * math.Cos(pitch))}
 }

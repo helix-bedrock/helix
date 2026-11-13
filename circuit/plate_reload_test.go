@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -19,14 +19,14 @@ func TestPlateComesUpAfterReload(t *testing.T) {
 	at := cube.Pos{4, surfaceY, 4}
 	var on atomic.Bool
 	on.Store(true)
-	w.circuits.SetEntityBox(func(*world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
+	w.circuits.SetEntityBox(func(*world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 		if !on.Load() {
 			return lo, hi, false, false
 		}
-		return mgl64.Vec3{4.2, surfaceY, 4.2}, mgl64.Vec3{4.8, surfaceY + 1, 4.8}, true, true
+		return mgl32.Vec3{4.2, surfaceY, 4.2}, mgl32.Vec3{4.8, surfaceY + 1, 4.8}, true, true
 	})
 	spawn := func(id int64) *world.Entity {
-		return w.d.AddEntity(world.EntityConfig{UniqueID: id, RuntimeID: uint64(id), Pos: mgl64.Vec3{4.5, surfaceY, 4.5}}) //nolint:gosec // small
+		return w.d.AddEntity(world.EntityConfig{UniqueID: id, RuntimeID: uint64(id), Pos: mgl32.Vec3{4.5, surfaceY, 4.5}}) //nolint:gosec // small
 	}
 	first := spawn(900)
 	w.run(func(r *world.Region) {

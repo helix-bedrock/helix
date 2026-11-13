@@ -4,7 +4,7 @@ import "github.com/helix-bedrock/entity/state"
 
 // DataValue is one entry of the mob's synched actor data that its components wrote
 // (variant, mark variant, colour, fuse time, skin ID, ambient sound timing): Value is an
-// int32, float64 or string, as the client reads that key.
+// int32, float32 or string, as the client reads that key.
 type DataValue struct {
 	Key   int
 	Value any
@@ -32,7 +32,7 @@ func (m *Mob) setData(key int, v any) {
 
 // SetIntData, SetFloatData and SetStringData are state.DataMob: the components' actor data.
 func (s stateMob) SetIntData(key int, v int32)     { s.setData(key, v) }
-func (s stateMob) SetFloatData(key int, v float64) { s.setData(key, float32(v)) } // actor data floats are 32-bit
+func (s stateMob) SetFloatData(key int, v float32) { s.setData(key, v) }
 func (s stateMob) SetStringData(key int, v string) { s.setData(key, v) }
 
 var _ state.DataMob = stateMob{}

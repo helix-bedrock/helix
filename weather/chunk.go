@@ -4,7 +4,7 @@ import (
 	"math/rand/v2"
 	"sync/atomic"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -77,11 +77,11 @@ type Climate interface {
 }
 
 // StrikeFunc makes a lightning bolt at pos. Runs: owner of the region.
-type StrikeFunc func(r *world.Region, pos mgl64.Vec3)
+type StrikeFunc func(r *world.Region, pos mgl32.Vec3)
 
 // MobsFunc appends the feet of the mobs and players in the chunk at pos to dst, the ones
 // lightning may strike. Runs: owner of the region.
-type MobsFunc func(r *world.Region, pos mcdb.ChunkPos, dst []mgl64.Vec3) []mgl64.Vec3
+type MobsFunc func(r *world.Region, pos mcdb.ChunkPos, dst []mgl32.Vec3) []mgl32.Vec3
 
 // Config is what the chunk weather needs.
 type Config struct {
@@ -135,7 +135,7 @@ type blockInfo struct {
 type regionState struct {
 	lcg  uint32
 	rng  *rand.Rand
-	mobs []mgl64.Vec3
+	mobs []mgl32.Vec3
 }
 
 type regionKey struct{}
@@ -215,7 +215,7 @@ func (t *Ticker) lightning(r *world.Region, s *regionState, pos mcdb.ChunkPos) {
 	if !ok {
 		return
 	}
-	at := mgl64.Vec3{float64(x), float64(top), float64(z)}
+	at := mgl32.Vec3{float32(x), float32(top), float32(z)}
 	if t.conf.Mobs != nil {
 		s.mobs = t.conf.Mobs(r, pos, s.mobs[:0])
 		open := s.mobs[:0]
@@ -238,8 +238,8 @@ func (t *Ticker) lightning(r *world.Region, s *regionState, pos mcdb.ChunkPos) {
 	}
 }
 
-func floor(f float64) float64 {
-	i := float64(int64(f))
+func floor(f float32) float32 {
+	i := float32(int32(f))
 	if i > f {
 		i--
 	}

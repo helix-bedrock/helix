@@ -1,14 +1,14 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
 // load reads the player's saved data: where they were, and the unique ID
 // BDS gave them.
-func (p *Player) load() (pos mgl64.Vec3, rot world.Rotation, ok bool) {
+func (p *Player) load() (pos mgl32.Vec3, rot world.Rotation, ok bool) {
 	data, found, err := p.s.playerStore.LoadPlayer(p.ids)
 	if err != nil {
 		p.s.log.Error("load player", "name", p.name, "err", err)
@@ -49,7 +49,7 @@ func (p *Player) load() (pos mgl64.Vec3, rot world.Rotation, ok bool) {
 		rot = world.Rotation{Yaw: r[0], Pitch: r[1], HeadYaw: r[0]}
 	}
 	if v, isList := floats(data["Pos"]); isList && len(v) == 3 {
-		return mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}, rot, true
+		return mgl32.Vec3{v[0], v[1], v[2]}, rot, true
 	}
 	return pos, rot, false
 }
@@ -91,12 +91,12 @@ func (p *Player) autoSave() {
 // save writes the player back where BDS keeps players, from the state the
 // entity had when it was removed. The saved Pos is the eye position, as
 // the client reports it and StartGame takes it.
-func (p *Player) save(pos mgl64.Vec3, rot world.Rotation) {
+func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	data := p.saved
 	if data == nil {
 		data = map[string]any{}
 	}
-	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
+	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data["DimensionId"] = int32(p.s.dimensionID(p.dim))
 	data["UniqueID"] = p.uniqueID

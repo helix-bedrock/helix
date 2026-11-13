@@ -7,7 +7,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix-data/data"
@@ -78,7 +78,7 @@ func vanillaBreathable() (state.BreathableConfig, error) {
 				Breathable *struct {
 					TotalSupply      *int32   `json:"total_supply"`
 					SuffocateTime    *int32   `json:"suffocate_time"`
-					InhaleTime       *float64 `json:"inhale_time"`
+					InhaleTime       *float32 `json:"inhale_time"`
 					BreathesAir      *bool    `json:"breathes_air"`
 					BreathesWater    *bool    `json:"breathes_water"`
 					BreathesLava     *bool    `json:"breathes_lava"`
@@ -182,9 +182,9 @@ func (b breather) Breath(breathe, nonBreathe []string) state.Medium {
 	if !s.reg.Blocks.Properties(block).SolidMaterial {
 		return state.MediumAir
 	}
-	in := at.Sub(mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])})
+	in := at.Sub(mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])})
 	for _, box := range s.boxesAt(b.r, pos, block) {
-		if in[0] >= float64(box[0]) && in[0] <= float64(box[3]) && in[1] >= float64(box[1]) && in[1] <= float64(box[4]) && in[2] >= float64(box[2]) && in[2] <= float64(box[5]) {
+		if in[0] >= box[0] && in[0] <= box[3] && in[1] >= box[1] && in[1] <= box[4] && in[2] >= box[2] && in[2] <= box[5] {
 			return state.MediumSolid
 		}
 	}
@@ -219,7 +219,7 @@ func (b breather) UnderWater() bool {
 	if !ok || s.reg.Blocks.Properties(liq).Material != registry.MaterialWater {
 		return false
 	}
-	return float64(s.liquidHeightOf(liq, pos)) > at[1]
+	return s.liquidHeightOf(liq, pos) > at[1]
 }
 
 // SetFlag shows the breathing flag; the component sets no other.
@@ -234,7 +234,7 @@ func (b breather) SetFlag(n int, on bool) {
 
 func (b breather) AttachPos(loc int) behavior.Vec3 {
 	v := b.p.AttachPos(AttachPoint(loc)) //nolint:gosec // BDS's actor locations
-	return behavior.Vec3{X: float64(v[0]), Y: float64(v[1]), Z: float64(v[2])}
+	return behavior.Vec3{X: v[0], Y: v[1], Z: v[2]}
 }
 
 // Respiration is the highest Respiration level the player wears.
@@ -250,8 +250,8 @@ func (b breather) Respiration() int32 {
 	return best
 }
 
-func (b breather) Hurt(cause int, amount float64) {
-	b.p.s.game.sys.Hurt(b.p, float32(amount), DamageSource{Cause: DamageCause(cause)}) //nolint:gosec // a cause number
+func (b breather) Hurt(cause int, amount float32) {
+	b.p.s.game.sys.Hurt(b.p, amount, DamageSource{Cause: DamageCause(cause)}) //nolint:gosec // a cause number
 }
 
 // SetAirSupply sends the air data to the player and those who see it when it changes.
@@ -286,16 +286,16 @@ func (breathRandom) NextInt(n int32) int32 {
 }
 
 // NextFloat returns 0 up to 1.
-func (breathRandom) NextFloat() float64 { return float64(rand.Float32()) } //nolint:gosec // gameplay randomness
+func (breathRandom) NextFloat() float32 { return rand.Float32() } //nolint:gosec // gameplay randomness
 
 // NextBool returns true or false.
 func (breathRandom) NextBool() bool { return rand.IntN(2) == 0 } //nolint:gosec // gameplay randomness
 
 // NextGaussian returns a normally spread number.
-func (breathRandom) NextGaussian() float64 { return float64(rand.NormFloat64()) } //nolint:gosec // gameplay randomness
+func (breathRandom) NextGaussian() float32 { return float32(rand.NormFloat64()) } //nolint:gosec // gameplay randomness
 
 func (w breathWorld) LevelEvent(id int32, at behavior.Vec3, _ string) {
-	levelEvent(w.r, w.p.blockPos(), mgl64.Vec3{float64(at.X), float64(at.Y), float64(at.Z)}, id, bubbleData)
+	levelEvent(w.r, w.p.blockPos(), mgl32.Vec3{at.X, at.Y, at.Z}, id, bubbleData)
 }
 
 // bubbleData is the data of BDS's bubble level event from the breathable tick.
@@ -317,10 +317,10 @@ func (s *Host) liquidIn(r *world.Region, pos cube.Pos) (uint32, bool) {
 }
 
 // liquidHeightOf is BlockUtils::getLiquidBlockHeight (0xB656EF0) of liquid block liq at pos.
-func (s *Host) liquidHeightOf(liq uint32, pos cube.Pos) float64 {
+func (s *Host) liquidHeightOf(liq uint32, pos cube.Pos) float32 {
 	depth, _ := s.reg.Blocks.States(liq)["liquid_depth"].(int32)
 	if depth >= liquidFalling {
 		depth = 0
 	}
-	return float64(pos[1]) + 1 - float64(depth)/liquidLevels
+	return float32(pos[1]) + 1 - float32(depth)/liquidLevels
 }

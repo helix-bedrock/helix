@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -53,7 +53,7 @@ type LightningBolt struct {
 func (b *LightningBolt) Entity() *world.Entity { return b.entity }
 
 // Strike makes a lightning bolt at pos. Runs: owner of the region.
-func (s *Host) Strike(r *world.Region, pos mgl64.Vec3) *LightningBolt {
+func (s *Host) Strike(r *world.Region, pos mgl32.Vec3) *LightningBolt {
 	b := &LightningBolt{s: s, life: boltLife, flashes: int32(rand.IntN(boltFlashes)) + 1} //nolint:gosec // weather, not a secret
 	b.entity = r.Dimension().AddEntity(world.EntityConfig{
 		UniqueID: itemUniqueIDBase | rand.Int64N(itemUniqueIDBase), RuntimeID: s.runtimeIDs.Add(1), Pos: pos, //nolint:gosec // an entity ID, not a secret
@@ -68,15 +68,15 @@ func (s *Host) StrikePlayer(p *Player) bool {
 	return p.Run(func(p *Player) {
 		if r := p.entity.Region(); r != nil {
 			at := p.entity.Position()
-			s.Strike(r, mgl64.Vec3{at[0], at[1] - eyeHeight, at[2]})
+			s.Strike(r, mgl32.Vec3{at[0], at[1] - eyeHeight, at[2]})
 		}
 	})
 }
 
 // MobsIn appends the feet of the players in the chunk at pos to dst, what lightning may
 // strike. Runs: owner of the region.
-func (s *Host) MobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl64.Vec3) []mgl64.Vec3 {
-	x0, z0 := float64(pos[0])*16, float64(pos[1])*16
+func (s *Host) MobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl32.Vec3) []mgl32.Vec3 {
+	x0, z0 := float32(pos[0])*16, float32(pos[1])*16
 	for _, e := range r.AppendEntitiesIn(nil, x0, z0, x0+16, z0+16) {
 		p, ok := e.Owner().(*Player)
 		if !ok || p.dead() {
@@ -86,7 +86,7 @@ func (s *Host) MobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl64.Vec3) []mg
 		if at[0] < x0 || at[0] >= x0+16 || at[2] < z0 || at[2] >= z0+16 {
 			continue
 		}
-		dst = append(dst, mgl64.Vec3{at[0], at[1] - eyeHeight, at[2]})
+		dst = append(dst, mgl32.Vec3{at[0], at[1] - eyeHeight, at[2]})
 	}
 	return dst
 }
@@ -94,12 +94,12 @@ func (s *Host) MobsIn(r *world.Region, pos mcdb.ChunkPos, dst []mgl64.Vec3) []mg
 func (b *LightningBolt) spawnPackets(e *world.Entity) []packet.Packet {
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: nameLightningBolt,
-		Position: world.Vec32(e.Position()), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyScale: float32(1)},
+		Position: e.Position(), EntityMetadata: protocol.EntityMetadata{protocol.EntityDataKeyScale: float32(1)},
 	}}
 }
 
 func (b *LightningBolt) movePacket(e *world.Entity) packet.Packet {
-	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: world.Vec32(e.Position())}
+	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: e.Position()}
 }
 
 // tick is the bolt's tick: on the first, thunder and fire; it hits what is around it once,
@@ -162,9 +162,9 @@ func (b *LightningBolt) fire(r *world.Region, pos cube.Pos) {
 
 // hitAround is each living entity in reach struck (Actor::thunderHit): 5 damage, and set on fire for
 // 8 seconds unless it does not burn.
-func (b *LightningBolt) hitAround(r *world.Region, at mgl64.Vec3) {
-	lo := mgl64.Vec3{at[0] - boltReach, at[1] - boltReach, at[2] - boltReach}
-	hi := mgl64.Vec3{at[0] + boltReach, at[1] + boltReachUp + boltReach, at[2] + boltReach}
+func (b *LightningBolt) hitAround(r *world.Region, at mgl32.Vec3) {
+	lo := mgl32.Vec3{at[0] - boltReach, at[1] - boltReach, at[2] - boltReach}
+	hi := mgl32.Vec3{at[0] + boltReach, at[1] + boltReachUp + boltReach, at[2] + boltReach}
 	for _, e := range r.AppendEntitiesIn(nil, lo[0], lo[2], hi[0], hi[2]) {
 		l, ok := e.Owner().(Living)
 		if !ok || l.Dead() {

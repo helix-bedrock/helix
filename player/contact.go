@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 )
 
@@ -60,9 +60,9 @@ func (i *ItemActor) tickContact(e *world.Entity, c burnContact) {
 }
 
 // playerBox is a player's box at its eye position at.
-func playerBox(at mgl64.Vec3) (lo, hi mgl64.Vec3) {
+func playerBox(at mgl32.Vec3) (lo, hi mgl32.Vec3) {
 	feet := at[1] - eyeHeight
-	lo = mgl64.Vec3{at[0] - playerHalfWidth, feet, at[2] - playerHalfWidth}
-	hi = mgl64.Vec3{at[0] + playerHalfWidth, feet + playerHeight, at[2] + playerHalfWidth}
+	lo = mgl32.Vec3{at[0] - playerHalfWidth, feet, at[2] - playerHalfWidth}
+	hi = mgl32.Vec3{at[0] + playerHalfWidth, feet + playerHeight, at[2] + playerHalfWidth}
 	return lo, hi
 }

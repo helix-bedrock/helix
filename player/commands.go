@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/command"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
@@ -46,7 +46,7 @@ func (s *CommandSource) Permission() command.Permission {
 }
 
 // Position is the player's feet.
-func (s *CommandSource) Position() mgl64.Vec3 { return s.p.State().Position }
+func (s *CommandSource) Position() mgl32.Vec3 { return s.p.State().Position }
 
 // Rotation is where the player looks.
 func (s *CommandSource) Rotation() (yaw, pitch float32) {
@@ -72,7 +72,7 @@ var commandGameModes = map[string]int32{
 // @a and @e (everyone, until there are other entities), @p (nearest) and @r (random),
 // with the arguments name, r, rm, x, y, z, m, l, lm, type and c. Players are read
 // through State, so every region's are seen. self may be nil (the console).
-func (h *Host) selectPlayers(self *Player, from mgl64.Vec3, sel command.Selector) []command.Target {
+func (h *Host) selectPlayers(self *Player, from mgl32.Vec3, sel command.Selector) []command.Target {
 	if sel.Kind == "" {
 		for _, o := range h.Online() {
 			if strings.EqualFold(o.name, sel.Name) {
@@ -85,7 +85,7 @@ func (h *Host) selectPlayers(self *Player, from mgl64.Vec3, sel command.Selector
 	list := h.selectorCandidates(self, sel)
 	list = slices.DeleteFunc(list, func(f selected) bool { return !matchesSelector(f.p, at, sel) })
 	for i := range list {
-		list[i].dist = float32(list[i].p.State().Position.Sub(at).Len())
+		list[i].dist = list[i].p.State().Position.Sub(at).Len()
 	}
 	list = orderSelected(list, sel)
 	out := make([]command.Target, len(list))
@@ -109,21 +109,21 @@ var selectorAxes = [...]struct {
 
 // selectorOrigin is where the selector measures from: from, with its x, y and z arguments
 // set or, after ~, added.
-func selectorOrigin(from mgl64.Vec3, sel command.Selector) mgl64.Vec3 {
+func selectorOrigin(from mgl32.Vec3, sel command.Selector) mgl32.Vec3 {
 	at := from
 	for _, axis := range selectorAxes {
 		a, ok := sel.Arg(axis.key)
 		if !ok {
 			continue
 		}
-		v, err := strconv.ParseFloat(strings.TrimPrefix(a.Value, "~"), 64)
+		v, err := strconv.ParseFloat(strings.TrimPrefix(a.Value, "~"), 32)
 		if err != nil {
 			continue
 		}
 		if strings.HasPrefix(a.Value, "~") {
-			at[axis.i] += v
+			at[axis.i] += float32(v)
 		} else {
-			at[axis.i] = float64(v)
+			at[axis.i] = float32(v)
 		}
 	}
 	return at
@@ -173,7 +173,7 @@ func orderSelected(list []selected, sel command.Selector) []selected {
 }
 
 // matchesSelector checks a player against a selector's filters.
-func matchesSelector(p *Player, at mgl64.Vec3, sel command.Selector) bool {
+func matchesSelector(p *Player, at mgl32.Vec3, sel command.Selector) bool {
 	st := p.State()
 	dist := st.Position.Sub(at).Len()
 	for _, a := range sel.Args {
@@ -187,15 +187,15 @@ func matchesSelector(p *Player, at mgl64.Vec3, sel command.Selector) bool {
 			mode, known := commandGameModes[strings.ToLower(a.Value)]
 			ok = known && mode == st.GameMode
 		case "r", "rm", "l", "lm":
-			v, err := strconv.ParseFloat(a.Value, 64)
+			v, err := strconv.ParseFloat(a.Value, 32)
 			if err != nil {
 				return false
 			}
 			switch a.Key {
 			case "r":
-				ok = dist <= v
+				ok = dist <= float32(v)
 			case "rm":
-				ok = dist >= v
+				ok = dist >= float32(v)
 			case "l":
 				ok = float64(st.Level) <= v
 			case "lm":

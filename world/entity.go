@@ -5,7 +5,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/mcdb"
@@ -32,7 +32,7 @@ type Entity struct {
 	removed bool
 
 	// Owned by the entity's region.
-	pos      mgl64.Vec3
+	pos      mgl32.Vec3
 	rot      Rotation
 	onGround bool
 	tick     uint64
@@ -73,7 +73,7 @@ type Rotation struct {
 
 // Movement is where an entity moved to.
 type Movement struct {
-	Pos      mgl64.Vec3
+	Pos      mgl32.Vec3
 	Rot      Rotation
 	OnGround bool
 	// Tick is the client's tick of a player's movement.
@@ -85,7 +85,7 @@ type Movement struct {
 type EntityConfig struct {
 	UniqueID  int64
 	RuntimeID uint64
-	Pos       mgl64.Vec3
+	Pos       mgl32.Vec3
 	Rot       Rotation
 	// Viewer makes the entity a player's: it moves with the viewer between
 	// regions and is shown every entity within BDS's 57-chunk disc.
@@ -299,7 +299,7 @@ func (e *Entity) RuntimeID() uint64 { return e.conf.RuntimeID }
 func (e *Entity) Owner() any { return e.conf.Owner }
 
 // Position returns where the entity is. Runs: owner.
-func (e *Entity) Position() mgl64.Vec3 { return e.pos }
+func (e *Entity) Position() mgl32.Vec3 { return e.pos }
 
 // Rotation returns the entity's rotation. Runs: owner.
 func (e *Entity) Rotation() Rotation { return e.rot }
@@ -370,13 +370,13 @@ func (e *Entity) Remove() {
 	e.inMu.Unlock()
 }
 
-func chunkOf(pos mgl64.Vec3) mcdb.ChunkPos {
+func chunkOf(pos mgl32.Vec3) mcdb.ChunkPos {
 	return ChunkPos(floor(pos[0]), floor(pos[2]))
 }
 
-func floor(f float64) int32 {
+func floor(f float32) int32 {
 	i := int32(f)
-	if f < float64(i) {
+	if f < float32(i) {
 		i--
 	}
 	return i
@@ -723,8 +723,8 @@ func (r *Region) AppendEntities(dst []*Entity) []*Entity { return append(dst, r.
 // AppendEntitiesIn appends the entities in this region standing in the chunks
 // the area touches to dst, so a caller reusing dst allocates nothing. The
 // caller checks positions. Runs: owner.
-func (r *Region) AppendEntitiesIn(dst []*Entity, minX, minZ, maxX, maxZ float64) []*Entity {
-	lo, hi := chunkOf(mgl64.Vec3{minX, 0, minZ}), chunkOf(mgl64.Vec3{maxX, 0, maxZ})
+func (r *Region) AppendEntitiesIn(dst []*Entity, minX, minZ, maxX, maxZ float32) []*Entity {
+	lo, hi := chunkOf(mgl32.Vec3{minX, 0, minZ}), chunkOf(mgl32.Vec3{maxX, 0, maxZ})
 	for x := lo[0]; x <= hi[0]; x++ {
 		for z := lo[1]; z <= hi[1]; z++ {
 			dst = append(dst, r.byChunk[mcdb.ChunkPos{x, z}]...)

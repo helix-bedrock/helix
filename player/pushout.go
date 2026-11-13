@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -25,15 +25,15 @@ const (
 )
 
 // pushDirs are BDS's directions, in the order of the push constants.
-var pushDirs = [...]mgl64.Vec3{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
+var pushDirs = [...]mgl32.Vec3{{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}
 
 // pushDirection is BDS's choice of way out from a position in a block: the nearest open
 // side, tried in the order west, east, down, up, north, south. BDS counts east as a whole
 // block away once it picks it, so any other open side beats it; that is copied too. closed
 // is in the order of the push constants.
-func pushDirection(at cube.Pos, pos mgl64.Vec3, closed *[pushNowhere]bool) int {
-	fx, fy, fz := pos[0]-float64(at[0]), pos[1]-float64(at[1]), pos[2]-float64(at[2])
-	dist, dir := math.MaxFloat64, pushNowhere
+func pushDirection(at cube.Pos, pos mgl32.Vec3, closed *[pushNowhere]bool) int {
+	fx, fy, fz := pos[0]-float32(at[0]), pos[1]-float32(at[1]), pos[2]-float32(at[2])
+	dist, dir := float32(math.MaxFloat32), pushNowhere
 	if !closed[pushWest] && fx < dist {
 		dist, dir = fx, pushWest
 	}
@@ -65,7 +65,7 @@ func (s *Host) closedSide(r *world.Region, pos cube.Pos) bool {
 // of the box. It sets the speed outright, so what a moving item had is forgotten. With every
 // side closed and a plain block, it rises through the blocks with its collision off until it
 // is out.
-func (i *ItemActor) pushOut(r *world.Region, e *world.Entity, pos, centre mgl64.Vec3) {
+func (i *ItemActor) pushOut(r *world.Region, e *world.Entity, pos, centre mgl32.Vec3) {
 	at := floorPos(pos)
 	b, ok := r.Block(at, 0)
 	if !ok {
@@ -73,8 +73,8 @@ func (i *ItemActor) pushOut(r *world.Region, e *world.Entity, pos, centre mgl64.
 		return
 	}
 	props := i.s.reg.Blocks.Properties(b)
-	lo := centre.Sub(mgl64.Vec3{itemHalfSize, itemHalfSize, itemHalfSize})
-	hi := centre.Add(mgl64.Vec3{itemHalfSize, itemHalfSize, itemHalfSize})
+	lo := centre.Sub(mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize})
+	hi := centre.Add(mgl32.Vec3{itemHalfSize, itemHalfSize, itemHalfSize})
 	origin := blockVec(at)
 	if !props.PushesOut || !boxesHit(props.Collision, origin, lo, hi) {
 		i.setNoClip(e, false)
@@ -88,7 +88,7 @@ func (i *ItemActor) pushOut(r *world.Region, e *world.Entity, pos, centre mgl64.
 	}
 	i.setNoClip(e, allClosed && len(props.Collision) < 2)
 
-	speed := float64(pushSpeed)
+	speed := float32(pushSpeed)
 	if props.Stairs {
 		speed = pushSpeedStairs
 	}
@@ -104,7 +104,7 @@ func (i *ItemActor) pushOut(r *world.Region, e *world.Entity, pos, centre mgl64.
 				return
 			}
 		} else {
-			speed *= max(height+2*itemHalfSize+float64(at[1])-pos[1], 0)
+			speed *= max(height+2*itemHalfSize+float32(at[1])-pos[1], 0)
 		}
 	}
 	i.vel = pushDirs[dir].Mul(speed)
@@ -129,7 +129,7 @@ func (i *ItemActor) setNoClip(e *world.Entity, on bool) {
 
 // boxesHit reports whether the box lo..hi overlaps the box around all of a block's collision
 // boxes, which is the one shape BDS's first check looks at.
-func boxesHit(boxes []registry.Box, origin, lo, hi mgl64.Vec3) bool {
+func boxesHit(boxes []registry.Box, origin, lo, hi mgl32.Vec3) bool {
 	if len(boxes) == 0 {
 		return false
 	}
@@ -144,20 +144,20 @@ func boxesHit(boxes []registry.Box, origin, lo, hi mgl64.Vec3) bool {
 }
 
 // topBoxHeight is the height of the last of a block's boxes the box lo..hi overlaps.
-func topBoxHeight(boxes []registry.Box, origin, lo, hi mgl64.Vec3) (float64, bool) {
-	var height float64
+func topBoxHeight(boxes []registry.Box, origin, lo, hi mgl32.Vec3) (float32, bool) {
+	var height float32
 	hit := false
 	for _, b := range boxes {
 		if boxHits(b, origin, lo, hi) {
-			height, hit = float64(b[4]-b[1]), true
+			height, hit = b[4]-b[1], true
 		}
 	}
 	return height, hit
 }
 
-func boxHits(b registry.Box, origin, lo, hi mgl64.Vec3) bool {
+func boxHits(b registry.Box, origin, lo, hi mgl32.Vec3) bool {
 	for n := range 3 {
-		if lo[n] >= origin[n]+float64(b[n+3]) || hi[n] <= origin[n]+float64(b[n]) {
+		if lo[n] >= origin[n]+b[n+3] || hi[n] <= origin[n]+b[n] {
 			return false
 		}
 	}

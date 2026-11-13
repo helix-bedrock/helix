@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/circuit"
@@ -610,15 +610,15 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 // stack and Helix's piles stayed apart, so every slot drops whole as a furnace's do.
 // With scatter, as a block's drop, each slot lands at its own place inside the block
 // at origin's corner with a little speed, upward; without, all land at origin, still.
-func (s *Host) spillSlots(r *world.Region, items []ItemStack, origin mgl64.Vec3, scatter bool, pickupDelay int32) {
+func (s *Host) spillSlots(r *world.Region, items []ItemStack, origin mgl32.Vec3, scatter bool, pickupDelay int32) {
 	for _, it := range items {
 		if it.Empty() {
 			continue
 		}
-		at, vel := origin, mgl64.Vec3{}
+		at, vel := origin, mgl32.Vec3{}
 		if scatter {
-			at = origin.Add(mgl64.Vec3{float64(chestThrowOffset()), float64(chestThrowOffset()), float64(chestThrowOffset())})
-			vel = mgl64.Vec3{float64(chestThrowDrift()), float64(chestThrowDrift() + chestThrowUp), float64(chestThrowDrift())}
+			at = origin.Add(mgl32.Vec3{chestThrowOffset(), chestThrowOffset(), chestThrowOffset()})
+			vel = mgl32.Vec3{chestThrowDrift(), chestThrowDrift() + chestThrowUp, chestThrowDrift()}
 		}
 		s.spawnItem(r.Dimension(), it, at, vel, world.Rotation{}, pickupDelay, 0)
 	}
@@ -743,14 +743,14 @@ func (c *Chest) closeSound() string {
 func (c *Chest) lidSound(r *world.Region, sound string) {
 	at := blockVec(c.pos)
 	if c.paired {
-		at[0] = (at[0] + float64(c.partner[0])) / 2
-		at[2] = (at[2] + float64(c.partner[2])) / 2
+		at[0] = (at[0] + float32(c.partner[0])) / 2
+		at[2] = (at[2] + float32(c.partner[2])) / 2
 	}
 	block, ok := r.Block(c.pos, 0)
 	if !ok {
 		return
 	}
-	playSound(r, c.pos, c.s.blockSound(sound, at.Add(mgl64.Vec3{0.5, 0.5, 0.5}), block), nil)
+	playSound(r, c.pos, c.s.blockSound(sound, at.Add(mgl32.Vec3{0.5, 0.5, 0.5}), block), nil)
 }
 
 // blockEvent tells the players near how the lid stands.
@@ -969,7 +969,7 @@ func (p *Player) tickChest() {
 		if b := p.window.boat; b != nil {
 			at = floorPos(b.entity.Position())
 		}
-		d := p.entity.Position().Sub(blockVec(at).Add(mgl64.Vec3{0.5, 0.5, 0.5}))
+		d := p.entity.Position().Sub(blockVec(at).Add(mgl32.Vec3{0.5, 0.5, 0.5}))
 		gone = d.Dot(d) > chestViewRange*chestViewRange
 	}
 	if gone {

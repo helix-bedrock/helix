@@ -52,7 +52,7 @@ func (m *Mob) fire(name string, other behavior.Actor) {
 
 // damageSensed runs the damage sensor on damage of a cause from other (nil for none): the
 // damage its trigger leaves, and whether it is dealt at all.
-func (m *Mob) damageSensed(amount float64, cause int, other behavior.Actor) (float64, bool) {
+func (m *Mob) damageSensed(amount float32, cause int, other behavior.Actor) (float32, bool) {
 	if m.sensors == nil || m.sensors.Damage == nil {
 		return amount, true
 	}

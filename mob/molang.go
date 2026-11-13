@@ -115,7 +115,7 @@ var molangCalls = map[string]struct {
 // molangExpr is a parsed expression node.
 type molangExpr struct {
 	kind molangKind
-	num  float64
+	num  float32
 	str  string
 	op   string
 	call molangCallID
@@ -128,7 +128,7 @@ type molangFunc struct {
 	m *Mob
 }
 
-func (f molangFunc) eval(behavior.Mob) float64 { return f.e.eval(f.m) }
+func (f molangFunc) eval(behavior.Mob) float32 { return f.e.eval(f.m) }
 
 // parseMolang parses an expression.
 func parseMolang(src string) (*molangExpr, error) {
@@ -279,7 +279,7 @@ func (p *molangParser) primary() (*molangExpr, error) {
 		if j < len(p.src) && (p.src[j] == 'f' || p.src[j] == 'F') {
 			p.i++
 		}
-		return &molangExpr{kind: molangNumber, num: float64(v)}, nil
+		return &molangExpr{kind: molangNumber, num: float32(v)}, nil
 	case isMolangName(c):
 		return p.name()
 	}
@@ -340,7 +340,7 @@ func (p *molangParser) name() (*molangExpr, error) {
 	return e, nil
 }
 
-func molangBool(b bool) float64 {
+func molangBool(b bool) float32 {
 	if b {
 		return 1
 	}
@@ -348,7 +348,7 @@ func molangBool(b bool) float64 {
 }
 
 // eval evaluates the expression for m. Strings are 0 outside function arguments.
-func (e *molangExpr) eval(m *Mob) float64 {
+func (e *molangExpr) eval(m *Mob) float32 {
 	switch e.kind {
 	case molangNumber:
 		return e.num
@@ -369,7 +369,7 @@ func (e *molangExpr) eval(m *Mob) float64 {
 	return 0
 }
 
-func (e *molangExpr) binary(m *Mob) float64 {
+func (e *molangExpr) binary(m *Mob) float32 {
 	l := e.args[0].eval(m)
 	switch e.op {
 	case "&&":
@@ -406,21 +406,21 @@ func (e *molangExpr) binary(m *Mob) float64 {
 	return 0
 }
 
-func (e *molangExpr) arg(m *Mob, i int) float64 { return e.args[i].eval(m) }
+func (e *molangExpr) arg(m *Mob, i int) float32 { return e.args[i].eval(m) }
 
 // random is Molang's math.random: a float from lo to hi.
-func molangRandom(m *Mob, lo, hi float64) float64 { return lo + m.NextFloat()*(hi-lo) }
+func molangRandom(m *Mob, lo, hi float32) float32 { return lo + m.NextFloat()*(hi-lo) }
 
 // randomInt is math.random_integer: an integer from lo to hi, both included.
-func molangRandomInt(m *Mob, lo, hi float64) float64 {
+func molangRandomInt(m *Mob, lo, hi float32) float32 {
 	a, b := math.Round(float64(lo)), math.Round(float64(hi))
 	if b < a {
 		a, b = b, a
 	}
-	return float64(a + math.Floor(float64(m.NextFloat())*(b-a+1)))
+	return float32(a + math.Floor(float64(m.NextFloat())*(b-a+1)))
 }
 
-func (e *molangExpr) callEval(m *Mob) float64 {
+func (e *molangExpr) callEval(m *Mob) float32 {
 	switch e.call {
 	case callMathRandom:
 		return molangRandom(m, e.arg(m, 0), e.arg(m, 1))
@@ -428,7 +428,7 @@ func (e *molangExpr) callEval(m *Mob) float64 {
 		return molangRandomInt(m, e.arg(m, 0), e.arg(m, 1))
 	case callMathDieRoll, callMathDieRollInt:
 		n, lo, hi := int(e.arg(m, 0)), e.arg(m, 1), e.arg(m, 2)
-		var sum float64
+		var sum float32
 		for range max(n, 0) {
 			if e.call == callMathDieRoll {
 				sum += molangRandom(m, lo, hi)
@@ -444,21 +444,21 @@ func (e *molangExpr) callEval(m *Mob) float64 {
 	case callMathMax:
 		return max(e.arg(m, 0), e.arg(m, 1))
 	case callMathAbs:
-		return float64(math.Abs(float64(e.arg(m, 0))))
+		return float32(math.Abs(float64(e.arg(m, 0))))
 	case callMathFloor:
-		return float64(math.Floor(float64(e.arg(m, 0))))
+		return float32(math.Floor(float64(e.arg(m, 0))))
 	case callMathCeil:
-		return float64(math.Ceil(float64(e.arg(m, 0))))
+		return float32(math.Ceil(float64(e.arg(m, 0))))
 	case callMathRound:
-		return float64(math.Round(float64(e.arg(m, 0))))
+		return float32(math.Round(float64(e.arg(m, 0))))
 	case callMathTrunc:
-		return float64(math.Trunc(float64(e.arg(m, 0))))
+		return float32(math.Trunc(float64(e.arg(m, 0))))
 	case callMathSqrt:
-		return float64(math.Sqrt(float64(e.arg(m, 0))))
+		return float32(math.Sqrt(float64(e.arg(m, 0))))
 	case callMathMod:
-		return float64(math.Mod(float64(e.arg(m, 0)), float64(e.arg(m, 1))))
+		return float32(math.Mod(float64(e.arg(m, 0)), float64(e.arg(m, 1))))
 	case callMathPow:
-		return float64(math.Pow(float64(e.arg(m, 0)), float64(e.arg(m, 1))))
+		return float32(math.Pow(float64(e.arg(m, 0)), float64(e.arg(m, 1))))
 	case callMathLerp:
 		a, b, t := e.arg(m, 0), e.arg(m, 1), e.arg(m, 2)
 		return a + (b-a)*t
@@ -468,7 +468,7 @@ func (e *molangExpr) callEval(m *Mob) float64 {
 	return e.query(m)
 }
 
-func (e *molangExpr) query(m *Mob) float64 {
+func (e *molangExpr) query(m *Mob) float32 {
 	switch e.call {
 	case callLastHitByPlayer:
 		return molangBool(m.playerHitTime > 0)
@@ -505,12 +505,12 @@ func (e *molangExpr) query(m *Mob) float64 {
 			comp = "minecraft:skin_id"
 		}
 		v, _ := intComponent(m.inst.Components(), comp)
-		return float64(v)
+		return float32(v)
 	case callAngerLevel:
 		// With or without an actor (the data passes this), the anger at the most annoying
 		// nuisance; not checked against BDS's query.
 		if m.states != nil && m.states.AngerLevel != nil {
-			return float64(m.states.AngerLevel.Anger())
+			return float32(m.states.AngerLevel.Anger())
 		}
 		return 0
 	case callHealth:
@@ -518,7 +518,7 @@ func (e *molangExpr) query(m *Mob) float64 {
 	case callMaxHealth:
 		return m.maxHealth
 	case callEquipmentCount:
-		return float64(m.equipmentCount())
+		return float32(m.equipmentCount())
 	}
 	// is_using_item, player_level: nothing a mob has yet.
 	return 0

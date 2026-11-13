@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
@@ -41,30 +41,30 @@ func railStates(dir int32) map[string]any {
 
 func TestCartRollsAlongRailAndSlowsDown(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
-	m := p.s.SpawnMinecart(d, nameMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 5.5})
-	onRegion(d, func(*world.Region) { m.SetVelocity(mgl64.Vec3{0, 0, 0.3}) })
+	m := p.s.SpawnMinecart(d, nameMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 5.5})
+	onRegion(d, func(*world.Region) { m.SetVelocity(mgl32.Vec3{0, 0, 0.3}) })
 	waitRegion(t, d, func(*world.Region) bool { return m.entity.Position()[2] > 7 })
 	var far float32
 	onRegion(d, func(*world.Region) {
 		at := m.entity.Position()
-		far = float32(at[2])
+		far = at[2]
 		if at[0] != 10.5 {
 			t.Errorf("left the line: %v", at)
 		}
-		if at[1] < float64(y) || at[1] > float64(y)+1 {
+		if at[1] < float32(y) || at[1] > float32(y)+1 {
 			t.Errorf("not on the rail: %v, rail at %d", at, y)
 		}
 		if v := m.Velocity(); v[2] <= 0 || v[2] >= 0.3 {
 			t.Errorf("speed %v", v)
 		}
 	})
-	waitRegion(t, d, func(*world.Region) bool { return m.entity.Position()[2] > float64(far) })
+	waitRegion(t, d, func(*world.Region) bool { return m.entity.Position()[2] > far })
 }
 
 func TestPoweredRailSpeedsUpAndBrakes(t *testing.T) {
 	p, d, y := cartWorld(t, nameGoldenRail, map[string]any{stateRailDirection: int32(0), stateRailData: uint8(1)})
-	m := p.s.SpawnMinecart(d, nameMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 2.5})
-	onRegion(d, func(*world.Region) { m.SetVelocity(mgl64.Vec3{0, 0, 0.1}) })
+	m := p.s.SpawnMinecart(d, nameMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 2.5})
+	onRegion(d, func(*world.Region) { m.SetVelocity(mgl32.Vec3{0, 0, 0.1}) })
 	waitRegion(t, d, func(*world.Region) bool { return m.Velocity()[2] > 0.3 })
 	onRegion(d, func(r *world.Region) {
 		for z := 0; z < 16; z++ {
@@ -77,7 +77,7 @@ func TestPoweredRailSpeedsUpAndBrakes(t *testing.T) {
 func TestPoweredRailStartsCartAgainstBlock(t *testing.T) {
 	p, d, y := cartWorld(t, nameGoldenRail, map[string]any{stateRailDirection: int32(0), stateRailData: uint8(1)})
 	onRegion(d, func(r *world.Region) { setNamed(t, p, r, cube.Pos{10, y, 4}, "minecraft:stone", nil) })
-	m := p.s.SpawnMinecart(d, nameMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 5.5})
+	m := p.s.SpawnMinecart(d, nameMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 5.5})
 	waitRegion(t, d, func(*world.Region) bool { return m.Velocity()[2] > 0 && m.entity.Position()[2] > 6 })
 }
 
@@ -89,13 +89,13 @@ func TestCartRollsDownSlope(t *testing.T) {
 		setNamed(t, p, r, cube.Pos{10, y, 11}, "minecraft:stone", nil)
 		setNamed(t, p, r, cube.Pos{10, y + 1, 11}, nameRail, railStates(0))
 	})
-	m := p.s.SpawnMinecart(d, nameMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 10.75})
+	m := p.s.SpawnMinecart(d, nameMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.75})
 	waitRegion(t, d, func(*world.Region) bool { return m.entity.Position()[2] < 8 })
 	onRegion(d, func(*world.Region) {
 		if v := m.Velocity(); v[2] >= 0 {
 			t.Errorf("speed %v", v)
 		}
-		if at := m.entity.Position(); at[1] >= float64(y)+1 {
+		if at := m.entity.Position(); at[1] >= float32(y)+1 {
 			t.Errorf("still high: %v", at)
 		}
 	})
@@ -117,7 +117,7 @@ func TestHopperTakesFromChestCartAbove(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
 	c, at := hopperUnder(t, p, d, y)
 	onRegion(d, func(r *world.Region) { setNamed(t, p, r, at.Side(cube.FaceUp), nameRail, railStates(0)) })
-	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl64.Vec3{3.5, float64(y) + 1.5, 8.5})
+	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 1.5, 8.5})
 	onRegion(d, func(r *world.Region) {
 		m.Chest().Inventory(r).SetItem(3, ItemStack{Name: "minecraft:emerald", Count: 2})
 	})
@@ -137,10 +137,10 @@ func TestHopperTakesFromMovingChestCart(t *testing.T) {
 			}
 		}
 	})
-	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl64.Vec3{3.5, float64(y) + 1.5, 7})
+	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 1.5, 7})
 	onRegion(d, func(r *world.Region) {
 		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 5})
-		m.SetVelocity(mgl64.Vec3{0, 0, 0.1})
+		m.SetVelocity(mgl32.Vec3{0, 0, 0.1})
 	})
 	waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count > 0 })
 }
@@ -152,7 +152,7 @@ func TestHopperDoesNotReachCartOnBlockAbove(t *testing.T) {
 		setNamed(t, p, r, at.Side(cube.FaceUp), "minecraft:stone", nil)
 		setNamed(t, p, r, cube.Pos{at[0], at[1] + 2, at[2]}, nameRail, railStates(0))
 	})
-	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl64.Vec3{3.5, float64(y) + 2.5, 8.5})
+	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 2.5, 8.5})
 	onRegion(d, func(r *world.Region) {
 		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 	})
@@ -177,7 +177,7 @@ func TestHopperFillsCartBelow(t *testing.T) {
 		c = p.s.chestAt(r, at)
 		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 1})
 	})
-	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl64.Vec3{3.5, float64(y) + 0.5, 8.5})
+	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5})
 	waitRegion(t, d, func(r *world.Region) bool {
 		return m.Chest().Inventory(r).Item(0).Count == 1 && c.Inventory(r).Item(0).Empty()
 	})
@@ -193,7 +193,7 @@ func TestHopperCartTakesFromChestAboveUntilStopped(t *testing.T) {
 		c = p.s.chestAt(r, above)
 		c.Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 	})
-	m := p.s.SpawnMinecart(d, nameHopperMinecart, mgl64.Vec3{3.5, float64(y) + 0.5, 8.5})
+	m := p.s.SpawnMinecart(d, nameHopperMinecart, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5})
 	time.Sleep(400 * time.Millisecond)
 	onRegion(d, func(r *world.Region) {
 		if c.Inventory(r).Item(0).Count != 2 {
@@ -206,7 +206,7 @@ func TestHopperCartTakesFromChestAboveUntilStopped(t *testing.T) {
 
 func TestTNTCartLightsOnPoweredActivatorRail(t *testing.T) {
 	p, d, y := cartWorld(t, nameActivatorRail, map[string]any{stateRailDirection: int32(0), stateRailData: uint8(1)})
-	m := p.s.SpawnMinecart(d, nameTNTMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 10.5})
+	m := p.s.SpawnMinecart(d, nameTNTMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.5})
 	waitRegion(t, d, func(*world.Region) bool { return m.lit })
 	onRegion(d, func(*world.Region) { m.fuse = 1 })
 	waitRegion(t, d, func(*world.Region) bool { return m.gone })
@@ -214,7 +214,7 @@ func TestTNTCartLightsOnPoweredActivatorRail(t *testing.T) {
 
 func TestActivatorRailThrowsOutRider(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
-	m := p.s.SpawnMinecart(d, nameMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 10.5})
+	m := p.s.SpawnMinecart(d, nameMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.5})
 	onRegion(d, func(*world.Region) {
 		mount(m, p)
 		if m.Rider() != p || p.vehicle != m {
@@ -229,7 +229,7 @@ func TestActivatorRailThrowsOutRider(t *testing.T) {
 
 func TestCartBreaksAfterHitsAndDrops(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
-	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 10.5})
+	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.5})
 	onRegion(d, func(r *world.Region) {
 		m.Chest().Inventory(r).SetItem(0, ItemStack{Name: "minecraft:emerald", Count: 2})
 		if m.Hurt(r, 1, nil) || m.Hurt(r, 1, nil) {
@@ -253,7 +253,7 @@ func TestCartBreaksAfterHitsAndDrops(t *testing.T) {
 
 func TestCartSavesAndLoads(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
-	m := p.s.SpawnMinecart(d, nameHopperMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 10.5})
+	m := p.s.SpawnMinecart(d, nameHopperMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 10.5})
 	onRegion(d, func(r *world.Region) {
 		m.Chest().Inventory(r).SetItem(2, ItemStack{Name: "minecraft:emerald", Count: 3})
 		saved, ok := m.saveEntity(m.entity)
@@ -304,11 +304,11 @@ func TestDispenserPutsCartOnRail(t *testing.T) {
 
 func TestRiderSitsInTheCartAndLandsBeside(t *testing.T) {
 	p, d, y := cartWorld(t, nameRail, railStates(0))
-	m := p.s.SpawnMinecart(d, nameMinecart, mgl64.Vec3{10.5, float64(y) + 0.5, 8.5})
+	m := p.s.SpawnMinecart(d, nameMinecart, mgl32.Vec3{10.5, float32(y) + 0.5, 8.5})
 	onRegion(d, func(*world.Region) {
 		mount(m, p)
 		at := m.entity.Position()
-		want := at.Add(mgl64.Vec3{0, eyeHeight + playerRidingOffset + cartSeatY, 0})
+		want := at.Add(mgl32.Vec3{0, eyeHeight + playerRidingOffset + cartSeatY, 0})
 		if got := p.seatPosition(); !got.ApproxEqualThreshold(want, 1e-4) {
 			t.Errorf("seat at %v, want %v", got, want)
 		}
@@ -317,7 +317,7 @@ func TestRiderSitsInTheCartAndLandsBeside(t *testing.T) {
 			t.Error("still riding")
 		}
 		got := p.entity.Position()
-		if feet := got[1] - eyeHeight; feet < float64(y) || feet > float64(y)+0.01 {
+		if feet := got[1] - eyeHeight; feet < float32(y) || feet > float32(y)+0.01 {
 			t.Errorf("landed with feet at %v, floor at %d", feet, y)
 		}
 		if got[0] == at[0] && got[2] == at[2] {

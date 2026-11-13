@@ -3,14 +3,13 @@ package player
 import (
 	"errors"
 	"fmt"
+	"github.com/helix-bedrock/helix/command"
 	"log/slog"
 	"net"
 	"os"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
-
-	"github.com/helix-bedrock/helix/command"
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix-data/data"

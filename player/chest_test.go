@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl64"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -248,7 +248,7 @@ func apiWorld(t *testing.T, register func(*Setup)) (*Player, *world.Dimension) {
 	d.SetBlockEntities(chestEntities{s: p.s})
 	ticket := d.KeepLoaded(world.Chunks(mcdb.ChunkPos{}), true)
 	t.Cleanup(ticket.Release)
-	p.entity = d.AddEntity(world.EntityConfig{UniqueID: 1, RuntimeID: 1, Pos: mgl64.Vec3{4, 0, 5}})
+	p.entity = d.AddEntity(world.EntityConfig{UniqueID: 1, RuntimeID: 1, Pos: mgl32.Vec3{4, 0, 5}})
 	// An entity joins its region on that region's tick.
 	for deadline := time.Now().Add(10 * time.Second); p.entity.Region() == nil; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
