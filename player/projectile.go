@@ -1405,6 +1405,7 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 		if p.inventory.offhand[0].Count <= 0 {
 			p.inventory.offhand[0] = ItemStack{}
 		}
+		p.sendOffhand()
 		p.sendEquipment()
 	} else {
 		s := &p.inventory.main[slot]

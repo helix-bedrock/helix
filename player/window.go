@@ -174,7 +174,9 @@ func (p *Player) leaveWindow(r *world.Region, serverSide bool) {
 
 // handleInteract is vanilla's Interact handler. Only opening the inventory
 // is built: BDS opens it when the target is within 12 blocks and no
-// container is open.
+// container is open. Helix's own rule beyond BDS: a client asks for its inventory only with
+// no screen up, so a window the server still has open was closed without a ContainerClose
+// and is closed here, instead of the player never opening anything again.
 func handleInteract(p *Player, pk *packet.Interact) {
 	if pk.ActionType == packet.InteractActionLeaveVehicle && p.vehicle != nil {
 		letOff(p.vehicle, p)
@@ -184,7 +186,7 @@ func handleInteract(p *Player, pk *packet.Interact) {
 		return
 	}
 	if p.window.open {
-		return
+		p.leaveWindow(p.entity.Region(), false)
 	}
 	// The client asks this way to open a chest or hopper minecart.
 	if m := p.cartInReach(pk.TargetEntityRuntimeID); m != nil && m.chest != nil {

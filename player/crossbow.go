@@ -126,6 +126,7 @@ func (p *Player) loadCrossbow(held ItemStack, drawn int32) {
 			if inv.offhand[0].Count == 0 {
 				inv.offhand[0] = ItemStack{}
 			}
+			p.sendOffhand()
 			p.sendEquipment()
 		} else {
 			s := &inv.main[slot]
