@@ -199,7 +199,8 @@ sibling library folders, so unreleased library changes are used.
   `item.go`, `playeritems.go`, `stackrequest.go`: the server-held items
   (BDS's saved format) and BDS's checks on stack
   requests (take, place, swap, destroy, creative items), applied all or
-  nothing on a copy. The client's view of its items is never read back.
+  nothing on a copy. The client's view of its items is never read back. A refused request resends
+  all the player's slots (Helix's own rule, beyond BDS) so a client out of step recovers.
   `inventory.go`: the `Inventory` wrapper every set of slots is reached through, and the only code
   that writes InventorySlot and InventoryContent, through the per-player view (`OnInventoryView`,
   `Inventory.SetView`). Packets written in many places have one wrapper each so a protocol change is

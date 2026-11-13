@@ -91,6 +91,11 @@ func handleItemStackRequest(p *Player, pk *packet.ItemStackRequest) {
 		r := p.stackRequest(req)
 		if r.Status != protocol.ItemStackResponseStatusOK {
 			p.s.log.Debug("item stack request refused", "name", p.name, "status", r.Status, "request", describeStackRequest(req), "server", p.describeServerSlots(req))
+			// Helix's own rule, beyond BDS: a refused request resends every slot as the
+			// server has it. A client that missed a change names its stacks by old IDs and
+			// would have every move of them refused until something resent the slot; now
+			// the next try works. Nothing the client sent is kept, so nothing can be duped.
+			p.requests.refresh = true
 		}
 		resp.Responses = append(resp.Responses, r)
 	}
