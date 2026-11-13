@@ -11,8 +11,10 @@ import (
 // Settling is Helix's own rule, not BDS's: generation leaves water and lava
 // beside open space (a lake cut by a cliff, a cave wall, an aquifer edge),
 // and nothing ticks it until a player changes a block next to it. Liquids, a
-// world.Settler, finds that liquid in each new chunk and queues its tick, so
-// it flows as soon as the chunk ticks.
+// world.Settler, finds that liquid in every chunk that loads (new or saved,
+// so chunks saved before this rule settle too) and queues its tick, so it
+// flows as soon as the chunk ticks. Liquid that is already settled but
+// looks open (the thin end of a flow) gets one tick that changes nothing.
 
 // chunkEdge is the last local X or Z in a chunk.
 const chunkEdge = 15
@@ -29,14 +31,28 @@ func settleSides() [5]cube.Pos {
 // worker, many at once.
 func (l *Liquids) Settle(pos mcdb.ChunkPos, col *chunk.Column, edge []chunk.ScheduledBlockUpdate) []chunk.ScheduledBlockUpdate {
 	c := col.Chunk
+	queued := queuedTicks(col)
 	for i, sub := range c.Sub() {
 		if !l.subHasLiquid(sub) {
 			continue
 		}
 		baseY := c.SubY(int16(i)) //nolint:gosec // sub chunk counts fit int16
-		edge = l.settleSub(pos, col, sub, baseY, edge)
+		edge = l.settleSub(pos, col, sub, baseY, queued, edge)
 	}
 	return edge
+}
+
+// queuedTicks is the positions col's saved queue already ticks, so a loaded
+// chunk's liquid is not queued twice; nil when the queue is empty.
+func queuedTicks(col *chunk.Column) map[cube.Pos]struct{} {
+	if len(col.ScheduledBlocks) == 0 {
+		return nil
+	}
+	queued := make(map[cube.Pos]struct{}, len(col.ScheduledBlocks))
+	for _, u := range col.ScheduledBlocks {
+		queued[u.Pos] = struct{}{}
+	}
+	return queued
 }
 
 // subHasLiquid reports whether either layer of sub holds a liquid, from the
@@ -57,11 +73,11 @@ func (l *Liquids) subHasLiquid(sub *chunk.SubChunk) bool {
 }
 
 // settleSub runs Settle's check on every block of one sub chunk.
-func (l *Liquids) settleSub(pos mcdb.ChunkPos, col *chunk.Column, sub *chunk.SubChunk, baseY int16, edge []chunk.ScheduledBlockUpdate) []chunk.ScheduledBlockUpdate {
+func (l *Liquids) settleSub(pos mcdb.ChunkPos, col *chunk.Column, sub *chunk.SubChunk, baseY int16, queued map[cube.Pos]struct{}, edge []chunk.ScheduledBlockUpdate) []chunk.ScheduledBlockUpdate {
 	for y := range uint8(16) {
 		for x := range uint8(16) {
 			for z := range uint8(16) {
-				edge = l.settleBlock(pos, col, sub, x, baseY+int16(y), z, edge)
+				edge = l.settleBlock(pos, col, sub, x, baseY+int16(y), z, queued, edge)
 			}
 		}
 	}
@@ -70,13 +86,16 @@ func (l *Liquids) settleSub(pos mcdb.ChunkPos, col *chunk.Column, sub *chunk.Sub
 
 // settleBlock queues the liquid at local x, y, z if it can move inside the
 // chunk, or keeps it in edge if it touches the chunk's side.
-func (l *Liquids) settleBlock(pos mcdb.ChunkPos, col *chunk.Column, sub *chunk.SubChunk, x uint8, y int16, z uint8, edge []chunk.ScheduledBlockUpdate) []chunk.ScheduledBlockUpdate {
+func (l *Liquids) settleBlock(pos mcdb.ChunkPos, col *chunk.Column, sub *chunk.SubChunk, x uint8, y int16, z uint8, queued map[cube.Pos]struct{}, edge []chunk.ScheduledBlockUpdate) []chunk.ScheduledBlockUpdate {
 	lb := l.chunkLiquidAt(sub, x, uint8(y&15), z) //nolint:gosec // y&15 fits uint8
 	i, ok := l.at(lb)
 	if !ok {
 		return edge
 	}
 	world := cube.Pos{int(pos[0])<<4 | int(x), int(y), int(pos[1])<<4 | int(z)}
+	if _, ok := queued[world]; ok {
+		return edge
+	}
 	delay := l.TickDelay(i.kind)
 	if l.opensInChunk(col.Chunk, i.kind, x, y, z) {
 		col.ScheduledBlocks = append(col.ScheduledBlocks, chunk.ScheduledBlockUpdate{Pos: world, Block: lb, Tick: col.Tick + int64(delay)})
@@ -127,6 +146,9 @@ func (l *Liquids) SettleEdges(r *world.Region, edge []chunk.ScheduledBlockUpdate
 		}
 		switch l.opensOutward(r, u.Pos, i.kind) {
 		case outwardOpen:
+			if r.HasScheduledTick(u.Pos, u.Block) {
+				continue
+			}
 			r.ScheduleTick(u.Pos, u.Block, int32(u.Tick), 0) //nolint:gosec // delays are small
 		case outwardUnknown:
 			waiting = append(waiting, u)

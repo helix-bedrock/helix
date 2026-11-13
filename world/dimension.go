@@ -94,8 +94,8 @@ type Config struct {
 	// Spawner runs on every ticking chunk after its block ticks: BDS's natural mob spawner,
 	// which BDS 1.26.60 runs once per ticking chunk per tick. Nil spawns nothing.
 	Spawner ChunkSpawner
-	// Settler queues the ticks a newly generated chunk needs to settle, such as liquid
-	// generation left beside open space. Nil queues none.
+	// Settler queues the ticks a chunk needs to settle when it loads, generated or saved,
+	// such as liquid generation left beside open space. Nil queues none.
 	Settler Settler
 	// ParallelMin is how many items a phase of Region.Parallel (mob AI and the like) needs
 	// before a crowded region spreads it over idle cores; 0 means DefaultParallelMin.
@@ -450,7 +450,6 @@ func (d *Dimension) poolLoad(pos mcdb.ChunkPos) {
 func (d *Dimension) load(pos mcdb.ChunkPos) {
 	col, err := d.conf.Store.LoadColumn(pos, d.conf.Dim)
 	discard := false
-	var settle []chunk.ScheduledBlockUpdate
 	if err != nil {
 		if !errors.Is(err, mcdb.ErrNotFound) {
 			// Never save over data that failed to load: it may be readable
@@ -464,10 +463,10 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 		if err := d.generate(pos, col); err != nil {
 			d.log.Error("generate chunk", "pos", pos, "err", err)
 		}
-		settle = d.settleChunk(pos, col)
 	} else {
 		col.Chunk.ReplaceBiomes(d.resolveBiome)
 	}
+	settle := d.settleChunk(pos, col)
 	entities := make([]chunk.BlockEntity, 0, len(col.BlockEntities))
 	for _, be := range col.BlockEntities {
 		entities = append(entities, chunk.BlockEntity{Pos: be.Pos, Data: savedNetworkData(be.Data)})

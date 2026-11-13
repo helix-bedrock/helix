@@ -5,12 +5,14 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Settler queues the ticks a newly generated chunk needs to settle: generation places
-// blocks without ticking them, so liquid left beside open space would stand still until a
-// neighbour changed. This is Helix's own step, not BDS's.
+// Settler queues the ticks a chunk needs to settle: generation places blocks without
+// ticking them, so liquid left beside open space would stand still until a neighbour
+// changed. It runs on every chunk that loads, generated or saved, so chunks saved before
+// it existed (or saved before their edges were decided) settle too. This is Helix's own
+// step, not BDS's.
 type Settler interface {
-	// Settle runs on a loading worker, many at once, on the column the generator just
-	// made at pos. It adds to col.ScheduledBlocks (due after col.Tick) the ticks the chunk
+	// Settle runs on a loading worker, many at once, on the column just generated or
+	// loaded at pos, before its saved queue is taken. It adds to col.ScheduledBlocks (due after col.Tick) the ticks the chunk
 	// alone shows are needed, and returns, appended to edge, the blocks on the chunk's
 	// side that need one only if the next chunk lets them move, with Tick holding the
 	// delay.
@@ -22,7 +24,7 @@ type Settler interface {
 	SettleEdges(r *Region, edge []chunk.ScheduledBlockUpdate) []chunk.ScheduledBlockUpdate
 }
 
-// settleChunk runs the Settler on a newly generated column, recovering a panic in it as
+// settleChunk runs the Settler on a generated or loaded column, recovering a panic in it as
 // generate does. It returns the edge blocks for the chunk's first tick.
 func (d *Dimension) settleChunk(pos mcdb.ChunkPos, col *chunk.Column) (edge []chunk.ScheduledBlockUpdate) {
 	if d.conf.Settler == nil {

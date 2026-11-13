@@ -60,7 +60,9 @@ sibling library folders, so unreleased library changes are used.
   lava fire, stair and slab shape rules. `settle.go` is Helix's own rule, not BDS's: as
   `world.Config.Settler` it finds liquid generation left beside open space
   (below or on a side) and queues its tick, inside the chunk on the loading
-  worker, at the chunk's edge on its ticks once the next chunk is loaded.
+  worker, at the chunk's edge on its ticks once the next chunk is loaded. It
+  runs on every chunk that loads, generated or saved, and skips liquid
+  already ticking.
 - `world.go`: opens the world folder and its stores (`world/mcdb`; the
   world and player stores can be replaced through `Config.Storage`) with
   the block registry.
