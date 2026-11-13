@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -51,7 +52,7 @@ const (
 type PrimedTNT struct {
 	s      *Host
 	entity *world.Entity
-	vel    mgl32.Vec3
+	vel    mgl64.Vec3
 
 	fuse     int32
 	lit      bool
@@ -60,7 +61,7 @@ type PrimedTNT struct {
 	// next is the move its think step worked out.
 	next thought
 	// power is the explosion's radius; fire whether it sets fires.
-	power float32
+	power float64
 	fire  bool
 	// owner is the player who lit it, if anyone.
 	owner *Player
@@ -81,24 +82,24 @@ func (t *PrimedTNT) Fuse() int32 { return t.fuse }
 func (t *PrimedTNT) SetFuse(ticks int32) { t.fuse = ticks }
 
 // SetPower sets the explosion's radius.
-func (t *PrimedTNT) SetPower(radius float32) { t.power = radius }
+func (t *PrimedTNT) SetPower(radius float64) { t.power = radius }
 
 // SetFire sets whether its explosion sets fires.
 func (t *PrimedTNT) SetFire(fire bool) { t.fire = fire }
 
 // SpawnTNT adds lit TNT with its feet at feet and BDS's hop.
-func (s *Host) SpawnTNT(d *world.Dimension, feet mgl32.Vec3, fuse int32, owner *Player) *PrimedTNT {
+func (s *Host) SpawnTNT(d *world.Dimension, feet mgl64.Vec3, fuse int32, owner *Player) *PrimedTNT {
 	angle := rand.Float64() * 2 * math.Pi //nolint:gosec // a hop, not a secret
 	t := &PrimedTNT{
-		s: s, fuse: fuse, lit: true, power: s.redstone.Get().TNT.Power, owner: owner,
-		vel: mgl32.Vec3{float32(-math.Sin(angle)) * tntSpread, tntHop, float32(-math.Cos(angle)) * tntSpread},
+		s: s, fuse: fuse, lit: true, power: float64(s.redstone.Get().TNT.Power), owner: owner,
+		vel: mgl64.Vec3{float64(-math.Sin(angle)) * tntSpread, tntHop, float64(-math.Cos(angle)) * tntSpread},
 	}
-	pos := mgl32.Vec3{feet[0], feet[1] + tntHalfSize, feet[2]}
+	pos := mgl64.Vec3{feet[0], feet[1] + tntHalfSize, feet[2]}
 	t.entity = d.AddEntity(t.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{})) //nolint:gosec // an entity ID, not a secret
 	return t
 }
 
-func (t *PrimedTNT) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+func (t *PrimedTNT) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Think: t.think, Input: t.tick, Save: t.saveEntity,
@@ -117,7 +118,7 @@ func (t *PrimedTNT) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: nameTNT,
-		Position: e.Position(), Velocity: t.vel, EntityMetadata: meta,
+		Position: world.Vec32(e.Position()), Velocity: world.Vec32(t.vel), EntityMetadata: meta,
 	}}
 }
 
@@ -128,7 +129,7 @@ func (t *PrimedTNT) movePacket(e *world.Entity) packet.Packet {
 		flags = packet.MoveFlagOnGround
 	}
 	return &packet.MoveActorAbsolute{
-		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw},
+		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), float32(rot.HeadYaw)},
 	}
 }
 
@@ -161,7 +162,7 @@ func (t *PrimedTNT) tick(e *world.Entity) {
 // explosion is what it explodes as.
 func (t *PrimedTNT) explosion(e *world.Entity) *Explosion {
 	at := e.Position()
-	x := NewExplosion(mgl32.Vec3{at[0], at[1] - tntHalfSize + tntBlastOffset, at[2]}, t.power)
+	x := NewExplosion(mgl64.Vec3{at[0], at[1] - tntHalfSize + tntBlastOffset, at[2]}, float32(t.power))
 	x.Source, x.Attacker, x.Fire, x.Cause = e, t.owner, t.fire, DamageEntityExplosion
 	x.Kind, x.FromBlock, x.Block, x.BlockPos = ExplosionTNT, t.fromBlock, t.block, t.from
 	if !t.s.level.TNTExplosionDropDecay {
@@ -193,30 +194,30 @@ func (t *PrimedTNT) move(_ *world.Region, e *world.Entity) {
 		t.vel[1] = 0
 	}
 	if !e.Apply(world.Movement{Pos: pos, Rot: e.Rotation(), OnGround: t.onGround, Tick: e.Tick()}) {
-		t.vel = mgl32.Vec3{}
+		t.vel = mgl64.Vec3{}
 		return
 	}
 	t.vel = t.vel.Mul(tntDrag)
 	if t.onGround {
-		t.vel = mgl32.Vec3{t.vel[0] * tntGroundDrag, t.vel[1] * tntBounce, t.vel[2] * tntGroundDrag}
+		t.vel = mgl64.Vec3{t.vel[0] * tntGroundDrag, t.vel[1] * tntBounce, t.vel[2] * tntGroundDrag}
 	}
 }
 
 // BlastBox is its box.
-func (t *PrimedTNT) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
+func (t *PrimedTNT) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 	if t.gone || t.entity == nil {
 		return lo, hi, false
 	}
 	at := t.entity.Position()
-	half := mgl32.Vec3{tntHalfSize, tntHalfSize, tntHalfSize}
+	half := mgl64.Vec3{tntHalfSize, tntHalfSize, tntHalfSize}
 	return at.Sub(half), at.Add(half), true
 }
 
 // BlastHit does nothing: explosions do not hurt it.
-func (t *PrimedTNT) BlastHit(float32, DamageSource) {}
+func (t *PrimedTNT) BlastHit(float64, DamageSource) {}
 
 // BlastPush adds to its speed.
-func (t *PrimedTNT) BlastPush(push mgl32.Vec3) {
+func (t *PrimedTNT) BlastPush(push mgl64.Vec3) {
 	t.vel = t.vel.Add(push)
 	pushed(t.entity, t.vel)
 }
@@ -231,8 +232,8 @@ func (t *PrimedTNT) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	pos, rot := e.Position(), e.Rotation()
 	data["identifier"] = nameTNT
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
-	data["Motion"] = []float32{t.vel[0], t.vel[1], t.vel[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
+	data["Motion"] = []float32{float32(t.vel[0]), float32(t.vel[1]), float32(t.vel[2])}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data[tntKeyFuse] = uint8(min(max(t.fuse, 0), math.MaxUint8)) //nolint:gosec // clamped
 	var lit uint8
@@ -249,9 +250,9 @@ func (s *Host) loadTNT(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bo
 	if !ok || len(pos) != 3 {
 		return false
 	}
-	t := &PrimedTNT{s: s, power: s.redstone.Get().TNT.Power, saved: saved.Data}
+	t := &PrimedTNT{s: s, power: float64(s.redstone.Get().TNT.Power), saved: saved.Data}
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
-		t.vel = mgl32.Vec3{v[0], v[1], v[2]}
+		t.vel = mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}
 	}
 	var rot world.Rotation
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
@@ -260,7 +261,7 @@ func (s *Host) loadTNT(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bo
 	fuse, _ := saved.Data[tntKeyFuse].(uint8)
 	lit, _ := saved.Data[tntKeyLit].(uint8)
 	t.fuse, t.lit = int32(fuse), lit != 0
-	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
+	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, rot))
 	return true
 }
 
@@ -339,8 +340,8 @@ func (t *PrimedTNT) litFrom(pos cube.Pos, block uint32) {
 }
 
 // tntFeet is where TNT lit in a block stands.
-func tntFeet(pos cube.Pos) mgl32.Vec3 {
-	return mgl32.Vec3{float32(pos[0]) + tntBlockCenter, float32(pos[1]), float32(pos[2]) + tntBlockCenter}
+func tntFeet(pos cube.Pos) mgl64.Vec3 {
+	return mgl64.Vec3{float64(pos[0]) + tntBlockCenter, float64(pos[1]), float64(pos[2]) + tntBlockCenter}
 }
 
 // PrimeBlock removes the TNT block at pos and lights it, by owner if a player did it.

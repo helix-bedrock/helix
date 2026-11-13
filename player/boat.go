@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -116,7 +117,7 @@ type Boat struct {
 
 	gone               bool
 	seats              *ride.Vehicle
-	moved              mgl32.Vec3
+	moved              mgl64.Vec3
 	hurtTime, hurtSide int32
 	integrity          int32
 	// motion is its own movement while no one steers it (boatphysics.go).
@@ -125,7 +126,7 @@ type Boat struct {
 	near []*world.Entity
 	// lastEyes is the position the driver's client last sent; traceTicks counts down the
 	// ticks logged at debug level after the driver got out.
-	lastEyes   mgl32.Vec3
+	lastEyes   mgl64.Vec3
 	traceTicks int32
 	driven     bool
 	// predicted is whether the driver's client said last it predicts the boat.
@@ -155,10 +156,10 @@ func (b *Boat) Driver() *Player {
 
 // SpawnBoat adds a boat of wood, with a chest or not, with the bottom of its box at feet,
 // facing yaw. Runs: any goroutine.
-func (s *Host) SpawnBoat(d *world.Dimension, wood int32, chest bool, feet mgl32.Vec3, yaw float32) *Boat {
+func (s *Host) SpawnBoat(d *world.Dimension, wood int32, chest bool, feet mgl64.Vec3, yaw float64) *Boat {
 	b := s.newBoat(wood, chest)
-	pos := feet.Add(mgl32.Vec3{0, boatHeightOffset, 0})
-	b.entity = d.AddEntity(b.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: yaw, HeadYaw: yaw})) //nolint:gosec // an entity ID, not a secret
+	pos := feet.Add(mgl64.Vec3{0, boatHeightOffset, 0})
+	b.entity = d.AddEntity(b.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: float32(yaw), HeadYaw: float32(yaw)})) //nolint:gosec // an entity ID, not a secret
 	return b
 }
 
@@ -182,13 +183,13 @@ var chestBoatSlots = &machineSpec{id: "ChestBoat", size: chestSize, window: byte
 // second seats' rotate_rider_by names turns by -90, players among them; Helix seats only
 // players.
 func boatRideRules(wood int32, chest bool) *ride.Rules {
-	y := float32(boatSeatY)
+	y := float64(boatSeatY)
 	if wood == woodBamboo {
 		y = raftSeatY
 	}
-	seat := func(x float32, minRiders, maxRiders int) ride.Seat {
+	seat := func(x float64, minRiders, maxRiders int) ride.Seat {
 		return ride.Seat{
-			Position: mgl32.Vec3{x, y, 0}, MinRiders: minRiders, MaxRiders: maxRiders,
+			Position: mgl64.Vec3{x, y, 0}, MinRiders: minRiders, MaxRiders: maxRiders,
 			LockRotation: true, LockDegrees: boatSeatLock, Rotates: true, RotateBy: boatSeatTurn,
 		}
 	}
@@ -211,7 +212,7 @@ func (b *Boat) id() string {
 	return nameBoat
 }
 
-func (b *Boat) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+func (b *Boat) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: b, Spawn: b.spawnPackets, Move: b.movePacket, Think: b.think, Input: b.tick, Save: b.saveEntity,
@@ -238,7 +239,7 @@ func (b *Boat) spawnPackets(e *world.Entity) []packet.Packet {
 	rot := e.Rotation()
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: b.id(),
-		Position: e.Position(), Yaw: rot.Yaw, HeadYaw: rot.Yaw, BodyYaw: rot.Yaw, EntityMetadata: meta,
+		Position: world.Vec32(e.Position()), Yaw: rot.Yaw, HeadYaw: rot.Yaw, BodyYaw: rot.Yaw, EntityMetadata: meta,
 		EntityLinks: b.seats.Links(e.UniqueID()),
 	}}
 }
@@ -250,7 +251,7 @@ func (b *Boat) movePacket(e *world.Entity) packet.Packet {
 		flags = packet.MoveFlagOnGround
 	}
 	return &packet.MoveActorAbsolute{
-		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.Yaw},
+		EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), rot.Yaw},
 	}
 }
 
@@ -280,7 +281,7 @@ func (b *Boat) tick(e *world.Entity) {
 		}
 	} else {
 		b.driven = true
-		b.motion.vel = mgl32.Vec3{}
+		b.motion.vel = mgl64.Vec3{}
 	}
 	changed := false
 	if b.hurtTime > 0 {
@@ -299,7 +300,7 @@ func (b *Boat) tick(e *world.Entity) {
 // drive moves the boat where its driver's client put it, turned to yaw: at pos itself when
 // the client predicts the boat, else so that the rider at pos (its eyes) is in its seat.
 // Region tick of the driver.
-func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
+func (b *Boat) drive(p *Player, pos mgl64.Vec3, yaw float64, predicted bool) {
 	if b.gone || b.Driver() != p {
 		return
 	}
@@ -312,11 +313,11 @@ func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
 	if !predicted {
 		off := b.seats.SeatOffset(p)
 		sin, cos := math.Sincos(float64(yaw) * -math.Pi / 180)
-		s, c := float32(sin), float32(cos)
-		pos = mgl32.Vec3{pos[0] - off[0]*c - off[2]*s, pos[1] - off[1], pos[2] - off[2]*c + off[0]*s}
+		s, c := float64(sin), float64(cos)
+		pos = mgl64.Vec3{pos[0] - off[0]*c - off[2]*s, pos[1] - off[1], pos[2] - off[2]*c + off[0]*s}
 	}
 	from := e.Position()
-	if e.Apply(world.Movement{Pos: pos, Rot: world.Rotation{Yaw: yaw, HeadYaw: yaw}, Tick: e.Tick()}) {
+	if e.Apply(world.Movement{Pos: pos, Rot: world.Rotation{Yaw: float32(yaw), HeadYaw: float32(yaw)}, Tick: e.Tick()}) {
 		b.moved = pos.Sub(from)
 	}
 }
@@ -331,7 +332,7 @@ func (b *Boat) sendHurt(e *world.Entity) {
 // Hurt is BDS's Boat::_hurt: the shake, damage times ten off its integrity, and it breaks
 // once that is gone or at once for a player in creative, who gets no drops. True if it
 // broke.
-func (b *Boat) Hurt(r *world.Region, damage float32, by *Player) bool {
+func (b *Boat) Hurt(r *world.Region, damage float64, by *Player) bool {
 	if b.gone {
 		return false
 	}
@@ -340,7 +341,7 @@ func (b *Boat) Hurt(r *world.Region, damage float32, by *Player) bool {
 		b.hurtSide = 1
 	}
 	b.hurtTime = boatHurtTime
-	b.integrity = int32(float32(b.integrity) - damage*boatHitScale)
+	b.integrity = int32(float64(b.integrity) - damage*boatHitScale)
 	b.sendHurt(b.entity)
 	creative := by != nil && by.creative()
 	if !creative && b.integrity > 0 {
@@ -367,7 +368,7 @@ func (b *Boat) Break(r *world.Region, drops bool) {
 		if b.name != "" {
 			item = item.WithName(b.name)
 		}
-		b.s.spawnItem(r.Dimension(), item, pos, mgl32.Vec3{}, world.Rotation{}, boatDropDelay, 0)
+		b.s.spawnItem(r.Dimension(), item, pos, mgl64.Vec3{}, world.Rotation{}, boatDropDelay, 0)
 	}
 	b.remove(r)
 }
@@ -390,7 +391,7 @@ func (b *Boat) OutOfWorld(_ *Host, e *world.Entity) {
 }
 
 // BlastBox is its box.
-func (b *Boat) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
+func (b *Boat) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 	if b.gone || b.entity == nil {
 		return lo, hi, false
 	}
@@ -399,20 +400,20 @@ func (b *Boat) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 }
 
 // BlastHit hurts it.
-func (b *Boat) BlastHit(damage float32, _ DamageSource) {
+func (b *Boat) BlastHit(damage float64, _ DamageSource) {
 	if r := b.entity.Region(); r != nil {
 		b.Hurt(r, damage, nil)
 	}
 }
 
 // BlastPush adds an explosion's push to an empty boat's movement.
-func (b *Boat) BlastPush(push mgl32.Vec3) { b.motion.vel = b.motion.vel.Add(push) }
+func (b *Boat) BlastPush(push mgl64.Vec3) { b.motion.vel = b.motion.vel.Add(push) }
 
 // boatBox is the boat's box at pos, its position (boatHeightOffset above the bottom).
-func boatBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
-	half := float32(boatWidth / 2)
+func boatBox(pos mgl64.Vec3) (lo, hi mgl64.Vec3) {
+	half := float64(boatWidth / 2)
 	y := pos[1] - boatHeightOffset
-	return mgl32.Vec3{pos[0] - half, y, pos[2] - half}, mgl32.Vec3{pos[0] + half, y + boatHeight, pos[2] + half}
+	return mgl64.Vec3{pos[0] - half, y, pos[2] - half}, mgl64.Vec3{pos[0] + half, y + boatHeight, pos[2] + half}
 }
 
 // riders, rideEntity, rideMoved and rideTop make the boat a vehicle.
@@ -420,14 +421,14 @@ func (b *Boat) riders() *ride.Vehicle { return b.seats }
 
 func (b *Boat) rideEntity() *world.Entity { return b.entity }
 
-func (b *Boat) rideMoved() mgl32.Vec3 { return b.moved }
+func (b *Boat) rideMoved() mgl64.Vec3 { return b.moved }
 
 // away and keeperGone make it a seatKeeper.
 func (b *Boat) away() *[]int64 { return &b.awayIDs }
 
 func (b *Boat) keeperGone() bool { return b.gone }
 
-func (b *Boat) rideTop() float32 { return b.entity.Position()[1] - boatHeightOffset + boatHeight }
+func (b *Boat) rideTop() float64 { return b.entity.Position()[1] - boatHeightOffset + boatHeight }
 
 // use is a player using the boat: get in, or with a chest boat while crouching (which
 // rideable skips) open its chest.
@@ -521,7 +522,7 @@ func (p *Player) useOnBoat(d *protocol.UseItemOnEntityTransactionData) bool {
 			if !held.Empty() {
 				damage += float32(p.s.game.combat.damage[held.Name])
 			}
-			b.Hurt(r, damage, p)
+			b.Hurt(r, float64(damage), p)
 		}
 	}
 	return true
@@ -531,7 +532,7 @@ func (p *Player) useOnBoat(d *protocol.UseItemOnEntityTransactionData) bool {
 // point clicked, turned to the player's yaw plus 90, and only where no entity but a dropped
 // item is in the box BDS checks. The boat takes the item's name. The use counts once a
 // boat is made; the item is used up outside creative.
-func (p *Player) placeBoat(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
+func (p *Player) placeBoat(r *world.Region, clicked cube.Pos, face int32, click mgl64.Vec3, held ItemStack) bool {
 	wood, chest, ok := boatItem(held.Name)
 	if !ok || face != int32(cube.FaceUp) || !p.inReach(clicked) {
 		return false
@@ -542,9 +543,9 @@ func (p *Player) placeBoat(r *world.Region, clicked cube.Pos, face int32, click 
 	pos := blockVec(clicked).Add(click)
 	// BDS builds this box from the boat's size as x and z by half its height, y up by its
 	// width (getAABBDim's two values, 0xC9D4AC0 and 1.21.3 alike).
-	half := float32(boatHeight / 2)
-	lo := mgl32.Vec3{pos[0] - half, pos[1], pos[2] - half}
-	hi := mgl32.Vec3{pos[0] + half, pos[1] + boatWidth, pos[2] + half}
+	half := float64(boatHeight / 2)
+	lo := mgl64.Vec3{pos[0] - half, pos[1], pos[2] - half}
+	hi := mgl64.Vec3{pos[0] + half, pos[1] + boatWidth, pos[2] + half}
 	p.touching = r.AppendEntitiesIn(p.touching[:0], lo[0]-cartScan, lo[2]-cartScan, hi[0]+cartScan, hi[2]+cartScan)
 	for _, e := range p.touching {
 		if _, item := e.Owner().(*ItemActor); item {
@@ -555,7 +556,7 @@ func (p *Player) placeBoat(r *world.Region, clicked cube.Pos, face int32, click 
 			return false
 		}
 	}
-	b := p.s.SpawnBoat(r.Dimension(), wood, chest, pos, p.entity.Rotation().Yaw+boatTurn)
+	b := p.s.SpawnBoat(r.Dimension(), wood, chest, pos, float64(p.entity.Rotation().Yaw+boatTurn))
 	if name := customName(held); name != "" {
 		b.name = name
 	}
@@ -575,7 +576,7 @@ func (b *Boat) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	pos, rot := e.Position(), e.Rotation()
 	data["identifier"] = b.id()
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data[boatKeyVariant] = b.wood
 	if b.name != "" {
@@ -620,6 +621,6 @@ func (s *Host) loadBoat(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, i
 		}
 		delete(b.saved, boatKeyItems)
 	}
-	b.entity = r.AddLoadedEntity(at, b.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
+	b.entity = r.AddLoadedEntity(at, b.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, rot))
 	return true
 }

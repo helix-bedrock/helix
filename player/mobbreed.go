@@ -2,10 +2,10 @@ package player
 
 import (
 	"github.com/helix-bedrock/entity/behavior"
-	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/mob"
+	"github.com/helix-bedrock/helix/world"
 )
 
 // Breeding, feeding and leashes on the engine side: the mob package decides (breed.go),

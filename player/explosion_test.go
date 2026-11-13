@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -50,7 +50,7 @@ func TestTNTBreaksBlocksAndLightsTNT(t *testing.T) {
 		}
 		r.SetBlock(cube.Pos{8, y + 1, 10}, 0, block("minecraft:tnt"))
 		r.SetBlock(cube.Pos{8, y + 1, 6}, 0, block("minecraft:obsidian"))
-		x := NewExplosion(mgl32.Vec3{8.5, float32(y) + 1, 8.5}, p.s.redstone.Get().TNT.Power)
+		x := NewExplosion(mgl64.Vec3{8.5, float64(y) + 1, 8.5}, p.s.redstone.Get().TNT.Power)
 		if !p.s.Explode(r, x) {
 			t.Error("explosion did nothing")
 		}
@@ -84,7 +84,7 @@ func TestPrimedTNTExplodesOnFuse(t *testing.T) {
 	var tnt *PrimedTNT
 	onRegion(d, func(r *world.Region) {
 		y = surface(r, air, 8, 8)
-		tnt = p.s.SpawnTNT(d, mgl32.Vec3{8.5, float32(y), 8.5}, 3, nil)
+		tnt = p.s.SpawnTNT(d, mgl64.Vec3{8.5, float64(y), 8.5}, 3, nil)
 	})
 	deadline := time.Now().Add(10 * time.Second)
 	for {
@@ -109,11 +109,11 @@ func TestBlastDestroysItemsButNotNetherStars(t *testing.T) {
 	var star, dirt *ItemActor
 	onRegion(d, func(r *world.Region) {
 		y := float32(surface(r, air, 8, 8))
-		star = p.s.spawnItem(d, ItemStack{Name: netherStar, Count: 1}, mgl32.Vec3{9, y + 0.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
-		dirt = p.s.spawnItem(d, ItemStack{Name: "minecraft:dirt", Count: 1}, mgl32.Vec3{8, y + 0.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+		star = p.s.spawnItem(d, ItemStack{Name: netherStar, Count: 1}, mgl64.Vec3{9, float64(y + 0.2), 8.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
+		dirt = p.s.spawnItem(d, ItemStack{Name: "minecraft:dirt", Count: 1}, mgl64.Vec3{8, float64(y + 0.2), 8.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 	})
 	onRegion(d, func(r *world.Region) {
-		x := NewExplosion(star.entity.Position().Sub(mgl32.Vec3{0.5, 0, 0}), p.s.redstone.Get().TNT.Power)
+		x := NewExplosion(star.entity.Position().Sub(mgl64.Vec3{0.5, 0, 0}), p.s.redstone.Get().TNT.Power)
 		x.BreaksBlocks = false
 		p.s.Explode(r, x)
 	})
@@ -131,7 +131,7 @@ func TestRayBlockedByBlock(t *testing.T) {
 	stone, _ := blocks.Block("minecraft:stone")
 	onRegion(d, func(r *world.Region) {
 		y := surface(r, blocks.Air(), 8, 8) + 2
-		from, to := mgl32.Vec3{6.5, float32(y) + 0.5, 8.5}, mgl32.Vec3{10.5, float32(y) + 0.5, 8.5}
+		from, to := mgl64.Vec3{6.5, float64(y) + 0.5, 8.5}, mgl64.Vec3{10.5, float64(y) + 0.5, 8.5}
 		if p.s.rayBlocked(r, from, to) {
 			t.Error("air blocked a ray")
 		}
@@ -139,7 +139,7 @@ func TestRayBlockedByBlock(t *testing.T) {
 		if !p.s.rayBlocked(r, from, to) {
 			t.Error("stone did not block a ray")
 		}
-		lo, hi := mgl32.Vec3{5.7, float32(y), 8.2}, mgl32.Vec3{6.3, float32(y) + 1.8, 8.8}
+		lo, hi := mgl64.Vec3{5.7, float64(y), 8.2}, mgl64.Vec3{6.3, float64(y) + 1.8, 8.8}
 		if e := p.s.exposure(r, to, lo, hi); e >= 1 {
 			t.Errorf("exposure behind stone is %v", e)
 		}
@@ -174,8 +174,8 @@ func TestExplosionHitAndCause(t *testing.T) {
 		y := surface(r, air, 8, 8)
 		keep[1] = y
 		r.SetBlock(keep, 0, stone)
-		dirt = p.s.spawnItem(d, ItemStack{Name: "minecraft:dirt", Count: 1}, mgl32.Vec3{8, float32(y) + 1.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
-		p.s.Explode(r, NewExplosion(mgl32.Vec3{8.5, float32(y) + 1, 8.5}, p.s.redstone.Get().TNT.Power))
+		dirt = p.s.spawnItem(d, ItemStack{Name: "minecraft:dirt", Count: 1}, mgl64.Vec3{8, float64(y) + 1.2, 8.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
+		p.s.Explode(r, NewExplosion(mgl64.Vec3{8.5, float64(y) + 1, 8.5}, p.s.redstone.Get().TNT.Power))
 	})
 	var x *Explosion
 	onRegion(d, func(r *world.Region) {

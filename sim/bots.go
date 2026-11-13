@@ -71,7 +71,7 @@ func (w *World) setGameMode(ctx context.Context, list []*Bot, mode int32) error 
 		if !ok {
 			return fmt.Errorf("sim: %s is not online", b.Name)
 		}
-		if err := w.Do(ctx, chunkOf(p.State().Position), func(*world.Region) { p.SetGameMode(mode) }); err != nil {
+		if err := w.Do(ctx, chunkOf(world.Vec32(p.State().Position)), func(*world.Region) { p.SetGameMode(mode) }); err != nil {
 			return err
 		}
 	}

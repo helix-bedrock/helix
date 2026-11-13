@@ -151,12 +151,12 @@ func handleBlockPick(p *Player, pk *packet.BlockPickRequest) {
 	// A banner comes with its colour and patterns, as BDS's asItemInstance gives it.
 	stack = bannerDrops(r, pos, []ItemStack{stack})[0]
 	creative := p.creative()
-	reach := float32(pickReach)
+	reach := float64(pickReach)
 	if creative {
 		reach = pickReachCreative
 	}
 	at := p.entity.Position()
-	dx, dy, dz := at[0]-float32(pos[0]), at[1]-float32(pos[1]), at[2]-float32(pos[2])
+	dx, dy, dz := at[0]-float64(pos[0]), at[1]-float64(pos[1]), at[2]-float64(pos[2])
 	if dx*dx+dy*dy+dz*dz > reach*reach {
 		return
 	}

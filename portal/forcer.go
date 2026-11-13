@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
@@ -76,7 +76,7 @@ func (p *Portals) Check(r *world.Region, pos cube.Pos, block uint32) {
 
 // Arrival is where a traveller ends up in a portal: its feet position.
 type Arrival struct {
-	Pos mgl32.Vec3
+	Pos mgl64.Vec3
 }
 
 // Find looks for a portal near pos in dim for a traveller, dropping records whose
@@ -103,12 +103,12 @@ func arrivalIn(rec Record, col cube.Pos, along float32) Arrival {
 		i := min(int(along*float32(rec.Span)), int(rec.Span)-1)
 		col = rec.column(i)
 	}
-	return Arrival{Pos: mgl32.Vec3{float32(col[0]) + 0.5, float32(col[1]), float32(col[2]) + 0.5}}
+	return Arrival{Pos: mgl64.Vec3{float64(col[0]) + 0.5, float64(col[1]), float64(col[2]) + 0.5}}
 }
 
 // Along is how far along the portal near pos a traveller standing at feet is, 0..1,
 // or -1 when there is no portal record there.
-func (p *Portals) Along(dim mcdb.Dimension, pos cube.Pos, feet mgl32.Vec3) float32 {
+func (p *Portals) Along(dim mcdb.Dimension, pos cube.Pos, feet mgl64.Vec3) float32 {
 	rec, _, ok := p.Records.Nearest(dim, pos, maxWidth)
 	if !ok || rec.Span <= 0 {
 		return -1
@@ -127,7 +127,7 @@ func (p *Portals) Along(dim mcdb.Dimension, pos cube.Pos, feet mgl32.Vec3) float
 // 3 by 4 floor with 4 free blocks above fits, else one where a single row fits, else in
 // the open at a clamped height on a built platform with BDS's netherrack ledge. The
 // portal is recorded and the traveller's arrival returned.
-func (p *Portals) Make(r *world.Region, dim mcdb.Dimension, from mgl32.Vec3, rng *rand.Rand) Arrival {
+func (p *Portals) Make(r *world.Region, dim mcdb.Dimension, from mgl64.Vec3, rng *rand.Rand) Arrival {
 	rg := r.Dimension().Range()
 	sp := portalSearch{p: p, r: r, from: from, rg: rg, best: -1, start: rng.IntN(4)}
 	sp.fx, sp.fy, sp.fz = int(math.Floor(float64(from[0]))), int(math.Floor(float64(from[1]))), int(math.Floor(float64(from[2])))
@@ -151,7 +151,7 @@ func (p *Portals) Make(r *world.Region, dim mcdb.Dimension, from mgl32.Vec3, rng
 type portalSearch struct {
 	p          *Portals
 	r          *world.Region
-	from       mgl32.Vec3
+	from       mgl64.Vec3
 	rg         [2]int
 	fx, fy, fz int
 	start      int

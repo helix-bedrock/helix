@@ -4,7 +4,7 @@ import (
 	"maps"
 	"sync/atomic"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -146,6 +146,6 @@ func (t *Ticker) composterTick(r *world.Region, pos cube.Pos) {
 
 // playSound plays a block sound with no data at the middle of pos.
 func playSound(r *world.Region, pos cube.Pos, name string) {
-	at := mgl32.Vec3{float32(pos[0]) + 0.5, float32(pos[1]) + 0.5, float32(pos[2]) + 0.5}
-	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: name, Position: at, ExtraData: -1}, nil)
+	at := mgl64.Vec3{float64(pos[0]) + 0.5, float64(pos[1]) + 0.5, float64(pos[2]) + 0.5}
+	r.Broadcast(pos, &packet.LevelSoundEvent{SoundType: name, Position: world.Vec32(at), ExtraData: -1}, nil)
 }

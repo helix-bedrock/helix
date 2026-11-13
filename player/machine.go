@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/registry"
@@ -439,7 +440,7 @@ type CircuitHooks struct {
 	JukeboxPower func(r *world.Region, pos cube.Pos, power int32)
 	// HitTarget is a projectile landing at hit on the target block at pos, false if the
 	// block is not a target. arrow says it was an arrow or trident.
-	HitTarget func(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool
+	HitTarget func(r *world.Region, pos cube.Pos, hit mgl64.Vec3, arrow bool) bool
 	// CartOnRail is a minecart in the block at pos.
 	CartOnRail func(r *world.Region, pos cube.Pos)
 	// Signal is the strength of the circuit part at pos, -1 for none: what an armour
@@ -470,12 +471,12 @@ func (c *Chest) viewersChanged(r *world.Region) {
 
 // EntityBox is what pressure plates see of an entity: players, dropped items and lit TNT, not
 // experience orbs. Runs: owner of the entity's region.
-func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
 	at := e.Position()
 	switch o := e.Owner().(type) {
 	case *Player:
-		lo = mgl32.Vec3{at[0] - playerHalfWidth, at[1] - eyeHeight, at[2] - playerHalfWidth}
-		return lo, mgl32.Vec3{at[0] + playerHalfWidth, lo[1] + playerHeight, at[2] + playerHalfWidth}, true, true
+		lo = mgl64.Vec3{at[0] - playerHalfWidth, at[1] - eyeHeight, at[2] - playerHalfWidth}
+		return lo, mgl64.Vec3{at[0] + playerHalfWidth, lo[1] + playerHeight, at[2] + playerHalfWidth}, true, true
 	case *Mob:
 		if o.gone {
 			return lo, hi, false, false
@@ -483,10 +484,10 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 		bx := o.m.Box()
 		return mglVec(bx.Min), mglVec(bx.Max), true, true
 	case *ItemActor:
-		lo = mgl32.Vec3{at[0] - itemHalfSize, at[1], at[2] - itemHalfSize}
-		return lo, mgl32.Vec3{at[0] + itemHalfSize, at[1] + 2*itemHalfSize, at[2] + itemHalfSize}, false, true
+		lo = mgl64.Vec3{at[0] - itemHalfSize, at[1], at[2] - itemHalfSize}
+		return lo, mgl64.Vec3{at[0] + itemHalfSize, at[1] + 2*itemHalfSize, at[2] + itemHalfSize}, false, true
 	case *PrimedTNT:
-		half := mgl32.Vec3{tntHalfSize, tntHalfSize, tntHalfSize}
+		half := mgl64.Vec3{tntHalfSize, tntHalfSize, tntHalfSize}
 		return at.Sub(half), at.Add(half), false, true
 	case *Minecart:
 		lo, hi = cartBox(at)
@@ -501,9 +502,9 @@ func (s *Host) EntityBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 // PlateBox is what plates and buttons see of an entity: EntityBox, and projectiles, which pistons
 // and carts do not take. Their box is taken as centred on their position. Runs: owner of the
 // entity's region.
-func (s *Host) PlateBox(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+func (s *Host) PlateBox(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
 	if t, isProjectile := e.Owner().(*Projectile); isProjectile {
-		at, half := e.Position(), mgl32.Vec3{t.spec.Width / 2, t.spec.Height / 2, t.spec.Width / 2}
+		at, half := e.Position(), mgl64.Vec3{t.spec.Width / 2, t.spec.Height / 2, t.spec.Width / 2}
 		return at.Sub(half), at.Add(half), false, true
 	}
 	return s.EntityBox(e)
@@ -518,7 +519,7 @@ func (s *Host) IsArrow(e *world.Entity) bool {
 // PistonPush moves an entity a piston runs into. A player's position is the client's, so
 // the server moves it, stopped by blocks as BDS's actor move is, and corrects the client.
 // Runs: owner of the entity's region.
-func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl32.Vec3) {
+func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl64.Vec3) {
 	if m, ok := e.Owner().(*Mob); ok {
 		// The mob's body is where it is; the entity follows it at the mob's next Apply.
 		if !m.gone && e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()}) {
@@ -535,7 +536,7 @@ func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl32.Vec3) {
 }
 
 // pistonPush moves the player and tells its client where it now is.
-func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
+func (p *Player) pistonPush(r *world.Region, by mgl64.Vec3) {
 	if p.entity == nil || p.dead() || p.gameMode == GameModeSpectator {
 		return
 	}
@@ -543,20 +544,20 @@ func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
 	if !ok {
 		return
 	}
-	var moved mgl32.Vec3
+	var moved mgl64.Vec3
 	for axis := range 3 {
 		moved[axis] = p.s.clipSweep(r, lo, hi, axis, by[axis])
 		lo[axis] += moved[axis]
 		hi[axis] += moved[axis]
 	}
-	if moved == (mgl32.Vec3{}) {
+	if moved == (mgl64.Vec3{}) {
 		return
 	}
 	rot, onGround, tick := p.entity.Rotation(), p.entity.OnGround(), p.entity.Tick()
 	pos := p.entity.Position().Add(moved)
 	p.s.handlers.movement(p, world.Movement{Pos: pos, Rot: rot, OnGround: onGround, Tick: tick})
 	p.send(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer, Position: pos, Delta: p.move.velocity,
+		PredictionType: packet.PredictionTypePlayer, Position: world.Vec32(pos), Delta: world.Vec32(p.move.velocity),
 		Rotation: mgl32.Vec2{rot.Pitch, rot.Yaw}, OnGround: onGround, Tick: tick,
 	})
 	p.flush()
@@ -566,7 +567,7 @@ func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
 // fits goes in whole. An item only some players may see stays out, as those players' own;
 // a name tag or lifetime changes nothing about what the item is.
 func (c *Chest) collectItems(r *world.Region, pos cube.Pos, conf *circuit.HopperConfig) bool {
-	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
+	x, y, z := float64(pos[0]), float64(pos[1]), float64(pos[2])
 	var buf [16]*world.Entity
 	for _, o := range r.AppendEntitiesIn(buf[:0], x, z, x+1, z+1) {
 		i, ok := o.Owner().(*ItemActor)
@@ -574,10 +575,10 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos, conf *circuit.Hopper
 			continue
 		}
 		at := o.Position()
-		inset := conf.PickupInset
+		inset := float64(conf.PickupInset)
 		if at[0]+itemHalfSize < x+inset || at[0]-itemHalfSize > x+1-inset ||
 			at[2]+itemHalfSize < z+inset || at[2]-itemHalfSize > z+1-inset ||
-			at[1]+itemHalfSize < y+conf.PickupLow+inset || at[1]-itemHalfSize > y+conf.PickupHigh-inset {
+			at[1]+itemHalfSize < y+float64(conf.PickupLow)+inset || at[1]-itemHalfSize > y+float64(conf.PickupHigh)-inset {
 			continue
 		}
 		left := c.Inventory(r).AddItem(i.stack)
@@ -598,7 +599,7 @@ func (c *Chest) collectItems(r *world.Region, pos cube.Pos, conf *circuit.Hopper
 
 // HitTarget is a projectile landing at hit on the target block at pos, for whatever makes
 // projectiles. False if the block is not a target. Runs: owner of the region.
-func (s *Host) HitTarget(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool {
+func (s *Host) HitTarget(r *world.Region, pos cube.Pos, hit mgl64.Vec3, arrow bool) bool {
 	if fn := s.circuits.HitTarget; fn != nil {
 		return fn(r, pos, hit, arrow)
 	}
@@ -659,8 +660,8 @@ type dispense struct {
 	pos   cube.Pos
 	front cube.Pos
 	face  cube.Face
-	dir   mgl32.Vec3
-	at    mgl32.Vec3
+	dir   mgl64.Vec3
+	at    mgl64.Vec3
 }
 
 // takeOne takes one item from the slot fired.
@@ -741,18 +742,18 @@ func (s *Host) dropIntoComposter(r *world.Region, c *Chest, slot int, below cube
 }
 
 // eject throws stack out of the machine at pos, as BDS's dispenser throws an item.
-func (s *Host) eject(r *world.Region, stack ItemStack, pos cube.Pos, dir, at mgl32.Vec3) {
+func (s *Host) eject(r *world.Region, stack ItemStack, pos cube.Pos, dir, at mgl64.Vec3) {
 	if dir[1] == 0 {
-		at[1] = float32(pos[1]) + ejectLow
+		at[1] = float64(pos[1]) + ejectLow
 	}
 	eject := &s.redstone.Get().Dispenser
-	speed := eject.Speed + rand.Float32()*eject.SpeedExtra
-	vel := mgl32.Vec3{dir[0] * speed, ejectUp, dir[2] * speed}
+	speed := float64(eject.Speed + rand.Float32()*eject.SpeedExtra)
+	vel := mgl64.Vec3{dir[0] * speed, ejectUp, dir[2] * speed}
 	if dir[1] != 0 {
 		vel[1] = dir[1] * speed
 	}
 	for n := range 3 {
-		vel[n] += float32(rand.NormFloat64()) * eject.Spread
+		vel[n] += rand.NormFloat64() * float64(eject.Spread)
 	}
 	if dir[1] == 0 {
 		at[1] += ejectDropSide
@@ -765,7 +766,7 @@ func (s *Host) eject(r *world.Region, stack ItemStack, pos cube.Pos, dir, at mgl
 // useBucket is BDS's bucket in a dispenser: a filled one pours at front and an empty one
 // takes the source there. The other bucket then goes in the dispenser, or out as an item
 // if it is full. False if it did neither, and the bucket is thrown out like any item.
-func (c *Chest) useBucket(r *world.Region, front cube.Pos, slot int, at mgl32.Vec3, pos cube.Pos, dir mgl32.Vec3) bool {
+func (c *Chest) useBucket(r *world.Region, front cube.Pos, slot int, at mgl64.Vec3, pos cube.Pos, dir mgl64.Vec3) bool {
 	s := c.s
 	it := c.items[slot]
 	var next string
@@ -847,18 +848,18 @@ func (c *Chest) pushOne(r *world.Region, at cube.Pos, slot int) bool {
 }
 
 // faceVec is a face as a direction.
-func faceVec(f cube.Face) mgl32.Vec3 {
+func faceVec(f cube.Face) mgl64.Vec3 {
 	switch f {
 	case cube.FaceDown:
-		return mgl32.Vec3{0, -1, 0}
+		return mgl64.Vec3{0, -1, 0}
 	case cube.FaceUp:
-		return mgl32.Vec3{0, 1, 0}
+		return mgl64.Vec3{0, 1, 0}
 	case cube.FaceNorth:
-		return mgl32.Vec3{0, 0, -1}
+		return mgl64.Vec3{0, 0, -1}
 	case cube.FaceSouth:
-		return mgl32.Vec3{0, 0, 1}
+		return mgl64.Vec3{0, 0, 1}
 	case cube.FaceWest:
-		return mgl32.Vec3{-1, 0, 0}
+		return mgl64.Vec3{-1, 0, 0}
 	}
-	return mgl32.Vec3{1, 0, 0}
+	return mgl64.Vec3{1, 0, 0}
 }

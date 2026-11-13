@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -106,7 +106,7 @@ func (p *Player) releaseTrident(held ItemStack, used int32) {
 
 // tridentHit is what a trident adds to hitting a living thing: Impaling's damage on one in
 // water or rain, and Channeling's lightning on one under a thundering sky.
-func (t *Projectile) tridentHit(r *world.Region, target Living, at mgl32.Vec3) float32 {
+func (t *Projectile) tridentHit(r *world.Region, target Living, at mgl64.Vec3) float32 {
 	tr := t.trident
 	if tr == nil {
 		return 0
@@ -128,11 +128,11 @@ func (t *Projectile) tridentHurt() {
 		return
 	}
 	t.trident.dealt = true
-	t.vel = mgl32.Vec3{}
+	t.vel = mgl64.Vec3{}
 }
 
 // skyOpen reports whether nothing is above at, by the height map.
-func (s *Host) skyOpen(r *world.Region, at mgl32.Vec3) bool {
+func (s *Host) skyOpen(r *world.Region, at mgl64.Vec3) bool {
 	h, ok := r.Height(int(math.Floor(float64(at[0]))), int(math.Floor(float64(at[2]))))
 	return ok && int(math.Floor(float64(at[1]))) >= h
 }
@@ -155,7 +155,7 @@ func (t *Projectile) tridentReturns(r *world.Region, e *world.Entity) bool {
 	if o.dead() {
 		if !t.item.Empty() && t.pickup != arrowPickupCreative {
 			d := e.Position()
-			t.s.spawnItem(r.Dimension(), t.s.freshStack(t.item), d, mgl32.Vec3{}, world.Rotation{}, blockDropDelay, 0)
+			t.s.spawnItem(r.Dimension(), t.s.freshStack(t.item), d, mgl64.Vec3{}, world.Rotation{}, blockDropDelay, 0)
 		}
 		t.remove(e)
 		return true
@@ -171,12 +171,12 @@ func (t *Projectile) returnStep(r *world.Region, e *world.Entity, o *Player, lev
 	pos := e.Position()
 	target := o.entity.Position()
 	d := target.Sub(pos)
-	pos[1] += d[1] * tridentClimb * level
-	var dir mgl32.Vec3
+	pos[1] += d[1] * tridentClimb * float64(level)
+	var dir mgl64.Vec3
 	if dist := d.Len(); dist >= minPushDist {
 		dir = d.Mul(1 / dist)
 	}
-	t.vel = t.vel.Mul(tridentKeep).Add(dir.Mul(tridentPull * level))
+	t.vel = t.vel.Mul(tridentKeep).Add(dir.Mul(float64(tridentPull * level)))
 	if !tr.returning {
 		tr.returning, t.stuck = true, false
 		playSound(r, o.blockPos(), soundEvent{name: packet.SoundEventTridentReturn, pos: target, extra: -1, entity: nameThrownTrident}, nil)
@@ -264,7 +264,7 @@ func (p *Player) tickSpin() {
 	if r == nil || !ok {
 		return
 	}
-	grow := mgl32.Vec3{spinReach, spinReach, spinReach}
+	grow := mgl64.Vec3{spinReach, spinReach, spinReach}
 	lo, hi = lo.Sub(grow), hi.Add(grow)
 	hits := 0
 	for _, e := range r.AppendEntitiesIn(nil, lo[0], lo[2], hi[0], hi[2]) {

@@ -1,9 +1,10 @@
 package player
 
 import (
+	"math"
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -34,7 +35,7 @@ func TestBowPull(t *testing.T) {
 		ticks int32
 		want  float32
 	}{{0, 0}, {20, 1}, {40, 1}, {10, 0.41666666}} {
-		if got := bowPull(c.ticks); got != c.want {
+		if got := float32(bowPull(c.ticks)); got != c.want {
 			t.Errorf("%d ticks: %v, want %v", c.ticks, got, c.want)
 		}
 	}
@@ -71,7 +72,7 @@ func TestProjectileHitsTargetBlock(t *testing.T) {
 		setNamed(t, p, r, at, "minecraft:target", nil)
 	})
 	hits := make(chan struct{}, 1)
-	p.s.SetCircuitHooks(CircuitHooks{HitTarget: func(_ *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool {
+	p.s.SetCircuitHooks(CircuitHooks{HitTarget: func(_ *world.Region, pos cube.Pos, hit mgl64.Vec3, arrow bool) bool {
 		if pos == at && !arrow && hit[2] > 7.9 && hit[2] < 8.1 {
 			select {
 			case hits <- struct{}{}:
@@ -83,7 +84,7 @@ func TestProjectileHitsTargetBlock(t *testing.T) {
 	spec, _ := p.s.projectileSpec(nameSnowball, "")
 	var thrown *Projectile
 	onRegion(d, func(r *world.Region) {
-		thrown = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 0.5, 4.5}, mgl32.Vec3{0, 0, 1}, spec.Power, nil)
+		thrown = p.s.SpawnProjectile(r.Dimension(), spec, mgl64.Vec3{3.5, float64(y) + 0.5, 4.5}, mgl64.Vec3{0, 0, 1}, spec.Power, nil)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return thrown.gone })
 	select {
@@ -106,7 +107,7 @@ func TestArrowSticksThenFalls(t *testing.T) {
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
 	var arrow *Projectile
 	onRegion(d, func(r *world.Region) {
-		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 0.5, 4.5}, mgl32.Vec3{0, 0, 1}, spec.Power, nil)
+		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl64.Vec3{3.5, float64(y) + 0.5, 4.5}, mgl64.Vec3{0, 0, 1}, spec.Power, nil)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return arrow.stuck })
 	if arrow.stuckAt != at {
@@ -124,9 +125,9 @@ func TestArrowStaysInLoadedChunks(t *testing.T) {
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
 	var arrow *Projectile
 	onRegion(d, func(r *world.Region) {
-		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, float32(y) + 100, 8.5}, mgl32.Vec3{1, 0, 0}, spec.Power, nil)
+		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl64.Vec3{3.5, float64(y) + 100, 8.5}, mgl64.Vec3{1, 0, 0}, spec.Power, nil)
 	})
-	var last mgl32.Vec3
+	var last mgl64.Vec3
 	still := 0
 	waitRegion(t, d, func(*world.Region) bool {
 		if pos := arrow.Entity().Position(); pos != last {
@@ -148,7 +149,7 @@ func TestArrowGoneBelowWorld(t *testing.T) {
 	var arrow *Projectile
 	onRegion(d, func(r *world.Region) {
 		low := float32(r.Dimension().Range()[0]) - voidDepth - 1
-		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl32.Vec3{3.5, low, 8.5}, mgl32.Vec3{0, -1, 0}, spec.Power, nil)
+		arrow = p.s.SpawnProjectile(r.Dimension(), spec, mgl64.Vec3{3.5, float64(low), 8.5}, mgl64.Vec3{0, -1, 0}, spec.Power, nil)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return arrow.gone })
 }
@@ -167,8 +168,8 @@ func TestThrowableKinds(t *testing.T) {
 func TestProjectileWaitsItsFirstTick(t *testing.T) {
 	p, d := machineWorld(t)
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
-	at := mgl32.Vec3{3.5, 200, 4.5}
-	arrow := &Projectile{s: p.s, spec: spec, vel: mgl32.Vec3{0, 0, 3}, waiting: true, separated: true}
+	at := mgl64.Vec3{3.5, 200, 4.5}
+	arrow := &Projectile{s: p.s, spec: spec, vel: mgl64.Vec3{0, 0, 3}, waiting: true, separated: true}
 	arrow.entity = d.AddEntity(arrow.config(990001, 990001, at, world.Rotation{}))
 	onRegion(d, func(*world.Region) {
 		if arrow.waiting && arrow.entity.Position() != at {
@@ -182,8 +183,8 @@ func TestProjectileWaitsItsFirstTick(t *testing.T) {
 func TestProjectileStartsBelowEyes(t *testing.T) {
 	p := testPlayer(t)
 	spec, _ := p.s.projectileSpec(nameArrow, arrowGroupPlayer)
-	got := projectileEyes(spec, mgl32.Vec3{0, 10, 0}, world.Rotation{Yaw: 90})
-	if got[1] != 9.9 || got[0] != 0 || got[2] != 0 {
+	got := projectileEyes(spec, mgl64.Vec3{0, 10, 0}, world.Rotation{Yaw: 90})
+	if math.Abs(got[1]-9.9) > 1e-6 || got[0] != 0 || got[2] != 0 {
 		t.Errorf("starts at %v", got)
 	}
 }
@@ -195,7 +196,7 @@ func TestProjectileMoveTicks(t *testing.T) {
 		dist float32
 		want int64
 	}{{0, 0}, {10, 0}, {16, 1}, {40, 2}, {80, 5}, {500, 5}} {
-		if got := s.moveTicks(c.dist); got != c.want {
+		if got := s.moveTicks(float64(c.dist)); got != c.want {
 			t.Errorf("at %v: %d, want %d", c.dist, got, c.want)
 		}
 	}
@@ -204,21 +205,21 @@ func TestProjectileMoveTicks(t *testing.T) {
 // A projectile that hit a box must count as in it, or it falls out the next tick. Hits land on
 // a face, and rounding can put them just off it.
 func TestProjectileHitStaysInBox(t *testing.T) {
-	lo, hi := mgl32.Vec3{10, 64, 30}, mgl32.Vec3{11, 65, 31}
+	lo, hi := mgl64.Vec3{10, 64, 30}, mgl64.Vec3{11, 65, 31}
 	for i := range 20000 {
 		f := float32(i) / 20000
-		from := mgl32.Vec3{10 + f, 65.03 + 3*f, 30.7 - f/2}
-		to := from.Add(mgl32.Vec3{0.05 - f/10, -0.1 - 3*f, f/10 - 0.05})
+		from := mgl64.Vec3{float64(10 + f), float64(65.03 + 3*f), float64(30.7 - f/2)}
+		to := from.Add(mgl64.Vec3{float64(0.05 - f/10), float64(-0.1 - 3*f), float64(f/10 - 0.05)})
 		at, hits := segmentEntersBox(from, to, lo, hi)
 		if !hits {
 			continue
 		}
-		pos := clampToBox(from.Add(to.Sub(from).Mul(float32(at))), lo, hi)
+		pos := clampToBox(from.Add(to.Sub(from).Mul(float64(at))), lo, hi)
 		if !insideBox(pos, lo, hi) {
 			t.Fatalf("hit %v counts as outside its box", pos)
 		}
 	}
-	if insideBox(mgl32.Vec3{10.5, 65.01, 30.5}, lo, hi) {
+	if insideBox(mgl64.Vec3{10.5, 65.01, 30.5}, lo, hi) {
 		t.Error("a point above the block counts as inside")
 	}
 }

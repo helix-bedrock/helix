@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -65,7 +65,7 @@ func vanillaFall(p *Player, m *MoveInfo) {
 		}
 		p.move.fall = 0
 	case dy < 0:
-		p.move.fall -= dy
+		p.move.fall -= float32(dy)
 	default:
 		p.move.fall = 0
 	}
@@ -86,7 +86,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 		boost = float32(amp + 1)
 	}
 	damage := float32(math.Ceil(float64(distance-p.Tuning(TuneFallFree)-boost))) * p.Tuning(TuneFallDamageScale)
-	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
+	feet := p.entity.Position().Sub(mgl64.Vec3{0, eyeHeight, 0})
 	pos := vecPos(feet)
 	p.trample(r, feet, distance)
 	if damage > 0 && !p.invulnerable() {

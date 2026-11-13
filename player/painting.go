@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -122,14 +123,14 @@ func paintingDir(face cube.Face) (int32, bool) {
 }
 
 // paintingYaw is the yaw of a painting hanging in dir.
-func paintingYaw(dir int32) float32 {
+func paintingYaw(dir int32) float64 {
 	switch dir {
 	case 0:
 		return 180
 	case 2:
 		return 0
 	}
-	return float32(90 * dir)
+	return float64(90 * dir)
 }
 
 // Painting is a painting on a wall. Runs: owner of its entity.
@@ -155,12 +156,12 @@ func (p *Painting) Motive() Motive { return p.motive }
 func (p *Painting) Direction() int32 { return p.dir }
 
 // halfSize is half its size in blocks across and up.
-func (m Motive) halfSize() (across, up float32) {
-	return float32(m.Width) / paintingEven, float32(m.Height) / paintingEven
+func (m Motive) halfSize() (across, up float64) {
+	return float64(m.Width) / paintingEven, float64(m.Height) / paintingEven
 }
 
 // evenOffset is how far a painting of size pixels is moved to sit between blocks.
-func evenOffset(size int32) float32 {
+func evenOffset(size int32) float64 {
 	if size%paintingEven == 0 {
 		return 0.5
 	}
@@ -168,7 +169,7 @@ func evenOffset(size int32) float32 {
 }
 
 // paintingPos is BDS's position of a painting hanging in dir on the block wall (0xBFC3D80).
-func paintingPos(wall cube.Pos, dir int32, m Motive) mgl32.Vec3 {
+func paintingPos(wall cube.Pos, dir int32, m Motive) mgl64.Vec3 {
 	pos := blockCenter(wall)
 	side := evenOffset(m.Width)
 	pos[1] += evenOffset(m.Height)
@@ -190,7 +191,7 @@ func paintingPos(wall cube.Pos, dir int32, m Motive) mgl32.Vec3 {
 }
 
 // paintingWall is the wall block of a painting at pos, as BDS's wouldSurvive finds it (0xBFC4A10).
-func paintingWall(pos mgl32.Vec3, dir int32, m Motive) cube.Pos {
+func paintingWall(pos mgl64.Vec3, dir int32, m Motive) cube.Pos {
 	side := evenOffset(m.Width)
 	switch dir {
 	case 0:
@@ -210,20 +211,20 @@ func paintingWall(pos mgl32.Vec3, dir int32, m Motive) cube.Pos {
 }
 
 // paintingBox is BDS's box of a painting at pos (0xBFC3F60).
-func paintingBox(pos mgl32.Vec3, dir int32, m Motive) (lo, hi mgl32.Vec3) {
+func paintingBox(pos mgl64.Vec3, dir int32, m Motive) (lo, hi mgl64.Vec3) {
 	across, up := m.halfSize()
-	half := mgl32.Vec3{across, up, paintingThick}
+	half := mgl64.Vec3{across, up, paintingThick}
 	if dir == 1 || dir == 3 {
-		half = mgl32.Vec3{paintingThick, up, across}
+		half = mgl64.Vec3{paintingThick, up, across}
 	}
-	shrink := mgl32.Vec3{paintingShrink, paintingShrink, paintingShrink}
+	shrink := mgl64.Vec3{paintingShrink, paintingShrink, paintingShrink}
 	return pos.Sub(half).Add(shrink), pos.Add(half).Sub(shrink)
 }
 
 // paintingFits is BDS's HangingActor survive check (0xBFC4BC0) without the facing rules of the
 // blocks behind and in front, which are not ported: no block's box in its box, every block
 // behind it of solid material, and no other painting in its box. self is left out.
-func (s *Host) paintingFits(r *world.Region, wall cube.Pos, pos mgl32.Vec3, dir int32, m Motive, self *Painting, near *[]*world.Entity) bool {
+func (s *Host) paintingFits(r *world.Region, wall cube.Pos, pos mgl64.Vec3, dir int32, m Motive, self *Painting, near *[]*world.Entity) bool {
 	lo, hi := paintingBox(pos, dir, m)
 	from, to := floorPos(lo), floorPos(hi)
 	for x := from[0]; x <= to[0]; x++ {
@@ -236,7 +237,7 @@ func (s *Host) paintingFits(r *world.Region, wall cube.Pos, pos mgl32.Vec3, dir 
 				}
 				base := blockVec(at)
 				for _, box := range s.boxesAt(r, at, b) {
-					if overlaps(lo, hi, base.Add(mgl32.Vec3{box[0], box[1], box[2]}), base.Add(mgl32.Vec3{box[3], box[4], box[5]})) {
+					if overlaps(lo, hi, base.Add(mgl64.Vec3{float64(box[0]), float64(box[1]), float64(box[2])}), base.Add(mgl64.Vec3{float64(box[3]), float64(box[4]), float64(box[5])})) {
 						return false
 					}
 				}
@@ -302,11 +303,11 @@ func (s *Host) SpawnPainting(r *world.Region, wall cube.Pos, dir int32, m Motive
 	p := &Painting{s: s, motive: m, dir: dir & 3}
 	pos := paintingPos(wall, p.dir, m)
 	yaw := paintingYaw(p.dir)
-	p.entity = r.Dimension().AddEntity(p.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: yaw, HeadYaw: yaw})) //nolint:gosec // an entity ID, not a secret
+	p.entity = r.Dimension().AddEntity(p.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: float32(yaw), HeadYaw: float32(yaw)})) //nolint:gosec // an entity ID, not a secret
 	return p
 }
 
-func (p *Painting) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+func (p *Painting) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: p, Spawn: p.spawnPackets, Move: p.movePacket, Input: p.tick, Save: p.saveEntity,
@@ -316,13 +317,13 @@ func (p *Painting) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot 
 // spawnPackets are BDS's AddPainting (0x8AF8A00).
 func (p *Painting) spawnPackets(e *world.Entity) []packet.Packet {
 	return []packet.Packet{&packet.AddPainting{
-		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Direction: p.dir, Title: p.motive.Name,
+		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Position: world.Vec32(e.Position()), Direction: p.dir, Title: p.motive.Name,
 	}}
 }
 
 func (p *Painting) movePacket(e *world.Entity) packet.Packet {
 	rot := e.Rotation()
-	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw}}
+	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), float32(rot.HeadYaw)}}
 }
 
 // tick is HangingActor's tick (0xBFC44D0): every 80 to 119 ticks, with the chunks around it
@@ -382,13 +383,13 @@ func (p *Painting) Break(r *world.Region, drops bool) {
 		levelEvent(r, at, pos, levelEventPaintingParticle, int32(p.s.reg.Blocks.Hash(planks))) //nolint:gosec // hashes are sent as int32
 	}
 	if drops && p.s.level.DoEntityDrops {
-		p.s.spawnItem(r.Dimension(), ItemStack{Name: paintingID, Count: 1}, pos.Add(mgl32.Vec3{0, paintingDropUp, 0}), mgl32.Vec3{}, world.Rotation{}, paintingDropDelay, 0)
+		p.s.spawnItem(r.Dimension(), ItemStack{Name: paintingID, Count: 1}, pos.Add(mgl64.Vec3{0, paintingDropUp, 0}), mgl64.Vec3{}, world.Rotation{}, paintingDropDelay, 0)
 	}
 	p.entity.Remove()
 }
 
 // BlastBox is its box.
-func (p *Painting) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
+func (p *Painting) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 	if p.gone || p.entity == nil {
 		return lo, hi, false
 	}
@@ -397,14 +398,14 @@ func (p *Painting) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 }
 
 // BlastHit takes it down, as any hurt does.
-func (p *Painting) BlastHit(float32, DamageSource) {
+func (p *Painting) BlastHit(float64, DamageSource) {
 	if r := p.entity.Region(); r != nil {
 		p.Hurt(r, nil)
 	}
 }
 
 // BlastPush does nothing: a painting does not move.
-func (p *Painting) BlastPush(mgl32.Vec3) {}
+func (p *Painting) BlastPush(mgl64.Vec3) {}
 
 // placePainting is HangingActorItem::_useOn (0xC914F60): only on the side of a block, with the
 // biggest motive that fits; the level event at the wall and the item used up outside creative.
@@ -474,7 +475,7 @@ func (p *Painting) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	pos, rot := e.Position(), e.Rotation()
 	data["identifier"] = paintingID
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data[paintingMotiveTag] = p.motive.Name
 	data[paintingDirTag] = uint8(p.dir) //nolint:gosec // 0 to 3
@@ -511,6 +512,6 @@ func (s *Host) loadPainting(r *world.Region, at mcdb.ChunkPos, saved chunk.Entit
 		p.dir = oldPaintingDir(int32(d))
 	}
 	yaw := paintingYaw(p.dir)
-	p.entity = r.AddLoadedEntity(at, p.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, world.Rotation{Yaw: yaw, HeadYaw: yaw}))
+	p.entity = r.AddLoadedEntity(at, p.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, world.Rotation{Yaw: float32(yaw), HeadYaw: float32(yaw)}))
 	return true
 }

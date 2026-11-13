@@ -4,7 +4,7 @@ import (
 	"maps"
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/helix/mob"
@@ -105,7 +105,7 @@ func (o *Mob) saveActor(e *world.Entity, data map[string]any) {
 	pitch, yaw, _, _ := o.m.Rotation()
 	vel := o.m.Body().Vel
 	data["UniqueID"] = e.UniqueID()
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
 	data["Rotation"] = []float32{yaw, pitch}
 	data["Motion"] = []float32{vel.X, vel.Y, vel.Z}
 	if name := o.m.NameTag(); name != "" {
@@ -215,7 +215,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
 		yaw, pitch = v[0], v[1]
 	}
-	feet := mgl32.Vec3{pos[0], pos[1], pos[2]}
+	feet := mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}
 	o, ok := s.newMobID(saved.ID, typ, feet, yaw, definition.InitLoaded, "")
 	if !ok {
 		return false

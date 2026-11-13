@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -108,9 +108,9 @@ func (p *Player) reach() float32 {
 // inReach is BDS's break range check: from the player's position to the
 // block's lowest corner, below reach.
 func (p *Player) inReach(pos cube.Pos) bool {
-	d := p.entity.Position().Sub(mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])})
+	d := p.entity.Position().Sub(mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])})
 	r := p.reach()
-	return d.Dot(d) < r*r
+	return d.Dot(d) < float64(r*r)
 }
 
 // underWater reports whether the player's head is in water.
@@ -160,12 +160,12 @@ func (p *Player) breakRate(r *world.Region, pos cube.Pos) float32 {
 }
 
 // levelEvent queues a LevelEvent for the players who have its chunk.
-func levelEvent(r *world.Region, at cube.Pos, pos mgl32.Vec3, event, data int32) {
-	r.Broadcast(at, &packet.LevelEvent{EventType: event, Position: pos, EventData: data}, nil)
+func levelEvent(r *world.Region, at cube.Pos, pos mgl64.Vec3, event, data int32) {
+	r.Broadcast(at, &packet.LevelEvent{EventType: event, Position: world.Vec32(pos), EventData: data}, nil)
 }
 
-func blockVec(pos cube.Pos) mgl32.Vec3 {
-	return mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])}
+func blockVec(pos cube.Pos) mgl64.Vec3 {
+	return mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}
 }
 
 func toCube(pos protocol.BlockPos) cube.Pos { return cube.Pos{int(pos[0]), int(pos[1]), int(pos[2])} }
@@ -202,7 +202,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 			p.stopBreak()
 			levelEvent(r, pos, blockVec(pos), levelEventStopCracking, 0)
 		case protocol.PlayerActionStopBreak:
-			levelEvent(r, cube.Pos{}, mgl32.Vec3{}, levelEventStopCracking, 0)
+			levelEvent(r, cube.Pos{}, mgl64.Vec3{}, levelEventStopCracking, 0)
 		case protocol.PlayerActionPredictDestroyBlock:
 			predicted, predictPos, predictFace = true, pos, a.Face
 			if hadContinue && creative && p.creativeDestroy(r, pos) {

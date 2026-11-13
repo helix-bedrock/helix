@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -159,8 +159,8 @@ func (p *Player) shootCrossbow(held ItemStack) {
 		dir := look
 		if n != 1 {
 			a := float64(i*crossbowMultishotAngle-crossbowMultishotAngle) * math.Pi / 180
-			c, s := float32(math.Cos(a)), float32(math.Sin(a))
-			dir = mgl32.Vec3{look[0]*c + look[2]*s, look[1], look[2]*c - look[0]*s}
+			c, s := math.Cos(a), math.Sin(a)
+			dir = mgl64.Vec3{look[0]*c + look[2]*s, look[1], look[2]*c - look[0]*s}
 		}
 		if firework {
 			p.shootCrossbowRocket(r, loaded, dir)
@@ -184,7 +184,7 @@ func (p *Player) shootCrossbow(held ItemStack) {
 }
 
 // shootCrossbowRocket launches one of the loaded rockets free along dir.
-func (p *Player) shootCrossbowRocket(r *world.Region, loaded ItemStack, dir mgl32.Vec3) {
+func (p *Player) shootCrossbowRocket(r *world.Region, loaded ItemStack, dir mgl64.Vec3) {
 	one := loaded
 	one.Count = 1
 	f := p.s.LaunchFirework(r.Dimension(), p.entity.Position(), dir, one, nil)
@@ -194,7 +194,7 @@ func (p *Player) shootCrossbowRocket(r *world.Region, loaded ItemStack, dir mgl3
 // shootCrossbowArrow shoots one critical arrow along dir with the crossbow's arrow
 // definition and Piercing; a side arrow of Multishot (side) cannot be picked up. False if
 // arrows have no definition.
-func (p *Player) shootCrossbowArrow(r *world.Region, held, loaded ItemStack, dir mgl32.Vec3, side bool) bool {
+func (p *Player) shootCrossbowArrow(r *world.Region, held, loaded ItemStack, dir mgl64.Vec3, side bool) bool {
 	spec, ok := p.s.projectileSpec(nameArrow, arrowGroupCrossbow)
 	if !ok {
 		return false

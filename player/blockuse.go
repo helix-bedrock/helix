@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -29,7 +29,7 @@ type BlockUse struct {
 	Pos      cube.Pos
 	Block    uint32
 	Face     int32
-	ClickPos mgl32.Vec3
+	ClickPos mgl64.Vec3
 	// Item is what the player holds.
 	Item ItemStack
 }

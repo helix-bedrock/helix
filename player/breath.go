@@ -7,7 +7,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix-data/data"
@@ -182,9 +182,9 @@ func (b breather) Breath(breathe, nonBreathe []string) state.Medium {
 	if !s.reg.Blocks.Properties(block).SolidMaterial {
 		return state.MediumAir
 	}
-	in := at.Sub(mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])})
+	in := at.Sub(mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])})
 	for _, box := range s.boxesAt(b.r, pos, block) {
-		if in[0] >= box[0] && in[0] <= box[3] && in[1] >= box[1] && in[1] <= box[4] && in[2] >= box[2] && in[2] <= box[5] {
+		if in[0] >= float64(box[0]) && in[0] <= float64(box[3]) && in[1] >= float64(box[1]) && in[1] <= float64(box[4]) && in[2] >= float64(box[2]) && in[2] <= float64(box[5]) {
 			return state.MediumSolid
 		}
 	}
@@ -219,7 +219,7 @@ func (b breather) UnderWater() bool {
 	if !ok || s.reg.Blocks.Properties(liq).Material != registry.MaterialWater {
 		return false
 	}
-	return s.liquidHeightOf(liq, pos) > at[1]
+	return float64(s.liquidHeightOf(liq, pos)) > at[1]
 }
 
 // SetFlag shows the breathing flag; the component sets no other.
@@ -234,7 +234,7 @@ func (b breather) SetFlag(n int, on bool) {
 
 func (b breather) AttachPos(loc int) behavior.Vec3 {
 	v := b.p.AttachPos(AttachPoint(loc)) //nolint:gosec // BDS's actor locations
-	return behavior.Vec3{X: v[0], Y: v[1], Z: v[2]}
+	return behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}
 }
 
 // Respiration is the highest Respiration level the player wears.
@@ -295,7 +295,7 @@ func (breathRandom) NextBool() bool { return rand.IntN(2) == 0 } //nolint:gosec 
 func (breathRandom) NextGaussian() float32 { return float32(rand.NormFloat64()) } //nolint:gosec // gameplay randomness
 
 func (w breathWorld) LevelEvent(id int32, at behavior.Vec3, _ string) {
-	levelEvent(w.r, w.p.blockPos(), mgl32.Vec3{at.X, at.Y, at.Z}, id, bubbleData)
+	levelEvent(w.r, w.p.blockPos(), mgl64.Vec3{float64(at.X), float64(at.Y), float64(at.Z)}, id, bubbleData)
 }
 
 // bubbleData is the data of BDS's bubble level event from the breathable tick.

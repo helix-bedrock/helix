@@ -1,7 +1,8 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -10,7 +11,7 @@ import (
 type DieFunc func(p *Player, src DamageSource)
 
 // RespawnFunc brings a dead player back at pos, its eye position.
-type RespawnFunc func(p *Player, pos mgl32.Vec3)
+type RespawnFunc func(p *Player, pos mgl64.Vec3)
 
 // Where a player is on BDS's way from dying to respawning.
 const (
@@ -156,13 +157,13 @@ func (p *Player) dropSlots(slots []ItemStack, vanishingOnly bool) {
 func (p *Player) tickRespawn() {
 	switch p.respawn {
 	case respawnStart:
-		p.send(&packet.Respawn{Position: p.entity.Position(), State: packet.RespawnStateSearchingForSpawn})
+		p.send(&packet.Respawn{Position: world.Vec32(p.entity.Position()), State: packet.RespawnStateSearchingForSpawn})
 		p.respawn = respawnWaitClient
 	case respawnFind:
 		spawn := p.respawnPoint()
 		p.moveZones(spawn)
-		p.send(&packet.Respawn{Position: spawn, State: packet.RespawnStateSearchingForSpawn},
-			&packet.Respawn{Position: spawn, State: packet.RespawnStateReadyToSpawn})
+		p.send(&packet.Respawn{Position: world.Vec32(spawn), State: packet.RespawnStateSearchingForSpawn},
+			&packet.Respawn{Position: world.Vec32(spawn), State: packet.RespawnStateReadyToSpawn})
 		p.respawn = respawnWaitAction
 	default:
 		return
@@ -203,7 +204,7 @@ func handlePlayerAction(p *Player, pk *packet.PlayerAction) {
 }
 
 // respawnPoint is where a dead player comes back: beside its bed, else the world spawn.
-func (p *Player) respawnPoint() mgl32.Vec3 {
+func (p *Player) respawnPoint() mgl64.Vec3 {
 	if at, ok := p.bedRespawn(p.entity.Region()); ok {
 		return at
 	}
@@ -215,7 +216,7 @@ func (p *Player) respawnPoint() mgl32.Vec3 {
 // player moves to the spawn, is told its health, and those who see it get
 // the spawn-alive event. Which attributes BDS resets is a first reading:
 // health, hunger, saturation and exhaustion to their defaults, effects gone.
-func vanillaRespawn(p *Player, pos mgl32.Vec3) {
+func vanillaRespawn(p *Player, pos mgl64.Vec3) {
 	p.respawn = respawnNone
 	p.resetBody()
 	p.s.handlers.movement(p, moveTo(pos, p.entity.Rotation(), p.entity.Tick()))

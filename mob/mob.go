@@ -648,9 +648,9 @@ func (m *Mob) physicsTick() {
 func (m *Mob) liquidPush() {
 	lava, water := m.body.LiquidBoxes()
 	push := liquid.Push(m.v.blocks.reg, m.v.r, blockArea(lava), blockArea(water))
-	m.body.Vel.X += push[0]
-	m.body.Vel.Y += push[1]
-	m.body.Vel.Z += push[2]
+	m.body.Vel.X += float32(push[0])
+	m.body.Vel.Y += float32(push[1])
+	m.body.Vel.Z += float32(push[2])
 }
 
 // blockArea is the blocks a box covers.

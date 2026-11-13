@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -40,9 +40,9 @@ func (t *Projectile) windBurst(r *world.Region, hit projectileHit, kind projecti
 	}
 	b := t.spec.Burst
 	ex := &Explosion{
-		Pos: at, Radius: b.Power, Kind: ExplosionWindCharge, Attacker: t.owner,
+		Pos: at, Radius: float32(b.Power), Kind: ExplosionWindCharge, Attacker: t.owner,
 		Fire: b.CausesFire, BreaksBlocks: b.BreaksBlocks, AllowUnderwater: b.AllowUnderwater,
-		MaxResistance: noResistance, DamageScale: b.DamageScale, KnockbackScale: b.KnockbackScale,
+		MaxResistance: noResistance, DamageScale: float32(b.DamageScale), KnockbackScale: float32(b.KnockbackScale),
 		Cause: DamageEntityExplosion, Particle: burstParticle(b.ParticleEffect), Sound: b.SoundEffect,
 		ToggleBlocks: b.TogglesBlocks, NegatesFallDamage: b.NegatesFallDamage,
 	}
@@ -90,7 +90,7 @@ func (s *Host) windToggle(r *world.Region, pos cube.Pos) {
 // hitParticles is BDS's particle_on_hit (ParticleOnHitSubcomponent 0x7156E10): the
 // definition's particle, once a particle, as level event 2009 at the projectile, which BDS
 // has moved to where it hit by then. Runs: owner of the region.
-func (t *Projectile) hitParticles(r *world.Region, pos mgl32.Vec3, kind projectileHitKind) {
+func (t *Projectile) hitParticles(r *world.Region, pos mgl64.Vec3, kind projectileHitKind) {
 	p, ok := particleType(t.spec.Particle)
 	if !ok {
 		return

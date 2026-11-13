@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -14,8 +14,8 @@ func TestInteractFindsCartInReach(t *testing.T) {
 	for _, kind := range []string{nameChestMinecart, nameHopperMinecart} {
 		t.Run(kind, func(t *testing.T) {
 			p, d, y := cartWorld(t, nameRail, railStates(0))
-			far := p.s.SpawnMinecart(d, kind, mgl32.Vec3{3.5, float32(y) + 0.5, 8.5})
-			near := p.s.SpawnMinecart(d, kind, p.entity.Position().Add(mgl32.Vec3{1, 1, 0}))
+			far := p.s.SpawnMinecart(d, kind, mgl64.Vec3{3.5, float64(y) + 0.5, 8.5})
+			near := p.s.SpawnMinecart(d, kind, p.entity.Position().Add(mgl64.Vec3{1, 1, 0}))
 			waitRegion(t, d, func(*world.Region) bool {
 				return p.cartNear(far.entity.RuntimeID()) != nil && p.cartNear(near.entity.RuntimeID()) != nil
 			})
@@ -51,7 +51,7 @@ func TestHopperCooldownsFromConfig(t *testing.T) {
 	onRegion(d, func(r *world.Region) {
 		c.Inventory(r).SetItem(0, ItemStack{})
 		c.cooldown = 0
-		p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 1}, mgl32.Vec3{3.5, float32(at[1]) + 1.2, 8.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+		p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 1}, mgl64.Vec3{3.5, float64(at[1]) + 1.2, 8.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return c.cooldown > 300 })
 }

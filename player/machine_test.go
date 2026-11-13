@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/attach"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -102,7 +102,7 @@ func TestHopperCollectsItemsAbove(t *testing.T) {
 		c = p.s.chestAt(r, at)
 	})
 	// One with a name tag, as -testcmds gives every dropped item, is still just an item.
-	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl32.Vec3{1.5, 70, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 3}, mgl64.Vec3{1.5, 70, 1.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 	onRegion(d, func(*world.Region) { i.SetView(func(*Player, *ItemView) {}) })
 	waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count == 3 })
 }
@@ -120,7 +120,7 @@ func TestHopperCollectsOnPartBlockAbove(t *testing.T) {
 				c = p.s.chestAt(r, at)
 			})
 			// From above the box, over the low half of the stair: its default rises to the east.
-			p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.25, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+			p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl64.Vec3{1.25, 71.4, 1.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 			waitRegion(t, d, func(r *world.Region) bool { return c.Inventory(r).Item(0).Count == 2 })
 		})
 	}
@@ -136,7 +136,7 @@ func TestHopperLeavesItemOnFullBlockAbove(t *testing.T) {
 		setNamed(t, p, r, at.Side(cube.FaceUp), "minecraft:stone", nil)
 		c = p.s.chestAt(r, at)
 	})
-	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl32.Vec3{1.5, 71.4, 1.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+	i := p.s.spawnItem(d, ItemStack{Name: "minecraft:emerald", Count: 2}, mgl64.Vec3{1.5, 71.4, 1.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 	waitRegion(t, d, func(*world.Region) bool { return i.onGround })
 	time.Sleep(300 * time.Millisecond)
 	onRegion(d, func(r *world.Region) {

@@ -3,8 +3,9 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -13,12 +14,12 @@ import (
 // are written against it so they work on both.
 type Moving interface {
 	// Velocity is its speed in blocks a tick.
-	Velocity() mgl32.Vec3
+	Velocity() mgl64.Vec3
 	// SetVelocity replaces its speed. A player's client is told, as BDS's SetActorMotion.
-	SetVelocity(v mgl32.Vec3)
+	SetVelocity(v mgl64.Vec3)
 	// Pull is BDS's pull toward a point (see [PullVelocity]): it gets off what it rides, and
 	// its speed is replaced by the pull.
-	Pull(to mgl32.Vec3, scale float32)
+	Pull(to mgl64.Vec3, scale float64)
 }
 
 var (
@@ -33,30 +34,30 @@ const pullLift = 0.08
 // from from toward to: the way there times scale, plus the square root of that step's
 // length times 0.08 upward, so a long pull arcs. The fishing rod uses scale 0.1, toward one
 // block above the angler's head.
-func PullVelocity(from, to mgl32.Vec3, scale float32) mgl32.Vec3 {
+func PullVelocity(from, to mgl64.Vec3, scale float64) mgl64.Vec3 {
 	v := to.Sub(from).Mul(scale)
-	v[1] += float32(math.Sqrt(float64(v.Len()))) * pullLift
+	v[1] += float64(math.Sqrt(float64(v.Len()))) * pullLift
 	return v
 }
 
 // Velocity returns the player's speed as the server last knew it, in blocks a tick.
 // Runs: the player's region.
-func (p *Player) Velocity() mgl32.Vec3 { return p.move.velocity }
+func (p *Player) Velocity() mgl64.Vec3 { return p.move.velocity }
 
 // SetVelocity replaces the player's speed and tells its client, as BDS's SetActorMotion.
 // Runs: the player's region.
-func (p *Player) SetVelocity(v mgl32.Vec3) {
+func (p *Player) SetVelocity(v mgl64.Vec3) {
 	if p.entity == nil {
 		return
 	}
 	p.move.velocity = v
-	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: v, Tick: p.entity.Tick()})
+	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: world.Vec32(v), Tick: p.entity.Tick()})
 	p.flush()
 }
 
 // Pull takes the player off what it rides and sets its speed toward to (see
 // [PullVelocity]). Runs: the player's region.
-func (p *Player) Pull(to mgl32.Vec3, scale float32) {
+func (p *Player) Pull(to mgl64.Vec3, scale float64) {
 	if p.entity == nil || p.dead() {
 		return
 	}
@@ -67,18 +68,20 @@ func (p *Player) Pull(to mgl32.Vec3, scale float32) {
 }
 
 // Velocity returns the mob's speed in blocks a tick. Runs: the mob's region.
-func (m *Mob) Velocity() mgl32.Vec3 {
+func (m *Mob) Velocity() mgl64.Vec3 {
 	v := m.m.Velocity()
-	return mgl32.Vec3{v.X, v.Y, v.Z}
+	return mgl64.Vec3{float64(v.X), float64(v.Y), float64(v.Z)}
 }
 
 // SetVelocity replaces the mob's speed; those who see it follow its moves. Runs: the
 // mob's region.
-func (m *Mob) SetVelocity(v mgl32.Vec3) { m.m.SetVelocity(behavior.Vec3{X: v[0], Y: v[1], Z: v[2]}) }
+func (m *Mob) SetVelocity(v mgl64.Vec3) {
+	m.m.SetVelocity(behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])})
+}
 
 // Pull sets the mob's speed toward to (see [PullVelocity]). Mobs riding something are not
 // taken off yet: mobs do not ride in Helix so far. Runs: the mob's region.
-func (m *Mob) Pull(to mgl32.Vec3, scale float32) {
+func (m *Mob) Pull(to mgl64.Vec3, scale float64) {
 	if m.entity == nil || m.Dead() {
 		return
 	}

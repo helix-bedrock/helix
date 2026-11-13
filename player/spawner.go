@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/entity/spawn"
@@ -192,10 +192,10 @@ func (m *MobSpawner) TickBlockEntity(r *world.Region, pos cube.Pos) {
 // playerNear is BDS's player search: a survival or adventure player within range of the
 // block's centre.
 func (m *MobSpawner) playerNear(r *world.Region, pos cube.Pos) bool {
-	centre := blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5})
-	limit := float32(math.MaxFloat32)
+	centre := blockVec(pos).Add(mgl64.Vec3{0.5, 0.5, 0.5})
+	limit := math.MaxFloat64
 	if m.playerRange >= 0 {
-		limit = float32(m.playerRange) * float32(m.playerRange)
+		limit = float64(m.playerRange) * float64(m.playerRange)
 	}
 	sc := m.s.scratch()
 	defer sc.done()
@@ -213,12 +213,12 @@ func (m *MobSpawner) playerNear(r *world.Region, pos cube.Pos) bool {
 }
 
 // spot draws one spawn spot, false when its block is taken or it is too far by blocks.
-func (m *MobSpawner) spot(r *world.Region, pos cube.Pos) (mgl32.Vec3, bool) {
+func (m *MobSpawner) spot(r *world.Region, pos cube.Pos) (mgl64.Vec3, bool) {
 	rng := float32(m.spawnRange)
 	x := float32(pos[0]) + (rand.Float32()-rand.Float32())*rng + 0.5 //nolint:gosec // gameplay randomness
 	y := float32(pos[1] + rand.IntN(3) - 1)                          //nolint:gosec // gameplay randomness
 	z := float32(pos[2]) + (rand.Float32()-rand.Float32())*rng + 0.5 //nolint:gosec // gameplay randomness
-	at := mgl32.Vec3{x, y, z}
+	at := mgl64.Vec3{float64(x), float64(y), float64(z)}
 	b := feetBlock(at)
 	if sg := m.s.spawning; sg != nil {
 		if id, ok := r.Block(b, 0); !ok || sg.blocks.Block(id).Flags&spawn.FlagSolidBlocking != 0 {
@@ -236,7 +236,7 @@ func (m *MobSpawner) nearbyCount(r *world.Region, pos cube.Pos) int32 {
 	typ := spawnerType(m.entity)
 	sc := m.s.scratch()
 	defer sc.done()
-	sc.list = r.AppendEntitiesIn(sc.list, px-side, pz-side, px+side, pz+side)
+	sc.list = r.AppendEntitiesIn(sc.list, float64(px-side), float64(pz-side), float64(px+side), float64(pz+side))
 	var n int32
 	for _, e := range sc.list {
 		o, ok := e.Owner().(*Mob)
@@ -261,13 +261,13 @@ func spawnerType(id string) string {
 }
 
 // spawnAt makes the spawner's mob at the spot, if its own spawn check lets it.
-func (m *MobSpawner) spawnAt(r *world.Region, pos cube.Pos, at mgl32.Vec3) bool {
+func (m *MobSpawner) spawnAt(r *world.Region, pos cube.Pos, at mgl64.Vec3) bool {
 	rs := m.s.regionSpawnState(r)
 	if rs == nil {
 		return false
 	}
 	defer rs.done()
-	sm := rs.w.NewMob(m.entity, path.Vec3{X: at[0], Y: at[1], Z: at[2]}, true)
+	sm := rs.w.NewMob(m.entity, path.Vec3{X: float32(at[0]), Y: float32(at[1]), Z: float32(at[2])}, true)
 	if sm == nil {
 		return false
 	}
@@ -331,7 +331,7 @@ func (p *Player) useSpawnEgg(r *world.Region, clicked cube.Pos, face int32, held
 		return true
 	}
 	pos := clicked.Side(cube.Face(face))
-	at := blockVec(pos).Add(mgl32.Vec3{0.5, 0, 0.5})
+	at := blockVec(pos).Add(mgl64.Vec3{0.5, 0, 0.5})
 	d := p.entity.Position().Sub(at)
 	var yaw float32
 	if d[0]*d[0]+d[2]*d[2] > 1e-7 {

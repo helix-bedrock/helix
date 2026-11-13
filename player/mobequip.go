@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/mob"
@@ -295,13 +295,13 @@ func (m *Mob) dropOnDeath(r *world.Region) {
 	}
 	for _, d := range m.s.entityLoot.Roll(table, c, nil) {
 		for _, it := range m.s.lootStacks(d) {
-			m.s.spawnMobDrop(r, it, at.Add(mgl32.Vec3{0, lootDropBelow, 0}))
+			m.s.spawnMobDrop(r, it, at.Add(mgl64.Vec3{0, lootDropBelow, 0}))
 		}
 	}
 }
 
 // dropEquipment is Mob::dropEquipmentOnDeath.
-func (m *Mob) dropEquipment(r *world.Region, at mgl32.Vec3, killer *Player) {
+func (m *Mob) dropEquipment(r *world.Region, at mgl64.Vec3, killer *Player) {
 	rnd := lootRandom{m.m.Rand()}
 	bonus := float32(m.s.lootingOf(killer)) * lootingDropBonus
 	for slot := range m.items.stacks {
@@ -337,8 +337,8 @@ func (m *Mob) dropEquipment(r *world.Region, at mgl32.Vec3, killer *Player) {
 
 // spawnMobDrop throws an item out where a mob is, as Actor::spawnAtLocation: the usual
 // scatter and a 10 tick pick-up delay.
-func (s *Host) spawnMobDrop(r *world.Region, it ItemStack, at mgl32.Vec3) {
-	s.spawnItem(r.Dimension(), s.freshStack(it), at, mgl32.Vec3{dropDrift(), dropUp, dropDrift()}, world.Rotation{}, mobDropDelay, 0)
+func (s *Host) spawnMobDrop(r *world.Region, it ItemStack, at mgl64.Vec3) {
+	s.spawnItem(r.Dimension(), s.freshStack(it), at, mgl64.Vec3{float64(dropDrift()), dropUp, float64(dropDrift())}, world.Rotation{}, mobDropDelay, 0)
 }
 
 // dropExperience drops the mob's death experience when its death has run its course.
@@ -373,21 +373,21 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 	_, yaw, head, _ := m.m.Rotation()
 	from := projectileEyes(spec, eyes, world.Rotation{Yaw: yaw, HeadYaw: head})
 	tp, box := t.Pos(), t.Box()
-	dx, dz := tp.X-from[0], tp.Z-from[2]
-	dy := (box.Min.Y+box.Max.Y)/2 - from[1]
+	dx, dz := float32(float64(tp.X)-from[0]), float32(float64(tp.Z)-from[2])
+	dy := float32(float64((box.Min.Y+box.Max.Y)/2) - from[1])
 	h := float32(math.Sqrt(float64(dx*dx + dz*dz)))
 	if h < 1e-7 {
 		return
 	}
 	speed := power
 	if speed <= 0 {
-		speed = spec.Power
+		speed = float32(spec.Power)
 	}
-	start := mgl32.Vec3{from[0] + dx/h, from[1], from[2] + dz/h}
-	dir := mgl32.Vec3{dx, dy, dz}.Normalize()
+	start := mgl64.Vec3{from[0] + float64(dx/h), from[1], from[2] + float64(dz/h)}
+	dir := mgl64.Vec3{float64(dx), float64(dy), float64(dz)}.Normalize()
 	if g := spec.Gravity; g != 0 {
 		v2 := float64(speed * speed)
-		gh := float64(g * h)
+		gh := g * float64(h)
 		disc := v2*v2 - float64(g)*(2*float64(dy)*v2+gh*float64(h))
 		pitch := -45.0
 		if disc >= 0 {
@@ -396,9 +396,9 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 		}
 		yawDeg := math.Atan2(float64(dz), float64(dx))*180/math.Pi - 90
 		p, y := pitch*math.Pi/180, yawDeg*math.Pi/180
-		dir = mgl32.Vec3{float32(-math.Sin(y) * math.Cos(p)), float32(-math.Sin(p)), float32(math.Cos(y) * math.Cos(p))}
+		dir = mgl64.Vec3{float64(-math.Sin(y) * math.Cos(p)), float64(-math.Sin(p)), float64(math.Cos(y) * math.Cos(p))}
 	}
-	m.s.SpawnProjectile(r.Dimension(), spec, start, dir, speed, nil)
+	m.s.SpawnProjectile(r.Dimension(), spec, start, dir, float64(speed), nil)
 	if sound != behavior.NoSound {
 		m.Sound(m.m, sound, m.m.Eyes())
 	}

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -29,14 +29,14 @@ func BenchmarkRegionLayout(b *testing.B) {
 	}{{2, 2}, {3, 1}, {3, 2}, {4, 1}, {5, 1}}
 	scenarios := []struct {
 		name  string
-		place func(rng *rand.Rand, i int) mgl32.Vec3
+		place func(rng *rand.Rand, i int) mgl64.Vec3
 	}{
-		{"crowd", func(rng *rand.Rand, _ int) mgl32.Vec3 { return square(rng, 0, 0, 64) }},
-		{"towns", func(rng *rand.Rand, i int) mgl32.Vec3 {
+		{"crowd", func(rng *rand.Rand, _ int) mgl64.Vec3 { return square(rng, 0, 0, 64) }},
+		{"towns", func(rng *rand.Rand, i int) mgl64.Vec3 {
 			town := rand.New(rand.NewPCG(uint64(i%20), 1)) //nolint:gosec // a fixed layout
 			return square(rng, town.Float32()*3000, town.Float32()*3000, 96)
 		}},
-		{"spread", func(rng *rand.Rand, _ int) mgl32.Vec3 { return square(rng, 0, 0, 4000) }},
+		{"spread", func(rng *rand.Rand, _ int) mgl64.Vec3 { return square(rng, 0, 0, 4000) }},
 	}
 	for _, sc := range scenarios {
 		for _, l := range layouts {
@@ -49,8 +49,8 @@ func BenchmarkRegionLayout(b *testing.B) {
 	}
 }
 
-func square(rng *rand.Rand, x, z, side float32) mgl32.Vec3 {
-	return mgl32.Vec3{x + rng.Float32()*side, 0, z + rng.Float32()*side}
+func square(rng *rand.Rand, x, z, side float32) mgl64.Vec3 {
+	return mgl64.Vec3{float64(x + rng.Float32()*side), 0, float64(z + rng.Float32()*side)}
 }
 
 const (
@@ -64,7 +64,7 @@ const (
 	flySpeed  = 1.5
 )
 
-func runLayout(b *testing.B, reg *registry.Registry, shift uint, merge int32, place func(*rand.Rand, int) mgl32.Vec3) {
+func runLayout(b *testing.B, reg *registry.Registry, shift uint, merge int32, place func(*rand.Rand, int) mgl64.Vec3) {
 	b.Helper()
 	d, db := openDimWith(b, reg, b.TempDir(), func(c *Config) {
 		c.SectionShift, c.MergeDistance, c.DiscardGenerated = shift, merge, true
@@ -89,13 +89,13 @@ func runLayout(b *testing.B, reg *registry.Registry, shift uint, merge int32, pl
 				return []packet.Packet{&packet.AddPlayer{EntityRuntimeID: e.RuntimeID()}}
 			},
 			Move: func(e *Entity) packet.Packet {
-				return &packet.MovePlayer{EntityRuntimeID: e.RuntimeID(), Position: e.Position()}
+				return &packet.MovePlayer{EntityRuntimeID: e.RuntimeID(), Position: Vec32(e.Position())}
 			},
 			Input: func(e *Entity) {
 				if rng.IntN(100) == 0 {
 					yaw = rng.Float64() * 2 * math.Pi
 				}
-				p := e.Position().Add(mgl32.Vec3{float32(math.Cos(yaw)) * speed, 0, float32(math.Sin(yaw)) * speed})
+				p := e.Position().Add(mgl64.Vec3{math.Cos(yaw) * float64(speed), 0, math.Sin(yaw) * float64(speed)})
 				old := e.chunk
 				e.Apply(Movement{Pos: p})
 				if c := chunkOf(p); c != old {

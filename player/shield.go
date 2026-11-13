@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/helix-bedrock/helix/direction"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -240,7 +241,7 @@ func (p *Player) blocks(src DamageSource) bool {
 	rot := p.entity.Rotation()
 	yaw, flat := direction.Units(rot.Yaw), direction.Cos(direction.Units(rot.Pitch))
 	to := src.Attacker.entity.Position().Sub(p.entity.Position())
-	return to[0]*-direction.Sin(yaw)*flat+to[2]*direction.Cos(yaw)*flat > 0
+	return to[0]*float64(-direction.Sin(yaw)*flat)+to[2]*float64(direction.Cos(yaw)*flat) > 0
 }
 
 // vanillaShieldBlock is BDS's block: the event, the sound, the attacker's push, an
@@ -310,8 +311,8 @@ func (p *Player) pushOffShield(blocker *Player) {
 	}
 	resist := max(1-p.attributes.get(attrKnockbackResistance), 0) * p.Tuning(TuneKnockbackTakenScale)
 	away := p.entity.Position().Sub(blocker.entity.Position())
-	vel := p.knockbackStep(p.move.velocity, away[0], away[2], p.Tuning(TuneShieldPush)*resist, p.Tuning(TuneShieldLift)*resist)
+	vel := p.knockbackStep(p.move.velocity, float32(away[0]), float32(away[2]), p.Tuning(TuneShieldPush)*resist, p.Tuning(TuneShieldLift)*resist)
 	p.move.velocity = vel
-	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: vel, Tick: p.entity.Tick()})
+	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: world.Vec32(vel), Tick: p.entity.Tick()})
 	p.flush()
 }

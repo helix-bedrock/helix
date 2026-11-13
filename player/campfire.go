@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"strconv"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -205,7 +205,7 @@ func (c *Campfire) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		}
 	}
 	if rand.IntN(campfireCrackleOdds) == 0 { //nolint:gosec // a sound's timing, not a secret
-		playSound(r, pos, soundEvent{name: packet.SoundEventCampfireCrackle, pos: blockVec(pos).Add(mgl32.Vec3{0.5, 0.5, 0.5}), extra: -1}, nil)
+		playSound(r, pos, soundEvent{name: packet.SoundEventCampfireCrackle, pos: blockVec(pos).Add(mgl64.Vec3{0.5, 0.5, 0.5}), extra: -1}, nil)
 	}
 	c.chunk.Changed()
 }
@@ -241,7 +241,7 @@ func (c *Campfire) cook(r *world.Region, pos cube.Pos, slot int) {
 		out = e.Result
 	}
 	if !out.Empty() {
-		c.s.spawnItem(r.Dimension(), out, blockCenter(pos), mgl32.Vec3{}, world.Rotation{}, campfireDropDelay, 0)
+		c.s.spawnItem(r.Dimension(), out, blockCenter(pos), mgl64.Vec3{}, world.Rotation{}, campfireDropDelay, 0)
 	}
 	c.items[slot], c.times[slot] = ItemStack{}, 0
 	r.SendBlockEntity(pos)
@@ -255,7 +255,7 @@ func (c *Campfire) DropItems(r *world.Region, pos cube.Pos) {
 		if c.items[i].Empty() {
 			continue
 		}
-		c.s.spawnItem(r.Dimension(), c.items[i], blockCenter(pos), mgl32.Vec3{}, world.Rotation{}, campfireDropDelay, 0)
+		c.s.spawnItem(r.Dimension(), c.items[i], blockCenter(pos), mgl64.Vec3{}, world.Rotation{}, campfireDropDelay, 0)
 		c.items[i], c.times[i] = ItemStack{}, 0
 		dropped = true
 	}
@@ -269,7 +269,7 @@ func (c *Campfire) DropItems(r *world.Region, pos cube.Pos) {
 func (c *Campfire) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	for i := range campfireSlots {
 		if !c.items[i].Empty() {
-			c.s.spawnItem(r.Dimension(), c.items[i], blockCenter(pos), mgl32.Vec3{}, world.Rotation{}, campfireDropDelay, 0)
+			c.s.spawnItem(r.Dimension(), c.items[i], blockCenter(pos), mgl64.Vec3{}, world.Rotation{}, campfireDropDelay, 0)
 			c.items[i] = ItemStack{}
 		}
 	}

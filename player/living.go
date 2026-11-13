@@ -4,7 +4,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -45,12 +45,12 @@ var (
 // (moved is how far it moved this tick, which a berry bush needs), fire and lava, then its
 // own fire burning down, hurting once a second, or going out in water or rain. It returns
 // what the box touched. Runs: the entity's region, once a tick.
-func (s *Host) tickHazards(r *world.Region, l Living, lo, hi, moved mgl32.Vec3) burnContact {
+func (s *Host) tickHazards(r *world.Region, l Living, lo, hi, moved mgl64.Vec3) burnContact {
 	return s.tickHazardsFrom(r, l, lo, hi, moved, s.touching(r, lo, hi))
 }
 
 // tickHazardsFrom is tickHazards with what the box touches already found.
-func (s *Host) tickHazardsFrom(r *world.Region, l Living, lo, hi, moved mgl32.Vec3, c burnContact) burnContact {
+func (s *Host) tickHazardsFrom(r *world.Region, l Living, lo, hi, moved mgl64.Vec3, c burnContact) burnContact {
 	if l.Dead() {
 		return c
 	}
@@ -102,12 +102,12 @@ func (s *Host) tickHazardsFrom(r *world.Region, l Living, lo, hi, moved mgl32.Ve
 // which the client keeps at 0 while stuck in the bush; mobs are taken the same way, not
 // checked. The client plays the bush's scratch sound (block.sweet_berry_bush.hurt) itself on
 // each hurt; BDS sends no sound for it.
-func (s *Host) contactHurt(l Living, c burnContact, moved mgl32.Vec3) {
+func (s *Host) contactHurt(l Living, c burnContact, moved mgl64.Vec3) {
 	block := nameCactus
 	switch c.contact {
 	case contactCactus:
 	case contactBerry:
-		if abs32(moved[0]) <= berryMoveLimit && abs32(moved[2]) <= berryMoveLimit {
+		if math.Abs(moved[0]) <= berryMoveLimit && math.Abs(moved[2]) <= berryMoveLimit {
 			return
 		}
 		block = nameBerryBush
@@ -153,7 +153,7 @@ func (p *Player) Wet() bool {
 		return false
 	}
 	at := p.entity.Position()
-	return p.s.inRain(r, mgl32.Vec3{at[0], at[1] - eyeHeight + playerHeight, at[2]})
+	return p.s.inRain(r, mgl64.Vec3{at[0], at[1] - eyeHeight + playerHeight, at[2]})
 }
 
 // LavaDamage is the player's minecraft:hurt_on_condition in lava.
@@ -199,7 +199,7 @@ func (m *Mob) Wet() bool { return m.m.Wet() }
 func (m *Mob) LavaDamage() float32 { return 0 }
 
 // BlastBox is the mob's box; a dead mob is passed by.
-func (m *Mob) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
+func (m *Mob) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 	if m.Dead() {
 		return lo, hi, false
 	}
@@ -211,13 +211,13 @@ func (m *Mob) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 func (m *Mob) BlastHit(damage float32, src DamageSource) { m.TakeDamage(damage, src) }
 
 // BlastPush adds to the mob's speed and shows it.
-func (m *Mob) BlastPush(push mgl32.Vec3) {
+func (m *Mob) BlastPush(push mgl64.Vec3) {
 	if m.Dead() {
 		return
 	}
 	b := m.m.Body()
-	b.Vel = behavior.Vec3{X: b.Vel.X + push[0], Y: b.Vel.Y + push[1], Z: b.Vel.Z + push[2]}
-	m.entity.Send(&packet.SetActorMotion{EntityRuntimeID: m.entity.RuntimeID(), Velocity: mglVec(b.Vel), Tick: m.entity.Tick()})
+	b.Vel = behavior.Vec3{X: b.Vel.X + float32(push[0]), Y: b.Vel.Y + float32(push[1]), Z: b.Vel.Z + float32(push[2])}
+	m.entity.Send(&packet.SetActorMotion{EntityRuntimeID: m.entity.RuntimeID(), Velocity: world.Vec32(mglVec(b.Vel)), Tick: m.entity.Tick()})
 }
 
 // tickHazards runs the shared hazards on the mob, then its landing. Runs: Apply.
@@ -239,7 +239,7 @@ func (m *Mob) hasFamily(f string) bool { return slices.Contains(m.m.Families(), 
 // small fall sound when it hurts, then the fall or land sound of the block below. A mob's
 // damage sensor decides whether the fall hurts (chickens, cats). Jump Boost and blocks that
 // change the fall are not counted: mobs have no effects yet.
-func (s *Host) landed(r *world.Region, l Living, feet mgl32.Vec3, distance float32, typ string) {
+func (s *Host) landed(r *world.Region, l Living, feet mgl64.Vec3, distance float32, typ string) {
 	damage := float32(math.Ceil(float64(distance-s.Tuning(TuneFallFree)))) * s.Tuning(TuneFallDamageScale)
 	pos := floorPos(feet)
 	if damage > 0 {

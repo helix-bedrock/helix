@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -41,7 +41,7 @@ var moveFlagInputs = [moveFlagCount]struct {
 // MoveInfo is one movement of a player, as the movement systems after it
 // see it. Positions are eye positions, as the client sends them.
 type MoveInfo struct {
-	From, To mgl32.Vec3
+	From, To mgl64.Vec3
 	// OnGround is set when the player collided vertically while not
 	// moving up.
 	OnGround bool
@@ -81,11 +81,11 @@ type moveState struct {
 	flags   uint8
 	fall    float32
 	// velocity is the player's last movement, as knockback starts from it.
-	velocity mgl32.Vec3
+	velocity mgl64.Vec3
 	// moved is how far the last movement took the player, BDS's
 	// PostTickPositionDeltaComponent. velocity is not that: a client stuck in a berry
 	// bush or cobweb sends 0 there while it still moves.
-	moved mgl32.Vec3
+	moved mgl64.Vec3
 	// inBerry is whether the server last found the player inside a grown sweet berry bush;
 	// soundTick is the tick a client sound was last played for it.
 	inBerry   bool
@@ -192,7 +192,7 @@ func vanillaJump(p *Player) {
 
 // afterMove runs the systems that follow a movement: fall distance and the
 // exhaustion of moving, in BDS's order.
-func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
+func (p *Player) afterMove(from mgl64.Vec3, collided bool) {
 	if p.entity == nil {
 		return
 	}
@@ -202,7 +202,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 	}
 	to := p.entity.Position()
 	m := MoveInfo{From: from, To: to, OnGround: collided && to[1] <= from[1]}
-	feet := vecPos(to.Sub(mgl32.Vec3{0, eyeHeight, 0}))
+	feet := vecPos(to.Sub(mgl64.Vec3{0, eyeHeight, 0}))
 	eyes := vecPos(to)
 	m.HeadInWater = p.water(r, eyes)
 	m.InWater = m.HeadInWater || p.water(r, feet)
@@ -232,7 +232,7 @@ func (p *Player) water(r *world.Region, pos cube.Pos) bool {
 }
 
 // vecPos is the block a position is in.
-func vecPos(v mgl32.Vec3) cube.Pos {
+func vecPos(v mgl64.Vec3) cube.Pos {
 	return cube.Pos{int(math.Floor(float64(v[0]))), int(math.Floor(float64(v[1]))), int(math.Floor(float64(v[2])))}
 }
 
@@ -248,7 +248,7 @@ func vanillaMoveCost(p *Player, m *MoveInfo) float32 {
 	flat := float32(math.Sqrt(float64(d[0]*d[0] + d[2]*d[2])))
 	switch {
 	case m.HeadInWater:
-		return d.Len() * p.Tuning(TuneExhaustSwim)
+		return float32(d.Len()) * p.Tuning(TuneExhaustSwim)
 	case m.InWater:
 		return flat * p.Tuning(TuneExhaustSwim)
 	case m.OnGround && p.Moving(MoveSprinting):

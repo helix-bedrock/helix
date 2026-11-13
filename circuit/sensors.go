@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -34,7 +35,7 @@ const statePowered = "powered_bit"
 
 // EntityBoxFunc returns what plates see of an entity: its box, whether it is a mob, and
 // false if plates do not see it at all. Runs: owner of the entity's region.
-type EntityBoxFunc func(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool)
+type EntityBoxFunc func(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool)
 
 // SetEntityBox sets how plates see entities. Call it before any player joins. Without
 // it plates stay up.
@@ -47,7 +48,7 @@ func (t *Ticker) SetPlateBox(fn EntityBoxFunc, isArrow func(e *world.Entity) boo
 }
 
 // boxOf is what plates and buttons see of an entity.
-func (t *Ticker) boxOf(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
+func (t *Ticker) boxOf(e *world.Entity) (lo, hi mgl64.Vec3, mob, ok bool) {
 	if t.plateBox != nil {
 		return t.plateBox(e)
 	}
@@ -55,7 +56,7 @@ func (t *Ticker) boxOf(e *world.Entity) (lo, hi mgl32.Vec3, mob, ok bool) {
 }
 
 // EntityPushFunc moves an entity a piston runs into. Runs: owner of the entity's region.
-type EntityPushFunc func(r *world.Region, e *world.Entity, by mgl32.Vec3)
+type EntityPushFunc func(r *world.Region, e *world.Entity, by mgl64.Vec3)
 
 // SetEntityPush sets how pistons move entities. Call it before any player joins. Without
 // it pistons only change the entity's position.
@@ -186,7 +187,7 @@ func (t *Ticker) plateSignal(c *regionCircuit, pos cube.Pos, rule plateRule) int
 	if t.entityBox == nil {
 		return 0
 	}
-	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
+	x, y, z := float64(pos[0]), float64(pos[1]), float64(pos[2])
 	c.found = c.r.AppendEntitiesIn(c.found[:0], x-plateReach, z-plateReach, x+1+plateReach, z+1+plateReach)
 	var count int32
 	for _, e := range c.found {
@@ -295,7 +296,7 @@ func (t *Ticker) entitiesOnPlates(c *regionCircuit) {
 }
 
 // floor is the block coordinate of v.
-func floor(v float32) int { return int(math.Floor(float64(v))) }
+func floor(v float64) int { return int(math.Floor(float64(v))) }
 
 // SetJukeboxPower gives a jukebox the power of what it is doing. Runs: owner of the region.
 func (t *Ticker) SetJukeboxPower(r *world.Region, pos cube.Pos, power int32) {

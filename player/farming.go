@@ -3,7 +3,7 @@ package player
 import (
 	"slices"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -67,7 +67,7 @@ func (p *Player) tillWithHoe(r *world.Region, u *BlockUse) bool {
 // useBoneMeal is BoneMealItem's useOn (0xC988B20): on a crop or stem that grows, the growth
 // particles where the block was clicked and one bone meal used up. True if bone meal was used
 // on something that takes it, grown or not.
-func (p *Player) useBoneMeal(r *world.Region, clicked cube.Pos, click mgl32.Vec3, held ItemStack) bool {
+func (p *Player) useBoneMeal(r *world.Region, clicked cube.Pos, click mgl64.Vec3, held ItemStack) bool {
 	f := p.s.farm
 	if f == nil || held.Name != nameBoneMeal {
 		return false
@@ -86,7 +86,7 @@ func (p *Player) useBoneMeal(r *world.Region, clicked cube.Pos, click mgl32.Vec3
 // as by a player in survival; if it grew, a click, the growth particles and one bone meal
 // used up, else a failed click and nothing used. Either way the dispenser smokes, as BDS's
 // does when an item's dispense returns true, which bone meal's always does.
-func (s *Host) dispenseBoneMeal(r *world.Region, c *Chest, slot int, front cube.Pos, at mgl32.Vec3) {
+func (s *Host) dispenseBoneMeal(r *world.Region, c *Chest, slot int, front cube.Pos, at mgl64.Vec3) {
 	f := s.farm
 	if f == nil || !f.Fertilize(r, front, false, false) {
 		playSound(r, front, soundEvent{name: packet.SoundEventBlockClickFail, pos: at, extra: dispenseBoneMealFail}, nil)
@@ -127,12 +127,12 @@ func (p *Player) pickBerries(r *world.Region, u *BlockUse) bool {
 
 // trample is FarmBlock's fall-on for the player landing after falling distance: the
 // farmland it lands on may turn to dirt. BDS lets a player trample with the mine ability.
-func (p *Player) trample(r *world.Region, feet mgl32.Vec3, distance float32) {
+func (p *Player) trample(r *world.Region, feet mgl64.Vec3, distance float32) {
 	f := p.s.farm
 	if f == nil {
 		return
 	}
-	pos := vecPos(feet.Sub(mgl32.Vec3{0, trampleDrop, 0}))
+	pos := vecPos(feet.Sub(mgl64.Vec3{0, trampleDrop, 0}))
 	f.Trample(r, pos, distance, playerVolume, p.abilities.Flag(AbilityMine))
 }
 
@@ -157,7 +157,7 @@ func (p *Player) useComposter(r *world.Region, u *BlockUse) bool {
 	if lvl >= composterReady || u.Item.Empty() || f.Compost(r, u.Pos, u.Item.Name, 1) != 1 {
 		return false
 	}
-	levelEvent(r, u.Pos, blockVec(u.Pos).Add(mgl32.Vec3{0, composterParticleUp, 0}), packet.LevelEventParticleCropGrowth, 0)
+	levelEvent(r, u.Pos, blockVec(u.Pos).Add(mgl64.Vec3{0, composterParticleUp, 0}), packet.LevelEventParticleCropGrowth, 0)
 	p.useUpHeld()
 	p.flush()
 	return true

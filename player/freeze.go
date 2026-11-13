@@ -122,9 +122,9 @@ func (p *Player) inPowderSnow() bool {
 	pos := p.entity.Position()
 	feet := pos[1] - playerEyeHeight
 	const in = 0.001
-	minX, maxX := int(floorInt(pos[0]-playerHalfWidth+in)), int(floorInt(pos[0]+playerHalfWidth-in))
-	minY, maxY := int(floorInt(feet+in)), int(floorInt(feet+playerHeight-in))
-	minZ, maxZ := int(floorInt(pos[2]-playerHalfWidth+in)), int(floorInt(pos[2]+playerHalfWidth-in))
+	minX, maxX := int(floorInt(pos[0] - playerHalfWidth + in)), int(floorInt(pos[0] + playerHalfWidth - in))
+	minY, maxY := int(floorInt(feet + in)), int(floorInt(feet + playerHeight - in))
+	minZ, maxZ := int(floorInt(pos[2] - playerHalfWidth + in)), int(floorInt(pos[2] + playerHalfWidth - in))
 	blocks := p.s.reg.Blocks
 	for x := minX; x <= maxX; x++ {
 		for y := minY; y <= maxY; y++ {

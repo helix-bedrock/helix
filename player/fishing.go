@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"slices"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -141,7 +141,7 @@ type FishingHook struct {
 	owner  *Player
 	// target is what it hooked, nil for nothing.
 	target Living
-	vel    mgl32.Vec3
+	vel    mgl64.Vec3
 	rot    world.Rotation
 	moves  actorMoves
 	// table is its loot table, picked by the biome it was cast in.
@@ -227,7 +227,7 @@ func (s *Host) castHook(r *world.Region, p *Player) *FishingHook {
 		dir = dir.Normalize()
 	}
 	for n := range 3 {
-		dir[n] += float32(rand.NormFloat64()) * hookSpread //nolint:gosec // an aim, not a secret
+		dir[n] += rand.NormFloat64() * hookSpread //nolint:gosec // an aim, not a secret
 	}
 	h := &FishingHook{s: s, owner: p, vel: dir.Mul(hookCastPower), gravity: true, waiting: true, table: s.hookTable(r, start)}
 	h.rot = flightRotation(h.vel)
@@ -245,7 +245,7 @@ type hookLoot struct {
 
 // hookTable is the hook's loot table from its definition: its own, or its jungle group's
 // when cast in a jungle biome, as its entity_spawned event adds.
-func (s *Host) hookTable(r *world.Region, at mgl32.Vec3) string {
+func (s *Host) hookTable(r *world.Region, at mgl64.Vec3) string {
 	t, ok := s.reg.EntityTypes.ByName(nameFishingHook)
 	if !ok {
 		return ""
@@ -279,13 +279,13 @@ func (s *Host) biomeHasTag(r *world.Region, pos cube.Pos, tag string) bool {
 	return ok && slices.Contains(b.Tags, tag)
 }
 
-func (h *FishingHook) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+func (h *FishingHook) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
 	spec, _ := h.s.projectileSpec(nameFishingHook, "")
 	dropped, far := spec.MoveDroppedTicks, spec.MoveFarDistance
 	if dropped == 0 {
 		dropped, far = projectileMoveDropped, projectileMoveFar
 	}
-	h.moves.start(pos, rot, dropped, far)
+	h.moves.start(pos, rot, dropped, float32(far))
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: h, Spawn: h.spawnPackets, Move: h.movePacket, Input: h.tick, Save: h.saveEntity,
@@ -326,7 +326,7 @@ func (h *FishingHook) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: nameFishingHook,
-		Position: e.Position(), Velocity: h.vel, Pitch: h.rot.Pitch, Yaw: h.rot.Yaw, HeadYaw: h.rot.HeadYaw,
+		Position: world.Vec32(e.Position()), Velocity: world.Vec32(h.vel), Pitch: h.rot.Pitch, Yaw: h.rot.Yaw, HeadYaw: h.rot.HeadYaw,
 		EntityMetadata: meta,
 	}}
 }
@@ -399,7 +399,7 @@ func (h *FishingHook) tick(e *world.Entity) {
 	if h.target != nil && !h.target.Dead() {
 		if lo, hi, ok := h.target.BlastBox(); ok {
 			te := livingEntity(h.target).Position()
-			pos = mgl32.Vec3{te[0], lo[1] + (hi[1]-lo[1])*hookTargetHeight, te[2]}
+			pos = mgl64.Vec3{te[0], lo[1] + (hi[1]-lo[1])*hookTargetHeight, te[2]}
 		}
 	}
 	e.Apply(world.Movement{Pos: pos, Rot: h.rot, OnGround: h.onGround, Tick: e.Tick()})
@@ -407,10 +407,10 @@ func (h *FishingHook) tick(e *world.Entity) {
 
 // hangOnTarget follows the entity the hook is in: its position, rotation and speed. False
 // if the target is gone, dead or in another region.
-func (h *FishingHook) hangOnTarget(r *world.Region) (mgl32.Vec3, bool) {
+func (h *FishingHook) hangOnTarget(r *world.Region) (mgl64.Vec3, bool) {
 	te := livingEntity(h.target)
 	if te == nil || te.Region() != r || h.target.Dead() {
-		return mgl32.Vec3{}, false
+		return mgl64.Vec3{}, false
 	}
 	h.rot = te.Rotation()
 	if m, ok := h.target.(Moving); ok {
@@ -421,7 +421,7 @@ func (h *FishingHook) hangOnTarget(r *world.Region) (mgl32.Vec3, bool) {
 
 // flyOrFish is the free hook's part of the tick: the hit check, then, if it hit nothing,
 // the move and, in water, fishing. It returns where the hook is now.
-func (h *FishingHook) flyOrFish(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
+func (h *FishingHook) flyOrFish(r *world.Region, pos mgl64.Vec3) mgl64.Vec3 {
 	h.setGravity(true)
 	moved := false
 	if !h.inGround {
@@ -439,7 +439,7 @@ func (h *FishingHook) flyOrFish(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
 
 // float is the start of the tick (BDS's _updateGravity inlined): the drag, lava taking the
 // hook back, and in water the rise to the surface with its bobbing. True if it is gone.
-func (h *FishingHook) float(r *world.Region, pos mgl32.Vec3) bool {
+func (h *FishingHook) float(r *world.Region, pos mgl64.Vec3) bool {
 	drag := float32(hookDrag)
 	if h.onGround || h.against {
 		drag = hookDragTouching
@@ -456,33 +456,33 @@ func (h *FishingHook) float(r *world.Region, pos mgl32.Vec3) bool {
 		if above, _ := liquidAt(h.s.reg, r, at.Add(cube.Pos{0, 1, 0})); above == registry.MaterialWater {
 			level = hookFullWater
 		} else {
-			level = float32(at[1]) - pos[1] + 1
+			level = float32(float64(at[1]) - pos[1] + 1)
 			dip = (float32(math.Sin(float64(h.bob))) + 1) * hookBobSize
 		}
 	}
-	vy := (h.waterShare(r, pos)*2-1)*hookSink + h.vel[1]
+	vy := (h.waterShare(r, pos)*2-1)*hookSink + float32(h.vel[1])
 	if level != 0 {
 		drag *= hookDragWater
 		vy = min((level-dip)*hookFloatPull, vy*hookFloatSlow+hookFloatMost)
 	}
-	h.vel = mgl32.Vec3{h.vel[0] * drag, vy * drag, h.vel[2] * drag}
+	h.vel = mgl64.Vec3{h.vel[0] * float64(drag), float64(vy * drag), h.vel[2] * float64(drag)}
 	return false
 }
 
 // box is its box at pos, its feet.
-func hookBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
-	return mgl32.Vec3{pos[0] - hookHalf, pos[1], pos[2] - hookHalf}, mgl32.Vec3{pos[0] + hookHalf, pos[1] + hookHeight, pos[2] + hookHalf}
+func hookBox(pos mgl64.Vec3) (lo, hi mgl64.Vec3) {
+	return mgl64.Vec3{pos[0] - hookHalf, pos[1], pos[2] - hookHalf}, mgl64.Vec3{pos[0] + hookHalf, pos[1] + hookHeight, pos[2] + hookHalf}
 }
 
 // waterShare is _getWaterPercentage (0xC08F210): of hookWaterSlices slices of its box from
 // the bottom, the share that touch water.
-func (h *FishingHook) waterShare(r *world.Region, pos mgl32.Vec3) float32 {
+func (h *FishingHook) waterShare(r *world.Region, pos mgl64.Vec3) float32 {
 	lo, hi := hookBox(pos)
 	var share float32
 	step := (hi[1] - lo[1]) / hookWaterSlices
 	for n := range hookWaterSlices {
 		sLo, sHi := lo, hi
-		sLo[1], sHi[1] = lo[1]+float32(n)*step, lo[1]+float32(n+1)*step
+		sLo[1], sHi[1] = lo[1]+float64(n)*step, lo[1]+float64(n+1)*step
 		if h.s.boxTouchesWater(r, sLo, sHi) {
 			share += 1.0 / hookWaterSlices
 		}
@@ -491,7 +491,7 @@ func (h *FishingHook) waterShare(r *world.Region, pos mgl32.Vec3) float32 {
 }
 
 // boxTouchesWater reports water in any block the box lo..hi overlaps.
-func (s *Host) boxTouchesWater(r *world.Region, lo, hi mgl32.Vec3) bool {
+func (s *Host) boxTouchesWater(r *world.Region, lo, hi mgl64.Vec3) bool {
 	for x := itemFloor(lo[0]); x <= itemFloor(hi[0]); x++ {
 		for y := itemFloor(lo[1]); y <= itemFloor(hi[1]); y++ {
 			for z := itemFloor(lo[2]); z <= itemFloor(hi[2]); z++ {
@@ -519,7 +519,7 @@ func (h *FishingHook) setGravity(on bool) {
 // move this tick. BDS also hurts the hooked entity for 0 through its hurt, which is not
 // done here, and skips the angler's vehicle and riders and a list of actor types, which
 // are not read yet. True if it hit something.
-func (h *FishingHook) hitCheck(r *world.Region, from mgl32.Vec3) bool {
+func (h *FishingHook) hitCheck(r *world.Region, from mgl64.Vec3) bool {
 	to := from.Add(h.vel)
 	limit := 2.0
 	hitBlock := false
@@ -528,7 +528,7 @@ func (h *FishingHook) hitCheck(r *world.Region, from mgl32.Vec3) bool {
 	}
 	lo, hi := minVec(from, to), maxVec(from, to)
 	h.found = r.AppendEntitiesIn(h.found[:0], lo[0]-hookScanGrow, lo[2]-hookScanGrow, hi[0]+hookScanGrow, hi[2]+hookScanGrow)
-	grow := mgl32.Vec3{hookTargetGrow, hookTargetGrow, hookTargetGrow}
+	grow := mgl64.Vec3{hookTargetGrow, hookTargetGrow, hookTargetGrow}
 	var best Living
 	for _, o := range h.found {
 		var l Living
@@ -577,7 +577,7 @@ func (h *FishingHook) hitCheck(r *world.Region, from mgl32.Vec3) bool {
 
 // move is Actor::move by its speed through the blocks' boxes, y then x then z; a blocked
 // axis loses its speed.
-func (h *FishingHook) move(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
+func (h *FishingHook) move(r *world.Region, pos mgl64.Vec3) mgl64.Vec3 {
 	h.onGround, h.against = false, false
 	for _, axis := range [...]int{1, 0, 2} {
 		lo, hi := hookBox(pos)
@@ -597,7 +597,7 @@ func (h *FishingHook) move(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
 
 // ownerHolds is the check that ends the tick: the angler must be alive in this region,
 // holding a fishing rod, within hookOwnerReach2 of the hook.
-func (h *FishingHook) ownerHolds(r *world.Region, pos mgl32.Vec3) bool {
+func (h *FishingHook) ownerHolds(r *world.Region, pos mgl64.Vec3) bool {
 	p := h.owner
 	if p == nil || p.entity == nil || p.dead() || p.entity.Region() != r || p.fishHook != h {
 		return false
@@ -606,20 +606,20 @@ func (h *FishingHook) ownerHolds(r *world.Region, pos mgl32.Vec3) bool {
 		return false
 	}
 	at := p.entity.Position()
-	d := mgl32.Vec3{pos[0] - at[0], pos[1] - (at[1] - eyeHeight), pos[2] - at[2]}
+	d := mgl64.Vec3{pos[0] - at[0], pos[1] - (at[1] - eyeHeight), pos[2] - at[2]}
 	return d.Dot(d) <= hookOwnerReach2
 }
 
 // lureSpeedAt is how fast the fish come this tick: one, two by chance in an ocean or in
 // rain, one less by chance where the sky is not seen.
-func (h *FishingHook) lureSpeedAt(r *world.Region, pos mgl32.Vec3) int32 {
+func (h *FishingHook) lureSpeedAt(r *world.Region, pos mgl64.Vec3) int32 {
 	at := floorPos(pos)
 	speed := int32(1)
 	if rand.Float32() < hookOceanChance && h.s.biomeHasTag(r, at, biomeTagOcean) { //nolint:gosec // gameplay randomness
 		speed = 2
 	}
 	up := at.Add(cube.Pos{0, 1, 0})
-	if rand.Float32() < hookRainChance && h.s.inRain(r, mgl32.Vec3{float32(up[0]), float32(up[1]), float32(up[2])}) { //nolint:gosec // gameplay randomness
+	if rand.Float32() < hookRainChance && h.s.inRain(r, mgl64.Vec3{float64(up[0]), float64(up[1]), float64(up[2])}) { //nolint:gosec // gameplay randomness
 		speed = 2
 	}
 	if rand.Float32() < hookSkyChance { //nolint:gosec // gameplay randomness
@@ -638,13 +638,13 @@ func (h *FishingHook) lureSpeedAt(r *world.Region, pos mgl32.Vec3) int32 {
 // fish is BDS's fish in water (_updateServer inlined): a bite counting down, the fish
 // coming with its trail of bubbles, the lure time with its teasing bubbles, or a new lure
 // time.
-func (h *FishingHook) fish(r *world.Region, pos mgl32.Vec3) {
+func (h *FishingHook) fish(r *world.Region, pos mgl64.Vec3) {
 	if h.biting > 0 {
 		h.biting--
 		if h.biting == 0 {
 			h.untilHooked, h.untilLured = 0, 0
 		}
-		h.vel[1] -= rand.Float32() * rand.Float32() * rand.Float32() * hookNibble //nolint:gosec // gameplay randomness
+		h.vel[1] -= float64(rand.Float32() * rand.Float32() * rand.Float32() * hookNibble) //nolint:gosec // gameplay randomness
 		return
 	}
 	h.lureSpeed = h.lureSpeedAt(r, pos)
@@ -660,7 +660,7 @@ func (h *FishingHook) fish(r *world.Region, pos mgl32.Vec3) {
 
 // fishComing moves the fish on toward the hook with its trail of bubbles; once it
 // arrives, it bites: the hook dips and splashes.
-func (h *FishingHook) fishComing(r *world.Region, pos mgl32.Vec3) {
+func (h *FishingHook) fishComing(r *world.Region, pos mgl64.Vec3) {
 	rid := h.entity.RuntimeID()
 	h.untilHooked -= h.lureSpeed
 	if h.untilHooked > 0 {
@@ -672,7 +672,7 @@ func (h *FishingHook) fishComing(r *world.Region, pos mgl32.Vec3) {
 		h.entity.Send(actorData(rid, protocol.EntityMetadata{
 			protocol.EntityDataKeyFishX: fx, protocol.EntityDataKeyFishZ: fz, protocol.EntityDataKeyFishAngle: deg,
 		}))
-		at := cube.Pos{itemFloor(pos[0] + fx), itemFloor(pos[1]), itemFloor(pos[2] + fz)}
+		at := cube.Pos{itemFloor(pos[0] + float64(fx)), itemFloor(pos[1]), itemFloor(pos[2] + float64(fz))}
 		if m, _ := liquidAt(h.s.reg, r, at); m == registry.MaterialWater {
 			h.entity.Send(actorEvent(rid, packet.ActorEventFishhookFishPosition))
 		}
@@ -687,7 +687,7 @@ func (h *FishingHook) fishComing(r *world.Region, pos mgl32.Vec3) {
 
 // lureTease counts the lure time down, with teasing bubbles more likely as it runs out;
 // when it ends a fish starts coming.
-func (h *FishingHook) lureTease(pos mgl32.Vec3) {
+func (h *FishingHook) lureTease(pos mgl64.Vec3) {
 	rid := h.entity.RuntimeID()
 	h.untilLured -= h.lureSpeed
 	chance := float32(hookTeaseBase)
@@ -702,8 +702,8 @@ func (h *FishingHook) lureTease(pos mgl32.Vec3) {
 	if chance > rand.Float32() { //nolint:gosec // gameplay randomness
 		a := float64(rand.Float32()*360) * radianToDegrees  //nolint:gosec // gameplay randomness
 		dist := rand.Float32()*hookTeaseMore + hookTeaseFar //nolint:gosec // gameplay randomness
-		fx := float32(math.Sin(a))*dist*hookFishStep + pos[0]
-		fz := float32(math.Cos(a))*dist*hookFishStep + pos[2]
+		fx := float32(math.Sin(a)*float64(dist*hookFishStep) + pos[0])
+		fz := float32(math.Cos(a)*float64(dist*hookFishStep) + pos[2])
 		h.entity.Send(actorData(rid, protocol.EntityMetadata{protocol.EntityDataKeyFishX: fx, protocol.EntityDataKeyFishZ: fz}))
 		h.entity.Send(actorEvent(rid, packet.ActorEventFishhookTease))
 	}
@@ -715,7 +715,7 @@ func (h *FishingHook) lureTease(pos mgl32.Vec3) {
 
 // newLureTime picks the next lure time: shorter with Lure on the rod, cut when water
 // animals crowd the hook.
-func (h *FishingHook) newLureTime(r *world.Region, pos mgl32.Vec3) {
+func (h *FishingHook) newLureTime(r *world.Region, pos mgl64.Vec3) {
 	lure := int32(0)
 	if h.owner != nil {
 		lure = heldEnchant(h.owner.inventory.Held(), enchantLure)
@@ -728,9 +728,9 @@ func (h *FishingHook) newLureTime(r *world.Region, pos mgl32.Vec3) {
 }
 
 // waterAnimalsNear reports a water animal within hookLureCrowd of the hook's box.
-func (h *FishingHook) waterAnimalsNear(r *world.Region, pos mgl32.Vec3) bool {
+func (h *FishingHook) waterAnimalsNear(r *world.Region, pos mgl64.Vec3) bool {
 	lo, hi := hookBox(pos)
-	grow := mgl32.Vec3{hookLureCrowd, hookLureCrowd, hookLureCrowd}
+	grow := mgl64.Vec3{hookLureCrowd, hookLureCrowd, hookLureCrowd}
 	lo, hi = lo.Sub(grow), hi.Add(grow)
 	h.found = r.AppendEntitiesIn(h.found[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range h.found {
@@ -748,8 +748,8 @@ func (h *FishingHook) waterAnimalsNear(r *world.Region, pos mgl32.Vec3) bool {
 
 // pullPoint is where reeling in pulls toward: hookPullAbove over the angler's head attach
 // point, as _pullCloser (0xC08DAA0) aims.
-func (h *FishingHook) pullPoint() mgl32.Vec3 {
-	return h.owner.AttachPos(AttachHead).Add(mgl32.Vec3{0, hookPullAbove, 0})
+func (h *FishingHook) pullPoint() mgl64.Vec3 {
+	return h.owner.AttachPos(AttachHead).Add(mgl64.Vec3{0, hookPullAbove, 0})
 }
 
 // retrieve is FishingHook::retrieve (0xC08DBF0): a hooked entity is pulled to the angler, a

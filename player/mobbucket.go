@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/helix/registry"
@@ -263,7 +263,7 @@ func (p *Player) landTarget(r *world.Region, clicked cube.Pos, face int32) (cube
 // spawnBucketMob is BDS's mob out of a bucket (0xC99A3F0): from the bucket's data if it has
 // any, else a new one (with the table's event), at the middle of the block's floor.
 func (s *Host) spawnBucketMob(r *world.Region, b mobBucket, held ItemStack, pos cube.Pos) {
-	at := blockVec(pos).Add(mgl32.Vec3{0.5, 0, 0.5})
+	at := blockVec(pos).Add(mgl64.Vec3{0.5, 0, 0.5})
 	if _, ok := held.Tag[bucketDefinitions]; ok {
 		o, ok := s.newMob(b.mob, at, 0, definition.InitLoaded, "")
 		if !ok {

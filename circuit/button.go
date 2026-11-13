@@ -1,7 +1,7 @@
 package circuit
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -18,20 +18,20 @@ const (
 )
 
 // buttonBox is the box of a button with this facing_direction, within its block.
-func buttonBox(facing int) (lo, hi mgl32.Vec3) {
+func buttonBox(facing int) (lo, hi mgl64.Vec3) {
 	switch cube.Face(facing) { //nolint:gosec // block state values are small
 	case cube.FaceDown:
-		return mgl32.Vec3{buttonLong, buttonFar, buttonWide}, mgl32.Vec3{buttonLongE, 1, buttonWideE}
+		return mgl64.Vec3{buttonLong, buttonFar, buttonWide}, mgl64.Vec3{buttonLongE, 1, buttonWideE}
 	case cube.FaceUp:
-		return mgl32.Vec3{buttonLong, 0, buttonWide}, mgl32.Vec3{buttonLongE, buttonNear, buttonWideE}
+		return mgl64.Vec3{buttonLong, 0, buttonWide}, mgl64.Vec3{buttonLongE, buttonNear, buttonWideE}
 	case cube.FaceNorth:
-		return mgl32.Vec3{buttonLong, buttonWide, buttonFar}, mgl32.Vec3{buttonLongE, buttonWideE, 1}
+		return mgl64.Vec3{buttonLong, buttonWide, buttonFar}, mgl64.Vec3{buttonLongE, buttonWideE, 1}
 	case cube.FaceSouth:
-		return mgl32.Vec3{buttonLong, buttonWide, 0}, mgl32.Vec3{buttonLongE, buttonWideE, buttonNear}
+		return mgl64.Vec3{buttonLong, buttonWide, 0}, mgl64.Vec3{buttonLongE, buttonWideE, buttonNear}
 	case cube.FaceWest:
-		return mgl32.Vec3{buttonFar, buttonWide, buttonLong}, mgl32.Vec3{1, buttonWideE, buttonLongE}
+		return mgl64.Vec3{buttonFar, buttonWide, buttonLong}, mgl64.Vec3{1, buttonWideE, buttonLongE}
 	}
-	return mgl32.Vec3{0, buttonWide, buttonLong}, mgl32.Vec3{buttonNear, buttonWideE, buttonLongE}
+	return mgl64.Vec3{0, buttonWide, buttonLong}, mgl64.Vec3{buttonNear, buttonWideE, buttonLongE}
 }
 
 // arrowTouches says the arrow e is in the box of the button at pos.
@@ -44,14 +44,14 @@ func (t *Ticker) arrowTouches(e *world.Entity, pos cube.Pos, block uint32) bool 
 		return false
 	}
 	lo, hi := buttonBox(int(intState(t.blocks.States(block), stateFacing)))
-	base := mgl32.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])}
+	base := mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}
 	lo, hi = lo.Add(base), hi.Add(base)
 	return eHi[0] > lo[0] && eLo[0] < hi[0] && eHi[1] > lo[1] && eLo[1] < hi[1] && eHi[2] > lo[2] && eLo[2] < hi[2]
 }
 
 // arrowOnButton says an arrow is in the box of the button at pos.
 func (t *Ticker) arrowOnButton(c *regionCircuit, pos cube.Pos, block uint32) bool {
-	x, z := float32(pos[0]), float32(pos[2])
+	x, z := float64(pos[0]), float64(pos[2])
 	c.found = c.r.AppendEntitiesIn(c.found[:0], x-plateReach, z-plateReach, x+1+plateReach, z+1+plateReach)
 	for _, e := range c.found {
 		if t.arrowTouches(e, pos, block) {

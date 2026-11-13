@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -63,21 +63,21 @@ func vanillaDropItem(p *Player, s ItemStack, randomly bool) bool {
 }
 
 // dropVelocity is the velocity BDS gives a dropped item.
-func (p *Player) dropVelocity(rot world.Rotation, randomly bool) mgl32.Vec3 {
+func (p *Player) dropVelocity(rot world.Rotation, randomly bool) mgl64.Vec3 {
 	if randomly {
 		speed := p.rng.Float32() * dropRandomSpeed
 		angle := p.rng.Float32() * 2 * math.Pi * direction.UnitsPerRadian
-		return mgl32.Vec3{-direction.Sin(angle) * speed, dropRandomUp, direction.Cos(angle) * speed}
+		return mgl64.Vec3{float64(-direction.Sin(angle) * speed), dropRandomUp, float64(direction.Cos(angle) * speed)}
 	}
 	yaw := direction.Units(rot.Yaw)
 	pitch := direction.Units(rot.Pitch)
 	flat := direction.Cos(pitch) * dropSpeed
 	angle := p.rng.Float32() * 2 * math.Pi * direction.UnitsPerRadian
 	spread := p.rng.Float32() * dropSpread
-	return mgl32.Vec3{
-		-direction.Sin(yaw)*flat + direction.Cos(angle)*spread,
-		-direction.Sin(pitch) * dropSpeed,
-		direction.Cos(yaw)*flat + direction.Sin(angle)*spread,
+	return mgl64.Vec3{
+		float64(-direction.Sin(yaw)*flat + direction.Cos(angle)*spread),
+		float64(-direction.Sin(pitch) * dropSpeed),
+		float64(direction.Cos(yaw)*flat + direction.Sin(angle)*spread),
 	}
 }
 

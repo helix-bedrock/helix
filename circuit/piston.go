@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -230,7 +231,7 @@ func (e *pistonEntity) pushEntities(r *world.Region, pos cube.Pos, dir pistonFac
 		return
 	}
 	front := pos.Side(pistonFaces[dir])
-	step := mgl32.Vec3{float32(front[0] - pos[0]), float32(front[1] - pos[1]), float32(front[2] - pos[2])}
+	step := mgl64.Vec3{float64(front[0] - pos[0]), float64(front[1] - pos[1]), float64(front[2] - pos[2])}
 	travel, gone := step, e.progress
 	if !expanding {
 		travel, gone = step.Mul(-1), 1-e.progress
@@ -246,9 +247,9 @@ func (e *pistonEntity) pushEntities(r *world.Region, pos cube.Pos, dir pistonFac
 
 // pushOutOf moves entities out of a block that started at base and has gone this far
 // along travel. A block, unlike the arm, also takes along what rides on it.
-func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.Vec3, gone float32, carries bool) {
-	lo := mgl32.Vec3{float32(base[0]), float32(base[1]), float32(base[2])}.Add(travel.Mul(gone))
-	hi := lo.Add(mgl32.Vec3{1, 1, 1})
+func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl64.Vec3, gone float32, carries bool) {
+	lo := mgl64.Vec3{float64(base[0]), float64(base[1]), float64(base[2])}.Add(travel.Mul(float64(gone)))
+	hi := lo.Add(mgl64.Vec3{1, 1, 1})
 	c.found = c.r.AppendEntitiesIn(c.found[:0], lo[0]-plateReach, lo[2]-plateReach, hi[0]+plateReach, hi[2]+plateReach)
 	for _, o := range c.found {
 		eLo, eHi, _, ok := e.t.entityBox(o)
@@ -258,14 +259,14 @@ func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.V
 		if carries && travel[1] == 0 && eLo[1] >= hi[1] && eLo[1] < hi[1]+pistonCarryHeight {
 			x, z := (eLo[0]+eHi[0])/2, (eLo[2]+eHi[2])/2
 			if x >= lo[0] && x <= hi[0] && z >= lo[2] && z <= hi[2] {
-				e.moveEntity(c.r, o, travel.Mul(e.t.settings.Get().Piston.Step))
+				e.moveEntity(c.r, o, travel.Mul(float64(e.t.settings.Get().Piston.Step)))
 			}
 			continue
 		}
 		if eHi[0] <= lo[0] || eLo[0] >= hi[0] || eHi[1] <= lo[1] || eLo[1] >= hi[1] || eHi[2] <= lo[2] || eLo[2] >= hi[2] {
 			continue
 		}
-		var by mgl32.Vec3
+		var by mgl64.Vec3
 		for i := range 3 {
 			switch {
 			case travel[i] > 0:
@@ -279,7 +280,7 @@ func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.V
 }
 
 // moveEntity moves an entity through the engine's hook, which knows how each kind moves.
-func (e *pistonEntity) moveEntity(r *world.Region, o *world.Entity, by mgl32.Vec3) {
+func (e *pistonEntity) moveEntity(r *world.Region, o *world.Entity, by mgl64.Vec3) {
 	if push := e.t.entityPush; push != nil {
 		push(r, o, by)
 		return

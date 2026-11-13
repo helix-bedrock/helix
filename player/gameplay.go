@@ -1,10 +1,11 @@
 package player
 
 import (
-	"github.com/helix-bedrock/entity/state"
 	"maps"
 	"slices"
 	"sync/atomic"
+
+	"github.com/helix-bedrock/entity/state"
 
 	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/loot"

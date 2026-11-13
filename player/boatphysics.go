@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -69,7 +69,7 @@ const newline = "\n"
 // boatMotion is what moves an empty boat: its velocity (StateVectorComponent's position
 // delta) and the buoyancy timer.
 type boatMotion struct {
-	vel   mgl32.Vec3
+	vel   mgl64.Vec3
 	timer float64
 }
 
@@ -96,7 +96,7 @@ func (b *Boat) physics(r *world.Region, e *world.Entity) {
 	}
 	// hitY carries whether it landed.
 	if !e.Apply(world.Movement{Pos: st.pos, Rot: e.Rotation(), OnGround: st.hitY, Tick: e.Tick()}) {
-		b.motion.vel = mgl32.Vec3{}
+		b.motion.vel = mgl64.Vec3{}
 	}
 }
 
@@ -105,15 +105,15 @@ func (b *Boat) plan(r *world.Region, e *world.Entity) thought {
 	m := &b.motion
 	pos := e.Position()
 	b.pushedByPlayers(r, e, pos)
-	m.timer += float64((float32(math.Sqrt(float64(m.vel[0]*m.vel[0]+m.vel[2]*m.vel[2])))*boatTimerSpeed + 1) * b.bigWave() * boatTimerStep)
+	m.timer += float64((float64(math.Sqrt(float64(m.vel[0]*m.vel[0]+m.vel[2]*m.vel[2])))*boatTimerSpeed + 1) * b.bigWave() * boatTimerStep)
 	at := floorPos(pos)
 	floats, resurface := b.s.boatFloat(r, at, pos[1])
 	m.vel[1] = (m.vel[1] - boatGravity) * boatGravityDrag
 	if floats || resurface {
-		sub, waves := float32(1), float32(0)
+		sub, waves := float64(1), float64(0)
 		if floats {
-			sub = min(max((boatBuoyancy-(pos[1]-float32(math.Floor(float64(pos[1])))))*boatFloatScale+boatFloatLift, 0), 1)
-			waves = float32(math.Sin(m.timer)+1) * boatWaveHeight
+			sub = min(max((boatBuoyancy-(pos[1]-float64(math.Floor(float64(pos[1])))))*boatFloatScale+boatFloatLift, 0), 1)
+			waves = float64(math.Sin(m.timer)+1) * boatWaveHeight
 		}
 		if sub != 0 {
 			m.vel[1] = min((sub-waves-boatFloatLift)*boatFloatRate, m.vel[1]*boatFloatKeep+boatFloatSpeed)
@@ -123,7 +123,7 @@ func (b *Boat) plan(r *world.Region, e *world.Entity) thought {
 	m.vel[0] *= f
 	m.vel[2] *= f
 	if m.vel.LenSqr() < boatStillSpeed2 && e.OnGround() {
-		m.vel = mgl32.Vec3{}
+		m.vel = mgl64.Vec3{}
 		return thought{ok: true, rest: true}
 	}
 	lo, hi := boatBox(pos)
@@ -154,9 +154,9 @@ func (b *Boat) plan(r *world.Region, e *world.Entity) thought {
 // player does not push, nor one riding, nor the one who just got off it until they part
 // (0x7517560). The push is added to the boat's speed before its own movement; where
 // PushActorsSystem runs against the boat's buoyancy systems is not read yet. Region tick.
-func (b *Boat) pushedByPlayers(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
+func (b *Boat) pushedByPlayers(r *world.Region, e *world.Entity, pos mgl64.Vec3) {
 	lo, hi := boatBox(pos)
-	grow := mgl32.Vec3{boatPushReach, 0, boatPushReach}
+	grow := mgl64.Vec3{boatPushReach, 0, boatPushReach}
 	b.near = r.AppendEntitiesIn(b.near[:0], pos[0]-boatPushScan, pos[2]-boatPushScan, pos[0]+boatPushScan, pos[2]+boatPushScan)
 	for _, o := range b.near {
 		p, ok := o.Owner().(*Player)
@@ -178,7 +178,7 @@ func (b *Boat) pushedByPlayers(r *world.Region, e *world.Entity, pos mgl32.Vec3)
 		}
 		at := o.Position()
 		dx, dz := at[0]-pos[0], at[2]-pos[2]
-		d := float32(math.Sqrt(float64(dx*dx + dz*dz)))
+		d := float64(math.Sqrt(float64(dx*dx + dz*dz)))
 		if d < boatPushMin {
 			continue
 		}
@@ -189,7 +189,7 @@ func (b *Boat) pushedByPlayers(r *world.Region, e *world.Entity, pos mgl32.Vec3)
 }
 
 // bigWave is big_wave_speed when BDS's draw falls under big_wave_probability, else 1.
-func (b *Boat) bigWave() float32 {
+func (b *Boat) bigWave() float64 {
 	if rand.Float32() <= boatBigWaveOdds { //nolint:gosec // gameplay odds
 		return boatBigWaveSpeed
 	}
@@ -199,7 +199,7 @@ func (b *Boat) bigWave() float32 {
 // boatFloat is BuoyancyComponent's canFloat and needToResurface for a boat whose feet are
 // at y in block at: it floats when the water there reaches above its feet with no water
 // over it, and comes up when water is over it too.
-func (s *Host) boatFloat(r *world.Region, at cube.Pos, y float32) (floats, resurface bool) {
+func (s *Host) boatFloat(r *world.Region, at cube.Pos, y float64) (floats, resurface bool) {
 	if !s.boatWater(r, at) {
 		return false, false
 	}
@@ -212,7 +212,7 @@ func (s *Host) boatFloat(r *world.Region, at cube.Pos, y float32) (floats, resur
 // liquidHeight is BlockUtils::getLiquidBlockHeight (1.26.60 0xB656EF0) of the liquid at
 // pos: the top of the block less a ninth per level of depth, a source and falling liquid
 // (depth 8 and up) reaching the top. It is higher than liquidTop by a ninth.
-func (s *Host) liquidHeight(r *world.Region, pos cube.Pos) float32 {
+func (s *Host) liquidHeight(r *world.Region, pos cube.Pos) float64 {
 	depth := int32(0)
 	if b, ok := r.Block(pos, 0); ok {
 		depth, _ = s.reg.Blocks.States(b)["liquid_depth"].(int32)
@@ -220,7 +220,7 @@ func (s *Host) liquidHeight(r *world.Region, pos cube.Pos) float32 {
 	if depth >= liquidFalling {
 		depth = 0
 	}
-	return float32(pos[1]) + 1 - float32(depth)/liquidLevels
+	return float64(pos[1]) + 1 - float64(depth)/liquidLevels
 }
 
 // boatWater reports whether the block at pos is one of the boat's liquid_blocks: water.
@@ -232,7 +232,7 @@ func (s *Host) boatWater(r *world.Region, pos cube.Pos) bool {
 // boatFriction is BoatMoveFrictionSystem's slow down: 0.9 floating or coming up; in any
 // other block, water 0.9 or on the ground the friction of what it rests on; in air, on
 // the ground the friction of the block below, over water 0.9, else none.
-func (s *Host) boatFriction(r *world.Region, at cube.Pos, inWater, onGround bool) float32 {
+func (s *Host) boatFriction(r *world.Region, at cube.Pos, inWater, onGround bool) float64 {
 	if inWater {
 		return boatWaterDrag
 	}
@@ -251,7 +251,7 @@ func (s *Host) boatFriction(r *world.Region, at cube.Pos, inWater, onGround bool
 			if len(s.reg.Blocks.Properties(b).Collision) == 0 {
 				return s.frictionOf(r, below)
 			}
-			return s.reg.Blocks.Properties(b).Friction
+			return float64(s.reg.Blocks.Properties(b).Friction)
 		}
 		return 1
 	}
@@ -265,10 +265,10 @@ func (s *Host) boatFriction(r *world.Region, at cube.Pos, inWater, onGround bool
 }
 
 // frictionOf is the friction of the block at pos, air's when it is not loaded.
-func (s *Host) frictionOf(r *world.Region, pos cube.Pos) float32 {
+func (s *Host) frictionOf(r *world.Region, pos cube.Pos) float64 {
 	b, ok := r.Block(pos, 0)
 	if !ok {
 		b = s.reg.Blocks.Air()
 	}
-	return s.reg.Blocks.Properties(b).Friction
+	return float64(s.reg.Blocks.Properties(b).Friction)
 }

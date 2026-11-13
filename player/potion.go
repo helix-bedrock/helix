@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -232,7 +232,7 @@ func (t *Projectile) splashReach() float32 {
 
 // splashShow is the splash's colour and item crack particles at the hit, BDS's LevelEvent
 // 2002 with the potion's colour and five of 2009 with the item.
-func (t *Projectile) splashShow(r *world.Region, at mgl32.Vec3, colour uint32, cracks bool) {
+func (t *Projectile) splashShow(r *world.Region, at mgl64.Vec3, colour uint32, cracks bool) {
 	block := floorPos(at)
 	levelEvent(r, block, at, packet.LevelEventParticlesPotionSplash, int32(colour)) //nolint:gosec // ARGB, as BDS sends it
 	if !cracks {
@@ -255,12 +255,12 @@ func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit)
 	if len(pot.Effects) == 0 {
 		return
 	}
-	reach, rng := t.splashReach(), t.spec.SplashRange
+	reach, rng := float64(t.splashReach()), t.spec.SplashRange
 	pos := e.Position()
 	half := t.spec.Width / 2
-	lo := mgl32.Vec3{pos[0] - half - rng - reach, pos[1] - rng/2 - reach, pos[2] - half - rng - reach}
-	hi := mgl32.Vec3{pos[0] + half + rng + reach, pos[1] + t.spec.Height + rng/2 + reach, pos[2] + half + rng + reach}
-	grow := mgl32.Vec3{reach, reach, reach}
+	lo := mgl64.Vec3{pos[0] - half - rng - reach, pos[1] - rng/2 - reach, pos[2] - half - rng - reach}
+	hi := mgl64.Vec3{pos[0] + half + rng + reach, pos[1] + t.spec.Height + rng/2 + reach, pos[2] + half + rng + reach}
+	grow := mgl64.Vec3{reach, reach, reach}
 	t.found = r.AppendEntitiesIn(t.found[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range t.found {
 		target, ok := o.Owner().(*Player)
@@ -278,7 +278,7 @@ func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit)
 		}
 		scale := float32(1)
 		if o != hit.entity {
-			scale = 1 - float32(math.Sqrt(float64(dist)))/rng
+			scale = float32(1 - math.Sqrt(dist)/rng)
 		}
 		t.splashOn(target, pot.Effects, scale)
 	}

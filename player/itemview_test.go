@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/mcdb"
@@ -81,7 +81,7 @@ func TestItemHiddenFromOthers(t *testing.T) {
 	defer func() { _ = d.Close() }()
 
 	logs := map[*Player]*packetLog{seer: {}, hidden: {}}
-	pos := mgl32.Vec3{8, -58, 8}
+	pos := mgl64.Vec3{8, -58, 8}
 	for p, l := range logs {
 		p.viewer = d.AddViewer(l.add, func() {})
 		defer p.viewer.Close()
@@ -89,9 +89,9 @@ func TestItemHiddenFromOthers(t *testing.T) {
 		p.entity = d.AddEntity(world.EntityConfig{UniqueID: int64(p.s.runtimeIDs.Add(1)), RuntimeID: p.s.runtimeIDs.Add(1), Pos: pos, Viewer: p.viewer, Owner: p})
 	}
 
-	it := seer.s.newItem(ItemStack{Name: "minecraft:emerald", Count: 3}, mgl32.Vec3{0, 0.2, 0}, dropPickupDelay, dropThrowTime)
+	it := seer.s.newItem(ItemStack{Name: "minecraft:emerald", Count: 3}, mgl64.Vec3{0, 0.2, 0}, dropPickupDelay, dropThrowTime)
 	it.SetVisibility(func(p *Player) bool { return p == seer })
-	it.addTo(d, mgl32.Vec3{9, -55, 9}, world.Rotation{})
+	it.addTo(d, mgl64.Vec3{9, -55, 9}, world.Rotation{})
 
 	id, unique := it.entity.RuntimeID(), it.entity.UniqueID()
 	deadline := time.Now().Add(15 * time.Second)
@@ -127,7 +127,7 @@ func TestItemHiddenFromOthers(t *testing.T) {
 // wins over vanilla's.
 func TestItemLifetime(t *testing.T) {
 	p := testPlayer(t)
-	i := p.s.newItem(ItemStack{Name: "minecraft:emerald", Count: 1}, mgl32.Vec3{}, 0, 0)
+	i := p.s.newItem(ItemStack{Name: "minecraft:emerald", Count: 1}, mgl64.Vec3{}, 0, 0)
 	i.age = 100
 	if got := i.TicksLeft(); got != itemLifetime-100 {
 		t.Fatalf("vanilla: %d", got)
@@ -140,7 +140,7 @@ func TestItemLifetime(t *testing.T) {
 	if got := i.TicksLeft(); got != ItemLifetimeForever {
 		t.Fatalf("own: %d", got)
 	}
-	o := p.s.newItem(ItemStack{Name: "minecraft:emerald", Count: 1}, mgl32.Vec3{}, 0, 0)
+	o := p.s.newItem(ItemStack{Name: "minecraft:emerald", Count: 1}, mgl64.Vec3{}, 0, 0)
 	if i.merge(o) {
 		t.Fatal("an item with its own lifetime merged")
 	}
@@ -150,13 +150,13 @@ func TestItemLifetime(t *testing.T) {
 func TestItemsSetApartDoNotMerge(t *testing.T) {
 	p := testPlayer(t)
 	stack := ItemStack{Name: "minecraft:emerald", Count: 3}
-	a := p.s.newItem(stack, mgl32.Vec3{}, 0, 0)
-	b := p.s.newItem(stack, mgl32.Vec3{}, 0, 0)
+	a := p.s.newItem(stack, mgl64.Vec3{}, 0, 0)
+	b := p.s.newItem(stack, mgl64.Vec3{}, 0, 0)
 	b.SetVisibility(func(*Player) bool { return true })
 	if a.merge(b) || b.merge(a) {
 		t.Fatal("an item with a visibility rule merged")
 	}
-	c := p.s.newItem(stack, mgl32.Vec3{}, 0, 0)
+	c := p.s.newItem(stack, mgl64.Vec3{}, 0, 0)
 	c.SetView(func(*Player, *ItemView) {})
 	if a.setApart(c) || c.setApart(a) {
 		t.Fatal("an item with only a view was kept apart")

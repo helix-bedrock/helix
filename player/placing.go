@@ -1,7 +1,7 @@
 package player
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/world"
@@ -18,7 +18,7 @@ type Placement struct {
 	// (0 to 1 on each axis).
 	Clicked  cube.Pos
 	Face     int32
-	ClickPos mgl32.Vec3
+	ClickPos mgl64.Vec3
 	// Pos is where the block goes: the clicked block if it can be built
 	// over, else its neighbour on Face.
 	Pos cube.Pos
@@ -80,7 +80,7 @@ func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 		return
 	}
 	first := d.TriggerType != protocol.TriggerTypeSimulationTick
-	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, first) {
+	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, world.Vec64(d.ClickedPosition), first) {
 		p.resendPlace(toCube(d.BlockPosition), d.BlockFace)
 		// What is thrown or drawn does not need the air: aimed at a block it still goes.
 		if held := p.inventory.Held(); first && (throwable(held.Name) != "" || held.Name == nameBow || held.Name == nameCrossbow || held.Name == nameFishingRod) {
@@ -93,7 +93,7 @@ func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 // then the held item. first is false for the repeats sent while the button is
 // held, which stay with whichever of the two the first click did, so a held
 // click does not flap a door. False if nothing happened.
-func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first bool) bool {
+func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl64.Vec3, first bool) bool {
 	if face < int32(cube.FaceDown) || face > int32(cube.FaceEast) {
 		return false
 	}
@@ -146,7 +146,7 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 // useHeldOn is the held item's part of useItemOn: an item with a use of its own on
 // blocks, else a block item's target, check, state and placing. False if nothing
 // was placed.
-func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
+func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl64.Vec3, held ItemStack) bool {
 	if used, ok := p.useSpecialOn(r, clicked, face, click, held); ok {
 		return used
 	}
@@ -156,7 +156,7 @@ func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click 
 // useSpecialOn runs the use on a block of an item that is not simply placed: fire,
 // buckets, spawn eggs, entities placed as items, signs, beds and the like. ok is false
 // if held has no such use; used is whether it did something.
-func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) (used, ok bool) {
+func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, click mgl64.Vec3, held ItemStack) (used, ok bool) {
 	if held.Name == nameFlintSteel {
 		return p.lightFire(r, clicked, face, held), true
 	}
@@ -219,7 +219,7 @@ func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, cli
 
 // placeHeld places the block item held: the target (the clicked block if it can be built
 // over, else the side clicked), the check and the state. False if nothing was placed.
-func (p *Player) placeHeld(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
+func (p *Player) placeHeld(r *world.Region, clicked cube.Pos, face int32, click mgl64.Vec3, held ItemStack) bool {
 	block, ok := p.itemBlock(held)
 	if !ok {
 		return false
@@ -361,7 +361,7 @@ func vanillaPlaceCheck(pl *Placement) bool {
 // actor flag that mayPlace (sub_CE5DEE0) reads (Actor+620), set by falling blocks.
 type BuildBlocker interface {
 	// BuildBox is its box, false if it does not block now.
-	BuildBox() (lo, hi mgl32.Vec3, ok bool)
+	BuildBox() (lo, hi mgl64.Vec3, ok bool)
 }
 
 // obstructed reports whether an entity that blocks building is inside a collision box block
@@ -371,7 +371,7 @@ func (s *Host) obstructed(r *world.Region, pos cube.Pos, block uint32) bool {
 	if len(boxes) == 0 {
 		return false
 	}
-	bx, by, bz := float32(pos[0]), float32(pos[1]), float32(pos[2])
+	bx, bz := float64(pos[0]), float64(pos[2])
 	for _, e := range r.AppendEntitiesIn(nil, bx-1, bz-1, bx+2, bz+2) {
 		bb, ok := e.Owner().(BuildBlocker)
 		if !ok {
@@ -382,7 +382,8 @@ func (s *Host) obstructed(r *world.Region, pos cube.Pos, block uint32) bool {
 			continue
 		}
 		for _, b := range boxes {
-			if hi[0] > bx+b[0] && lo[0] < bx+b[3] && hi[1] > by+b[1] && lo[1] < by+b[4] && hi[2] > bz+b[2] && lo[2] < bz+b[5] {
+			bLo, bHi := boxAt(pos, b)
+			if hi[0] > bLo[0] && lo[0] < bHi[0] && hi[1] > bLo[1] && lo[1] < bHi[1] && hi[2] > bLo[2] && lo[2] < bHi[2] {
 				return true
 			}
 		}
@@ -405,9 +406,9 @@ func (p *Player) inside(pos cube.Pos, block uint32) bool {
 	minY := e[1] - playerEyeHeight
 	maxY := minY + playerHeight
 	minZ, maxZ := e[2]-playerHalfWidth, e[2]+playerHalfWidth
-	bx, by, bz := float32(pos[0]), float32(pos[1]), float32(pos[2])
 	for _, b := range p.s.reg.Blocks.Properties(block).Collision {
-		if maxX > bx+b[0] && minX < bx+b[3] && maxY > by+b[1] && minY < by+b[4] && maxZ > bz+b[2] && minZ < bz+b[5] {
+		lo, hi := boxAt(pos, b)
+		if maxX > lo[0] && minX < hi[0] && maxY > lo[1] && minY < hi[1] && maxZ > lo[2] && minZ < hi[2] {
 			return true
 		}
 	}

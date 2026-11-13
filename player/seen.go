@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -15,7 +15,7 @@ import (
 // which way it looks, its game mode and level, as of the end of its last tick.
 type PlayerState struct {
 	// Position is the player's feet.
-	Position mgl32.Vec3
+	Position mgl64.Vec3
 	Rotation world.Rotation
 	GameMode int32
 	Level    int32
@@ -27,18 +27,19 @@ type PlayerState struct {
 // seenState is a PlayerState kept for other regions: a sequence lock over atomic words,
 // so writing allocates nothing and readers never see half an update.
 type seenState struct {
-	seq                       atomic.Uint32
-	x, y, z, yaw, pitch, head atomic.Uint32
-	gameMode, level           atomic.Int32
-	region                    atomic.Pointer[world.Region]
+	seq              atomic.Uint32
+	x, y, z          atomic.Uint64
+	yaw, pitch, head atomic.Uint32
+	gameMode, level  atomic.Int32
+	region           atomic.Pointer[world.Region]
 }
 
 // store publishes s. Only the player's owner writes.
 func (st *seenState) store(s PlayerState) {
 	st.seq.Add(1)
-	st.x.Store(math.Float32bits(s.Position[0]))
-	st.y.Store(math.Float32bits(s.Position[1]))
-	st.z.Store(math.Float32bits(s.Position[2]))
+	st.x.Store(math.Float64bits(s.Position[0]))
+	st.y.Store(math.Float64bits(s.Position[1]))
+	st.z.Store(math.Float64bits(s.Position[2]))
 	st.yaw.Store(math.Float32bits(s.Rotation.Yaw))
 	st.pitch.Store(math.Float32bits(s.Rotation.Pitch))
 	st.head.Store(math.Float32bits(s.Rotation.HeadYaw))
@@ -56,7 +57,7 @@ func (st *seenState) load() PlayerState {
 			continue
 		}
 		s := PlayerState{
-			Position: mgl32.Vec3{math.Float32frombits(st.x.Load()), math.Float32frombits(st.y.Load()), math.Float32frombits(st.z.Load())},
+			Position: mgl64.Vec3{math.Float64frombits(st.x.Load()), math.Float64frombits(st.y.Load()), math.Float64frombits(st.z.Load())},
 			Rotation: world.Rotation{Yaw: math.Float32frombits(st.yaw.Load()), Pitch: math.Float32frombits(st.pitch.Load()), HeadYaw: math.Float32frombits(st.head.Load())},
 			GameMode: st.gameMode.Load(), Level: st.level.Load(), Region: st.region.Load(),
 		}
@@ -77,7 +78,7 @@ func (p *Player) publishState() {
 		return
 	}
 	p.seen.store(PlayerState{
-		Position: p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0}), Rotation: p.entity.Rotation(),
+		Position: p.entity.Position().Sub(mgl64.Vec3{0, eyeHeight, 0}), Rotation: p.entity.Rotation(),
 		GameMode: p.gameMode, Level: p.Level(), Region: p.entity.Region(),
 	})
 }

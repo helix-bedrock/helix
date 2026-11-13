@@ -3,7 +3,7 @@ package ride
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
@@ -39,13 +39,13 @@ func (b *testBlocks) Boxes(pos cube.Pos) []registry.Box {
 func (b *testBlocks) PassThrough(pos cube.Pos) bool { return b.open[pos] }
 
 func TestSeatPutsAPlayerInTheCart(t *testing.T) {
-	v := New(&Rules{SeatCount: 1, Seats: []Seat{{Position: mgl32.Vec3{0, -0.2, 0}}}})
+	v := New(&Rules{SeatCount: 1, Seats: []Seat{{Position: mgl64.Vec3{0, -0.2, 0}}}})
 	p := player(1)
 	if !v.Add(p) {
 		t.Fatal("no seat")
 	}
 	got := v.SeatOffset(p)
-	want := mgl32.Vec3{0, 1.02, 0}
+	want := mgl64.Vec3{0, 1.02, 0}
 	if !got.ApproxEqual(want) {
 		t.Fatalf("seat offset %v, want %v", got, want)
 	}
@@ -56,9 +56,9 @@ func TestSeatPutsAPlayerInTheCart(t *testing.T) {
 
 func TestSeatsChangeWithRiders(t *testing.T) {
 	v := New(&Rules{SeatCount: 2, Seats: []Seat{
-		{Position: mgl32.Vec3{0, 1, 0}, MinRiders: 1, MaxRiders: 1},
-		{Position: mgl32.Vec3{0, 1, 0.5}, MinRiders: 2, MaxRiders: 2},
-		{Position: mgl32.Vec3{0, 1, -0.5}, MinRiders: 2, MaxRiders: 2},
+		{Position: mgl64.Vec3{0, 1, 0}, MinRiders: 1, MaxRiders: 1},
+		{Position: mgl64.Vec3{0, 1, 0.5}, MinRiders: 2, MaxRiders: 2},
+		{Position: mgl64.Vec3{0, 1, -0.5}, MinRiders: 2, MaxRiders: 2},
 	}})
 	a, b := player(1), player(2)
 	v.Add(a)
@@ -93,20 +93,20 @@ func TestWhoMayRide(t *testing.T) {
 }
 
 func TestPositionTurnsWithTheVehicle(t *testing.T) {
-	pos := mgl32.Vec3{10, 5, 20}
-	if got := Position(pos, 0, mgl32.Vec3{0, 1, 1}); !got.ApproxEqual(mgl32.Vec3{10, 6, 21}) {
+	pos := mgl64.Vec3{10, 5, 20}
+	if got := Position(pos, 0, mgl64.Vec3{0, 1, 1}); !got.ApproxEqual(mgl64.Vec3{10, 6, 21}) {
 		t.Fatalf("yaw 0: %v", got)
 	}
 	// BDS turns by -yaw: x' = x cos + z sin, z' = z cos - x sin.
-	if got := Position(pos, 90, mgl32.Vec3{0, 1, 1}); !got.ApproxEqualThreshold(mgl32.Vec3{9, 6, 20}, 1e-4) {
+	if got := Position(pos, 90, mgl64.Vec3{0, 1, 1}); !got.ApproxEqualThreshold(mgl64.Vec3{9, 6, 20}, 1e-4) {
 		t.Fatalf("yaw 90: %v", got)
 	}
 }
 
 func TestExitLandsBesideAtRest(t *testing.T) {
 	b := &testBlocks{}
-	got := Exit(b, player(1).body, mgl32.Vec3{4.5, 0.35, 4.5}, mgl32.Vec3{}, mgl32.Vec3{4.5, 1.77, 4.5}, 0.7)
-	want := mgl32.Vec3{4.5, 1.621, 3.5}
+	got := Exit(b, player(1).body, mgl64.Vec3{4.5, 0.35, 4.5}, mgl64.Vec3{}, mgl64.Vec3{4.5, 1.77, 4.5}, 0.7)
+	want := mgl64.Vec3{4.5, 1.621, 3.5}
 	if !got.ApproxEqualThreshold(want, 1e-4) {
 		t.Fatalf("landed at %v, want %v", got, want)
 	}
@@ -114,8 +114,8 @@ func TestExitLandsBesideAtRest(t *testing.T) {
 
 func TestExitTriesTheOtherSide(t *testing.T) {
 	b := &testBlocks{solid: map[cube.Pos]bool{{4, 0, 3}: true, {4, 1, 3}: true}}
-	got := Exit(b, player(1).body, mgl32.Vec3{4.5, 0.35, 4.5}, mgl32.Vec3{}, mgl32.Vec3{4.5, 1.77, 4.5}, 0.7)
-	if !got.ApproxEqualThreshold(mgl32.Vec3{4.5, 1.621, 5.5}, 1e-4) {
+	got := Exit(b, player(1).body, mgl64.Vec3{4.5, 0.35, 4.5}, mgl64.Vec3{}, mgl64.Vec3{4.5, 1.77, 4.5}, 0.7)
+	if !got.ApproxEqualThreshold(mgl64.Vec3{4.5, 1.621, 5.5}, 1e-4) {
 		t.Fatalf("landed at %v", got)
 	}
 }
@@ -123,8 +123,8 @@ func TestExitTriesTheOtherSide(t *testing.T) {
 func TestExitFollowsTheWayItMoves(t *testing.T) {
 	b := &testBlocks{}
 	// Moving east, its right is south.
-	got := Exit(b, player(1).body, mgl32.Vec3{4.5, 0.35, 4.5}, mgl32.Vec3{0.4, 0, 0}, mgl32.Vec3{4.5, 1.77, 4.5}, 0.7)
-	if !got.ApproxEqualThreshold(mgl32.Vec3{4.5, 1.621, 5.5}, 1e-4) {
+	got := Exit(b, player(1).body, mgl64.Vec3{4.5, 0.35, 4.5}, mgl64.Vec3{0.4, 0, 0}, mgl64.Vec3{4.5, 1.77, 4.5}, 0.7)
+	if !got.ApproxEqualThreshold(mgl64.Vec3{4.5, 1.621, 5.5}, 1e-4) {
 		t.Fatalf("landed at %v", got)
 	}
 }
@@ -141,8 +141,8 @@ func TestExitWalledInLandsOnTop(t *testing.T) {
 			}
 		}
 	}
-	got := Exit(&testBlocks{solid: solid}, player(1).body, mgl32.Vec3{4.5, 0.35, 4.5}, mgl32.Vec3{}, mgl32.Vec3{4.5, 1.77, 4.5}, 0.7)
-	if !got.ApproxEqualThreshold(mgl32.Vec3{4.5, 2.321, 4.5}, 1e-4) {
+	got := Exit(&testBlocks{solid: solid}, player(1).body, mgl64.Vec3{4.5, 0.35, 4.5}, mgl64.Vec3{}, mgl64.Vec3{4.5, 1.77, 4.5}, 0.7)
+	if !got.ApproxEqualThreshold(mgl64.Vec3{4.5, 2.321, 4.5}, 1e-4) {
 		t.Fatalf("landed at %v", got)
 	}
 }
@@ -150,8 +150,8 @@ func TestExitWalledInLandsOnTop(t *testing.T) {
 func TestExitThroughAnOpenBlock(t *testing.T) {
 	at := cube.Pos{4, 0, 3}
 	b := &testBlocks{solid: map[cube.Pos]bool{at: true}, open: map[cube.Pos]bool{at: true}}
-	got := Exit(b, player(1).body, mgl32.Vec3{4.5, 0.35, 4.5}, mgl32.Vec3{}, mgl32.Vec3{4.5, 1.77, 4.5}, 0.7)
-	if !got.ApproxEqualThreshold(mgl32.Vec3{4.5, 1.621, 3.5}, 1e-4) {
+	got := Exit(b, player(1).body, mgl64.Vec3{4.5, 0.35, 4.5}, mgl64.Vec3{}, mgl64.Vec3{4.5, 1.77, 4.5}, 0.7)
+	if !got.ApproxEqualThreshold(mgl64.Vec3{4.5, 1.621, 3.5}, 1e-4) {
 		t.Fatalf("landed at %v", got)
 	}
 }

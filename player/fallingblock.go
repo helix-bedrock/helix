@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/world"
@@ -48,7 +48,7 @@ const (
 type FallingBlock struct {
 	s      *Host
 	entity *world.Entity
-	vel    mgl32.Vec3
+	vel    mgl64.Vec3
 	block  uint32
 	time   int32
 	// landed is set once it put its block down; it goes fallingRemoveAfter ticks later.
@@ -58,8 +58,8 @@ type FallingBlock struct {
 	noDrop bool
 	gone   bool
 	// next is the move its think step worked out.
-	next thought
-	saved  map[string]any
+	next  thought
+	saved map[string]any
 	// moves is what those who see it were last told of its movement.
 	moves actorMoves
 }
@@ -122,13 +122,13 @@ func (s *Host) DestroySnow(r *world.Region, pos cube.Pos, block uint32) {
 }
 
 // SpawnFallingBlock adds a falling block carrying block with its middle at pos.
-func (s *Host) SpawnFallingBlock(d *world.Dimension, pos mgl32.Vec3, block uint32) *FallingBlock {
+func (s *Host) SpawnFallingBlock(d *world.Dimension, pos mgl64.Vec3, block uint32) *FallingBlock {
 	f := &FallingBlock{s: s, block: block}
 	f.entity = d.AddEntity(f.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{})) //nolint:gosec // an entity ID, not a secret
 	return f
 }
 
-func (f *FallingBlock) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+func (f *FallingBlock) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
 	f.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
@@ -147,7 +147,7 @@ func (f *FallingBlock) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: fallingBlockID,
-		Position: e.Position(), Velocity: f.vel, EntityMetadata: meta,
+		Position: world.Vec32(e.Position()), Velocity: world.Vec32(f.vel), EntityMetadata: meta,
 	}}
 }
 
@@ -182,13 +182,13 @@ func (f *FallingBlock) tick(e *world.Entity) {
 	pos := e.Position()
 	at := cube.Pos{itemFloor(pos[0]), itemFloor(pos[1]), itemFloor(pos[2])}
 	if f.s.falling != nil && f.s.falling.StopsFalling(r, at, f.block, onGround) {
-		f.vel = mgl32.Vec3{f.vel[0] * fallingGroundDrag, f.vel[1] * fallingBounce, f.vel[2] * fallingGroundDrag}
+		f.vel = mgl64.Vec3{f.vel[0] * fallingGroundDrag, f.vel[1] * fallingBounce, f.vel[2] * fallingGroundDrag}
 		if f.noDrop {
 			f.remove(e)
 			return
 		}
 		if f.s.falling.Land(r, at, f.block) {
-			f.landed, f.wait, f.vel = true, 0, mgl32.Vec3{}
+			f.landed, f.wait, f.vel = true, 0, mgl64.Vec3{}
 			return
 		}
 		f.breakApart(r, e, at)
@@ -198,7 +198,7 @@ func (f *FallingBlock) tick(e *world.Entity) {
 		f.breakApart(r, e, at)
 		return
 	}
-	if f.time > fallingVoidTime && pos[1] < float32(r.Dimension().Range()[0]) {
+	if f.time > fallingVoidTime && pos[1] < float64(r.Dimension().Range()[0]) {
 		f.remove(e)
 	}
 }
@@ -227,7 +227,7 @@ func (f *FallingBlock) move(_ *world.Region, e *world.Entity) bool {
 		f.vel[1] = 0
 	}
 	if !e.Apply(world.Movement{Pos: pos, Rot: e.Rotation(), OnGround: onGround, Tick: e.Tick()}) {
-		f.vel = mgl32.Vec3{}
+		f.vel = mgl64.Vec3{}
 	}
 	return onGround
 }
@@ -248,7 +248,7 @@ func (f *FallingBlock) breakApart(r *world.Region, e *world.Entity, at cube.Pos)
 	}
 	pos := e.Position()
 	for _, it := range items {
-		s.spawnItem(r.Dimension(), it, pos, mgl32.Vec3{}, world.Rotation{}, fallingPickupDelay, 0)
+		s.spawnItem(r.Dimension(), it, pos, mgl64.Vec3{}, world.Rotation{}, fallingPickupDelay, 0)
 	}
 	levelEvent(r, at, pos, levelEventDestroyParticles, int32(s.reg.Blocks.Hash(f.block))) //nolint:gosec // hashes are sent as int32
 	f.remove(e)
@@ -261,12 +261,12 @@ func (f *FallingBlock) remove(e *world.Entity) {
 
 // BuildBox is its box: a falling block keeps blocks from being placed where it is, as BDS's
 // FallingBlockActor sets its blocks-building flag. A placed one waiting to go does not.
-func (f *FallingBlock) BuildBox() (lo, hi mgl32.Vec3, ok bool) {
+func (f *FallingBlock) BuildBox() (lo, hi mgl64.Vec3, ok bool) {
 	if f.gone || f.landed || f.entity == nil {
 		return lo, hi, false
 	}
 	at := f.entity.Position()
-	half := mgl32.Vec3{fallingHalf, fallingHalf, fallingHalf}
+	half := mgl64.Vec3{fallingHalf, fallingHalf, fallingHalf}
 	return at.Sub(half), at.Add(half), true
 }
 
@@ -284,8 +284,8 @@ func (f *FallingBlock) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	blocks := f.s.reg.Blocks
 	pos, rot := e.Position(), e.Rotation()
 	data["identifier"] = fallingBlockID
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
-	data["Motion"] = []float32{f.vel[0], f.vel[1], f.vel[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
+	data["Motion"] = []float32{float32(f.vel[0]), float32(f.vel[1]), float32(f.vel[2])}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data[fallingKeyBlock] = map[string]any{"name": blocks.Name(f.block), "states": blocks.States(f.block), "version": blocks.Version(f.block)}
 	data[fallingKeyTime] = uint8(min(max(f.time, 0), math.MaxUint8)) //nolint:gosec // clamped, BDS saves a byte
@@ -307,7 +307,7 @@ func (s *Host) loadFallingBlock(r *world.Region, at mcdb.ChunkPos, saved chunk.E
 	}
 	f := &FallingBlock{s: s, block: block, saved: saved.Data}
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
-		f.vel = mgl32.Vec3{v[0], v[1], v[2]}
+		f.vel = mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}
 	}
 	var rot world.Rotation
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
@@ -315,6 +315,6 @@ func (s *Host) loadFallingBlock(r *world.Region, at mcdb.ChunkPos, saved chunk.E
 	}
 	t, _ := saved.Data[fallingKeyTime].(uint8)
 	f.time = int32(t)
-	f.entity = r.AddLoadedEntity(at, f.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
+	f.entity = r.AddLoadedEntity(at, f.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, rot))
 	return true
 }

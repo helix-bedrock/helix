@@ -7,7 +7,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/path"
@@ -240,9 +240,9 @@ func (w *spawnWorld) NearestPlayer(p path.Vec3, maxDist float32) (path.Vec3, boo
 			continue
 		}
 		v := e.Position()
-		dx, dy, dz := v[0]-p.X, v[1]-p.Y, v[2]-p.Z
+		dx, dy, dz := float32(v[0]-float64(p.X)), float32(v[1]-float64(p.Y)), float32(v[2]-float64(p.Z))
 		if d := dx*dx + dy*dy + dz*dz; d <= best {
-			best, found, at = d, true, path.Vec3{X: v[0], Y: v[1], Z: v[2]}
+			best, found, at = d, true, path.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}
 		}
 	}
 	return at, found
@@ -256,7 +256,7 @@ func (w *spawnWorld) PlayerInVillage(path.Pos, int32) bool {
 }
 
 func (w *spawnWorld) Mobs(minX, minZ, maxX, maxZ int32, f func(identifier string, surface bool)) {
-	w.list = w.r.AppendEntitiesIn(w.list[:0], float32(minX*16), float32(minZ*16), float32(maxX*16+15), float32(maxZ*16+15))
+	w.list = w.r.AppendEntitiesIn(w.list[:0], float64(minX*16), float64(minZ*16), float64(maxX*16+15), float64(maxZ*16+15))
 	for _, e := range w.list {
 		if o, ok := e.Owner().(*Mob); ok && !o.gone && !o.m.Dead() {
 			f(o.m.Type(), o.surface)
@@ -265,7 +265,7 @@ func (w *spawnWorld) Mobs(minX, minZ, maxX, maxZ int32, f func(identifier string
 }
 
 func (w *spawnWorld) EntitiesIn(b path.Box) int {
-	w.list = w.r.AppendEntitiesIn(w.list[:0], b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
+	w.list = w.r.AppendEntitiesIn(w.list[:0], float64(b.Min.X-2), float64(b.Min.Z-2), float64(b.Max.X+2), float64(b.Max.Z+2))
 	n := 0
 	for _, e := range w.list {
 		var bx behavior.Box
@@ -273,7 +273,7 @@ func (w *spawnWorld) EntitiesIn(b path.Box) int {
 			bx = a.Box()
 		} else {
 			v := e.Position()
-			bx = behavior.Box{Min: behavior.Vec3{X: v[0], Y: v[1], Z: v[2]}, Max: behavior.Vec3{X: v[0], Y: v[1], Z: v[2]}}
+			bx = behavior.Box{Min: behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}, Max: behavior.Vec3{X: float32(v[0]), Y: float32(v[1]), Z: float32(v[2])}}
 		}
 		if bx.Min.X <= b.Max.X && bx.Max.X >= b.Min.X && bx.Min.Y <= b.Max.Y && bx.Max.Y >= b.Min.Y && bx.Min.Z <= b.Max.Z && bx.Max.Z >= b.Min.Z {
 			n++
@@ -294,7 +294,7 @@ func (w *spawnWorld) NewMob(identifier string, pos path.Vec3, surface bool) spaw
 	if event != "" {
 		method = definition.InitEvent
 	}
-	o, ok := w.s.newMob(typ, mgl32.Vec3{pos.X, pos.Y, pos.Z}, w.rnd.Float()*360, method, event)
+	o, ok := w.s.newMob(typ, mgl64.Vec3{float64(pos.X), float64(pos.Y), float64(pos.Z)}, w.rnd.Float()*360, method, event)
 	if !ok {
 		return nil
 	}

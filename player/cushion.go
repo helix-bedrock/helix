@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/ride"
 	"github.com/helix-bedrock/helix/world"
@@ -96,7 +97,7 @@ func (c *Cushion) Rider() *Player {
 func cushionRideRules() *ride.Rules {
 	return &ride.Rules{
 		SeatCount: 1, CrouchingSkipInteract: true, Dismount: ride.DismountOnTopCenter,
-		Seats: []ride.Seat{{Position: mgl32.Vec3{0, cushionSeatY, 0}, Rotates: true, RotateBy: cushionSeatTurn}},
+		Seats: []ride.Seat{{Position: mgl64.Vec3{0, cushionSeatY, 0}, Rotates: true, RotateBy: cushionSeatTurn}},
 	}
 }
 
@@ -105,13 +106,13 @@ func (s *Host) newCushion(color uint8) *Cushion {
 }
 
 // SpawnCushion adds a cushion of the colour given, facing yaw. Runs: any goroutine.
-func (s *Host) SpawnCushion(d *world.Dimension, pos mgl32.Vec3, yaw float32, color uint8) *Cushion {
+func (s *Host) SpawnCushion(d *world.Dimension, pos mgl64.Vec3, yaw float64, color uint8) *Cushion {
 	c := s.newCushion(color & 0xf)
-	c.entity = d.AddEntity(c.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: yaw, HeadYaw: yaw})) //nolint:gosec // an entity ID, not a secret
+	c.entity = d.AddEntity(c.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, world.Rotation{Yaw: float32(yaw), HeadYaw: float32(yaw)})) //nolint:gosec // an entity ID, not a secret
 	return c
 }
 
-func (c *Cushion) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+func (c *Cushion) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: c, Spawn: c.spawnPackets, Move: c.movePacket, Input: c.tick, Save: c.saveEntity,
@@ -132,14 +133,14 @@ func (c *Cushion) spawnPackets(e *world.Entity) []packet.Packet {
 	rot := e.Rotation()
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: cushionID,
-		Position: e.Position(), Yaw: rot.Yaw, HeadYaw: rot.Yaw, BodyYaw: rot.Yaw, EntityMetadata: meta,
+		Position: world.Vec32(e.Position()), Yaw: rot.Yaw, HeadYaw: rot.Yaw, BodyYaw: rot.Yaw, EntityMetadata: meta,
 		EntityLinks: c.seats.Links(e.UniqueID()),
 	}}
 }
 
 func (c *Cushion) movePacket(e *world.Entity) packet.Packet {
 	rot := e.Rotation()
-	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw}}
+	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), float32(rot.HeadYaw)}}
 }
 
 // tick keeps its riders and, now and then, checks it still rests on something; in lava it
@@ -172,16 +173,16 @@ func (s *Host) lavaBlock(b uint32) bool {
 }
 
 // box is its collision box at pos.
-func cushionBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
+func cushionBox(pos mgl64.Vec3) (lo, hi mgl64.Vec3) {
 	const half = cushionWidth / 2
-	return mgl32.Vec3{pos[0] - half, pos[1], pos[2] - half}, mgl32.Vec3{pos[0] + half, pos[1] + cushionHeight, pos[2] + half}
+	return mgl64.Vec3{pos[0] - half, pos[1], pos[2] - half}, mgl64.Vec3{pos[0] + half, pos[1] + cushionHeight, pos[2] + half}
 }
 
 // resting is BDS's sub_C087200: something under it within cushionRest has a box its own
 // box, moved down that far, touches; and it is not stuck inside solid blocks.
 func (c *Cushion) resting(r *world.Region) bool {
 	pos := c.entity.Position()
-	below := mgl32.Vec3{pos[0], pos[1] - cushionRest, pos[2]}
+	below := mgl64.Vec3{pos[0], pos[1] - cushionRest, pos[2]}
 	at := floorPos(below)
 	b, ok := r.Block(at, 0)
 	if !ok {
@@ -191,8 +192,8 @@ func (c *Cushion) resting(r *world.Region) bool {
 	held := false
 	base := blockVec(at)
 	for _, box := range c.s.reg.Blocks.Properties(b).Collision {
-		bLo := base.Add(mgl32.Vec3{box[0], box[1], box[2]})
-		bHi := base.Add(mgl32.Vec3{box[3], box[4], box[5]})
+		bLo := base.Add(mgl64.Vec3{float64(box[0]), float64(box[1]), float64(box[2])})
+		bHi := base.Add(mgl64.Vec3{float64(box[3]), float64(box[4]), float64(box[5])})
 		if overlaps(lo, hi, bLo, bHi) {
 			held = true
 			break
@@ -217,9 +218,9 @@ func (c *Cushion) riders() *ride.Vehicle { return c.seats }
 
 func (c *Cushion) rideEntity() *world.Entity { return c.entity }
 
-func (c *Cushion) rideMoved() mgl32.Vec3 { return mgl32.Vec3{} }
+func (c *Cushion) rideMoved() mgl64.Vec3 { return mgl64.Vec3{} }
 
-func (c *Cushion) rideTop() float32 { return c.entity.Position()[1] + cushionHeight }
+func (c *Cushion) rideTop() float64 { return c.entity.Position()[1] + cushionHeight }
 
 // use is a player using it: sit down, unless someone holds the seat.
 func (c *Cushion) use(p *Player) {
@@ -254,13 +255,13 @@ func (c *Cushion) Break(r *world.Region, drops bool) {
 		if c.name != "" {
 			item = item.WithName(c.name)
 		}
-		c.s.spawnItem(r.Dimension(), item, c.entity.Position(), mgl32.Vec3{}, world.Rotation{}, cushionDropDelay, 0)
+		c.s.spawnItem(r.Dimension(), item, c.entity.Position(), mgl64.Vec3{}, world.Rotation{}, cushionDropDelay, 0)
 	}
 	c.entity.Remove()
 }
 
 // BlastBox is its box.
-func (c *Cushion) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
+func (c *Cushion) BlastBox() (lo, hi mgl64.Vec3, ok bool) {
 	if c.gone || c.entity == nil {
 		return lo, hi, false
 	}
@@ -269,14 +270,14 @@ func (c *Cushion) BlastBox() (lo, hi mgl32.Vec3, ok bool) {
 }
 
 // BlastHit breaks it, as any hurt does.
-func (c *Cushion) BlastHit(float32, DamageSource) {
+func (c *Cushion) BlastHit(float64, DamageSource) {
 	if r := c.entity.Region(); r != nil {
 		c.Hurt(r, nil)
 	}
 }
 
 // BlastPush does nothing: a cushion does not move.
-func (c *Cushion) BlastPush(mgl32.Vec3) {}
+func (c *Cushion) BlastPush(mgl64.Vec3) {}
 
 // isCushionItem reports whether the item called name is a cushion.
 func isCushionItem(name string) bool { _, ok := cushionColor(name); return ok }
@@ -284,13 +285,13 @@ func isCushionItem(name string) bool { _, ok := cushionColor(name); return ok }
 // placeCushion is BDS's CushionItem useOn: only on a top face, at the very height clicked,
 // in the middle of the block, turned to the nearest quarter from where the player looks, and
 // never on or into another cushion. The use counts once it is tried.
-func (p *Player) placeCushion(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
+func (p *Player) placeCushion(r *world.Region, clicked cube.Pos, face int32, click mgl64.Vec3, held ItemStack) bool {
 	if cube.Face(face) != cube.FaceUp || !p.inReach(clicked) {
 		return false
 	}
 	color, _ := cushionColor(held.Name)
-	pos := mgl32.Vec3{float32(clicked[0]) + 0.5, float32(clicked[1]) + click[1], float32(clicked[2]) + 0.5}
-	point := mgl32.Vec3{float32(clicked[0]) + click[0], pos[1], float32(clicked[2]) + click[2]}
+	pos := mgl64.Vec3{float64(clicked[0]) + 0.5, float64(clicked[1]) + click[1], float64(clicked[2]) + 0.5}
+	point := mgl64.Vec3{float64(clicked[0]) + click[0], pos[1], float64(clicked[2]) + click[2]}
 	lo, hi := cushionBox(pos)
 	p.touching = r.AppendEntitiesIn(p.touching[:0], lo[0]-1, lo[2]-1, hi[0]+1, hi[2]+1)
 	for _, e := range p.touching {
@@ -305,7 +306,7 @@ func (p *Player) placeCushion(r *world.Region, clicked cube.Pos, face int32, cli
 			return false
 		}
 	}
-	yaw := cushionYaw(p.entity.Rotation().Yaw)
+	yaw := cushionYaw(float64(p.entity.Rotation().Yaw))
 	c := p.s.SpawnCushion(r.Dimension(), pos, yaw, color)
 	if name := customName(held); name != "" {
 		c.name = name
@@ -318,12 +319,12 @@ func (p *Player) placeCushion(r *world.Region, clicked cube.Pos, face int32, cli
 }
 
 // cushionYaw is the player's yaw turned to the nearest quarter, as BDS turns a placed cushion.
-func cushionYaw(yaw float32) float32 {
-	y := float32(math.Mod(float64(yaw), 360))
+func cushionYaw(yaw float64) float64 {
+	y := float64(math.Mod(float64(yaw), 360))
 	if y < 0 {
 		y += 360
 	}
-	return float32(math.Floor(float64((y-180+45)/90))) * 90
+	return float64(math.Floor(float64((y-180+45)/90))) * 90
 }
 
 // cushionNear finds a cushion near the player by its runtime ID.
@@ -376,7 +377,7 @@ func (c *Cushion) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	pos, rot := e.Position(), e.Rotation()
 	data["identifier"] = cushionID
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data[cushionVariantTag] = int32(c.color)
 	if c.name != "" {
@@ -401,6 +402,6 @@ func (s *Host) loadCushion(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
 		rot = world.Rotation{Yaw: v[0], Pitch: v[1], HeadYaw: v[0]}
 	}
-	c.entity = r.AddLoadedEntity(at, c.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, rot))
+	c.entity = r.AddLoadedEntity(at, c.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, rot))
 	return true
 }

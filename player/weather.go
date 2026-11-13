@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/weather"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
@@ -27,7 +27,7 @@ func (s *Host) BroadcastLevelEvent(event, data int32) {
 
 // inRain is BDS's Actor::isInRain: it rains on the block at top, the top of the entity's box.
 // Runs: owner of the region.
-func (s *Host) inRain(r *world.Region, top mgl32.Vec3) bool {
+func (s *Host) inRain(r *world.Region, top mgl64.Vec3) bool {
 	if s.chunkWeather == nil {
 		return false
 	}

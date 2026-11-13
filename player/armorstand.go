@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
@@ -150,7 +150,7 @@ func (p *Player) interactArmorStand(o *Mob, d *protocol.UseItemOnEntityTransacti
 	if held.Empty() {
 		dy := d.ClickedPosition[1]
 		if dy > armorStandAimRelative || dy < 0 {
-			dy -= o.entity.Position()[1]
+			dy -= float32(o.entity.Position()[1])
 		}
 		var ok bool
 		if slot, ok = o.standHeightSlot(dy); !ok {
@@ -204,7 +204,7 @@ func (p *Player) equipArmorStand(r *world.Region, o *Mob, n int) {
 	p.sendHeld()
 	p.sendEquipment()
 	p.flush()
-	at := o.entity.Position().Add(mgl32.Vec3{0.5, 0.5, 0.5})
+	at := o.entity.Position().Add(mgl64.Vec3{0.5, 0.5, 0.5})
 	playSound(r, floorPos(at), soundEvent{name: packet.SoundEventArmorPlace, pos: at, extra: -1}, nil)
 }
 
@@ -282,8 +282,8 @@ func (o *Mob) standWobble() {
 	o.stand.hurt = armorStandHurtTime
 	o.stand.hurtDir = -o.stand.hurtDir
 	o.entity.Send(actorData(o.entity.RuntimeID(), protocol.EntityMetadata{
-		protocol.EntityDataKeyHurtDirection:      o.stand.hurtDir,
-		protocol.EntityDataKeyHurt:               int32(armorStandHurtTime),
+		protocol.EntityDataKeyHurtDirection:       o.stand.hurtDir,
+		protocol.EntityDataKeyHurt:                int32(armorStandHurtTime),
 		protocol.EntityDataKeyStructuralIntegrity: int32(armorStandStructural),
 	}))
 }
@@ -294,7 +294,7 @@ func (o *Mob) standWobble() {
 func (o *Mob) standBreak(r *world.Region, drops bool) {
 	pos := o.entity.Position()
 	if drops && o.s.level.DoEntityDrops {
-		o.s.spawnMobDrop(r, ItemStack{Name: armorStandID, Count: 1}, pos.Add(mgl32.Vec3{0, armorStandDropUp, 0}))
+		o.s.spawnMobDrop(r, ItemStack{Name: armorStandID, Count: 1}, pos.Add(mgl64.Vec3{0, armorStandDropUp, 0}))
 		o.standDropEquipment(r)
 	}
 	_, h := o.m.Size()
@@ -317,7 +317,7 @@ func (o *Mob) standDropEquipment(r *world.Region) {
 		if it.Empty() {
 			continue
 		}
-		at := pos.Add(mgl32.Vec3{rand.Float32()*0.5 - 0.25, rand.Float32()*1.5 + 0.25, rand.Float32()*0.5 - 0.25}) //nolint:gosec // a scatter, not a secret
+		at := pos.Add(mgl64.Vec3{float64(rand.Float32()*0.5 - 0.25), float64(rand.Float32()*1.5 + 0.25), float64(rand.Float32()*0.5 - 0.25)}) //nolint:gosec // a scatter, not a secret
 		o.s.spawnMobDrop(r, it, at)
 		o.setItem(slot, ItemStack{})
 	}
@@ -392,7 +392,7 @@ func (p *Player) placeArmorStand(r *world.Region, clicked cube.Pos, face int32) 
 			return false
 		}
 	}
-	if p.s.entityIn(r, blockVec(at), blockVec(at).Add(mgl32.Vec3{1, 2, 1})) {
+	if p.s.entityIn(r, blockVec(at), blockVec(at).Add(mgl64.Vec3{1, 2, 1})) {
 		return false
 	}
 	blocks := p.s.reg.Blocks
@@ -408,7 +408,7 @@ func (p *Player) placeArmorStand(r *world.Region, clicked cube.Pos, face int32) 
 		yaw += 360
 	}
 	yaw = float32(math.Floor(float64((yaw-180+22.5)/45))) * 45
-	pos := blockVec(at).Add(mgl32.Vec3{0.5, 0, 0.5})
+	pos := blockVec(at).Add(mgl64.Vec3{0.5, 0, 0.5})
 	if _, ok := p.s.SpawnMob(r.Dimension(), armorStandID, pos, yaw); !ok {
 		return false
 	}
@@ -426,7 +426,7 @@ func (s *Host) buildOver(b uint32) bool {
 }
 
 // entityIn reports any player or mob with its box inside lo to hi.
-func (s *Host) entityIn(r *world.Region, lo, hi mgl32.Vec3) bool {
+func (s *Host) entityIn(r *world.Region, lo, hi mgl64.Vec3) bool {
 	for _, e := range r.AppendEntitiesIn(nil, lo[0]-1, lo[2]-1, hi[0]+1, hi[2]+1) {
 		elo, ehi, _, ok := s.EntityBox(e)
 		if ok && overlaps(lo, hi, elo, ehi) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/protocol"
@@ -272,7 +272,7 @@ func TestEntities(t *testing.T) {
 	d, db := openDim(t, reg, t.TempDir())
 	defer func() { _ = db.Close() }()
 	defer func() { _ = d.Close() }()
-	add := func(id uint64, pos mgl32.Vec3) (*Entity, *recorder, *Viewer) {
+	add := func(id uint64, pos mgl64.Vec3) (*Entity, *recorder, *Viewer) {
 		rec := &recorder{}
 		v := d.AddViewer(rec.send, func() {})
 		v.Move(chunkOf(pos), 2)
@@ -282,13 +282,13 @@ func TestEntities(t *testing.T) {
 				return []packet.Packet{&packet.AddPlayer{EntityRuntimeID: e.RuntimeID()}}
 			},
 			Move: func(e *Entity) packet.Packet {
-				return &packet.MovePlayer{EntityRuntimeID: e.RuntimeID(), Position: e.Position()}
+				return &packet.MovePlayer{EntityRuntimeID: e.RuntimeID(), Position: Vec32(e.Position())}
 			},
 		})
 		return e, rec, v
 	}
-	a, recA, va := add(1, mgl32.Vec3{0, 0, 0})
-	b, recB, vb := add(2, mgl32.Vec3{3 * 16, 0, 0})
+	a, recA, va := add(1, mgl64.Vec3{0, 0, 0})
+	b, recB, vb := add(2, mgl64.Vec3{3 * 16, 0, 0})
 	defer va.Close()
 	defer vb.Close()
 	sees := func(rec *recorder, id uint64) func() bool {
@@ -299,10 +299,10 @@ func TestEntities(t *testing.T) {
 	waitFor(t, "a to see b", sees(recA, 2))
 	waitFor(t, "b to see a", sees(recB, 1))
 
-	move := func(pos mgl32.Vec3) {
+	move := func(pos mgl64.Vec3) {
 		runAt(t, d, mcdb.ChunkPos{3, 0}, func(*Region) { b.Apply(Movement{Pos: pos}) })
 	}
-	move(mgl32.Vec3{3*16 + 1, 0, 0})
+	move(mgl64.Vec3{3*16 + 1, 0, 0})
 	waitFor(t, "a to get b's movement", func() bool {
 		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.MovePlayer); return ok && pk.Position[0] == 3*16+1 })
 	})
@@ -311,7 +311,7 @@ func TestEntities(t *testing.T) {
 	}
 
 	// Out of the disc: b at 5 chunks is removed for a.
-	move(mgl32.Vec3{5 * 16, 0, 0})
+	move(mgl64.Vec3{5 * 16, 0, 0})
 	waitFor(t, "a to lose b", func() bool {
 		return recA.has(func(p packet.Packet) bool { pk, ok := p.(*packet.RemoveActor); return ok && pk.EntityUniqueID == 2 })
 	})
@@ -355,7 +355,7 @@ func TestEntityHandOff(t *testing.T) {
 		rec := &recorder{}
 		v := d.AddViewer(rec.send, func() {})
 		v.Move(mcdb.ChunkPos{chunkX, 0}, 2)
-		d.AddEntity(EntityConfig{UniqueID: int64(id), RuntimeID: id, Pos: mgl32.Vec3{float32(chunkX*16 + 8), 0, 8}, Viewer: v, Spawn: spawn}) //nolint:gosec // test IDs
+		d.AddEntity(EntityConfig{UniqueID: int64(id), RuntimeID: id, Pos: mgl64.Vec3{float64(chunkX*16 + 8), 0, 8}, Viewer: v, Spawn: spawn}) //nolint:gosec // test IDs
 		return rec, v
 	}
 	recA, va := player(1, 0)
@@ -369,15 +369,15 @@ func TestEntityHandOff(t *testing.T) {
 	}
 	unloaded := make(chan struct{})
 	mob := d.AddEntity(EntityConfig{
-		UniqueID: 10, RuntimeID: 10, Pos: mgl32.Vec3{24, 0, 8}, Spawn: spawn,
+		UniqueID: 10, RuntimeID: 10, Pos: mgl64.Vec3{24, 0, 8}, Spawn: spawn,
 		Unloaded: func(*Entity) { close(unloaded) },
 	})
 	waitFor(t, "a to see the mob", sees(recA, 10))
 
 	var intoUnloaded, intoB bool
 	runAt(t, d, mcdb.ChunkPos{1, 0}, func(*Region) {
-		intoUnloaded = mob.Apply(Movement{Pos: mgl32.Vec3{50 * 16, 0, 8}})
-		intoB = mob.Apply(Movement{Pos: mgl32.Vec3{101*16 + 8, 0, 8}})
+		intoUnloaded = mob.Apply(Movement{Pos: mgl64.Vec3{50 * 16, 0, 8}})
+		intoB = mob.Apply(Movement{Pos: mgl64.Vec3{101*16 + 8, 0, 8}})
 	})
 	if intoUnloaded || !intoB {
 		t.Fatalf("moved into an unloaded chunk: %v, into b's region: %v", intoUnloaded, intoB)
@@ -414,7 +414,7 @@ func TestTeleport(t *testing.T) {
 	d, db := openDim(t, reg, t.TempDir())
 	defer func() { _ = db.Close() }()
 	defer func() { _ = d.Close() }()
-	add := func(id uint64, pos mgl32.Vec3) (*Entity, *recorder, *Viewer) {
+	add := func(id uint64, pos mgl64.Vec3) (*Entity, *recorder, *Viewer) {
 		rec := &recorder{}
 		v := d.AddViewer(rec.send, func() {})
 		v.Move(chunkOf(pos), 2)
@@ -426,9 +426,9 @@ func TestTeleport(t *testing.T) {
 		})
 		return e, rec, v
 	}
-	a, recA, va := add(1, mgl32.Vec3{0, 0, 0})
-	_, recC, vc := add(3, mgl32.Vec3{16, 0, 0})
-	_, _, vb := add(2, mgl32.Vec3{100 * 16, 0, 0})
+	a, recA, va := add(1, mgl64.Vec3{0, 0, 0})
+	_, recC, vc := add(3, mgl64.Vec3{16, 0, 0})
+	_, _, vb := add(2, mgl64.Vec3{100 * 16, 0, 0})
 	defer va.Close()
 	defer vb.Close()
 	defer vc.Close()
@@ -454,7 +454,7 @@ func TestTeleport(t *testing.T) {
 	waitFor(t, "two regions", func() bool { return len(ids()) == 2 })
 	before := ids()
 
-	far := mgl32.Vec3{100 * 16, 0, 16}
+	far := mgl64.Vec3{100 * 16, 0, 16}
 	runAt(t, d, mcdb.ChunkPos{}, func(*Region) { a.Apply(Movement{Pos: far}) })
 	va.Move(chunkOf(far), 2)
 	waitFor(t, "a to see b", sees(recA, 2))

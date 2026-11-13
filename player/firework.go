@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -55,8 +56,8 @@ const (
 type FireworkRocket struct {
 	s      *Host
 	entity *world.Entity
-	vel    mgl32.Vec3
-	dir    mgl32.Vec3
+	vel    mgl64.Vec3
+	dir    mgl64.Vec3
 	// next is the move its think step worked out.
 	next thought
 
@@ -83,9 +84,9 @@ func (f *FireworkRocket) Shot() bool { return f.shot }
 
 // shotHits is whether a shot rocket at pos touches a living entity other than its shooter.
 // It only reads the region, so it may run in the think step.
-func (f *FireworkRocket) shotHits(r *world.Region, pos mgl32.Vec3) bool {
-	lo := pos.Sub(mgl32.Vec3{fireworkHalf, 0, fireworkHalf})
-	hi := pos.Add(mgl32.Vec3{fireworkHalf, 2 * fireworkHalf, fireworkHalf})
+func (f *FireworkRocket) shotHits(r *world.Region, pos mgl64.Vec3) bool {
+	lo := pos.Sub(mgl64.Vec3{fireworkHalf, 0, fireworkHalf})
+	hi := pos.Add(mgl64.Vec3{fireworkHalf, 2 * fireworkHalf, fireworkHalf})
 	for _, o := range r.AppendEntitiesIn(nil, lo[0]-2, lo[2]-2, hi[0]+2, hi[2]+2) {
 		l, ok := o.Owner().(Living)
 		if !ok || o == f.entity {
@@ -112,7 +113,7 @@ func (f *FireworkRocket) Item() ItemStack { return f.item }
 func (f *FireworkRocket) Attached() *Player { return f.attached }
 
 // Direction returns the way it flies when free.
-func (f *FireworkRocket) Direction() mgl32.Vec3 { return f.dir }
+func (f *FireworkRocket) Direction() mgl64.Vec3 { return f.dir }
 
 // Lifetime returns the tick of its age it explodes after.
 func (f *FireworkRocket) Lifetime() int32 { return f.lifetime }
@@ -178,9 +179,9 @@ func fireworkLifetime(item ItemStack) int32 {
 // LaunchFirework adds a firework rocket made from item at pos, flying along dir, or riding
 // with attached when it is not nil, as BDS's rocket init (0xBD5EB40) starts one. Runs:
 // owner of the chunk at pos.
-func (s *Host) LaunchFirework(d *world.Dimension, pos, dir mgl32.Vec3, item ItemStack, attached *Player) *FireworkRocket {
+func (s *Host) LaunchFirework(d *world.Dimension, pos, dir mgl64.Vec3, item ItemStack, attached *Player) *FireworkRocket {
 	f := &FireworkRocket{s: s, dir: dir, item: item, attached: attached, lifetime: fireworkLifetime(item)}
-	jitter := mgl32.Vec3{float32(rand.NormFloat64()), float32(rand.NormFloat64()), float32(rand.NormFloat64())} //nolint:gosec // a flight, not a secret
+	jitter := mgl64.Vec3{float64(rand.NormFloat64()), float64(rand.NormFloat64()), float64(rand.NormFloat64())} //nolint:gosec // a flight, not a secret
 	f.vel = jitter.Mul(fireworkJitter).Add(dir.Mul(fireworkThrust))
 	f.entity = d.AddEntity(world.EntityConfig{
 		UniqueID: itemUniqueIDBase | rand.Int64N(itemUniqueIDBase), RuntimeID: s.runtimeIDs.Add(1), //nolint:gosec // an ID, not a secret
@@ -212,14 +213,14 @@ func (f *FireworkRocket) spawnPackets(e *world.Entity) []packet.Packet {
 	rot := e.Rotation()
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: nameFireworksActor,
-		Position: e.Position(), Velocity: f.vel, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		Position: world.Vec32(e.Position()), Velocity: world.Vec32(f.vel), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		EntityMetadata: f.metadata(),
 	}}
 }
 
 func (f *FireworkRocket) movePacket(e *world.Entity) packet.Packet {
 	rot := e.Rotation()
-	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw}}
+	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: world.Vec32(e.Position()), Rotation: mgl32.Vec3{float32(rot.Pitch), float32(rot.Yaw), float32(rot.HeadYaw)}}
 }
 
 // tick is BDS's rocket tick (0xBD5F2E0): the launch sound on its first tick, its age, and
@@ -288,7 +289,7 @@ func (f *FireworkRocket) move(r *world.Region, e *world.Entity) {
 	pos := f.next.pos
 	f.next = thought{}
 	if !e.Apply(world.Movement{Pos: pos, Rot: flightRotation(f.vel), Tick: e.Tick()}) {
-		f.vel = mgl32.Vec3{}
+		f.vel = mgl64.Vec3{}
 	}
 }
 
@@ -340,7 +341,7 @@ func vanillaFirework(r *world.Region, f *FireworkRocket) {
 			if !ok {
 				continue
 			}
-			mob, head = t, mgl32.Vec3{(lo[0] + hi[0]) / 2, hi[1], (lo[2] + hi[2]) / 2}
+			mob, head = t, mgl64.Vec3{(lo[0] + hi[0]) / 2, hi[1], (lo[2] + hi[2]) / 2}
 		default:
 			continue
 		}
@@ -376,7 +377,7 @@ func (p *Player) useFirework(held ItemStack) bool {
 	if r == nil {
 		return false
 	}
-	f := p.s.LaunchFirework(r.Dimension(), p.entity.Position(), mgl32.Vec3{}, held, p)
+	f := p.s.LaunchFirework(r.Dimension(), p.entity.Position(), mgl64.Vec3{}, held, p)
 	p.useUpHeld()
 	p.send(&packet.MovementEffect{EntityRuntimeID: p.runtimeID, Type: packet.MovementEffectTypeGlideBoost, Duration: f.lifetime, Tick: p.entity.Tick()})
 	p.flush()
@@ -385,12 +386,12 @@ func (p *Player) useFirework(held ItemStack) bool {
 
 // useFireworkOn is BDS's FireworksItem::useOn (0xC98CF10): not while gliding; a rocket
 // flying up from where the block was clicked, one item used up outside creative.
-func (p *Player) useFireworkOn(r *world.Region, clicked cube.Pos, click mgl32.Vec3, held ItemStack) bool {
+func (p *Player) useFireworkOn(r *world.Region, clicked cube.Pos, click mgl64.Vec3, held ItemStack) bool {
 	if p.Gliding() {
 		return true
 	}
 	at := blockVec(clicked).Add(click)
-	p.s.LaunchFirework(r.Dimension(), at, mgl32.Vec3{0, fireworkUseRise, 0}, held, nil)
+	p.s.LaunchFirework(r.Dimension(), at, mgl64.Vec3{0, fireworkUseRise, 0}, held, nil)
 	p.useUpHeld()
 	p.flush()
 	return true
@@ -412,14 +413,14 @@ func (p *Player) useUpHeld() {
 
 // dispenseFirework is BDS's FireworksItem::dispense (0xC98DC70): a rocket flying out of
 // the face, just outside it, with the dispenser's click. False if the item is not a rocket.
-func (s *Host) dispenseFirework(r *world.Region, pos cube.Pos, face cube.Face, at mgl32.Vec3, item ItemStack) bool {
+func (s *Host) dispenseFirework(r *world.Region, pos cube.Pos, face cube.Face, at mgl64.Vec3, item ItemStack) bool {
 	if item.Name != nameFireworkRocket {
 		return false
 	}
 	dir := faceVec(face)
-	var start mgl32.Vec3
+	var start mgl64.Vec3
 	for n := range 3 {
-		start[n] = float32(math.Floor(float64(at[n]-dir[n]))) + 0.5 + dir[n]*0.5 + dir[n]*fireworkHalf
+		start[n] = math.Floor(at[n]-dir[n]) + 0.5 + dir[n]*0.5 + dir[n]*fireworkHalf
 	}
 	if face == cube.FaceDown || face == cube.FaceUp {
 		start[1] -= fireworkHalf

@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/portal"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -61,7 +61,7 @@ type portalState struct {
 // entity out.
 type dimMove struct {
 	to     *world.Dimension
-	eyes   mgl32.Vec3
+	eyes   mgl64.Vec3
 	rot    world.Rotation
 	arrive func(r *world.Region) bool
 	// respawn marks a move made by respawning, not a portal.
@@ -155,9 +155,9 @@ func (p *Player) tickPortal() {
 // portalBlocks reports whether the player's box is in a nether portal or end portal
 // block.
 func (p *Player) portalBlocks(r *world.Region) (nether, end bool) {
-	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
-	lo := vecPos(feet.Sub(mgl32.Vec3{playerWidth / 2, 0, playerWidth / 2}))
-	hi := vecPos(feet.Add(mgl32.Vec3{playerWidth / 2, playerHeight, playerWidth / 2}))
+	feet := p.entity.Position().Sub(mgl64.Vec3{0, eyeHeight, 0})
+	lo := vecPos(feet.Sub(mgl64.Vec3{playerWidth / 2, 0, playerWidth / 2}))
+	hi := vecPos(feet.Add(mgl64.Vec3{playerWidth / 2, playerHeight, playerWidth / 2}))
 	for x := lo[0]; x <= hi[0]; x++ {
 		for y := lo[1]; y <= hi[1]; y++ {
 			for z := lo[2]; z <= hi[2]; z++ {
@@ -188,7 +188,7 @@ func (p *Player) enterNetherPortal() {
 		return
 	}
 	eyes := p.entity.Position()
-	feet := eyes.Sub(mgl32.Vec3{0, eyeHeight, 0})
+	feet := eyes.Sub(mgl64.Vec3{0, eyeHeight, 0})
 	along := p.s.portals.Along(mcdb.Dimension(from), vecPos(feet), feet)
 	target := feet
 	switch {
@@ -199,21 +199,21 @@ func (p *Player) enterNetherPortal() {
 	}
 	target[0], target[2] = clampWorld(target[0]), clampWorld(target[2])
 	rg := dest.Range()
-	target[1] = min(max(target[1], float32(rg[0])), float32(rg[1]))
-	p.changeDimension(&dimMove{to: dest, eyes: target.Add(mgl32.Vec3{0, eyeHeight, 0}), rot: p.entity.Rotation(), arrive: func(r *world.Region) bool {
+	target[1] = min(max(target[1], float64(rg[0])), float64(rg[1]))
+	p.changeDimension(&dimMove{to: dest, eyes: target.Add(mgl64.Vec3{0, eyeHeight, 0}), rot: p.entity.Rotation(), arrive: func(r *world.Region) bool {
 		return p.arriveAtPortal(r, to, target, along)
 	}})
 }
 
 // clampWorld keeps a portal trip's x or z within BDS's limit, whole as BDS makes it.
-func clampWorld(v float32) float32 {
-	return float32(min(max(math.Trunc(float64(v)), -worldLimit), worldLimit))
+func clampWorld(v float64) float64 {
+	return min(max(math.Trunc(v), -worldLimit), worldLimit)
 }
 
 // arriveAtPortal is BDS's PortalForcer::force at the end of a nether portal trip, once
 // the chunks around the target are loaded (or the wait ran out): the nearest recorded
 // portal, else a new one.
-func (p *Player) arriveAtPortal(r *world.Region, dim mcdb.Dimension, target mgl32.Vec3, along float32) bool {
+func (p *Player) arriveAtPortal(r *world.Region, dim mcdb.Dimension, target mgl64.Vec3, along float32) bool {
 	at := vecPos(target)
 	if !p.areaLoaded(r, at) && p.portal.waited < arrivalWaitTicks {
 		return false
@@ -260,10 +260,10 @@ func (p *Player) enterEndPortal() {
 		return
 	}
 	arrival := portal.EndArrival
-	feet := mgl32.Vec3{float32(arrival[0]), float32(arrival[1]), float32(arrival[2])}
+	feet := mgl64.Vec3{float64(arrival[0]), float64(arrival[1]), float64(arrival[2])}
 	rot := p.entity.Rotation()
 	rot.Pitch = 0
-	p.changeDimension(&dimMove{to: p.s.end, eyes: feet.Add(mgl32.Vec3{0, eyeHeight, 0}), rot: rot, arrive: func(r *world.Region) bool {
+	p.changeDimension(&dimMove{to: p.s.end, eyes: feet.Add(mgl64.Vec3{0, eyeHeight, 0}), rot: rot, arrive: func(r *world.Region) bool {
 		if _, ok := r.Block(arrival, 0); !ok && p.portal.waited < arrivalWaitTicks {
 			return false
 		}
@@ -287,7 +287,7 @@ func (p *Player) toOverworldSpawn(respawn bool) {
 	spawn, _ := p.worldSpawn()
 	if p.spawn.set {
 		bed := p.spawn.pos
-		spawn = mgl32.Vec3{float32(bed[0]) + 0.5, float32(bed[1]) + 1 + eyeHeight, float32(bed[2]) + 0.5}
+		spawn = mgl64.Vec3{float64(bed[0]) + 0.5, float64(bed[1]) + 1 + eyeHeight, float64(bed[2]) + 0.5}
 	}
 	p.changeDimension(&dimMove{to: p.s.overworld, eyes: spawn, rot: p.entity.Rotation(), respawn: respawn, arrive: func(r *world.Region) bool {
 		if !p.spawn.set {
@@ -297,7 +297,7 @@ func (p *Player) toOverworldSpawn(respawn bool) {
 			return false
 		}
 		if at, ok := p.bedRespawn(r); ok {
-			p.teleportFeet(at.Sub(mgl32.Vec3{0, eyeHeight, 0}), p.entity.Rotation())
+			p.teleportFeet(at.Sub(mgl64.Vec3{0, eyeHeight, 0}), p.entity.Rotation())
 		}
 		return true
 	}})
@@ -331,7 +331,7 @@ func (p *Player) arrive(mv *dimMove) {
 	old.Close()
 	p.portal.loadingScreen++
 	p.traceSends.Store(dimensionTrace)
-	p.send(&packet.ChangeDimension{Dimension: p.s.dimensionID(mv.to), Position: mv.eyes, Respawn: mv.respawn, LoadingScreenID: protocol.Option(p.portal.loadingScreen)})
+	p.send(&packet.ChangeDimension{Dimension: p.s.dimensionID(mv.to), Position: world.Vec32(mv.eyes), Respawn: mv.respawn, LoadingScreenID: protocol.Option(p.portal.loadingScreen)})
 	p.portal.arrival, p.portal.waited = mv.arrive, 0
 	p.portal.changing, p.portal.changingTicks = true, 0
 	p.move = moveState{}
@@ -348,15 +348,15 @@ func (p *Player) finishArrival() {
 }
 
 // teleportFeet moves the player to feet and tells its client, as a teleport.
-func (p *Player) teleportFeet(feet mgl32.Vec3, rot world.Rotation) {
-	eyes := feet.Add(mgl32.Vec3{0, eyeHeight, 0})
+func (p *Player) teleportFeet(feet mgl64.Vec3, rot world.Rotation) {
+	eyes := feet.Add(mgl64.Vec3{0, eyeHeight, 0})
 	if !p.entity.Apply(world.Movement{Pos: eyes, Rot: rot, Tick: p.entity.Tick()}) {
 		return
 	}
 	p.move.fall = 0
 	p.moveZones(eyes)
 	p.send(&packet.MovePlayer{
-		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		EntityRuntimeID: p.runtimeID, Position: world.Vec32(eyes), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
 		// A teleport always carries its cause: the client (1.26.60, sub_DC17774) rejects one
 		// without and disconnects with BadPacket. BDS's dimension transfer builds it with

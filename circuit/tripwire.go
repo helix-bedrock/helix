@@ -215,7 +215,7 @@ func (t *Ticker) wireTouched(c *regionCircuit, pos cube.Pos) bool {
 	if t.entityBox == nil {
 		return false
 	}
-	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
+	x, y, z := float64(pos[0]), float64(pos[1]), float64(pos[2])
 	c.found = c.r.AppendEntitiesIn(c.found[:0], x-plateReach, z-plateReach, x+1+plateReach, z+1+plateReach)
 	for _, e := range c.found {
 		lo, hi, _, ok := t.entityBox(e)

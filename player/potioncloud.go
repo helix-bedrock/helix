@@ -4,7 +4,7 @@ import (
 	"maps"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -61,7 +61,7 @@ type CloudSpec struct {
 	// Duration is in ticks; Radius is where it starts, RadiusOnUse what each player it
 	// touches takes from it.
 	Duration            int32
-	Radius, RadiusOnUse float32
+	Radius, RadiusOnUse float64
 	// ReapplicationDelay is how many ticks before it touches a player again.
 	ReapplicationDelay int32
 	// Particle is the particle it shows, AffectOwner whether it touches who threw it.
@@ -84,10 +84,10 @@ type AreaEffectCloud struct {
 	duration, durationOnUse int32
 	// radius grows by perTick each tick of its life; radiusOnUse is added for each player
 	// touched.
-	radius, radiusOnUse, perTick float32
+	radius, radiusOnUse, perTick float64
 	reapplication                int32
 	particle                     int32
-	changeOnPickup               float32
+	changeOnPickup               float64
 	pickupCount                  int32
 	owner                        int64
 	affectOwner                  bool
@@ -108,7 +108,7 @@ func (c *AreaEffectCloud) Effects() []ActiveEffect { return append([]ActiveEffec
 // spawnCloud is BDS's spawn_aoe_cloud (0x714EA60) where a lingering potion lands: a potion with
 // no effects other than water shows only its splash; any other leaves a cloud of its effects,
 // owned by the thrower.
-func (t *Projectile) spawnCloud(r *world.Region, at mgl32.Vec3) {
+func (t *Projectile) spawnCloud(r *world.Region, at mgl64.Vec3) {
 	pot, _ := t.s.Potion(int32(t.potion))
 	if len(pot.Effects) == 0 && t.potion != potionWater || t.spec.Cloud == nil {
 		t.splashShow(r, at, waterColour, false)
@@ -122,7 +122,7 @@ func (t *Projectile) spawnCloud(r *world.Region, at mgl32.Vec3) {
 // potion's is its projectile's ProjectileSpec.Cloud), owned by owner or nil. It waits its
 // reapplication delay between touches of a player unless its first effect is instant. Runs:
 // anywhere.
-func (s *Host) SpawnCloud(d *world.Dimension, pos mgl32.Vec3, potion int16, spec CloudSpec, owner *Player) *AreaEffectCloud {
+func (s *Host) SpawnCloud(d *world.Dimension, pos mgl64.Vec3, potion int16, spec CloudSpec, owner *Player) *AreaEffectCloud {
 	pot, _ := s.Potion(int32(potion))
 	c := &AreaEffectCloud{
 		s: s, potion: potion, effects: append([]ActiveEffect(nil), pot.Effects...), colour: s.potionColour(pot.Effects),
@@ -140,13 +140,13 @@ func (s *Host) SpawnCloud(d *world.Dimension, pos mgl32.Vec3, potion int16, spec
 	}
 	// BDS's setup (0xC07FC60): the radius grows by the on use amount over the cloud's life.
 	if c.duration > 0 {
-		c.perTick = -c.radiusOnUse / float32(c.duration)
+		c.perTick = -c.radiusOnUse / float64(c.duration)
 	}
 	c.entity = d.AddEntity(c.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos)) //nolint:gosec // an ID, not a secret
 	return c
 }
 
-func (c *AreaEffectCloud) config(uid int64, rid uint64, pos mgl32.Vec3) world.EntityConfig {
+func (c *AreaEffectCloud) config(uid int64, rid uint64, pos mgl64.Vec3) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uid, RuntimeID: rid, Pos: pos,
 		Owner: c, Spawn: c.spawnPackets, Input: c.tick, Save: c.saveEntity,
@@ -167,14 +167,14 @@ func (c *AreaEffectCloud) metadata() protocol.EntityMetadata {
 func (c *AreaEffectCloud) spawnPackets(e *world.Entity) []packet.Packet {
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: nameAreaEffectCloud,
-		Position: e.Position(), EntityMetadata: c.metadata(),
+		Position: world.Vec32(e.Position()), EntityMetadata: c.metadata(),
 	}}
 }
 
 // currentRadius is BDS's radius (0xC07F7F0): the radius it was given, grown by its change a
 // tick for each tick of its life.
-func (c *AreaEffectCloud) currentRadius(age int64) float32 {
-	return max(c.radius+float32(age)*c.perTick, 0)
+func (c *AreaEffectCloud) currentRadius(age int64) float64 {
+	return max(c.radius+float64(age)*c.perTick, 0)
 }
 
 // remove takes it out of the world.
@@ -219,8 +219,8 @@ func (c *AreaEffectCloud) tick(e *world.Entity) {
 func (c *AreaEffectCloud) touch(r *world.Region, e *world.Entity, age int64) {
 	radius := c.currentRadius(age)
 	pos := e.Position()
-	lo := mgl32.Vec3{pos[0] - radius, pos[1] - radius/2, pos[2] - radius}
-	hi := mgl32.Vec3{pos[0] + radius, pos[1] + radius/2, pos[2] + radius}
+	lo := mgl64.Vec3{pos[0] - radius, pos[1] - radius/2, pos[2] - radius}
+	hi := mgl64.Vec3{pos[0] + radius, pos[1] + radius/2, pos[2] + radius}
 	c.found = r.AppendEntitiesIn(c.found[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range c.found {
 		target, ok := o.Owner().(*Player)
@@ -264,7 +264,7 @@ func (c *AreaEffectCloud) affect(target *Player) {
 		}
 		ticks := eff.Duration
 		if ticks != EffectInfinite {
-			ticks = max(int32(float32(ticks)*cloudDurationScale), 0)
+			ticks = max(int32(float64(ticks)*cloudDurationScale), 0)
 		}
 		target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
 	}
@@ -305,7 +305,7 @@ func (c *AreaEffectCloud) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	pos := e.Position()
 	data["identifier"] = nameAreaEffectCloud
 	data["UniqueID"] = e.UniqueID()
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
 	data["Rotation"] = []float32{0, 0}
 	data["Motion"] = []float32{0, 0, 0}
 	data[cloudTagDuration] = c.duration
@@ -348,16 +348,16 @@ func (s *Host) loadCloud(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) 
 	c.duration, _ = d[cloudTagDuration].(int32)
 	c.reapplication, _ = d[cloudTagReapplication].(int32)
 	c.durationOnUse, _ = d[cloudTagDurationOnUse].(int32)
-	c.radius, _ = d[cloudTagInitialRadius].(float32)
-	c.radiusOnUse, _ = d[cloudTagRadiusOnUse].(float32)
-	c.perTick, _ = d[cloudTagRadiusPerTick].(float32)
+	c.radius = savedFloat(d, cloudTagInitialRadius)
+	c.radiusOnUse = savedFloat(d, cloudTagRadiusOnUse)
+	c.perTick = savedFloat(d, cloudTagRadiusPerTick)
 	c.owner, _ = d[cloudTagOwner].(int64)
 	c.potion, _ = d[cloudTagPotion].(int16)
 	c.particle, _ = d[cloudTagParticle].(int32)
 	colour, _ := d[cloudTagColour].(int32)
 	c.colour = uint32(colour) //nolint:gosec // ARGB, as BDS saves it
 	c.spawnTick, _ = d[cloudTagSpawnTick].(int64)
-	c.changeOnPickup, _ = d[cloudTagChangeOnPickup].(float32)
+	c.changeOnPickup = savedFloat(d, cloudTagChangeOnPickup)
 	c.pickupCount, _ = d[cloudTagPickupCount].(int32)
 	if list, isList := d[cloudTagEffects].([]any); isList {
 		for _, v := range list {
@@ -368,6 +368,12 @@ func (s *Host) loadCloud(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) 
 			}
 		}
 	}
-	c.entity = r.AddLoadedEntity(at, c.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}))
+	c.entity = r.AddLoadedEntity(at, c.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}))
 	return true
+}
+
+// savedFloat reads a saved float tag (NBT float, 32-bit) as a float64, 0 if missing.
+func savedFloat(d map[string]any, key string) float64 {
+	v, _ := d[key].(float32)
+	return float64(v)
 }

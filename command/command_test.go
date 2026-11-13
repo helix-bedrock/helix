@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/protocol"
 )
 
@@ -20,7 +20,7 @@ func (n namedTarget) Name() string { return string(n) }
 
 func (s *testSource) Name() string                   { return "tester" }
 func (s *testSource) Permission() Permission         { return s.perm }
-func (s *testSource) Position() mgl32.Vec3           { return mgl32.Vec3{10, 64, -5} }
+func (s *testSource) Position() mgl64.Vec3           { return mgl64.Vec3{10, 64, -5} }
 func (s *testSource) Rotation() (yaw, pitch float32) { return 0, 0 }
 func (s *testSource) Targets(sel Selector) []Target {
 	s.got = append(s.got, sel)

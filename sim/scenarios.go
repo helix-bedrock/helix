@@ -86,7 +86,7 @@ func startItems(_ context.Context, w *World, n int) error {
 	for i := range n {
 		x, z, layer := i%side, i/side%side, i/(side*side)
 		pos := mgl32.Vec3{float32(x0) + float32(x) + 0.5, w.Surface() + float32(layer) + 0.5, float32(z0) + float32(z) + 0.5}
-		w.Host.SpawnItem(w.Dim, stacks[(x*3+z*5+layer)%len(stacks)], pos, mgl32.Vec3{})
+		w.Host.SpawnItem(w.Dim, stacks[(x*3+z*5+layer)%len(stacks)], world.Vec64(pos), world.Vec64(mgl32.Vec3{}))
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func startItems(_ context.Context, w *World, n int) error {
 // tickTNT lights TNT at random spots on BDS's fuse.
 func tickTNT(w *World, n, tick int) {
 	for range spawnsThisTick(n, tntFuse, tick) {
-		w.Host.SpawnTNT(w.Dim, w.RandomSpot(0), tntFuse, nil)
+		w.Host.SpawnTNT(w.Dim, world.Vec64(w.RandomSpot(0)), tntFuse, nil)
 	}
 }
 
@@ -105,7 +105,7 @@ func tickFalling(w *World, n, tick int) {
 		return
 	}
 	for range spawnsThisTick(n, fallTicks, tick) {
-		w.Host.SpawnFallingBlock(w.Dim, w.RandomSpot(fallHeight), sand)
+		w.Host.SpawnFallingBlock(w.Dim, world.Vec64(w.RandomSpot(fallHeight)), sand)
 	}
 }
 
@@ -119,14 +119,16 @@ func tickFireworks(w *World, n, tick int) {
 	up := mgl32.Vec3{0, 1, 0}
 	for range spawnsThisTick(n, rocketTicks, tick) {
 		pos := w.RandomSpot(0)
-		w.Post(pos, func(r *world.Region) { w.Host.LaunchFirework(r.Dimension(), pos, up, rocket, nil) })
+		w.Post(pos, func(r *world.Region) {
+			w.Host.LaunchFirework(r.Dimension(), world.Vec64(pos), world.Vec64(up), rocket, nil)
+		})
 	}
 }
 
 // startMobs spawns n cows at random spots.
 func startMobs(_ context.Context, w *World, n int) error {
 	for range n {
-		if _, ok := w.Host.SpawnMob(w.Dim, "minecraft:cow", w.RandomSpot(0), w.Rand.Float32()*360); !ok {
+		if _, ok := w.Host.SpawnMob(w.Dim, "minecraft:cow", world.Vec64(w.RandomSpot(0)), w.Rand.Float32()*360); !ok {
 			return errors.New("sim: cows cannot be spawned")
 		}
 	}
@@ -141,7 +143,7 @@ func startClouds(_ context.Context, w *World, n int) error {
 		return fmt.Errorf("sim: lingering potions leave no cloud")
 	}
 	for range n {
-		w.Host.SpawnCloud(w.Dim, w.RandomSpot(0), regenerationPotion, *spec.Cloud, nil)
+		w.Host.SpawnCloud(w.Dim, world.Vec64(w.RandomSpot(0)), regenerationPotion, *spec.Cloud, nil)
 	}
 	return nil
 }

@@ -1,7 +1,7 @@
 package circuit
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/redstone"
 	"github.com/helix-bedrock/world/cube"
@@ -452,9 +452,9 @@ func (t *Ticker) detectorCarts(c *regionCircuit, pos cube.Pos, fn func(e *world.
 	if t.cartBox == nil || t.entityBox == nil {
 		return
 	}
-	x, y, z := float32(pos[0]), float32(pos[1]), float32(pos[2])
-	lo := mgl32.Vec3{x + railDetectorInset, y, z + railDetectorInset}
-	hi := mgl32.Vec3{x + 1 - railDetectorInset, y + 1 - railDetectorInset, z + 1 - railDetectorInset}
+	x, y, z := float64(pos[0]), float64(pos[1]), float64(pos[2])
+	lo := mgl64.Vec3{x + railDetectorInset, y, z + railDetectorInset}
+	hi := mgl64.Vec3{x + 1 - railDetectorInset, y + 1 - railDetectorInset, z + 1 - railDetectorInset}
 	c.found = c.r.AppendEntitiesIn(c.found[:0], x-1, z-1, x+2, z+2)
 	for _, e := range c.found {
 		signal, isCart := t.cartBox(e)

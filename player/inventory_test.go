@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -70,7 +70,7 @@ func TestInventoryAPI(t *testing.T) {
 	if !p.openStation(nil, &BlockUse{Pos: cube.Pos{1, 2, 3}}, ContainerGrindstone, byte(protocol.ContainerTypeGrindstone)) || p.window.kind != ContainerGrindstone {
 		t.Error("a grindstone did not open")
 	}
-	if p.s.Explode(nil, NewExplosion(mgl32.Vec3{}, 4)) {
+	if p.s.Explode(nil, NewExplosion(mgl64.Vec3{}, 4)) {
 		t.Error("a cancelled explosion went off")
 	}
 }

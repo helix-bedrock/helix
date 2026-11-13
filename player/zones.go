@@ -3,7 +3,7 @@ package player
 import (
 	"sync"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -15,7 +15,7 @@ import (
 // (RequestChunkRadius), so it has its own lock.
 type zoneState struct {
 	mu        sync.Mutex
-	pos       mgl32.Vec3
+	pos       mgl64.Vec3
 	centre    mcdb.ChunkPos
 	radius    int32
 	published bool
@@ -23,7 +23,7 @@ type zoneState struct {
 
 // moveZones moves the player's zones when it entered another chunk, and
 // tells the client where chunks are published. Runs: anywhere.
-func (p *Player) moveZones(pos mgl32.Vec3) {
+func (p *Player) moveZones(pos mgl64.Vec3) {
 	z := &p.zone
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -60,13 +60,13 @@ func (p *Player) viewRadius() int32 {
 }
 
 // blockPosOf is the block a position is in.
-func blockPosOf(pos mgl32.Vec3) protocol.BlockPos {
+func blockPosOf(pos mgl64.Vec3) protocol.BlockPos {
 	return protocol.BlockPos{floorInt(pos[0]), floorInt(pos[1]), floorInt(pos[2])}
 }
 
-func floorInt(f float32) int32 {
+func floorInt(f float64) int32 {
 	i := int32(f)
-	if f < float32(i) {
+	if f < float64(i) {
 		i--
 	}
 	return i

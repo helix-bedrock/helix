@@ -7,7 +7,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -114,16 +114,16 @@ type ProjectileSpec struct {
 	// ID is the entity's identifier.
 	ID string
 	// Width and Height are its collision box.
-	Width, Height float32
+	Width, Height float64
 	// Power is its speed when shot, in blocks a tick. Gravity is what it loses each tick;
 	// Inertia what is left of its speed each tick, LiquidInertia the same in water.
-	Power, Gravity, Inertia, LiquidInertia float32
+	Power, Gravity, Inertia, LiquidInertia float64
 	// UncertaintyBase less UncertaintyPerDifficulty for each level of difficulty is how far
 	// off it may fly.
-	UncertaintyBase, UncertaintyPerDifficulty float32
+	UncertaintyBase, UncertaintyPerDifficulty float64
 	// DamageMin and DamageMax bound its base damage, and PowerMultiplier adds its speed
 	// times this. DamageOnly names the only family it damages, empty for all.
-	DamageMin, DamageMax, PowerMultiplier float32
+	DamageMin, DamageMax, PowerMultiplier float64
 	DamageOnly                            string
 	// CeilDamage rounds its damage up before a critical hit adds to it.
 	CeilDamage bool
@@ -133,7 +133,7 @@ type ProjectileSpec struct {
 	RemoveOnHit, DestroyOnHit bool
 	// MoveDroppedTicks and MoveFarDistance say how seldom far players get its moves.
 	MoveDroppedTicks int32
-	MoveFarDistance  float32
+	MoveFarDistance  float64
 	// Stick leaves it in the block it hits, shaking for ShakeTicks.
 	Stick      bool
 	ShakeTicks int32
@@ -146,7 +146,7 @@ type ProjectileSpec struct {
 	// StopOnHurt stops it when it hurts what it hits (stop_on_hurt).
 	StopOnHurt bool
 	// Offset is how far from its shooter's eyes it starts, turned with the shooter.
-	Offset mgl32.Vec3
+	Offset mgl64.Vec3
 	// ReflectOnHurt turns it back along its attacker's view when hit, once it has flown
 	// ReflectTicks (reflect_on_hurt, reflect_immunity).
 	ReflectOnHurt bool
@@ -161,11 +161,11 @@ type ProjectileSpec struct {
 	ParticleCount                     int32
 	ParticleOnEntity, ParticleOnOther bool
 	// AngleOffset turns its thrower's aim up (negative) or down, in degrees (angle_offset).
-	AngleOffset float32
+	AngleOffset float64
 	// SplashPotion splashes its potion's effects within SplashRange where it hits
 	// (thrown_potion_effect); Cloud leaves its potion's cloud there (spawn_aoe_cloud).
 	SplashPotion bool
-	SplashRange  float32
+	SplashRange  float64
 	Cloud        *CloudSpec
 	// DouseFire puts fires out where a water potion hits a block (douse_fire).
 	DouseFire bool
@@ -173,7 +173,7 @@ type ProjectileSpec struct {
 
 // ExplodeSpec is a definition's minecraft:explode component.
 type ExplodeSpec struct {
-	Power, DamageScale, KnockbackScale        float32
+	Power, DamageScale, KnockbackScale        float64
 	BreaksBlocks, CausesFire, AllowUnderwater bool
 	TogglesBlocks, NegatesFallDamage          bool
 	ParticleEffect, SoundEffect               string
@@ -181,9 +181,9 @@ type ExplodeSpec struct {
 
 // explodeComponent is the minecraft:explode component, with BDS's defaults (0x7258540).
 type explodeComponent struct {
-	Power           *float32 `json:"power"`
-	DamageScale     *float32 `json:"damage_scaling"`
-	KnockbackScale  *float32 `json:"knockback_scaling"`
+	Power           *float64 `json:"power"`
+	DamageScale     *float64 `json:"damage_scaling"`
+	KnockbackScale  *float64 `json:"knockback_scaling"`
 	BreaksBlocks    *bool    `json:"breaks_blocks"`
 	CausesFire      bool     `json:"causes_fire"`
 	AllowUnderwater bool     `json:"allow_underwater"`
@@ -231,42 +231,42 @@ type projectileDefinition struct {
 
 // projectileComponent is the minecraft:projectile component.
 type projectileComponent struct {
-	Power           float32   `json:"power"`
-	Gravity         float32   `json:"gravity"`
-	Inertia         *float32  `json:"inertia"`
-	LiquidInertia   *float32  `json:"liquid_inertia"`
-	UncertaintyBase float32   `json:"uncertainty_base"`
-	UncertaintyMult float32   `json:"uncertainty_multiplier"`
+	Power           float64   `json:"power"`
+	Gravity         float64   `json:"gravity"`
+	Inertia         *float64  `json:"inertia"`
+	LiquidInertia   *float64  `json:"liquid_inertia"`
+	UncertaintyBase float64   `json:"uncertainty_base"`
+	UncertaintyMult float64   `json:"uncertainty_multiplier"`
 	HitSound        string    `json:"hit_sound"`
 	ShouldBounce    string    `json:"should_bounce"`
 	StopOnHurt      bool      `json:"stop_on_hurt"`
 	ReflectOnHurt   bool      `json:"reflect_on_hurt"`
-	ReflectImmunity float32   `json:"reflect_immunity"`
+	ReflectImmunity float64   `json:"reflect_immunity"`
 	Offset          []float32 `json:"offset"`
-	AngleOffset     float32   `json:"angle_offset"`
+	AngleOffset     float64   `json:"angle_offset"`
 	OnHit           struct {
 		Impact *struct {
 			Damage struct {
-				Min float32 `json:"min"`
-				Max float32 `json:"max"`
+				Min float64 `json:"min"`
+				Max float64 `json:"max"`
 			} `json:"damage"`
 			Filter          string  `json:"filter"`
-			PowerMultiplier float32 `json:"power_multiplier"`
+			PowerMultiplier float64 `json:"power_multiplier"`
 			Ceil            bool    `json:"ceil_pre_critical_damage"`
 			Knockback       bool    `json:"knockback"`
 			Destroy         bool    `json:"destroy_on_hit"`
 		} `json:"impact_damage"`
 		Remove *struct{} `json:"remove_on_hit"`
 		Stick  *struct {
-			ShakeTime float32 `json:"shake_time"`
+			ShakeTime float64 `json:"shake_time"`
 		} `json:"stick_in_ground"`
 		Teleport *struct{} `json:"teleport_owner"`
 		Thrown   *struct{} `json:"thrown_potion_effect"`
 		Douse    *struct{} `json:"douse_fire"`
 		Cloud    *struct {
 			Duration    int32    `json:"duration"`
-			Radius      float32  `json:"radius"`
-			RadiusOnUse *float32 `json:"radius_on_use"`
+			Radius      float64  `json:"radius"`
+			RadiusOnUse *float64 `json:"radius_on_use"`
 			Reapply     int32    `json:"reapplication_delay"`
 			AffectOwner *bool    `json:"affect_owner"`
 		} `json:"spawn_aoe_cloud"`
@@ -282,8 +282,8 @@ type projectileComponent struct {
 
 // projectileBox is the minecraft:collision_box component.
 type projectileBox struct {
-	Width  float32 `json:"width"`
-	Height float32 `json:"height"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
 }
 
 // Defaults of the component when a definition does not say, read from its constructor
@@ -301,7 +301,7 @@ const (
 type projectileBandwidth struct {
 	Default struct {
 		Dropped int32   `json:"max_dropped_ticks"`
-		Far     float32 `json:"max_optimized_distance"`
+		Far     float64 `json:"max_optimized_distance"`
 	} `json:"default_values"`
 }
 
@@ -366,7 +366,7 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 		s.Cloud = cs
 	}
 	if len(c.Offset) == 3 {
-		s.Offset = mgl32.Vec3{c.Offset[0], c.Offset[1], c.Offset[2]}
+		s.Offset = mgl64.Vec3{float64(c.Offset[0]), float64(c.Offset[1]), float64(c.Offset[2])}
 	}
 	if c.Inertia != nil {
 		s.Inertia = *c.Inertia
@@ -431,7 +431,7 @@ type Projectile struct {
 	s      *Host
 	spec   ProjectileSpec
 	entity *world.Entity
-	vel    mgl32.Vec3
+	vel    mgl64.Vec3
 	rot    world.Rotation
 
 	// plan is what its think step found along this tick's flight, when planned.
@@ -456,7 +456,7 @@ type Projectile struct {
 	// critical, power, punch and pickup are from the bow that shot it.
 	critical bool
 	power    int32
-	punch    float32
+	punch    float64
 	pickup   arrowPickup
 	item     ItemStack
 	// pierce is how many more entities it may fly through (a crossbow's Piercing), and
@@ -491,45 +491,45 @@ func (t *Projectile) Spec() ProjectileSpec { return t.spec }
 func (t *Projectile) SetSpec(spec ProjectileSpec) { t.spec = spec }
 
 // Velocity returns its speed in blocks a tick.
-func (t *Projectile) Velocity() mgl32.Vec3 { return t.vel }
+func (t *Projectile) Velocity() mgl64.Vec3 { return t.vel }
 
 // SetVelocity changes its speed.
-func (t *Projectile) SetVelocity(vel mgl32.Vec3) { t.vel = vel }
+func (t *Projectile) SetVelocity(vel mgl64.Vec3) { t.vel = vel }
 
 // aim is BDS's shoot (0x71480f0): dir made one long, off by a gaussian on each axis, times
 // the speed.
-func aim(dir mgl32.Vec3, speed, uncertainty float32) mgl32.Vec3 {
+func aim(dir mgl64.Vec3, speed, uncertainty float64) mgl64.Vec3 {
 	if dir.Len() < 0.001 {
-		dir = mgl32.Vec3{}
+		dir = mgl64.Vec3{}
 	} else {
 		dir = dir.Normalize()
 	}
 	for n := range 3 {
-		dir[n] += float32(rand.NormFloat64()) * projectileSpread * uncertainty //nolint:gosec // an aim, not a secret
+		dir[n] += float64(rand.NormFloat64()) * projectileSpread * uncertainty //nolint:gosec // an aim, not a secret
 	}
 	return dir.Mul(speed)
 }
 
 // flightRotation is the rotation that points along vel.
-func flightRotation(vel mgl32.Vec3) world.Rotation {
+func flightRotation(vel mgl64.Vec3) world.Rotation {
 	flat := math.Sqrt(float64(vel[0]*vel[0] + vel[2]*vel[2]))
-	yaw := float32(math.Atan2(float64(vel[0]), float64(vel[2])) * 180 / math.Pi)
-	pitch := float32(math.Atan2(float64(vel[1]), flat) * 180 / math.Pi)
-	return world.Rotation{Pitch: pitch, Yaw: yaw, HeadYaw: yaw}
+	yaw := float64(math.Atan2(float64(vel[0]), float64(vel[2])) * 180 / math.Pi)
+	pitch := float64(math.Atan2(float64(vel[1]), flat) * 180 / math.Pi)
+	return world.Rotation{Pitch: float32(pitch), Yaw: float32(yaw), HeadYaw: float32(yaw)}
 }
 
 // SpawnProjectile adds spec's projectile at pos, flying along dir at speed. owner is who
 // shot it, or nil.
-func (s *Host) SpawnProjectile(d *world.Dimension, spec ProjectileSpec, pos, dir mgl32.Vec3, speed float32, owner *Player) *Projectile {
-	uncertainty := max(spec.UncertaintyBase-spec.UncertaintyPerDifficulty*float32(s.level.Difficulty), 0)
+func (s *Host) SpawnProjectile(d *world.Dimension, spec ProjectileSpec, pos, dir mgl64.Vec3, speed float64, owner *Player) *Projectile {
+	uncertainty := max(spec.UncertaintyBase-spec.UncertaintyPerDifficulty*float64(s.level.Difficulty), 0)
 	t := &Projectile{s: s, spec: spec, owner: owner, vel: aim(dir, speed, uncertainty), separated: owner == nil, waiting: true}
 	t.rot = flightRotation(t.vel)
 	t.entity = d.AddEntity(t.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), s.runtimeIDs.Add(1), pos, t.rot)) //nolint:gosec // an ID, not a secret
 	return t
 }
 
-func (t *Projectile) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
-	t.moves.start(pos, rot, t.spec.MoveDroppedTicks, t.spec.MoveFarDistance)
+func (t *Projectile) config(uniqueID int64, runtimeID uint64, pos mgl64.Vec3, rot world.Rotation) world.EntityConfig {
+	t.moves.start(pos, rot, t.spec.MoveDroppedTicks, float32(t.spec.MoveFarDistance))
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
 		Owner: t, Spawn: t.spawnPackets, Move: t.movePacket, Think: t.think, Input: t.tick, Save: t.saveEntity,
@@ -550,7 +550,7 @@ func (t *Projectile) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: t.spec.ID,
-		Position: e.Position(), Velocity: t.vel, Pitch: t.rot.Pitch, Yaw: t.rot.Yaw, HeadYaw: t.rot.HeadYaw,
+		Position: world.Vec32(e.Position()), Velocity: world.Vec32(t.vel), Pitch: t.rot.Pitch, Yaw: t.rot.Yaw, HeadYaw: t.rot.HeadYaw,
 		EntityMetadata: meta,
 	}}
 }
@@ -590,8 +590,8 @@ func (t *Projectile) movePacket(e *world.Entity) packet.Packet {
 }
 
 // moveTicks is BDS's count for a player dist away.
-func (s ProjectileSpec) moveTicks(dist float32) int64 {
-	return moveTicks(s.MoveDroppedTicks, s.MoveFarDistance, dist)
+func (s ProjectileSpec) moveTicks(dist float64) int64 {
+	return moveTicks(s.MoveDroppedTicks, float32(s.MoveFarDistance), float32(dist))
 }
 
 // tick is BDS's projectile tick: if stuck, whether the block still holds it; if not, what
@@ -683,11 +683,11 @@ func (t *Projectile) sendFlags(e *world.Entity) {
 
 // projectileEyes is where a shooter's projectile starts: its eyes and the definition's
 // offset, turned with the shooter.
-func projectileEyes(spec ProjectileSpec, eyes mgl32.Vec3, rot world.Rotation) mgl32.Vec3 {
+func projectileEyes(spec ProjectileSpec, eyes mgl64.Vec3, rot world.Rotation) mgl64.Vec3 {
 	yaw := float64(rot.Yaw) * -math.Pi / 180
-	c, s := float32(math.Cos(yaw)), float32(math.Sin(yaw))
+	c, s := float64(math.Cos(yaw)), float64(math.Sin(yaw))
 	o := spec.Offset
-	return eyes.Add(mgl32.Vec3{o[0]*c + o[2]*s, o[1], o[2]*c - o[0]*s})
+	return eyes.Add(mgl64.Vec3{o[0]*c + o[2]*s, o[1], o[2]*c - o[0]*s})
 }
 
 // turn moves its rotation a part of the way to where it now flies.
@@ -699,7 +699,7 @@ func (t *Projectile) turn() {
 }
 
 // inWater reports whether the block at pos holds water.
-func (s *Host) inWater(r *world.Region, pos mgl32.Vec3) bool {
+func (s *Host) inWater(r *world.Region, pos mgl64.Vec3) bool {
 	b, ok := r.Block(floorPos(pos), 0)
 	return ok && (s.reg.Blocks.Name(b) == nameWater || s.reg.Blocks.Name(b) == nameFlowingWater)
 }
@@ -723,7 +723,7 @@ func (t *Projectile) think(e *world.Entity) {
 	t.planned = true
 }
 
-func (t *Projectile) checkSeparated(r *world.Region, from, to mgl32.Vec3) {
+func (t *Projectile) checkSeparated(r *world.Region, from, to mgl64.Vec3) {
 	if t.separated {
 		return
 	}
@@ -737,16 +737,16 @@ func (t *Projectile) checkSeparated(r *world.Region, from, to mgl32.Vec3) {
 		return
 	}
 	pathLo, pathHi := minVec(from, to), maxVec(from, to)
-	grow := mgl32.Vec3{1, 1, 1}
+	grow := mgl64.Vec3{1, 1, 1}
 	t.separated = !overlaps(pathLo.Sub(grow), pathHi.Add(grow), lo, hi)
 }
 
-func minVec(a, b mgl32.Vec3) mgl32.Vec3 {
-	return mgl32.Vec3{min(a[0], b[0]), min(a[1], b[1]), min(a[2], b[2])}
+func minVec(a, b mgl64.Vec3) mgl64.Vec3 {
+	return mgl64.Vec3{min(a[0], b[0]), min(a[1], b[1]), min(a[2], b[2])}
 }
 
-func maxVec(a, b mgl32.Vec3) mgl32.Vec3 {
-	return mgl32.Vec3{max(a[0], b[0]), max(a[1], b[1]), max(a[2], b[2])}
+func maxVec(a, b mgl64.Vec3) mgl64.Vec3 {
+	return mgl64.Vec3{max(a[0], b[0]), max(a[1], b[1]), max(a[2], b[2])}
 }
 
 // projectileHitKind is what a projectile hit.
@@ -760,7 +760,7 @@ const (
 
 // projectileHit is where a flight hit something.
 type projectileHit struct {
-	pos    mgl32.Vec3
+	pos    mgl64.Vec3
 	block  cube.Pos
 	player *Player
 	// mob is the mob hit, when a mob and not a player was hit.
@@ -768,13 +768,13 @@ type projectileHit struct {
 	// entity is the entity hit.
 	entity *world.Entity
 	// normal is the hit block face's outward direction, zero if not worked out.
-	normal mgl32.Vec3
+	normal mgl64.Vec3
 }
 
 // faceNormal is the face of the box lo to hi that a flight along vel entered at pos.
-func faceNormal(pos, lo, hi, vel mgl32.Vec3) mgl32.Vec3 {
+func faceNormal(pos, lo, hi, vel mgl64.Vec3) mgl64.Vec3 {
 	const edge = 1e-4
-	var n mgl32.Vec3
+	var n mgl64.Vec3
 	for a := range 3 {
 		switch {
 		case vel[a] > 0 && pos[a]-lo[a] < edge:
@@ -789,17 +789,17 @@ func faceNormal(pos, lo, hi, vel mgl32.Vec3) mgl32.Vec3 {
 }
 
 // firstHit is the nearest thing along from to to.
-func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileHit, projectileHitKind) {
+func (t *Projectile) firstHit(r *world.Region, from, to mgl64.Vec3) (projectileHit, projectileHitKind) {
 	best, kind := projectileHit{}, projectileHitNone
 	limit := float64(2)
 	if at, block, lo, hi, ok := t.s.clipBlocks(r, from, to); ok {
-		pos := clampToBox(from.Add(to.Sub(from).Mul(float32(at))), lo, hi)
+		pos := clampToBox(from.Add(to.Sub(from).Mul(float64(at))), lo, hi)
 		best, kind, limit = projectileHit{pos: pos, block: block, normal: faceNormal(pos, lo, hi, to.Sub(from))}, projectileHitBlock, at
 	}
-	reach := min(max((float32(t.age)-projectileReachFrom)*projectileReachStep, 0), projectileReachMax)
+	reach := min(max((float64(t.age)-projectileReachFrom)*projectileReachStep, 0), projectileReachMax)
 	lo, hi := minVec(from, to), maxVec(from, to)
 	t.found = r.AppendEntitiesIn(t.found[:0], lo[0]-projectileScan, lo[2]-projectileScan, hi[0]+projectileScan, hi[2]+projectileScan)
-	grow := mgl32.Vec3{reach, reach, reach}
+	grow := mgl64.Vec3{reach, reach, reach}
 	for _, o := range t.found {
 		if t.wasPierced(o) {
 			continue
@@ -826,7 +826,7 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 		at, hits := segmentEntersBox(from, to, boxLo.Sub(grow), boxHi.Add(grow))
 		if hits && at < limit {
 			limit, kind = at, projectileHitEntity
-			hit.pos = from.Add(to.Sub(from).Mul(float32(at)))
+			hit.pos = from.Add(to.Sub(from).Mul(float64(at)))
 			best = hit
 		}
 	}
@@ -834,7 +834,7 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 }
 
 // segmentEntersBox is how far along from to to it enters the box, 0 to 1.
-func segmentEntersBox(from, to, lo, hi mgl32.Vec3) (float64, bool) {
+func segmentEntersBox(from, to, lo, hi mgl64.Vec3) (float64, bool) {
 	t0, t1 := 0.0, 1.0
 	for n := range 3 {
 		a, d := float64(from[n]), float64(to[n]-from[n])
@@ -859,7 +859,7 @@ func segmentEntersBox(from, to, lo, hi mgl32.Vec3) (float64, bool) {
 
 // clampToBox keeps a point on the box it hit: rounding can leave it just outside, and a stuck
 // projectile must still count as in its block.
-func clampToBox(p, lo, hi mgl32.Vec3) mgl32.Vec3 {
+func clampToBox(p, lo, hi mgl64.Vec3) mgl64.Vec3 {
 	for n := range 3 {
 		p[n] = min(max(p[n], lo[n]), hi[n])
 	}
@@ -868,7 +868,7 @@ func clampToBox(p, lo, hi mgl32.Vec3) mgl32.Vec3 {
 
 // insideBox is BDS's test of whether a stuck projectile's block still holds it (0x7745da0): the
 // faces count, since that is where it hit.
-func insideBox(p, lo, hi mgl32.Vec3) bool {
+func insideBox(p, lo, hi mgl64.Vec3) bool {
 	for n := range 3 {
 		if p[n] < lo[n] || p[n] > hi[n] {
 			return false
@@ -879,7 +879,7 @@ func insideBox(p, lo, hi mgl32.Vec3) bool {
 
 // clipBlocks walks the blocks from from to to, and says how far along it first enters a
 // block's collision box, which block and which box. A block not loaded stops it.
-func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.Pos, mgl32.Vec3, mgl32.Vec3, bool) {
+func (s *Host) clipBlocks(r *world.Region, from, to mgl64.Vec3) (float64, cube.Pos, mgl64.Vec3, mgl64.Vec3, bool) {
 	var pos, end, step [3]int
 	var next, delta [3]float64
 	for n := range 3 {
@@ -898,13 +898,12 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 		at := cube.Pos{pos[0], pos[1], pos[2]}
 		b, ok := r.Block(at, 0)
 		if !ok {
-			return 0, at, mgl32.Vec3{}, mgl32.Vec3{}, false
+			return 0, at, mgl64.Vec3{}, mgl64.Vec3{}, false
 		}
 		best, found := 2.0, false
-		var bestLo, bestHi mgl32.Vec3
+		var bestLo, bestHi mgl64.Vec3
 		for _, box := range s.boxesAt(r, at, b) {
-			lo := mgl32.Vec3{float32(at[0]) + box[0], float32(at[1]) + box[1], float32(at[2]) + box[2]}
-			hi := mgl32.Vec3{float32(at[0]) + box[3], float32(at[1]) + box[4], float32(at[2]) + box[5]}
+			lo, hi := boxAt(at, box)
 			if v, hits := segmentEntersBox(from, to, lo, hi); hits && v < best {
 				best, found, bestLo, bestHi = v, true, lo, hi
 			}
@@ -913,7 +912,7 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 			return best, at, bestLo, bestHi, true
 		}
 		if pos == end {
-			return 0, at, mgl32.Vec3{}, mgl32.Vec3{}, false
+			return 0, at, mgl64.Vec3{}, mgl64.Vec3{}, false
 		}
 		n := 0
 		if next[1] < next[n] {
@@ -923,12 +922,12 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 			n = 2
 		}
 		if next[n] > 1 {
-			return 0, at, mgl32.Vec3{}, mgl32.Vec3{}, false
+			return 0, at, mgl64.Vec3{}, mgl64.Vec3{}, false
 		}
 		pos[n] += step[n]
 		next[n] += delta[n]
 	}
-	return 0, cube.Pos{}, mgl32.Vec3{}, mgl32.Vec3{}, false
+	return 0, cube.Pos{}, mgl64.Vec3{}, mgl64.Vec3{}, false
 }
 
 // apply is what a hit does, BDS's on hit subcomponents as far as built.
@@ -975,7 +974,7 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 }
 
 // hitSound plays its sound of hitting something.
-func (t *Projectile) hitSound(r *world.Region, at mgl32.Vec3) {
+func (t *Projectile) hitSound(r *world.Region, at mgl64.Vec3) {
 	if t.spec.HitSound != "" {
 		playSound(r, floorPos(at), soundEvent{name: t.spec.HitSound, pos: at, extra: -1, entity: t.spec.ID}, nil)
 	}
@@ -989,7 +988,7 @@ func (t *Projectile) remove(e *world.Entity) {
 
 // stickIn leaves it where it hit.
 func (t *Projectile) stickIn(e *world.Entity, hit projectileHit) {
-	t.vel = mgl32.Vec3{}
+	t.vel = mgl64.Vec3{}
 	t.stuck, t.stuckAt, t.stuckTicks, t.shake, t.critical = true, hit.block, 0, t.spec.ShakeTicks, false
 	t.stuckMoveDue = true
 	// BDS's on ground flag is what stuck is; its moves carry it to the client.
@@ -1028,18 +1027,17 @@ func (t *Projectile) tickStuck(r *world.Region, e *world.Entity) {
 }
 
 // arrowTouchReach is how far around a player's box it picks up arrows.
-var arrowTouchReach = mgl32.Vec3{1, 0.5, 1}
+var arrowTouchReach = mgl64.Vec3{1, 0.5, 1}
 
 // heldBy reports whether its block still has a collision box where it sits.
-func (t *Projectile) heldBy(r *world.Region, pos mgl32.Vec3) bool {
+func (t *Projectile) heldBy(r *world.Region, pos mgl64.Vec3) bool {
 	b, ok := r.Block(t.stuckAt, 0)
 	if !ok {
 		return true
 	}
 	for _, box := range t.s.boxesAt(r, t.stuckAt, b) {
 		at := t.stuckAt
-		lo := mgl32.Vec3{float32(at[0]) + box[0], float32(at[1]) + box[1], float32(at[2]) + box[2]}
-		hi := mgl32.Vec3{float32(at[0]) + box[3], float32(at[1]) + box[4], float32(at[2]) + box[5]}
+		lo, hi := boxAt(at, box)
 		if insideBox(pos, lo, hi) {
 			return true
 		}
@@ -1073,16 +1071,16 @@ func (t *Projectile) pickedUpBy(r *world.Region, e *world.Entity, p *Player) boo
 // projectileDamage is BDS's impact damage (0x714a880) on what it may damage: the base, its
 // speed times the multiplier, the bow's Power, rounded up if the definition says, then a
 // critical hit's random extra.
-func projectileDamage(spec ProjectileSpec, speed float32, power int32, critical bool) float32 {
-	damage := spec.DamageMin + rand.Float32()*(spec.DamageMax-spec.DamageMin) + speed*spec.PowerMultiplier //nolint:gosec // damage, not a secret
+func projectileDamage(spec ProjectileSpec, speed float64, power int32, critical bool) float64 {
+	damage := spec.DamageMin + rand.Float64()*(spec.DamageMax-spec.DamageMin) + speed*spec.PowerMultiplier //nolint:gosec // damage, not a secret
 	if power > 0 {
-		damage *= float32(power)*powerPerLevel + powerBase
+		damage *= float64(power)*powerPerLevel + powerBase
 	}
 	if spec.CeilDamage {
-		damage = float32(math.Ceil(float64(damage)))
+		damage = float64(math.Ceil(float64(damage)))
 	}
 	if critical {
-		damage += rand.Float32() * (critShare*damage + critFlat) //nolint:gosec // damage, not a secret
+		damage += rand.Float64() * (critShare*damage + critFlat) //nolint:gosec // damage, not a secret
 	}
 	return damage
 }
@@ -1095,15 +1093,15 @@ func (t *Projectile) hitPlayer(target *Player) {
 	if t.owner != nil && t.owner != target && !t.s.level.PVP {
 		return
 	}
-	var damage float32
+	var damage float64
 	if t.spec.DamageOnly == "" {
 		damage = projectileDamage(t.spec, t.vel.Len(), t.power, t.critical)
 	}
 	if r := target.entity.Region(); r != nil && damage > 0 {
-		damage += t.tridentHit(r, target, target.entity.Position())
+		damage += float64(t.tridentHit(r, target, target.entity.Position()))
 	}
 	g := t.s.game
-	hurt := damage > 0 && g.sys.Hurt(target, damage, DamageSource{Cause: causeProjectile, Attacker: t.owner})
+	hurt := damage > 0 && g.sys.Hurt(target, float32(damage), DamageSource{Cause: causeProjectile, Attacker: t.owner})
 	if hurt && t.spec.StopOnHurt {
 		t.tridentHurt()
 	}
@@ -1122,14 +1120,14 @@ func (t *Projectile) hitPlayer(target *Player) {
 // attacker, which also pushes the mob away from the shooter. BDS's knockback along the flight
 // and Punch on mobs were not read; the hit's push stands in.
 func (t *Projectile) hitMob(target *Mob) {
-	var damage float32
+	var damage float64
 	if t.spec.DamageOnly == "" || target.hasFamily(t.spec.DamageOnly) {
 		damage = projectileDamage(t.spec, t.vel.Len(), t.power, t.critical)
 	}
 	if r := target.entity.Region(); r != nil && damage > 0 {
-		damage += t.tridentHit(r, target, target.entity.Position())
+		damage += float64(t.tridentHit(r, target, target.entity.Position()))
 	}
-	hurt := damage > 0 && target.TakeDamage(damage, DamageSource{Cause: causeProjectile, Attacker: t.owner})
+	hurt := damage > 0 && target.TakeDamage(float32(damage), DamageSource{Cause: causeProjectile, Attacker: t.owner})
 	if hurt && t.spec.StopOnHurt {
 		t.tridentHurt()
 	}
@@ -1140,35 +1138,35 @@ func (t *Projectile) hitMob(target *Mob) {
 }
 
 // projectileKnockback pushes the player along a flight.
-func (p *Player) projectileKnockback(flight mgl32.Vec3, punch float32) {
+func (p *Player) projectileKnockback(flight mgl64.Vec3, punch float64) {
 	if p.entity == nil {
 		return
 	}
 	resist := max(1-p.attributes.get(attrKnockbackResistance), 0) * p.Tuning(TuneKnockbackTakenScale)
-	vel := p.knockbackStep(p.move.velocity, flight[0], flight[2], p.Tuning(TuneKnockbackPush)*resist, p.Tuning(TuneKnockbackLift)*resist)
+	vel := p.knockbackStep(p.move.velocity, float32(flight[0]), float32(flight[2]), p.Tuning(TuneKnockbackPush)*resist, p.Tuning(TuneKnockbackLift)*resist)
 	if punch > 0 {
-		vel = p.knockbackStep(vel, flight[0], flight[2], punch*p.Tuning(TuneKnockbackExtraPush)*resist, punch*p.Tuning(TuneKnockbackExtraLift)*resist)
+		vel = p.knockbackStep(vel, float32(flight[0]), float32(flight[2]), float32(punch)*p.Tuning(TuneKnockbackExtraPush)*resist, float32(punch)*p.Tuning(TuneKnockbackExtraLift)*resist)
 	}
 	p.move.velocity = vel
-	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: vel, Tick: p.entity.Tick()})
+	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: world.Vec32(vel), Tick: p.entity.Tick()})
 	p.flush()
 }
 
 // teleportOwner moves who threw it to where it landed, with BDS's fall damage. A thrower in
 // another region by now stays where it is.
-func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
+func (t *Projectile) teleportOwner(r *world.Region, at mgl64.Vec3) {
 	p := t.owner
 	if p == nil || p.dead() || p.entity == nil || p.entity.Region() != r {
 		return
 	}
-	eyes := at.Add(mgl32.Vec3{0, eyeHeight, 0})
+	eyes := at.Add(mgl64.Vec3{0, eyeHeight, 0})
 	rot := p.entity.Rotation()
 	if !p.entity.Apply(world.Movement{Pos: eyes, Rot: rot, Tick: p.entity.Tick()}) {
 		return
 	}
 	p.move.fall = 0
 	p.send(&packet.MovePlayer{
-		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
+		EntityRuntimeID: p.runtimeID, Position: world.Vec32(eyes), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
 		// The client disconnects on a teleport without its cause (see teleportFeet). BDS's
 		// projectile teleport (sub_714F4B0) sends cause Projectile with the projectile's
@@ -1189,8 +1187,8 @@ func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	}
 	pos := e.Position()
 	data["identifier"] = t.spec.ID
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
-	data["Motion"] = []float32{t.vel[0], t.vel[1], t.vel[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
+	data["Motion"] = []float32{float32(t.vel[0]), float32(t.vel[1]), float32(t.vel[2])}
 	data["Rotation"] = []float32{t.rot.Yaw, t.rot.Pitch}
 	var stuck uint8
 	if t.stuck {
@@ -1234,7 +1232,7 @@ func (s *Host) loadProjectile(r *world.Region, at mcdb.ChunkPos, saved chunk.Ent
 	}
 	t := &Projectile{s: s, spec: spec, saved: saved.Data, separated: true}
 	if v, isList := floats(saved.Data["Motion"]); isList && len(v) == 3 {
-		t.vel = mgl32.Vec3{v[0], v[1], v[2]}
+		t.vel = mgl64.Vec3{float64(v[0]), float64(v[1]), float64(v[2])}
 	}
 	if v, isList := floats(saved.Data["Rotation"]); isList && len(v) == 2 {
 		t.rot = world.Rotation{Yaw: v[0], HeadYaw: v[0], Pitch: v[1]}
@@ -1252,14 +1250,14 @@ func (s *Host) loadProjectile(r *world.Region, at mcdb.ChunkPos, saved chunk.Ent
 	if v, isShort := saved.Data[projectileKeyPotion].(int16); isShort {
 		t.potion = v
 	}
-	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, t.rot))
+	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}, t.rot))
 	return true
 }
 
 // lookDirection is where a rotation looks.
-func lookDirection(rot world.Rotation) mgl32.Vec3 {
+func lookDirection(rot world.Rotation) mgl64.Vec3 {
 	yaw, pitch := float64(rot.Yaw)*math.Pi/180, float64(rot.Pitch)*math.Pi/180
-	return mgl32.Vec3{float32(-math.Sin(yaw) * math.Cos(pitch)), float32(-math.Sin(pitch)), float32(math.Cos(yaw) * math.Cos(pitch))}
+	return mgl64.Vec3{float64(-math.Sin(yaw) * math.Cos(pitch)), float64(-math.Sin(pitch)), float64(math.Cos(yaw) * math.Cos(pitch))}
 }
 
 // throwable is the projectile a held item throws, empty if it is none.
@@ -1310,7 +1308,7 @@ func (p *Player) throwItem(held ItemStack) bool {
 	}
 	p.thrownAt = now
 	eyes, rot := p.entity.Position(), p.entity.Rotation()
-	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(aimRotation(rot, spec.AngleOffset)), spec.Power, p)
+	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(aimRotation(rot, float32(spec.AngleOffset))), spec.Power, p)
 	t.potion = held.Meta
 	// BDS's throwable items (0xC985510 and the like) play it at the drop attach point.
 	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
@@ -1321,8 +1319,8 @@ func (p *Player) throwItem(held ItemStack) bool {
 }
 
 // bowPull is how far a bow is drawn after ticks, BDS's 0xc8d71c0: 0 to 1.
-func bowPull(ticks int32) float32 {
-	s := float32(ticks) / bowPullSpan
+func bowPull(ticks int32) float64 {
+	s := float64(ticks) / bowPullSpan
 	return min((s*s+s+s)/3, 1)
 }
 
@@ -1386,7 +1384,7 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power*pull, p)
 	t.critical = pull == 1
 	t.power = heldEnchant(held, enchantPower)
-	t.punch = float32(heldEnchant(held, enchantPunch)) * punchPerLevel
+	t.punch = float64(heldEnchant(held, enchantPunch)) * punchPerLevel
 	if infinity || creative {
 		t.pickup = arrowPickupCreative
 	}
@@ -1419,7 +1417,7 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 // dispenseProjectile is a dispenser shooting what a dispenser shoots, 0xc8e4c50: from at,
 // along its face and a little up, with what the item's definition says. False if the item
 // is not one. Who shot it is no one, so an arrow may be picked up.
-func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.Vec3, item string) bool {
+func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl64.Vec3, item string) bool {
 	id := throwable(item)
 	if item == nameArrow {
 		id = nameArrow
@@ -1432,7 +1430,7 @@ func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.V
 	if !ok {
 		return false
 	}
-	s.SpawnProjectile(r.Dimension(), spec, at, dir.Add(mgl32.Vec3{0, dispenseLift, 0}), spec.Power, nil)
+	s.SpawnProjectile(r.Dimension(), spec, at, dir.Add(mgl64.Vec3{0, dispenseLift, 0}), spec.Power, nil)
 	levelEvent(r, pos, at, levelEventDispenseProjectile, dispenseProjectilePitch)
 	return true
 }

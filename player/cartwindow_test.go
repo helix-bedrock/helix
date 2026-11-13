@@ -3,7 +3,7 @@ package player
 import (
 	"testing"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/world/cube"
@@ -15,7 +15,7 @@ import (
 func cartViewers(t *testing.T, id string) (p, q *Player, m *Minecart, d *world.Dimension) {
 	t.Helper()
 	p, d, y := cartWorld(t, nameRail, railStates(0))
-	at := mgl32.Vec3{10.5, float32(y) + 0.5, 10.5}
+	at := mgl64.Vec3{10.5, float64(y) + 0.5, 10.5}
 	m = p.s.SpawnMinecart(d, id, at)
 	q = &Player{s: p.s, gameMode: GameModeSurvival}
 	q.entity = d.AddEntity(world.EntityConfig{UniqueID: 2, RuntimeID: 2, Pos: at})
@@ -132,7 +132,7 @@ func TestCartInOtherRegionTakesNothing(t *testing.T) {
 	far := mcdb.ChunkPos{100, 100}
 	ticket := d.KeepLoaded(world.Chunks(far), true)
 	t.Cleanup(ticket.Release)
-	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl32.Vec3{1600.5, float32(y) + 0.5, 1600.5})
+	m := p.s.SpawnMinecart(d, nameChestMinecart, mgl64.Vec3{1600.5, float64(y) + 0.5, 1600.5})
 	done := make(chan struct{})
 	d.RunAt(far, func(r *world.Region) {
 		m.chest.items[0] = ItemStack{Name: "minecraft:emerald", Count: 10, netID: 77}
@@ -186,20 +186,20 @@ func TestPushDirection(t *testing.T) {
 	eastOnly[pushEast] = false
 	for _, c := range []struct {
 		name   string
-		pos    mgl32.Vec3
+		pos    mgl64.Vec3
 		closed *[pushNowhere]bool
 		want   int
 	}{
-		{"nearest is down", mgl32.Vec3{0.5, 0.1, 0.5}, &open, pushDown},
-		{"nearest is up", mgl32.Vec3{0.5, 0.9, 0.5}, &open, pushUp},
-		{"nearest is west", mgl32.Vec3{0.1, 0.5, 0.5}, &open, pushWest},
-		{"nearest is north", mgl32.Vec3{0.5, 0.5, 0.1}, &open, pushNorth},
-		{"nearest is south", mgl32.Vec3{0.5, 0.5, 0.9}, &open, pushSouth},
+		{"nearest is down", mgl64.Vec3{0.5, 0.1, 0.5}, &open, pushDown},
+		{"nearest is up", mgl64.Vec3{0.5, 0.9, 0.5}, &open, pushUp},
+		{"nearest is west", mgl64.Vec3{0.1, 0.5, 0.5}, &open, pushWest},
+		{"nearest is north", mgl64.Vec3{0.5, 0.5, 0.1}, &open, pushNorth},
+		{"nearest is south", mgl64.Vec3{0.5, 0.5, 0.9}, &open, pushSouth},
 		// BDS counts east as a whole block, so it goes down instead though east is nearer.
-		{"east loses to down", mgl32.Vec3{0.9, 0.5, 0.5}, &open, pushDown},
-		{"only the top is open", mgl32.Vec3{0.1, 0.1, 0.1}, &top, pushUp},
-		{"only east is open", mgl32.Vec3{0.1, 0.1, 0.1}, &eastOnly, pushEast},
-		{"nothing is open", mgl32.Vec3{0.5, 0.5, 0.5}, &all, pushNowhere},
+		{"east loses to down", mgl64.Vec3{0.9, 0.5, 0.5}, &open, pushDown},
+		{"only the top is open", mgl64.Vec3{0.1, 0.1, 0.1}, &top, pushUp},
+		{"only east is open", mgl64.Vec3{0.1, 0.1, 0.1}, &eastOnly, pushEast},
+		{"nothing is open", mgl64.Vec3{0.5, 0.5, 0.5}, &all, pushNowhere},
 	} {
 		if got := pushDirection(at, c.pos, c.closed); got != c.want {
 			t.Errorf("%s: went %d, want %d", c.name, got, c.want)
@@ -210,7 +210,7 @@ func TestPushDirection(t *testing.T) {
 // inStone reports whether the item's box is in the block at its bottom.
 func inStone(i *ItemActor, r *world.Region, stone uint32) bool {
 	pos := i.entity.Position()
-	b, ok := r.Block(floorPos(mgl32.Vec3{pos[0], pos[1] - itemHalfSize, pos[2]}), 0)
+	b, ok := r.Block(floorPos(mgl64.Vec3{pos[0], pos[1] - itemHalfSize, pos[2]}), 0)
 	return ok && b == stone
 }
 
@@ -220,7 +220,7 @@ func TestItemPushedOutOfBlockPlacedOnIt(t *testing.T) {
 	var i *ItemActor
 	onRegion(d, func(r *world.Region) {
 		i = p.s.spawnItem(r.Dimension(), ItemStack{Name: "minecraft:emerald", Count: 1},
-			mgl32.Vec3{4.3, float32(y) + itemHalfSize, 4.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+			mgl64.Vec3{4.3, float64(y) + itemHalfSize, 4.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return i.entity.Region() != nil })
 	at := cube.Pos{4, y, 4}
@@ -244,14 +244,14 @@ func TestItemWalledInRisesOut(t *testing.T) {
 			r.SetBlock(at.Side(f), 0, stone)
 		}
 		i = p.s.spawnItem(r.Dimension(), ItemStack{Name: "minecraft:emerald", Count: 1},
-			mgl32.Vec3{4.5, float32(at[1]) + 0.5, 4.5}, mgl32.Vec3{}, world.Rotation{}, 0, 0)
+			mgl64.Vec3{4.5, float64(at[1]) + 0.5, 4.5}, mgl64.Vec3{}, world.Rotation{}, 0, 0)
 	})
 	waitRegion(t, d, func(*world.Region) bool { return i.entity.Region() != nil })
 	onRegion(d, func(r *world.Region) { r.SetBlock(at, 0, stone) })
 	waitRegion(t, d, func(*world.Region) bool { return i.noClip })
 	waitRegion(t, d, func(r *world.Region) bool { return !inStone(i, r, stone) && !i.noClip })
 	onRegion(d, func(r *world.Region) {
-		if got := i.entity.Position()[1]; got <= float32(at[1])+1 {
+		if got := i.entity.Position()[1]; got <= float64(at[1])+1 {
 			t.Errorf("came out at y %v, under the block over it at %d", got, at[1]+1)
 		}
 	})

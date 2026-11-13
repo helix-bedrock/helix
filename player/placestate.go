@@ -146,7 +146,7 @@ func vanillaPlaceState(pl *Placement) (uint32, bool) {
 		return pl.Block, true
 	}
 	s := &placeState{pl: pl, r: r, name: name, states: maps.Clone(blocks.States(pl.Block)),
-		yaw: p.entity.Rotation().Yaw, feet: p.entity.Position()[1] - eyeHeight}
+		yaw: p.entity.Rotation().Yaw, feet: float32(p.entity.Position()[1] - eyeHeight)}
 	for _, t := range how.Traits {
 		s.trait(t)
 	}

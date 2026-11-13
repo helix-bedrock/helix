@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
@@ -170,6 +170,6 @@ func vanillaGlideCrash(p *Player, before, after float32) {
 }
 
 // flatSpeed is a movement's horizontal length.
-func flatSpeed(v mgl32.Vec3) float32 {
+func flatSpeed(v mgl64.Vec3) float32 {
 	return float32(math.Sqrt(float64(v[0]*v[0] + v[2]*v[2])))
 }

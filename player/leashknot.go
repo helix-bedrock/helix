@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl64"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -52,7 +52,7 @@ func isLeashFence(name string) bool {
 	return strings.HasSuffix(name, "_fence") || strings.HasSuffix(name, "_wall")
 }
 
-func (k *LeashKnot) config(uid int64, rid uint64, pos mgl32.Vec3) world.EntityConfig {
+func (k *LeashKnot) config(uid int64, rid uint64, pos mgl64.Vec3) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uid, RuntimeID: rid, Pos: pos,
 		Owner: k, Spawn: k.spawnPackets, Input: k.tick, Save: k.saveEntity,
@@ -62,7 +62,7 @@ func (k *LeashKnot) config(uid int64, rid uint64, pos mgl32.Vec3) world.EntityCo
 func (k *LeashKnot) spawnPackets(e *world.Entity) []packet.Packet {
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: leashKnotID,
-		Position: e.Position(), EntityMetadata: protocol.EntityMetadata{},
+		Position: world.Vec32(e.Position()), EntityMetadata: protocol.EntityMetadata{},
 	}}
 }
 
@@ -77,7 +77,7 @@ func (k *LeashKnot) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	pos := e.Position()
 	data["identifier"] = leashKnotID
 	data["UniqueID"] = e.UniqueID()
-	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
+	data["Pos"] = []float32{float32(pos[0]), float32(pos[1]), float32(pos[2])}
 	data["Rotation"] = []float32{0, 0}
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
@@ -89,7 +89,7 @@ func (s *Host) loadKnot(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) b
 		return false
 	}
 	k := &LeashKnot{s: s, saved: saved.Data}
-	k.entity = r.AddLoadedEntity(at, k.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}))
+	k.entity = r.AddLoadedEntity(at, k.config(saved.ID, s.runtimeIDs.Add(1), mgl64.Vec3{float64(pos[0]), float64(pos[1]), float64(pos[2])}))
 	return true
 }
 
@@ -192,12 +192,12 @@ func (p *Player) tieToFence(r *world.Region, u *BlockUse) bool {
 	tied := false
 	for _, o := range p.s.leashedTo(r, me.ID()) {
 		reach := o.m.LeashMaxDistance(me)
-		if o.entity.Position().Sub(centre).LenSqr() > reach*reach {
+		if o.entity.Position().Sub(centre).LenSqr() > float64(reach*reach) {
 			continue
 		}
 		if k == nil {
 			k = &LeashKnot{s: p.s}
-			pos := mgl32.Vec3{float32(u.Pos[0]) + 0.5, float32(u.Pos[1]) + leashKnotY, float32(u.Pos[2]) + 0.5}
+			pos := mgl64.Vec3{float64(u.Pos[0]) + 0.5, float64(u.Pos[1]) + leashKnotY, float64(u.Pos[2]) + 0.5}
 			uid := itemUniqueIDBase | rand.Int64N(itemUniqueIDBase) //nolint:gosec // an entity ID, not a secret
 			k.entity = r.Dimension().AddEntity(k.config(uid, p.s.runtimeIDs.Add(1), pos))
 		}
