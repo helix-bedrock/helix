@@ -318,15 +318,25 @@ sibling library folders, so unreleased library changes are used.
   right under them changes; landing places the block, or adds snow to snow (rest on top).
   `player/fallingblock.go` is the entity (`FallingBlock`, `Host.StartFalling`,
   `SpawnFallingBlock`, `OnBlockFall`; breaks into its item when it cannot land, saved with its
-  chunk). Not done: anvil damage and landing sound, concrete powder hardening, scaffolding,
-  pointed dripstone, suspicious sand and gravel, entities that break falling blocks.
+  chunk). `fall/scaffolding.go`: scaffolding's stability (0 on a block that holds things on top,
+  the same as the scaffolding below, else one more than the steadiest side neighbour, up to 7),
+  kept in its state on place and neighbour changes; at 7 a new one falls and a settled one breaks
+  with its drops (`Ticker.SetBreak`), so a tower whose base goes comes down. `player/scaffolding.go`
+  is the item: using it on scaffolding builds on top of the column. Not done: anvil damage and
+  landing sound, concrete powder hardening, pointed dripstone, suspicious sand and gravel,
+  entities that break falling blocks.
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.
 - `direction`: every direction beyond `cube`'s faces and positions: `Cardinal` and the numberings block states use for it, the orders BDS walks a block's sides in (`Updates`, `Spread`, `Clockwise`, `Sides`), yaw to direction, axes and BDS's table sine. Systems name what they mean here instead of keeping tables of numbers; a test pins each numbering and order to BDS's.
 - `circuit` (written from BDS's code and not fully tested: only the basics have been tried in game, nothing compared with BDS): vanilla's redstone blocks on the `redstone` library, one System per region (`Ticker`, a `world.RegionTicker`); its components move with their chunks on merges and splits. `comparator.go` has what wire connects to, what comparators read (`SignalEntity` for block entities that work it out themselves) and the comparator's block entity (`Ticker.Entities` wraps the world's list). `piston.go` has pistons and the blocks they move, as block entities (`SetEntityPush` is how they move entities: `Host.PistonPush` moves a player on the server and sends `CorrectPlayerMovePrediction`); `TakeBlockEntity` moves one without spilling it. Hoppers, dispensers and droppers are in `player/machine.go`, as `Chest`s with a `machineSpec`, since they share the chest's slots and window.
 - `player/bed.go`: beds and straw beds (`bedEntity`, the colour block entity; placing; using; sleeping,
   the sleep counter and the night skip on the global owner's tick; the bed respawn point, saved under
-  BDS's Spawn keys). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
+  BDS's Spawn keys with its dimension). `player/respawnanchor.go`: respawn anchors (glowstone charges
+  to 4, a charged one sets the spawn in the Nether and explodes elsewhere when respawn blocks
+  explode, calmed by water around it; respawning takes a charge and stands the player by BDS's
+  search on solid blocks, helix-data's `bds/block_solid.json`; a player who died elsewhere is
+  moved to the Nether). `player/shelf.go`: shelves (`Shelf` block entity saved as BDS's "Shelf",
+  `ShelfAt`; clicking the front swaps the held item with a slot; powered row swaps not built). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
   Ticker removes a half whose other half went. `player/cushion.go`: cushions (`Cushion`, placing,
   breaking, the rest check, riders kept across leaving and restarts as `LinksTag`, `reseat` on join).
 - `player/void.go`: the void as BDS's OutOfWorldSystem (below the dimension's min height minus 16; `Systems.OutOfWorld`, `Systems.Void`, `OnVoid`, `TuneVoidDamage`, `OutOfWorlder` for an owner's own answer). Every entity's tick calls `Host.checkVoid`; a new entity kind calls it too.
