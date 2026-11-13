@@ -334,8 +334,8 @@ sibling library folders, so unreleased library changes are used.
   BDS's Spawn keys with its dimension). `player/respawnanchor.go`: respawn anchors (glowstone charges
   to 4, a charged one sets the spawn in the Nether and explodes elsewhere when respawn blocks
   explode, calmed by water around it; respawning takes a charge and stands the player by BDS's
-  search on solid blocks, helix-data's `bds/block_solid.json`; a player who died elsewhere is
-  moved to the Nether). `player/shelf.go`: shelves (`Shelf` block entity saved as BDS's "Shelf",
+  search on solid blocks, helix-data's `bds/block_solid.json`; only a player who dies in the
+  Nether respawns at it, as BDS checks the spawn against the dimension of death). `player/shelf.go`: shelves (`Shelf` block entity saved as BDS's "Shelf",
   `ShelfAt`; clicking the front swaps the held item with a slot; powered row swaps not built). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
   Ticker removes a half whose other half went. `player/cushion.go`: cushions (`Cushion`, placing,
   breaking, the rest check, riders kept across leaving and restarts as `LinksTag`, `reseat` on join).

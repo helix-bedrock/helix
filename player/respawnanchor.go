@@ -210,42 +210,22 @@ func (a *respawnAnchorBlock) canStand(s *Host, r *world.Region, pos cube.Pos) bo
 	return ok1 && ok2 && ok3 && a.isSolid(s, below) && !a.isSolid(s, at) && !a.isSolid(s, above)
 }
 
-// respawnAtAnchor respawns a dead player at its anchor in the Nether, taking a charge,
-// moving it there first if it died elsewhere. False if its spawn is no anchor; an anchor
-// that is gone, empty or blocked is forgotten with BDS's message, and the caller respawns
-// the player as without one.
+// respawnAtAnchor respawns a player who died in the Nether at its anchor there, taking a
+// charge. BDS 1.26.60's Respawn (0xBCED800) checks the spawn against the dimension the
+// player died in (0xBCD4290), so an anchor never pulls a player back from another
+// dimension: one who died elsewhere respawns as without it. False if the player is not in
+// the Nether or its spawn is no anchor; an anchor that is gone, empty or blocked is
+// forgotten with BDS's message, and the caller respawns the player as without one.
 func (p *Player) respawnAtAnchor() bool {
-	if !p.spawn.set || p.spawn.dim != spawnNether || p.s.nether == nil {
+	if !p.spawn.set || p.spawn.dim != spawnNether || p.s.nether == nil || p.dim != p.s.nether {
 		return false
 	}
-	if p.dim == p.s.nether {
-		at, ok := p.anchorSpot(p.entity.Region(), true)
-		if !ok {
-			p.forgetAnchor()
-			return false
-		}
-		p.s.game.sys.Respawn(p, at)
-		return true
-	}
-	p.s.game.sys.Respawn(p, p.entity.Position())
-	stand := p.spawn.stand
-	eyes := mgl32.Vec3{float32(stand[0]) + 0.5, float32(stand[1]) + playerEyeHeight, float32(stand[2]) + 0.5}
-	p.changeDimension(&dimMove{to: p.s.nether, eyes: eyes, rot: p.entity.Rotation(), respawn: true, arrive: p.arriveAtAnchor})
-	return true
-}
-
-// arriveAtAnchor is the arrival of a player respawning at an anchor from another dimension:
-// it waits for the anchor's chunk, then stands the player beside it.
-func (p *Player) arriveAtAnchor(r *world.Region) bool {
-	if _, ok := r.Block(p.spawn.pos, 0); !ok && p.portal.waited < arrivalWaitTicks {
-		return false
-	}
-	at, ok := p.anchorSpot(r, true)
+	at, ok := p.anchorSpot(p.entity.Region(), true)
 	if !ok {
 		p.forgetAnchor()
-		return true
+		return false
 	}
-	p.teleportFeet(at.Sub(mgl32.Vec3{0, playerEyeHeight, 0}), p.entity.Rotation())
+	p.s.game.sys.Respawn(p, at)
 	return true
 }
 
