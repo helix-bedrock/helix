@@ -200,63 +200,68 @@ func (p *Player) mapLock(items []ItemStack) (ItemStack, uint8) {
 // cartography table recipe (paper into an empty map, with a compass a locator map). Each
 // slot gives one item a craft.
 func (p *Player) craftCartography(a *protocol.CraftRecipeStackRequestAction) (uint8, []slotRef) {
-	st := &p.requests
-	c := &st.craft
+	c := &p.requests.craft
 	if c.active || len(c.results) != 0 {
 		return protocol.ItemStackResponseStatusRequestAlreadyInProgress, nil
 	}
 	if a.NumberOfCrafts == 0 {
 		return protocol.ItemStackResponseStatusInvalidNumCrafts, nil
 	}
+	return p.cartographyRecipe(a.RecipeNetworkID, a.NumberOfCrafts), nil
+}
+
+// cartographyRecipe crafts the recipe with a network ID from the table's two slots, times
+// times, BDS's CartographyContainerScreenValidator::getCraftResult past its rename case.
+func (p *Player) cartographyRecipe(id uint32, times byte) uint8 {
+	st := &p.requests
+	c := &st.craft
 	in, add := st.work.ui[cartographyInputSlot], st.work.ui[cartographyAdditionalSlot]
 	var made ItemStack
 	var r *crafting.Recipe
-	if u, special := p.s.Recipes().Special(a.RecipeNetworkID); special && p.hasRecipe(a.RecipeNetworkID) {
+	if u, special := p.s.Recipes().Special(id); special && p.hasRecipe(id) {
 		result := p.mapRecipeResult(u)
 		if result == nil || u == mapExtendRecipe || u == mapCloneRecipe || u == mapUpgradeRecipe {
-			return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId, nil
+			return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId
 		}
 		var status uint8
 		if made, status = result([]ItemStack{in, add}); status != protocol.ItemStackResponseStatusOK {
-			return status, nil
+			return status
 		}
 	} else {
 		var ok bool
-		r, ok = p.s.Recipes().Recipe(a.RecipeNetworkID)
-		if !ok || r.Block != cartographyRecipes || !p.hasRecipe(a.RecipeNetworkID) {
-			return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId, nil
+		r, ok = p.s.Recipes().Recipe(id)
+		if !ok || r.Block != cartographyRecipes || !p.hasRecipe(id) {
+			return protocol.ItemStackResponseStatusFailedToFindRecipeByNetId
 		}
 		if !r.Fits(crafting.Grid{Items: []crafting.Item{p.craftItem(in), p.craftItem(add)}, Width: 2}) {
-			return protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems, nil
+			return protocol.ItemStackResponseStatusMismatchedRecipeForInputGridItems
 		}
 	}
-	c.active, c.times = true, a.NumberOfCrafts
+	c.active, c.times = true, times
 	if !in.Empty() {
-		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerCartographyInput, slot: cartographyInputSlot, item: in, left: a.NumberOfCrafts})
+		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerCartographyInput, slot: cartographyInputSlot, item: in, left: times})
 	}
 	if !add.Empty() {
-		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerCartographyAdditional, slot: cartographyAdditionalSlot, item: add, left: a.NumberOfCrafts})
+		c.slots = append(c.slots, expectedSlot{container: protocol.ContainerCartographyAdditional, slot: cartographyAdditionalSlot, item: add, left: times})
 	}
 	if r != nil {
-		return p.startResults(r, false), nil
+		return p.startResults(r, false)
 	}
-	c.results = append(c.results, craftResult{stack: made, left: int32(made.Count) * int32(a.NumberOfCrafts)})
+	c.results = append(c.results, craftResult{stack: made, left: int32(made.Count) * int32(times)})
 	// As at a table: the client is sent the item the server made.
 	st.refresh = true
-	return protocol.ItemStackResponseStatusOK, nil
+	return protocol.ItemStackResponseStatusOK
 }
 
-// craftCartographyName is renaming a map at the cartography table: the map takes the name,
-// or loses its name for none, and nothing else is used.
+// craftCartographyName is a craft at the cartography table with the name box, as BDS's
+// getCraftResult: with nothing in the second slot a map only takes the name (or loses its
+// name for none) and nothing else is used; otherwise the recipe the action names is crafted
+// once and its result takes the name the same way.
 func (p *Player) craftCartographyName(a *protocol.CraftRecipeOptionalStackRequestAction) (uint8, []slotRef) {
 	st := &p.requests
 	c := &st.craft
 	if c.active || len(c.results) != 0 {
 		return protocol.ItemStackResponseStatusRequestAlreadyInProgress, nil
-	}
-	in := st.work.ui[cartographyInputSlot]
-	if in.Name != itemFilledMapName && in.Name != itemEmptyMapName {
-		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
 	}
 	var name string
 	if i := int(a.FilterStringIndex); i >= 0 && i < len(st.filter) {
@@ -265,6 +270,10 @@ func (p *Player) craftCartographyName(a *protocol.CraftRecipeOptionalStackReques
 	if utf8.RuneCountInString(name) > int(p.Tuning(TuneAnvilNameLength)) {
 		return protocol.ItemStackResponseStatusInvalidCraftRequest, nil
 	}
+	in := st.work.ui[cartographyInputSlot]
+	if !st.work.ui[cartographyAdditionalSlot].Empty() || (in.Name != itemFilledMapName && in.Name != itemEmptyMapName) {
+		return p.cartographyRecipeNamed(a.RecipeNetworkID, name), nil
+	}
 	made := withName(mapResult(in), name)
 	made.Count = in.Count
 	c.active, c.times = true, 1
@@ -272,4 +281,18 @@ func (p *Player) craftCartographyName(a *protocol.CraftRecipeOptionalStackReques
 	c.results = append(c.results, craftResult{stack: made, left: int32(made.Count)})
 	st.refresh = true
 	return protocol.ItemStackResponseStatusOK, nil
+}
+
+// cartographyRecipeNamed crafts a recipe once at the table and names its results.
+func (p *Player) cartographyRecipeNamed(id uint32, name string) uint8 {
+	status := p.cartographyRecipe(id, 1)
+	if status != protocol.ItemStackResponseStatusOK {
+		return status
+	}
+	st := &p.requests
+	for i := range st.craft.results {
+		st.craft.results[i].stack = withName(st.craft.results[i].stack, name)
+	}
+	st.refresh = true
+	return status
 }
