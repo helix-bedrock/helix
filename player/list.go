@@ -103,6 +103,7 @@ func (g *global) loop() {
 
 // add puts p on the player list. Global owner only.
 func (g *global) add(p *Player) {
+	p.index = g.freeIndex(p)
 	g.players[p.uuid] = p
 	g.order = append(g.order, p)
 	g.publish()

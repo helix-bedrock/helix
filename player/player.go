@@ -51,14 +51,16 @@ type Player struct {
 	traceSends atomic.Int32
 
 	// Session: fixed once the player joined. Runs: anywhere.
-	uuid      uuid.UUID
-	name      string
-	xuid      string
-	skin      protocol.Skin
-	ids       mcdb.PlayerIDs
-	uniqueID  int64
+	uuid     uuid.UUID
+	name     string
+	xuid     string
+	skin     protocol.Skin
+	ids      mcdb.PlayerIDs
+	uniqueID int64
+	// index is the player's index (synched actor data 27), set when it goes on the list.
+	index int32
 	// mapIndex numbers the maps the player makes, BDS's map_name_index. Not saved yet.
-	mapIndex int32
+	mapIndex  int32
 	runtimeID uint64
 	// sendErrLogged is set by the first failed send, so a dead connection
 	// is logged once.
@@ -104,8 +106,8 @@ type Player struct {
 	// effectValued and effectMaxed mark the attributes whose value and maximum effect
 	// modifiers changed, so they go back when the effects go.
 	effectValued, effectMaxed uint32
-	brk        breakState
-	move       moveState
+	brk                       breakState
+	move                      moveState
 	// vehicle is what the player sits on, riding whether others see it so.
 	vehicle vehicle
 	riding  bool

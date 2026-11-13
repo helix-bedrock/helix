@@ -91,6 +91,8 @@ type mapData struct {
 	tracked map[int64]*mapTracked
 	// trackRound counts the tracking passes; a player missed by one is no longer followed.
 	trackRound uint64
+	// carried is the world tick each player last carried the map at, by unique ID.
+	carried map[int64]int64
 	// renderTick counts the holders' ticks to the next redraw.
 	renderTick int32
 	dirty      bool
@@ -393,7 +395,12 @@ func (p *Player) tickMap(st *ItemStack, held bool, resend func()) {
 		st.Meta = mapMetaLocked
 		resend()
 	}
-	p.s.trackPlayers(d)
+	now := r.CurrentTick()
+	if d.carried == nil {
+		d.carried = map[int64]int64{}
+	}
+	d.carried[p.uniqueID] = now
+	p.s.trackPlayers(d, now)
 	if !held {
 		return
 	}
@@ -411,8 +418,8 @@ func (p *Player) tickMap(st *ItemStack, held bool, resend func()) {
 }
 
 // trackPlayers follows every online player on the map and works out their markers, BDS's
-// tickByActor. Runs: under d.mu.
-func (s *Host) trackPlayers(d *mapData) {
+// tickByActor. now is the world tick. Runs: under d.mu.
+func (s *Host) trackPlayers(d *mapData, now int64) {
 	scale := float32(int32(1) << d.scale)
 	d.trackRound++
 	for _, o := range s.global.online() {
@@ -447,9 +454,14 @@ func (s *Host) trackPlayers(d *mapData) {
 		}
 		t.decoration = protocol.MapDecoration{
 			Type: kind, Rotation: byte(int8(int32((yaw + off) * 16 / 360))), //nolint:gosec // BDS's byte
-			X: mapMarkerOffset(dx), Y: mapMarkerOffset(dz), Colour: color.RGBA{R: 255, G: 255, B: 255, A: 255},
+			X: mapMarkerOffset(dx), Y: mapMarkerOffset(dz), Colour: d.markerColour(o, now),
 		}
 		t.shown = true
+	}
+	for id, at := range d.carried {
+		if at < now-1 {
+			delete(d.carried, id)
+		}
 	}
 	for id, t := range d.tracked {
 		if t.round != d.trackRound {
@@ -460,6 +472,30 @@ func (s *Host) trackPlayers(d *mapData) {
 			delete(d.tracked, id)
 		}
 	}
+}
+
+// Marker colours BDS gives by the player's dimension (0xD761E20): white in the
+// Overworld for a player carrying the map, red in the Nether, blue in the End.
+var (
+	mapMarkerWhite  = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	mapMarkerNether = color.RGBA{R: 255, A: 255}
+	mapMarkerEnd    = color.RGBA{B: 255, A: 255}
+)
+
+// markerColour is a player's marker colour, BDS's tickByActor: by dimension outside the
+// Overworld; in it, white for a player who carries the map (carried this tick or the
+// last, as regions tick in turn), else the colour of the player's index. Runs: under d.mu.
+func (d *mapData) markerColour(o *Player, now int64) color.RGBA {
+	switch d.dim {
+	case mcdb.Nether:
+		return mapMarkerNether
+	case mcdb.End:
+		return mapMarkerEnd
+	}
+	if at, ok := d.carried[o.uniqueID]; ok && at >= now-1 {
+		return mapMarkerWhite
+	}
+	return playerColour(o.index)
 }
 
 func mapAbs(v int32) int32 {

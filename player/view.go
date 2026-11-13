@@ -24,12 +24,13 @@ func (p *Player) listEntry() protocol.PlayerListEntry {
 func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 	pos, rot := e.Position(), e.Rotation()
 	meta := protocol.EntityMetadata{
-		protocol.EntityDataKeyFlags:    p.actorFlags(),
-		protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo(),
-		protocol.EntityDataKeyName:     p.name,
-		protocol.EntityDataKeyWidth:    float32(0.6),
-		protocol.EntityDataKeyHeight:   float32(1.8),
-		protocol.EntityDataKeyScale:    float32(1),
+		protocol.EntityDataKeyFlags:       p.actorFlags(),
+		protocol.EntityDataKeyFlagsTwo:    p.actorFlagsTwo(),
+		protocol.EntityDataKeyName:        p.name,
+		protocol.EntityDataKeyPlayerIndex: p.index,
+		protocol.EntityDataKeyWidth:       float32(0.6),
+		protocol.EntityDataKeyHeight:      float32(1.8),
+		protocol.EntityDataKeyScale:       float32(1),
 
 		protocol.EntityDataKeyVisibleMobEffects: p.visibleEffects(),
 	}
@@ -102,7 +103,7 @@ func (p *Player) ownMetadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyAirSupply:                        b.Air(),
 		protocol.EntityDataKeyChargeAmount:                     uint8(0),
 		protocol.EntityDataKeyPlayerFlags:                      uint8(0),
-		protocol.EntityDataKeyPlayerIndex:                      int32(1),
+		protocol.EntityDataKeyPlayerIndex:                      p.index,
 		protocol.EntityDataKeyBedPosition:                      protocol.BlockPos{},
 		protocol.EntityDataKeyLeashHolder:                      int64(-1),
 		protocol.EntityDataKeyHasNPC:                           uint8(0),
