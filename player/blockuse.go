@@ -99,6 +99,10 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useStonecutter(r, u)
 	case cartographyBlock:
 		return p.useCartography(r, u)
+	case nameChiseledBookshelf:
+		return p.useBookshelf(r, u)
+	case lecternBlock:
+		return p.useLectern(r, u)
 	case nameCake:
 		return p.useCake(r, u)
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:

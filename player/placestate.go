@@ -237,6 +237,9 @@ func (s *placeState) rule(rule string) {
 		if s.name == crafterBlock {
 			s.crafter()
 		}
+		if s.name == lecternBlock {
+			s.set(direction.CardinalState, int(look.Opposite()))
+		}
 	case "bell", "grindstone":
 		s.attached(face, look, rule == "bell")
 	}

@@ -440,6 +440,10 @@ type CircuitHooks struct {
 	// HitTarget is a projectile landing at hit on the target block at pos, false if the
 	// block is not a target. arrow says it was an arrow or trident.
 	HitTarget func(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool
+	// StrikeRod is lightning striking the lightning rod at pos, false if it is no rod.
+	StrikeRod func(r *world.Region, pos cube.Pos) bool
+	// PulseLectern is a page turned on the lectern at pos, false if it is no lectern.
+	PulseLectern func(r *world.Region, pos cube.Pos) bool
 	// CartOnRail is a minecart in the block at pos.
 	CartOnRail func(r *world.Region, pos cube.Pos)
 	// Signal is the strength of the circuit part at pos, -1 for none: what an armour

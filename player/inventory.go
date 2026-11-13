@@ -56,6 +56,8 @@ const (
 	// ContainerCartography is a cartography table's screen, its map and addition in the
 	// player's UI slots.
 	ContainerCartography
+	// ContainerLectern is a lectern's book screen, with no slots.
+	ContainerLectern
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.

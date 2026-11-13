@@ -341,6 +341,18 @@ sibling library folders, so unreleased library changes are used.
   `circuit/shelf.go` on power changes; BDS's row repair without a power change is not ported). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
   Ticker removes a half whose other half went. `player/cushion.go`: cushions (`Cushion`, placing,
   breaking, the rest check, riders kept across leaving and restarts as `LinksTag`, `reseat` on join).
+- `player/bookshelf.go`: chiseled bookshelves (`Bookshelf` block entity saved as BDS's
+  "ChiseledBookshelf", `BookshelfAt`; clicking a slot on the front takes its book or puts in one
+  of the held item tagged minecraft:bookshelf_books, `books_stored` shows them, the comparator
+  reads the last slot used plus one, books drop when it goes). `player/lectern.go`: lecterns
+  (`Lectern` block entity saved as BDS's "Lectern", `LecternAt`; a book and quill or written book
+  goes on an empty one, clicking one with a book opens window type 25, LecternUpdate sets the
+  page and gives a redstone pulse through `circuit/lectern.go`, hitting or breaking it knocks the
+  book off, the comparator reads how far through the book it is). `player/lightningrod.go` and
+  `weather/rod.go`: lightning rods (a strike goes to the nearest rod within 64 blocks that is
+  open to the sky and rained on; a struck rod gives power for 8 ticks, `circuit/lightningrod.go`;
+  the strike cleans oxidation off the copper it stands on and copper around it, `player/copper.go`;
+  Channeling tridents on a rod call lightning). Copper ageing, axes and waxing are not built.
 - `player/void.go`: the void as BDS's OutOfWorldSystem (below the dimension's min height minus 16; `Systems.OutOfWorld`, `Systems.Void`, `OnVoid`, `TuneVoidDamage`, `OutOfWorlder` for an owner's own answer). Every entity's tick calls `Host.checkVoid`; a new entity kind calls it too.
 - `player/explosion.go`: BDS's explosion as a struct anyone can run (`Explosion`, `Host.Explode`, `Systems.Explode`, `OnExplosionStart` (before anything), `OnExplosion` (once the blocks are known, `Keep`), `OnExplosionHit` (per entity reached), what set it off (`Kind`, `FromBlock`, `Block`, `BlockPos`, `Attacker`), block behaviour `Exploded`, entity owner `Blastable`). `player/primedtnt.go`: lit TNT (`PrimedTNT`, `Host.SpawnTNT`, `OnTNTPrime`, saved with its chunk) and vanilla's TNT block as a block behaviour.
 - `circuit/config.go`: `Config`, every number redstone runs by, BDS's by default (`DefaultConfig`), and `Settings`, which holds it for the regions to read while `Server.SetRedstone` swaps it. A new redstone number goes here, not in a constant. The circuit library's own numbers are `redstone.Rules`.

@@ -428,6 +428,8 @@ func (s *Server) hookCircuits(host *player.Host) {
 		ChestViewers: c.SetChestViewers,
 		CartOnRail:   c.CartOnRail,
 		HitTarget:    c.HitTarget,
+		StrikeRod:    c.StrikeRod,
+		PulseLectern: c.PulseLectern,
 		Signal:       c.Signal,
 	})
 	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {

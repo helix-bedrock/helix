@@ -109,6 +109,8 @@ const (
 	kindJukebox
 	kindBell
 	kindShelf
+	kindRod
+	kindLectern
 )
 
 // kindOf returns the class of the block called name.
@@ -171,6 +173,10 @@ func kindOf(name string) kind {
 		return kindGate
 	case isShelf(name):
 		return kindShelf
+	case isRodName(name):
+		return kindRod
+	case name == nameLectern:
+		return kindLectern
 	}
 	return kindNone
 }
@@ -186,7 +192,8 @@ func componentKind(k kind) redstone.Kind {
 		return redstone.KindRepeater
 	case kindComparator:
 		return redstone.KindComparator
-	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook, kindJukebox:
+	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook, kindJukebox,
+		kindRod, kindLectern:
 		return redstone.KindProducer
 	case kindObserver:
 		return redstone.KindPulse
@@ -675,6 +682,10 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		if bitState(t.blocks.States(block), statePowered) {
 			t.wireUpdate(t.circuitOf(r), pos, block)
 		}
+	case kindRod:
+		t.rodTick(r, pos, block)
+	case kindLectern:
+		t.lecternTick(t.circuitOf(r), pos, block)
 	default:
 		t.BlockTicker.QueuedTick(r, pos, block)
 	}
@@ -838,6 +849,10 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetAllowUp(true)
 		}
+	case kindRod:
+		t.rodComponent(c, p, states)
+	case kindLectern:
+		t.lecternComponent(c, p, states)
 	}
 }
 

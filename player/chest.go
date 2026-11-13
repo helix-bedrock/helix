@@ -305,6 +305,12 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if isShelfBlock(e.s.reg.Blocks.Name(block)) {
 		return &Shelf{s: e.s}
 	}
+	if e.s.reg.Blocks.Name(block) == nameChiseledBookshelf {
+		return &Bookshelf{s: e.s}
+	}
+	if e.s.reg.Blocks.Name(block) == lecternBlock {
+		return &Lectern{s: e.s}
+	}
 	if e.s.reg.Blocks.Name(block) == enchantingTable {
 		return &enchantTableEntity{}
 	}
@@ -351,6 +357,12 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == shelfEntityID {
 		return e.s.loadShelf(saved), true
+	}
+	if id == bookshelfEntityID {
+		return e.s.loadBookshelf(saved), true
+	}
+	if id == lecternEntityID {
+		return e.s.loadLectern(saved), true
 	}
 	if id == bannerEntityID {
 		return e.s.loadBanner(saved), true

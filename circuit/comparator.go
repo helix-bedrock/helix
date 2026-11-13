@@ -82,6 +82,9 @@ const (
 	signalFrame
 )
 
+// nameBookshelf is the chiseled bookshelf, whose block entity gives its last used slot.
+const nameBookshelf = "minecraft:chiseled_bookshelf"
+
 // Sizes of the containers a comparator reads.
 const (
 	sizeHopper  = 5
@@ -112,14 +115,13 @@ func signalOf(name string) signal {
 		return signalAnchor
 	case nameDetectorRail:
 		return signalDetectorRail
-	case nameJukebox, nameCrafter:
+	case nameJukebox, nameCrafter, nameLectern, nameBookshelf:
 		return signalEntity
 	case "minecraft:frame", "minecraft:glow_frame":
 		return signalFrame
-	case "minecraft:lectern",
-		"minecraft:command_block", "minecraft:chain_command_block",
+	case "minecraft:command_block", "minecraft:chain_command_block",
 		"minecraft:repeating_command_block", "minecraft:creaking_heart",
-		"minecraft:chiseled_bookshelf", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
+		"minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor":
 		return signalUnbuilt
 	}
 	switch {

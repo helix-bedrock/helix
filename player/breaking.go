@@ -195,6 +195,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 		switch a.Action {
 		case protocol.PlayerActionStartBreak:
 			p.attackCircuit(r, pos)
+			p.hitLectern(r, pos)
 			if p.startBreak(r, pos, a.Face) {
 				destroyed = true
 			}
@@ -401,6 +402,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		becomes, wear = e.Becomes, e.Wear
 	}
 	p.s.brokenTNT(r, pos, b.Block, p)
+	p.hitLectern(r, pos)
 	p.breakDoublePlantLower(r, pos, b.Block)
 	if destroy := p.s.circuits.Destroy; destroy != nil {
 		destroy(r, pos, b.Block, p.inventory.main[p.inventory.held].Name)

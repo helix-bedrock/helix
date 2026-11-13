@@ -116,6 +116,7 @@ func (b *LightningBolt) tick(e *world.Entity) {
 		for _, name := range [...]string{packet.SoundEventThunder, packet.SoundEventExplode} {
 			playSound(r, pos, soundEvent{name: name, pos: at, extra: -1, entity: nameLightningBolt}, nil)
 		}
+		b.s.boltHitBlocks(r, pos)
 		if b.setsFire() {
 			b.fire(r, pos)
 			for range boltSpreadFires {

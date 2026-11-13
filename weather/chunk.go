@@ -111,6 +111,8 @@ type Ticker struct {
 	info []blockInfo
 	// odds replaces lightningOdds when above 0 (SetLightningOdds).
 	odds atomic.Int32
+	// rods marks the lightning rod states (rod.go).
+	rods []bool
 }
 
 // SetLightningOdds makes lightning strike a stormy chunk one tick in n instead of BDS's one in
@@ -136,6 +138,7 @@ type regionState struct {
 	lcg  uint32
 	rng  *rand.Rand
 	mobs []mgl32.Vec3
+	rods []rodHit
 }
 
 type regionKey struct{}
@@ -146,6 +149,7 @@ func NewTicker(conf Config) *Ticker {
 	t := &Ticker{conf: conf, blocks: b, biomes: conf.Registry.Biomes, air: b.Air(), info: make([]blockInfo, b.Count())}
 	t.ice, _ = b.Block(nameIce)
 	t.snowBlk, _ = b.Block(nameSnow)
+	t.rods = rodTable(b.Name, b.Count())
 	for id := range uint32(b.Count()) { //nolint:gosec // block counts fit
 		p := b.Properties(id)
 		t.info[id] = blockInfo{precip: p.Precipitation, material: p.Material, solid: p.SolidMaterial}
@@ -207,8 +211,8 @@ func (s *regionState) next(pos mcdb.ChunkPos) (int, int) {
 	return int(pos[0])<<4 | int(s.lcg>>2&15), int(pos[1])<<4 | int(s.lcg>>10&15)
 }
 
-// lightning strikes a mob or player out in the open in the chunk if there is one, else the
-// top of a random column, where it rains.
+// lightning strikes the nearest lightning rod that draws it, else a mob or player out in the
+// open in the chunk if there is one, else the top of a random column, where it rains.
 func (t *Ticker) lightning(r *world.Region, s *regionState, pos mcdb.ChunkPos) {
 	x, z := s.next(pos)
 	top, ok := t.RainTop(r, x, z)
@@ -216,7 +220,9 @@ func (t *Ticker) lightning(r *world.Region, s *regionState, pos mcdb.ChunkPos) {
 		return
 	}
 	at := mgl32.Vec3{float32(x), float32(top), float32(z)}
-	if t.conf.Mobs != nil {
+	if rod, ok := t.lightningRod(r, s, cube.Pos{x, top, z}); ok {
+		at = rodStrike(rod)
+	} else if t.conf.Mobs != nil {
 		s.mobs = t.conf.Mobs(r, pos, s.mobs[:0])
 		open := s.mobs[:0]
 		for _, m := range s.mobs {
