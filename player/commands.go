@@ -69,7 +69,7 @@ var commandGameModes = map[string]int32{
 }
 
 // selectPlayers resolves a selector to players: a name, @s and @initiator (the runner),
-// @a and @e (everyone, until there are other entities), @p (nearest) and @r (random),
+// @a (everyone), @e (everyone and the entities of the runner's region), @p (nearest) and @r (random),
 // with the arguments name, r, rm, x, y, z, m, l, lm, type and c. Players are read
 // through State, so every region's are seen. self may be nil (the console).
 func (h *Host) selectPlayers(self *Player, from mgl32.Vec3, sel command.Selector) []command.Target {
@@ -86,19 +86,81 @@ func (h *Host) selectPlayers(self *Player, from mgl32.Vec3, sel command.Selector
 	list = slices.DeleteFunc(list, func(f selected) bool { return !matchesSelector(f.p, at, sel) })
 	for i := range list {
 		list[i].dist = list[i].p.State().Position.Sub(at).Len()
+		list[i].t = list[i].p
+	}
+	if sel.Kind == "e" && self != nil {
+		list = h.appendSelectedEntities(list, self, at, sel)
 	}
 	list = orderSelected(list, sel)
 	out := make([]command.Target, len(list))
 	for i, f := range list {
-		out[i] = f.p
+		out[i] = f.t
 	}
 	return out
 }
 
-// selected is a player a selector picked, with its distance from the selector's origin.
+// selected is what a selector picked, with its distance from the selector's origin; p is
+// set for players.
 type selected struct {
 	p    *Player
+	t    command.Target
 	dist float32
+}
+
+// appendSelectedEntities adds the entities other than players of the runner's region that
+// pass the selector's name, type, r and rm. Entities in other regions are not seen. Runs:
+// the runner's region.
+func (h *Host) appendSelectedEntities(list []selected, self *Player, at mgl32.Vec3, sel command.Selector) []selected {
+	r := self.entity.Region()
+	if r == nil {
+		return list
+	}
+	for _, e := range r.AppendEntities(nil) {
+		if _, isPlayer := e.Owner().(*Player); isPlayer {
+			continue
+		}
+		t := EntityTarget{e: e}
+		dist := e.Position().Sub(at).Len()
+		if matchesEntity(t, dist, sel) {
+			list = append(list, selected{t: t, dist: dist})
+		}
+	}
+	return list
+}
+
+// matchesEntity checks an entity against a selector's name, type, r and rm; any player-only
+// filter (m, l, lm) leaves it out.
+func matchesEntity(t EntityTarget, dist float32, sel command.Selector) bool {
+	for _, a := range sel.Args {
+		ok := true
+		switch a.Key {
+		case "name":
+			ok = strings.EqualFold(t.Name(), a.Value)
+		case "type":
+			want := a.Value
+			if !strings.Contains(want, ":") {
+				want = "minecraft:" + want
+			}
+			ok = t.entityType() == want
+		case "m", "l", "lm":
+			return false
+		case "r", "rm":
+			v, err := strconv.ParseFloat(a.Value, 32)
+			if err != nil {
+				return false
+			}
+			ok = dist <= float32(v)
+			if a.Key == "rm" {
+				ok = dist >= float32(v)
+			}
+		default:
+			continue
+		}
+		if ok == a.Negated {
+			return false
+		}
+	}
+	return true
 }
 
 // selectorAxes are the selector arguments that move its origin, with their axis.
