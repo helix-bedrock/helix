@@ -636,7 +636,7 @@ func (t *Projectile) tick(e *world.Entity) {
 func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 	if t.stuckMoveDue {
 		t.stuckMoveDue = false
-		t.moves.send(e)
+		t.moves.sendNow(e)
 	}
 	if t.shake > 0 {
 		e.Send(actorEventData(e.RuntimeID(), actorEventArrowShake, t.shake))

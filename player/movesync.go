@@ -29,10 +29,13 @@ const (
 // actorMoves is what those who see an actor were last told of its movement: the last move
 // sent and the tick each of them last got one. Runs: owner of the actor's entity.
 type actorMoves struct {
-	pos     mgl32.Vec3
-	rot     world.Rotation
-	ground  bool
-	sentTo  map[*world.Entity]int64
+	pos    mgl32.Vec3
+	rot    world.Rotation
+	ground bool
+	sentTo map[*world.Entity]int64
+	// missed holds the players a move was held back from: the fields of a move are what
+	// changed since the last one sent to anyone, so their next one carries every field.
+	missed  map[*world.Entity]bool
 	dropped int32
 	far     float32
 	// head is set for mobs, whose moves carry the head yaw.
@@ -59,6 +62,12 @@ func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 	if moved <= actorMoveMin && turned <= actorTurnMin && (moved <= actorRestMin || speed >= actorRestMin) {
 		return
 	}
+	if moved <= actorMoveMin && turned <= actorTurnMin {
+		// It came to rest: no move follows this one, so a player it would skip never
+		// learns where it stopped.
+		m.sendNow(e)
+		return
+	}
 	m.send(e)
 }
 
@@ -66,7 +75,13 @@ func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 // and the head rotation only for mobs. What differs per player is how far they are
 // (0x8ce9d60): further off they get it less often, and Ticks says how many ticks it is meant
 // to last. It is 0 near by, and 0 for all on the tick it lands or leaves the ground.
-func (m *actorMoves) send(e *world.Entity) {
+func (m *actorMoves) send(e *world.Entity) { m.sendMove(e, false) }
+
+// sendNow is send to every player at once with Ticks 0, as the move BDS sends on the tick
+// after a projectile sticks: where it stopped must reach players a move would skip.
+func (m *actorMoves) sendNow(e *world.Entity) { m.sendMove(e, true) }
+
+func (m *actorMoves) sendMove(e *world.Entity, now bool) {
 	pos, rot := e.Position(), e.Rotation()
 	ground := e.OnGround()
 	pk := &packet.MoveActorDelta{EntityRuntimeID: e.RuntimeID(), OnGround: ground}
@@ -88,33 +103,53 @@ func (m *actorMoves) send(e *world.Entity) {
 	if m.head && rotationByte(rot.HeadYaw) != rotationByte(m.rot.HeadYaw) {
 		pk.RotationYHead = protocol.Option(rot.HeadYaw)
 	}
-	same := ground == m.ground
+	same := ground == m.ground && !now
 	m.pos, m.rot, m.ground = pos, rot, ground
 	r := e.Region()
 	if r == nil {
 		return
 	}
-	now := r.CurrentTick()
+	tick := r.CurrentTick()
 	e.EachSeer(func(p *world.Entity) {
 		var ticks int64
 		if same {
 			ticks = moveTicks(m.dropped, m.far, pos.Sub(p.Position()).Len())
 		}
-		if last, ok := m.sentTo[p]; ok && now < last+ticks {
+		if last, ok := m.sentTo[p]; ok && tick < last+ticks {
+			if m.missed == nil {
+				m.missed = make(map[*world.Entity]bool)
+			}
+			m.missed[p] = true
 			return
 		}
 		if m.sentTo == nil {
 			m.sentTo = make(map[*world.Entity]int64)
 		}
-		m.sentTo[p] = now
-		if ticks == 0 {
+		m.sentTo[p] = tick
+		out := pk
+		if m.missed[p] {
+			delete(m.missed, p)
+			out = m.fullMove(pk, pos, rot)
+		}
+		if ticks == 0 && out == pk {
 			p.SendTo(pk)
 			return
 		}
-		far := *pk
-		far.Ticks = uint64(ticks)
-		p.SendTo(&far)
+		moved := *out
+		moved.Ticks = uint64(ticks) //nolint:gosec // never negative
+		p.SendTo(&moved)
 	})
+}
+
+// fullMove is pk with every field set, for a player that missed moves.
+func (m *actorMoves) fullMove(pk *packet.MoveActorDelta, pos mgl32.Vec3, rot world.Rotation) *packet.MoveActorDelta {
+	full := *pk
+	full.PositionX, full.PositionY, full.PositionZ = protocol.Option(pos[0]), protocol.Option(pos[1]), protocol.Option(pos[2])
+	full.RotationX, full.RotationY = protocol.Option(rot.Pitch), protocol.Option(rot.Yaw)
+	if m.head {
+		full.RotationYHead = protocol.Option(rot.HeadYaw)
+	}
+	return &full
 }
 
 // moveTicks is BDS's count of ticks a move lasts for a player dist away.
