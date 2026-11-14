@@ -8,10 +8,10 @@ require (
 	github.com/helix-bedrock/entity v0.0.0-20261113173324-985e07555c2c
 	github.com/helix-bedrock/helix-data v0.0.0-20261114021846-3a878d79a7bf
 	github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41
-	github.com/helix-bedrock/protocol v0.0.0-20261114194732-93fcc32c6430
+	github.com/helix-bedrock/protocol v0.0.0-20261114213740-60c91f2876c2
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
-	github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10
-	github.com/helix-bedrock/world v0.0.0-20261114201704-1b9d3dbd2e14
+	github.com/helix-bedrock/redstone v0.0.0-20261114213817-51ee10bb236a
+	github.com/helix-bedrock/world v0.0.0-20261114213802-2d626cb278db
 	github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb
 	github.com/pion/ice/v4 v4.4.8
 	github.com/pion/webrtc/v4 v4.2.26

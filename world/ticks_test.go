@@ -55,11 +55,11 @@ func (tt *testTicker) queuedTicks() []cube.Pos {
 
 func TestTickQueueOrder(t *testing.T) {
 	var q tickQueue
-	q.push(cube.Pos{1}, 0, 5, 0)
-	q.push(cube.Pos{2}, 0, 3, 1)
-	q.push(cube.Pos{3}, 0, 3, -1)
-	q.push(cube.Pos{4}, 0, 5, 0)
-	q.push(cube.Pos{5}, 0, 3, 1)
+	q.push(cube.Pos{1}, 0, 0, 5, 0)
+	q.push(cube.Pos{2}, 0, 0, 3, 1)
+	q.push(cube.Pos{3}, 0, 0, 3, -1)
+	q.push(cube.Pos{4}, 0, 0, 5, 0)
+	q.push(cube.Pos{5}, 0, 0, 3, 1)
 	var got []int
 	for len(q.ticks) > 0 {
 		got = append(got, q.pop().pos[0])
@@ -105,13 +105,13 @@ func TestBlockTicks(t *testing.T) {
 	runAt(t, d, mcdb.ChunkPos{}, func(r *Region) {
 		c := r.chunks[mcdb.ChunkPos{}]
 		for i := range 150 {
-			c.ticks.push(cube.Pos{i % 16, -40, i / 16}, stone, c.ticks.clock, 0)
+			c.ticks.push(cube.Pos{i % 16, -40, i / 16}, stone, r.blockType(stone), c.ticks.clock, 0)
 		}
 		r.runQueue(c, &c.ticks, c.ticks.clock+1)
 		if len(c.ticks.ticks) != 50 {
 			t.Errorf("%d ticks left after one run, want 50", len(c.ticks.ticks))
 		}
-		c.ticks.ticks = c.ticks.ticks[:0]
+		c.ticks = tickQueue{clock: c.ticks.clock}
 
 		// The flat world has blocks in its bottom sub chunk only: BDS
 		// rounds 1 * 2.5 down to 2 random ticks, times the speed 3.
@@ -152,7 +152,7 @@ func TestBlockTicks(t *testing.T) {
 
 func TestTickQueueRebase(t *testing.T) {
 	var q tickQueue
-	q.load([]chunk.ScheduledBlockUpdate{{Pos: cube.Pos{1, 2, 3}, Block: 7, Tick: 10020}}, 10000)
+	q.load([]chunk.ScheduledBlockUpdate{{Pos: cube.Pos{1, 2, 3}, Block: 7, Tick: 10020}}, 10000, func(b uint32) uint32 { return b }, func(cube.Pos, uint32) bool { return true })
 	q.rebase(20000)
 	if q.clock != 10000 || q.ticks[0].time != 10020 {
 		t.Errorf("a clock behind the world moved: %d, %d", q.clock, q.ticks[0].time)
@@ -160,5 +160,25 @@ func TestTickQueueRebase(t *testing.T) {
 	q.rebase(500)
 	if q.clock != 500 || q.ticks[0].time != 520 {
 		t.Errorf("after the world tick went back: clock %d, tick at %d, want 500 and 520", q.clock, q.ticks[0].time)
+	}
+}
+
+// TestTickQueueMerge checks a queue keeps one tick per position and type, with the first and
+// the last time asked for, so asking again and again never grows it.
+func TestTickQueueMerge(t *testing.T) {
+	var q tickQueue
+	for i := range 1000 {
+		q.push(cube.Pos{1, 2, 3}, 7, 7, int64(10+i%5), 0)
+	}
+	q.push(cube.Pos{1, 2, 3}, 8, 9, 12, 0)
+	if len(q.ticks) != 2 || len(q.index) != 2 {
+		t.Fatalf("%d ticks, %d keys, want 2", len(q.ticks), len(q.index))
+	}
+	first := q.pop()
+	if first.typ != 7 || first.time != 10 || first.later != 14 {
+		t.Errorf("merged tick %+v, want type 7 at 10, later 14", first)
+	}
+	if got := q.save(); len(got) != 1 || got[0].Tick != 12 {
+		t.Errorf("saved %v, want the type 9 tick at 12", got)
 	}
 }

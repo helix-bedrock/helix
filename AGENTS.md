@@ -111,7 +111,7 @@ sibling library folders, so unreleased library changes are used.
   (BDS's count and position generator, `RandomTickSpeed`), then its two
   queues (pending ticks and the random ticking queue, up to 100 each, in
   time then priority order, waiting while chunks within 8 blocks are not
-  loaded, run only if the block type is still there). Blocks get their
+  loaded, run only if the block type is still there). Beyond BDS (Helix's own rule against tick growth): a queue holds one tick per block position and type; a tick asked for while one waits merges into it, keeping the earliest time and the latest, and is put back for the latest when it runs, so no queue outgrows its chunk's blocks however fast a contraption asks; saved ticks load through the same rule, dropping those outside the chunk or for blocks no longer there (the world library's `chunk.DecodeTicks` reads them one at a time, at most `chunk.MaxTicks`). Blocks get their
   behaviour through `Config.Ticker` (`BlockTicker`): ticks, `Placed`
   (BDS's onPlace, from `Region.SetBlock` when the state changes) and
   `NeighbourChanged` (from `Region.UpdateNeighbours`, BDS's order -x +x

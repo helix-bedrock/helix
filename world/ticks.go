@@ -88,10 +88,15 @@ const (
 
 // scheduledTick is a tick waiting in a queue.
 type scheduledTick struct {
-	pos      cube.Pos
-	block    uint32
+	pos   cube.Pos
+	block uint32
+	// typ is the block type of block, which with pos makes the tick's key.
+	typ      uint32
 	time     int64
 	priority int32
+	// later is the latest time another tick was asked for at the same key while this one
+	// waited, or no later than time if none was: the tick is put back for it when it runs.
+	later int64
 	// seq orders ticks with the same time and priority by when they were
 	// added.
 	seq uint64
@@ -107,19 +112,45 @@ func (a *scheduledTick) before(b *scheduledTick) bool {
 	return a.seq < b.seq
 }
 
+// tickKey is what makes two ticks the same tick: the block position and the block type.
+type tickKey struct {
+	pos cube.Pos
+	typ uint32
+}
+
 // tickQueue is one of a chunk's two tick queues: a heap ordered by time,
 // then priority. clock is the tick it last ran at, which new ticks are
 // scheduled from.
+//
+// Beyond BDS, which keeps every tick asked for (lead 2026-11-14): a queue holds at most one
+// tick per block position and type. A tick asked for while one waits at the same key is
+// merged into it: the waiting tick takes the earlier time and remembers the latest one, and is
+// put back for that when it runs. Every block that asked for a tick still gets its first and
+// its last one; only ticks asked for in between merge, and each of those would re-check the
+// block as it is when it ran anyway. So a queue is never longer than its chunk has blocks,
+// however fast a contraption asks for ticks or however many a world file lists, and no block
+// is cut off.
 type tickQueue struct {
 	clock int64
 	ticks []scheduledTick
+	// index is the heap slot of each key's tick.
+	index map[tickKey]int32
 	seq   uint64
 }
 
-func (q *tickQueue) load(ticks []chunk.ScheduledBlockUpdate, clock int64) {
+// keptTicks is how many slots an empty queue keeps for its next ticks: a queue that grew past
+// it in a burst gives its memory back once it is empty.
+const keptTicks = 1024
+
+// load fills the queue from a saved one. typeOf gives a block's type and present reports
+// whether a block of that type is at pos: a tick for a block no longer there would do nothing
+// when it ran, so it is left out instead of taking memory until then.
+func (q *tickQueue) load(ticks []chunk.ScheduledBlockUpdate, clock int64, typeOf func(block uint32) uint32, present func(pos cube.Pos, typ uint32) bool) {
 	q.clock = clock
 	for _, t := range ticks {
-		q.push(t.Pos, t.Block, t.Tick, 0)
+		if typ := typeOf(t.Block); present(t.Pos, typ) {
+			q.push(t.Pos, t.Block, typ, t.Tick, 0)
+		}
 	}
 }
 
@@ -134,66 +165,169 @@ func (q *tickQueue) rebase(now int64) {
 	q.clock = now
 	for i := range q.ticks {
 		q.ticks[i].time -= ahead
+		q.ticks[i].later -= ahead
 	}
 }
 
-// save returns the queue as the world library stores it, in heap order as
-// BDS saves it.
+// save returns the queue as the world library stores it, in heap order as BDS saves it. A
+// merged tick is saved as its two times, which load merges again.
 func (q *tickQueue) save() []chunk.ScheduledBlockUpdate {
 	if len(q.ticks) == 0 {
 		return nil
 	}
-	out := make([]chunk.ScheduledBlockUpdate, len(q.ticks))
-	for i, t := range q.ticks {
-		out[i] = chunk.ScheduledBlockUpdate{Pos: t.pos, Block: t.block, Tick: t.time}
+	out := make([]chunk.ScheduledBlockUpdate, 0, len(q.ticks))
+	for _, t := range q.ticks {
+		out = append(out, chunk.ScheduledBlockUpdate{Pos: t.pos, Block: t.block, Tick: t.time})
+	}
+	for _, t := range q.ticks {
+		if t.later > t.time {
+			out = append(out, chunk.ScheduledBlockUpdate{Pos: t.pos, Block: t.block, Tick: t.later})
+		}
 	}
 	return out
 }
 
-func (q *tickQueue) push(pos cube.Pos, block uint32, time int64, priority int32) {
+// push asks for a tick of block, of type typ, at pos at time, merged into the tick waiting at
+// the same key if there is one.
+func (q *tickQueue) push(pos cube.Pos, block, typ uint32, time int64, priority int32) {
+	q.pushLater(pos, block, typ, time, priority, time)
+}
+
+// pushLater is push for a tick that also still waits for a later time.
+func (q *tickQueue) pushLater(pos cube.Pos, block, typ uint32, time int64, priority int32, later int64) {
+	k := tickKey{pos, typ}
+	if i, ok := q.index[k]; ok {
+		q.merge(int(i), block, time, priority, later)
+		return
+	}
+	if q.index == nil {
+		q.index = make(map[tickKey]int32)
+	}
 	q.seq++
-	q.ticks = append(q.ticks, scheduledTick{pos: pos, block: block, time: time, priority: priority, seq: q.seq})
-	for i := len(q.ticks) - 1; i > 0; {
+	q.ticks = append(q.ticks, scheduledTick{pos: pos, block: block, typ: typ, time: time, priority: priority, later: later, seq: q.seq})
+	i := len(q.ticks) - 1
+	q.index[k] = int32(i) //nolint:gosec // at most a chunk of ticks
+	q.up(i)
+}
+
+// merge folds a tick asked for at time, still waiting for later, into the one in slot i.
+func (q *tickQueue) merge(i int, block uint32, time int64, priority int32, later int64) {
+	t := &q.ticks[i]
+	switch {
+	case time < t.time:
+		t.later = max(t.later, t.time, later)
+		t.time, t.priority, t.block = time, priority, block
+		q.seq++
+		t.seq = q.seq
+		q.up(i)
+	case time > t.time:
+		t.later = max(t.later, later, time)
+	default:
+		t.later = max(t.later, later)
+		if priority < t.priority {
+			t.priority = priority
+			q.up(i)
+		}
+	}
+}
+
+// swap swaps two heap slots and keeps the index right.
+func (q *tickQueue) swap(i, j int) {
+	q.ticks[i], q.ticks[j] = q.ticks[j], q.ticks[i]
+	q.index[tickKey{q.ticks[i].pos, q.ticks[i].typ}] = int32(i) //nolint:gosec // at most a chunk of ticks
+	q.index[tickKey{q.ticks[j].pos, q.ticks[j].typ}] = int32(j) //nolint:gosec // at most a chunk of ticks
+}
+
+func (q *tickQueue) up(i int) {
+	for i > 0 {
 		parent := (i - 1) / 2
 		if !q.ticks[i].before(&q.ticks[parent]) {
-			break
+			return
 		}
-		q.ticks[i], q.ticks[parent] = q.ticks[parent], q.ticks[i]
+		q.swap(i, parent)
 		i = parent
 	}
 }
 
-func (q *tickQueue) pop() scheduledTick {
-	top := q.ticks[0]
-	last := len(q.ticks) - 1
-	q.ticks[0] = q.ticks[last]
-	q.ticks = q.ticks[:last]
-	for i := 0; ; {
+func (q *tickQueue) down(i int) {
+	n := len(q.ticks)
+	for {
 		l, small := 2*i+1, i
-		if l < last && q.ticks[l].before(&q.ticks[small]) {
+		if l < n && q.ticks[l].before(&q.ticks[small]) {
 			small = l
 		}
-		if r := l + 1; r < last && q.ticks[r].before(&q.ticks[small]) {
+		if r := l + 1; r < n && q.ticks[r].before(&q.ticks[small]) {
 			small = r
 		}
 		if small == i {
-			break
+			return
 		}
-		q.ticks[i], q.ticks[small] = q.ticks[small], q.ticks[i]
+		q.swap(i, small)
 		i = small
 	}
-	return top
+}
+
+// remove takes the tick in slot i out of the queue and returns it.
+func (q *tickQueue) remove(i int) scheduledTick {
+	t := q.ticks[i]
+	last := len(q.ticks) - 1
+	if i != last {
+		q.swap(i, last)
+	}
+	q.ticks = q.ticks[:last]
+	delete(q.index, tickKey{t.pos, t.typ})
+	if i < last {
+		q.down(i)
+		q.up(i)
+	}
+	if last == 0 && cap(q.ticks) > keptTicks {
+		q.ticks, q.index = nil, nil
+	}
+	return t
+}
+
+func (q *tickQueue) pop() scheduledTick { return q.remove(0) }
+
+// at returns the tick waiting at pos for blocks of type typ, and its heap slot.
+func (q *tickQueue) at(pos cube.Pos, typ uint32) (*scheduledTick, int, bool) {
+	i, ok := q.index[tickKey{pos, typ}]
+	if !ok {
+		return nil, 0, false
+	}
+	return &q.ticks[i], int(i), true
 }
 
 // has reports whether a tick for block's type is waiting at pos.
 func (q *tickQueue) has(r *Region, pos cube.Pos, block uint32) bool {
+	_, _, ok := q.at(pos, r.blockType(block))
+	return ok
+}
+
+// blockType returns the type of block, the second half of a tick's key.
+func (r *Region) blockType(block uint32) uint32 {
 	typ, _ := r.d.conf.Blocks.Type(block)
-	for i := range q.ticks {
-		if t, _ := r.d.conf.Blocks.Type(q.ticks[i].block); q.ticks[i].pos == pos && t == typ {
-			return true
+	return typ
+}
+
+// loadTicks fills c's tick queues from its column, leaving out ticks outside the chunk and
+// ticks for blocks no longer there.
+func (r *Region) loadTicks(c *Chunk, col *chunk.Column) {
+	air := r.d.conf.Blocks.Air()
+	present := func(pos cube.Pos, typ uint32) bool {
+		if pos[0]>>4 != int(c.pos[0]) || pos[2]>>4 != int(c.pos[1]) || pos[1] < r.d.r[0] || pos[1] > r.d.r[1] {
+			return false
 		}
+		x, y, z := uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15) //nolint:gosec // masked and range-checked
+		for layer := range uint8(2) {
+			if b := col.Chunk.Block(x, y, z, layer); b != air && r.blockType(b) == typ {
+				return true
+			}
+		}
+		return false
 	}
-	return false
+	c.ticks.load(col.ScheduledBlocks, col.Tick, r.blockType, present)
+	c.ticks.rebase(r.d.sched.CurrentTick())
+	c.randomTicks.load(col.RandomTicks, col.RandomTick, r.blockType, present)
 }
 
 // ScheduleTick asks for a queued tick of block at pos in delay ticks, as
@@ -227,26 +361,10 @@ func (r *Region) CancelTick(pos cube.Pos, block uint32) {
 	if !ok {
 		return
 	}
-	typ, _ := r.d.conf.Blocks.Type(block)
-	q := &c.ticks
-	kept := q.ticks[:0]
-	for _, t := range q.ticks {
-		if tt, _ := r.d.conf.Blocks.Type(t.block); t.pos != pos || tt != typ {
-			kept = append(kept, t)
-		}
+	if _, i, ok := c.ticks.at(pos, r.blockType(block)); ok {
+		c.ticks.remove(i)
+		c.ticksDirty = true
 	}
-	if len(kept) == len(q.ticks) {
-		return
-	}
-	q.ticks = kept
-	// A sorted list is a valid heap.
-	slices.SortFunc(q.ticks, func(a, b scheduledTick) int {
-		if a.before(&b) {
-			return -1
-		}
-		return 1
-	})
-	c.ticksDirty = true
 }
 
 // ScheduledTickAt reports whether a tick for block's type is waiting at pos
@@ -256,15 +374,9 @@ func (r *Region) ScheduledTickAt(pos cube.Pos, block uint32, delay int32) bool {
 	if !ok {
 		return false
 	}
-	q := &c.ticks
-	typ, _ := r.d.conf.Blocks.Type(block)
-	for i := range q.ticks {
-		t := &q.ticks[i]
-		if tt, _ := r.d.conf.Blocks.Type(t.block); t.pos == pos && tt == typ && t.time == q.clock+int64(delay) {
-			return true
-		}
-	}
-	return false
+	t, _, ok := c.ticks.at(pos, r.blockType(block))
+	at := c.ticks.clock + int64(delay)
+	return ok && (t.time == at || t.later == at)
 }
 
 func (r *Region) schedule(pos cube.Pos, block uint32, delay, priority int32, random bool) bool {
@@ -280,7 +392,7 @@ func (r *Region) schedule(pos cube.Pos, block uint32, delay, priority int32, ran
 	if random {
 		q = &c.randomTicks
 	}
-	q.push(pos, block, q.clock+int64(delay), priority)
+	q.push(pos, block, r.blockType(block), q.clock+int64(delay), priority)
 	c.ticksDirty = true
 	return true
 }
@@ -336,8 +448,12 @@ func (r *Region) runQueue(c *Chunk, q *tickQueue, now int64) {
 	c.ticksDirty = true
 	for _, t := range r.due {
 		if !r.neighboursLoaded(t.pos, tickNeighbourhood) {
-			q.push(t.pos, t.block, q.clock, t.priority)
+			q.pushLater(t.pos, t.block, t.typ, q.clock, t.priority, t.later)
 			continue
+		}
+		if t.later > t.time {
+			// Put back first, so ticks the block asks for now merge into it.
+			q.push(t.pos, t.block, t.typ, t.later, t.priority)
 		}
 		r.queuedTick(t.pos, t.block)
 	}
