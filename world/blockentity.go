@@ -75,7 +75,8 @@ func (h ChunkHandle) Changed() {
 // BlockEntities makes block entities: the engine's list of those it runs.
 type BlockEntities interface {
 	// Load returns the live form of a saved block entity. False keeps it saved
-	// as it is, as for those the engine does not run yet.
+	// as it is, as for those the engine does not run yet. Runs: on a chunk load
+	// worker, many at once, so it may read only saved and data that never changes.
 	Load(pos cube.Pos, saved map[string]any) (BlockEntity, bool)
 	// New returns the block entity block makes, or nil. It is asked whenever a
 	// block changes type, so it must be cheap.
@@ -126,19 +127,24 @@ func (s savedBlockEntity) SaveData(cube.Pos) map[string]any { return s.data }
 // NetworkData returns the data without what the client never needs.
 func (s savedBlockEntity) NetworkData(cube.Pos) map[string]any { return savedNetworkData(s.data) }
 
-// loadBlockEntities turns the saved block entities of a chunk that just loaded
-// into live ones.
-func (r *Region) loadBlockEntities(c *Chunk) {
-	saved := c.col.BlockEntities
-	c.col.BlockEntities = nil
-	defer r.addListeners(c)
+// loadedBlockEntity is a block entity a load worker made, waiting to join its chunk.
+type loadedBlockEntity struct {
+	pos cube.Pos
+	be  BlockEntity
+}
+
+// makeBlockEntities turns the saved block entities of a chunk being loaded into live ones. It
+// runs on the load worker, not the tick: a chunk of huge chests takes hundreds of
+// milliseconds to read into items, which would stall its region's tick.
+func (d *Dimension) makeBlockEntities(saved []chunk.BlockEntity) []loadedBlockEntity {
 	if len(saved) == 0 {
-		return
+		return nil
 	}
 	var maker BlockEntities
-	if m := r.d.blockEntities.Load(); m != nil {
+	if m := d.blockEntities.Load(); m != nil {
 		maker = *m
 	}
+	out := make([]loadedBlockEntity, 0, len(saved))
 	for _, s := range saved {
 		var be BlockEntity = savedBlockEntity{data: s.Data}
 		if maker != nil {
@@ -146,7 +152,16 @@ func (r *Region) loadBlockEntities(c *Chunk) {
 				be = live
 			}
 		}
-		c.addBlockEntity(s.Pos, be)
+		out = append(out, loadedBlockEntity{pos: s.Pos, be: be})
+	}
+	return out
+}
+
+// loadBlockEntities adds the block entities a load worker made to a chunk that just joined.
+func (r *Region) loadBlockEntities(c *Chunk, loaded []loadedBlockEntity) {
+	defer r.addListeners(c)
+	for _, l := range loaded {
+		c.addBlockEntity(l.pos, l.be)
 	}
 }
 
@@ -177,6 +192,7 @@ func (r *Region) addListeners(c *Chunk) {
 					}
 					if be := (*m).New(b); be != nil {
 						c.addBlockEntity(pos, be)
+						c.dirty = true // a new block entity the store does not have yet
 					}
 				}
 			}

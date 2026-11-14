@@ -487,7 +487,7 @@ func (r *Region) requestMissing() {
 }
 
 // arrive takes a chunk a worker loaded.
-func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool, light *chunkLight, settle []chunk.ScheduledBlockUpdate) {
+func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, discard bool, light *chunkLight, settle []chunk.ScheduledBlockUpdate, live []loadedBlockEntity) {
 	delete(r.loading, pos)
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
@@ -500,7 +500,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	r.chunks[pos] = c
 	r.joinLight(c)
 	c.savedLive = r.loadEntities(c)
-	r.loadBlockEntities(c)
+	r.loadBlockEntities(c, live)
 	if fns, ok := r.awaiting[pos]; ok {
 		delete(r.awaiting, pos)
 		for _, fn := range fns {
@@ -647,12 +647,18 @@ func (r *Region) save(c *Chunk, ticks, force bool) {
 	if c.discard || !c.dirty && (!ticks || !c.ticksDirty && !c.savedLive && !r.holdsSaved(c.pos)) {
 		return
 	}
+	// Block entities change only with a change that marks the chunk dirty; a save for
+	// entities or tick queues alone keeps the stored ones instead of encoding them again.
+	keepBlockEntities := !c.dirty
 	c.dirty, c.ticksDirty, c.fullPending = false, false, false
 	c.saveWait = r.saveDelay(c)
 	d, pos, snap := r.d, c.pos, *c.col
 	snap.Chunk = c.col.Chunk.Snapshot()
 	snap.Entities, c.savedLive = r.entitiesToSave(c)
-	snap.BlockEntities = c.savedBlockEntities()
+	snap.KeepBlockEntities = keepBlockEntities
+	if !keepBlockEntities {
+		snap.BlockEntities = c.savedBlockEntities()
+	}
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	d.pool.do(pos, func() {

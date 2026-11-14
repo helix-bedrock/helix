@@ -117,9 +117,9 @@ func (p *Player) tickUILeftovers() {
 	p.flush()
 }
 
-// compounds reads an NBT list of compounds.
+// compounds reads an NBT list of compounds, decoding one kept as a Raw (packItems).
 func compounds(v any) []map[string]any {
-	l, _ := v.([]any)
+	l, _ := unpacked(v).([]any)
 	out := make([]map[string]any, 0, len(l))
 	for _, x := range l {
 		if m, ok := x.(map[string]any); ok {

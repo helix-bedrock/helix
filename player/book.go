@@ -12,8 +12,15 @@ import (
 // "photoname" (0xC909470) in the "pages" list, at most 50 pages; signing (0xC6D7D90 ->
 // 0xC6D8430) writes author, xuid, title and generation 0 and turns it into one written book.
 // Anything else in the slot becomes nothing, which BDS then does not put back.
+//
+// BDS takes text of any length, so one client can grow a book by megabytes a page. Helix's own
+// rule: an edit whose page text is over bookMaxPageBytes, or whose photo name, title, author or
+// XUID is over bookMaxFieldBytes, is ignored. Both are far above what the client's book screen
+// lets a player type.
 const (
 	bookMaxPages      = 50
+	bookMaxPageBytes  = 4096
+	bookMaxFieldBytes = 256
 	bookPageTextTag   = "text"
 	bookPagePhotoTag  = "photoname"
 	bookAuthorTag     = "author"
@@ -31,6 +38,9 @@ func handleBookEdit(p *Player, pk *packet.BookEdit) {
 	}
 	book := inv.main[slot]
 	if book.Name != nameWritableBook {
+		return
+	}
+	if !bookEditFits(pk) {
 		return
 	}
 	book.Tag = cloneNBT(book.Tag)
@@ -52,6 +62,12 @@ func handleBookEdit(p *Player, pk *packet.BookEdit) {
 	p.sendSlot(slot)
 	p.sendEquipment()
 	p.flush()
+}
+
+// bookEditFits reports whether every string of the edit is within Helix's book limits.
+func bookEditFits(pk *packet.BookEdit) bool {
+	return len(pk.Text) <= bookMaxPageBytes && len(pk.PhotoName) <= bookMaxFieldBytes &&
+		len(pk.Title) <= bookMaxFieldBytes && len(pk.Author) <= bookMaxFieldBytes && len(pk.XUID) <= bookMaxFieldBytes
 }
 
 // signBook turns the book and quill into one written book by the packet's author, as BDS:

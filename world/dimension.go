@@ -493,7 +493,9 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
-	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle) })
+	live := d.makeBlockEntities(col.BlockEntities)
+	col.BlockEntities = nil
+	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })
 }
 
 // tickSafely is runTick with a panic recovered and passed to the scheduler's handler.

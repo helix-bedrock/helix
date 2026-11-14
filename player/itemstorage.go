@@ -7,6 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -104,8 +105,8 @@ func (s ItemStack) networkTag(own bool) map[string]any {
 	if !own {
 		delete(tag, bookPagesTag)
 	}
-	if list, ok := tag[shulkerItemsTag].([]any); ok {
-		tag[shulkerItemsTag] = shownItems(list)
+	if list, ok := shownItemsOf(tag[shulkerItemsTag]); ok {
+		tag[shulkerItemsTag] = list
 	}
 	return tag
 }
@@ -118,8 +119,11 @@ func hasPages(tag map[string]any) bool {
 
 // holdsItems reports whether a tag holds items, as a shulker box item's does.
 func holdsItems(tag map[string]any) bool {
-	_, ok := tag[shulkerItemsTag].([]any)
-	return ok
+	switch tag[shulkerItemsTag].(type) {
+	case []any, nbt.Raw:
+		return true
+	}
+	return false
 }
 
 // shownItems is a list of saved items as the client gets it inside another item: each
@@ -144,8 +148,8 @@ func shownCompound(m map[string]any) map[string]any {
 	}
 	tag := maps.Clone(t)
 	delete(tag, bookPagesTag)
-	if list, ok := tag[shulkerItemsTag].([]any); ok {
-		tag[shulkerItemsTag] = shownItems(list)
+	if list, ok := shownItemsOf(tag[shulkerItemsTag]); ok {
+		tag[shulkerItemsTag] = list
 	}
 	out := maps.Clone(m)
 	out["tag"] = tag

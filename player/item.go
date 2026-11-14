@@ -60,6 +60,7 @@ func itemFromNBT(m map[string]any) ItemStack {
 	s.Meta, _ = m["Damage"].(int16)
 	s.Block, _ = m["Block"].(map[string]any)
 	s.Tag, _ = m["tag"].(map[string]any)
+	s.Tag = packItems(s.Tag)
 	s.readStored()
 	for k, v := range m {
 		switch k {

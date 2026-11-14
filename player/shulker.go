@@ -112,7 +112,7 @@ func (s *Host) shulkerDrops(r *world.Region, pos cube.Pos, items []ItemStack) []
 			continue
 		}
 		if len(held) > 0 {
-			items[i] = withTag(items[i], shulkerItemsTag, held)
+			items[i] = withTag(items[i], shulkerItemsTag, packedItems(held))
 		}
 		if name != "" {
 			items[i] = withTag(items[i], "display", map[string]any{"Name": name})
