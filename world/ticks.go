@@ -231,39 +231,51 @@ func (q *tickQueue) merge(i int, block uint32, time int64, priority int32, later
 	}
 }
 
-// swap swaps two heap slots and keeps the index right.
-func (q *tickQueue) swap(i, j int) {
-	q.ticks[i], q.ticks[j] = q.ticks[j], q.ticks[i]
-	q.index[tickKey{q.ticks[i].pos, q.ticks[i].typ}] = int32(i) //nolint:gosec // at most a chunk of ticks
-	q.index[tickKey{q.ticks[j].pos, q.ticks[j].typ}] = int32(j) //nolint:gosec // at most a chunk of ticks
+// place puts t in slot i and records it in the index.
+func (q *tickQueue) place(i int, t scheduledTick) {
+	q.ticks[i] = t
+	q.index[tickKey{t.pos, t.typ}] = int32(i) //nolint:gosec // at most a chunk of ticks
 }
 
+// up moves the tick in slot i towards the root. Ticks it passes shift down into the hole it
+// leaves, so each moved tick writes the index once instead of twice per swap.
 func (q *tickQueue) up(i int) {
+	t := q.ticks[i]
+	start := i
 	for i > 0 {
 		parent := (i - 1) / 2
-		if !q.ticks[i].before(&q.ticks[parent]) {
-			return
+		if !t.before(&q.ticks[parent]) {
+			break
 		}
-		q.swap(i, parent)
+		q.place(i, q.ticks[parent])
 		i = parent
+	}
+	if i != start {
+		q.place(i, t)
 	}
 }
 
+// down moves the tick in slot i towards the leaves, as up does the other way.
 func (q *tickQueue) down(i int) {
 	n := len(q.ticks)
+	t := q.ticks[i]
+	start := i
 	for {
-		l, small := 2*i+1, i
-		if l < n && q.ticks[l].before(&q.ticks[small]) {
+		l, small := 2*i+1, -1
+		if l < n && q.ticks[l].before(&t) {
 			small = l
 		}
-		if r := l + 1; r < n && q.ticks[r].before(&q.ticks[small]) {
+		if r := l + 1; r < n && q.ticks[r].before(&t) && (small < 0 || q.ticks[r].before(&q.ticks[l])) {
 			small = r
 		}
-		if small == i {
-			return
+		if small < 0 {
+			break
 		}
-		q.swap(i, small)
+		q.place(i, q.ticks[small])
 		i = small
+	}
+	if i != start {
+		q.place(i, t)
 	}
 }
 
@@ -271,11 +283,11 @@ func (q *tickQueue) down(i int) {
 func (q *tickQueue) remove(i int) scheduledTick {
 	t := q.ticks[i]
 	last := len(q.ticks) - 1
+	delete(q.index, tickKey{t.pos, t.typ})
 	if i != last {
-		q.swap(i, last)
+		q.place(i, q.ticks[last])
 	}
 	q.ticks = q.ticks[:last]
-	delete(q.index, tickKey{t.pos, t.typ})
 	if i < last {
 		q.down(i)
 		q.up(i)
