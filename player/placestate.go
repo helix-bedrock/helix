@@ -137,6 +137,9 @@ func vanillaPlaceState(pl *Placement) (uint32, bool) {
 	if flowerBeds[name] {
 		return flowerBedState(pl)
 	}
+	if name == nameSeaPickle {
+		return seaPickleState(pl)
+	}
 	if isCandleBlock(name) {
 		return candleState(pl)
 	}

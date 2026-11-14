@@ -99,6 +99,8 @@ const (
 	kindNote
 	kindTarget
 	kindTrapped
+	// kindDripleaf is a big dripleaf, which power keeps level.
+	kindDripleaf
 	kindDaylight
 	kindHook
 	kindTripWire
@@ -148,6 +150,8 @@ func kindOf(name string) kind {
 		return kindTarget
 	case nameTrapped:
 		return kindTrapped
+	case nameDripleaf:
+		return kindDripleaf
 	case nameDaylight, nameDaylightInverted:
 		return kindDaylight
 	case nameHook:
@@ -261,6 +265,8 @@ type Ticker struct {
 	entityPush EntityPushFunc
 	// powerTNT is what power reaching a TNT block does.
 	powerTNT func(r *world.Region, pos cube.Pos)
+	// powerDripleaf is what power reaching a big dripleaf does.
+	powerDripleaf func(r *world.Region, pos cube.Pos)
 }
 
 // localKey finds a region's circuit state on it.
@@ -859,7 +865,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)
 		}
-	case kindNote, kindTNT, kindBell:
+	case kindNote, kindTNT, kindBell, kindDripleaf:
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetAllowUp(true)
 		}
@@ -948,6 +954,10 @@ func (c *regionCircuit) PowerChanged(p redstone.Pos, strength, previous int16, f
 	case kindTNT:
 		if on && t.powerTNT != nil {
 			t.powerTNT(c.r, pos)
+		}
+	case kindDripleaf:
+		if on && t.powerDripleaf != nil {
+			t.powerDripleaf(c.r, pos)
 		}
 	case kindDispenser:
 		triggered := bitState(t.blocks.States(block), stateTriggered)

@@ -15,7 +15,8 @@
 //     rooted dirt 0xD53DCC0) and the hoe's on_tool_used (0xC981EA0).
 //
 // The other farmable plants (torchflowers, pitcher crops, nether wart, sweet berries, cocoa,
-// sugar cane, cactus) are in plants.go. Bamboo and kelp are in bamboo.go. Not ported: saplings, mobs trampling
+// sugar cane, cactus) are in plants.go. Bamboo and kelp are in bamboo.go; vines, weeping, twisting and cave vines in vines.go; big and
+// small dripleaf in dripleaf.go; sea pickles in pickle.go. Not ported: saplings, mobs trampling
 // (only players do in Helix), and raids eating crops (minecraft:on_raided).
 package farm
 
@@ -138,6 +139,16 @@ const (
 	kindSapling
 	// kindFoliage is a flower, grass or other foliage of foliage.go; crop is its rule.
 	kindFoliage
+	// kindVine is a vine; age is its vine_direction_bits.
+	kindVine
+	// kindNetherVine is weeping or twisting vines (facing); kindCaveVine is cave vines
+	// (facing: plain, body or head with berries).
+	kindNetherVine
+	kindCaveVine
+	// kindBigDripleaf is a big dripleaf (age its tilt, facing 1 for a head, crop its
+	// direction); kindSmallDripleaf a small dripleaf half (facing 1 for the upper).
+	kindBigDripleaf
+	kindSmallDripleaf
 )
 
 // plant reports whether k is one of the plants in plants.go.
@@ -204,8 +215,14 @@ type Ticker struct {
 	foliageKit *foliageKit
 	// grassBlockKit holds what grass blocks need.
 	grassBlockKit *grassBlockKit
+	// vineKit holds the vines, leafKit the dripleaves, pickleKit the sea pickles.
+	vineKit   *vineKit
+	leafKit   *leafKit
+	pickleKit *pickleKit
 	// support says which block faces hold things; nil for none.
 	support atomic.Pointer[SupportFunc]
+	// power says whether redstone powers a block; nil for never.
+	power atomic.Pointer[PowerFunc]
 }
 
 // The crops BDS builds with CropBlock, in the order their definitions are kept.
@@ -288,6 +305,9 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.composterKit = t.newComposterKit()
 	t.foliageKit = t.newFoliageKit()
 	t.grassBlockKit = t.newGrassBlockKit()
+	t.vineKit = t.newVineKit()
+	t.leafKit = t.newLeafKit()
+	t.pickleKit = t.newPickleKit()
 	return t
 }
 
@@ -347,7 +367,8 @@ func (t *Ticker) skyDarken() uint8 {
 // RandomTicks takes farmland's, crops' and stems' random ticks and the next ticker's.
 func (t *Ticker) RandomTicks(block uint32, layer uint8) bool {
 	k := t.state(block).kind
-	return layer == 0 && k != kindNone && k != kindKelp && k != kindComposter && k != kindFoliage || t.BlockTicker.RandomTicks(block, layer)
+	return layer == 0 && k != kindNone && k != kindKelp && k != kindComposter && k != kindFoliage &&
+		k != kindNetherVine && k != kindBigDripleaf && k != kindSmallDripleaf || t.BlockTicker.RandomTicks(block, layer)
 }
 
 // RandomTick runs farmland's, a crop's or a stem's random tick, and the next ticker's for
@@ -363,6 +384,10 @@ func (t *Ticker) RandomTick(r *world.Region, pos cube.Pos, block uint32, layer u
 			t.stemTick(r, pos, block, s)
 		case kindGrassBlock:
 			t.grassTick(r, pos)
+		case kindVine:
+			t.vineTick(r, pos, s)
+		case kindCaveVine:
+			t.caveVineTick(r, pos, s)
 		default:
 			if s.kind.plant() {
 				t.plantTick(r, pos, s)
@@ -392,7 +417,19 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		}
 	case kindComposter:
 		t.composterTick(r, pos)
+	case kindNetherVine:
+		if now, ok := r.Block(pos, 0); ok && t.state(now).kind == kindNetherVine {
+			t.netherVineTick(r, pos, now, t.state(now))
+		}
+	case kindBigDripleaf:
+		if now, ok := r.Block(pos, 0); ok && t.state(now).kind == kindBigDripleaf {
+			t.bigLeafTick(r, pos, now, t.state(now))
+		}
 	default:
+		if t.isPickle(block) {
+			t.pickleTick(r, pos)
+			return
+		}
 		if s := t.state(block); s.kind.plant() {
 			if now, ok := r.Block(pos, 0); ok && t.state(now).kind == s.kind && !t.plantSurvives(r, pos, t.state(now)) && t.fall != nil {
 				t.fall(r, pos, now)
@@ -422,7 +459,19 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 				r.ScheduleTick(pos, block, surviveDelay, 0)
 			}
 			t.letGoOfFruit(r, pos, from, s)
+		case kindVine:
+			t.vineNeighbourChanged(r, pos, block, s)
+		case kindNetherVine:
+			t.netherVineNeighbourChanged(r, pos, from, block, s)
+		case kindBigDripleaf:
+			if (from == pos.Side(cube.FaceUp) || from == pos.Side(cube.FaceDown)) && !t.bigLeafSurvives(r, pos) {
+				r.ScheduleTick(pos, block, surviveDelay, 0)
+			}
 		default:
+			if t.isPickle(block) {
+				r.ScheduleTick(pos, block, surviveDelay, 0)
+				break
+			}
 			if s.kind.plant() && !t.plantSurvives(r, pos, s) {
 				r.ScheduleTick(pos, block, surviveDelay, 0)
 			}
@@ -440,6 +489,12 @@ func (t *Ticker) MayPlace(r *world.Region, pos cube.Pos, block uint32) bool {
 		return t.farmlandSurvives(r, pos)
 	case kindCrop, kindStem:
 		return t.survives(r, pos, block)
+	}
+	switch s := t.state(block); s.kind {
+	case kindVine:
+		return s.age != 0 && t.vineAttached(r, pos, int(s.age)) == int(s.age)
+	case kindSmallDripleaf:
+		return s.facing != 0 || t.smallLeafMayPlace(r, pos)
 	}
 	if s := t.state(block); s.kind == kindFoliage && foliageRule(s.crop) == ruleDouble {
 		return s.facing == 1 || t.doublePlantMayPlace(r, pos)

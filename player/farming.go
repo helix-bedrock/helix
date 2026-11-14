@@ -125,6 +125,48 @@ func (p *Player) pickBerries(r *world.Region, u *BlockUse) bool {
 	})
 }
 
+// pickGlowBerries is a cave vine with berries' use (BDS 0xCB517C0): it drops its drops (the
+// glow berries), plays the pick sound and goes back to plain cave vines. False if the click
+// was not taken.
+func (p *Player) pickGlowBerries(r *world.Region, u *BlockUse) bool {
+	f := p.s.farm
+	if f == nil {
+		return false
+	}
+	return f.PickGlowBerries(r, u.Pos, func(block uint32) {
+		items, _ := p.s.game.sys.Drops(p.s, block, &loot.Context{})
+		for _, it := range items {
+			d := NewBlockDrop(u.Pos, it)
+			p.s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+		}
+		playSound(r, u.Pos, soundEvent{name: packet.SoundEventCaveVinesPickBerries, pos: blockCenter(u.Pos), extra: -1}, nil)
+	})
+}
+
+// shearPlantTip is shears on the tip of weeping, twisting or cave vines: it stops growing and
+// the shears wear by 1. False if the click was not taken.
+func (p *Player) shearPlantTip(r *world.Region, u *BlockUse) bool {
+	f := p.s.farm
+	if f == nil || !f.ShearPlantTip(r, u.Pos, u.Item.Name) {
+		return false
+	}
+	p.hurtHeld(1)
+	return true
+}
+
+// standOnDripleaf tips a big dripleaf the player stands on.
+func (p *Player) standOnDripleaf(r *world.Region, feet mgl32.Vec3) {
+	f := p.s.farm
+	if f == nil {
+		return
+	}
+	f.StandOnDripleaf(r, vecPos(feet), feet[1])
+	f.StandOnDripleaf(r, vecPos(feet.Sub(mgl32.Vec3{0, standBelow, 0})), feet[1])
+}
+
+// standBelow is how far under the feet the block stood on is looked for.
+const standBelow = 0.01
+
 // trample is FarmBlock's fall-on for the player landing after falling distance: the
 // farmland it lands on may turn to dirt. BDS lets a player trample with the mine ability.
 func (p *Player) trample(r *world.Region, feet mgl32.Vec3, distance float32) {

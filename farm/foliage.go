@@ -38,8 +38,8 @@ import (
 //   - wall coral fans (0xCB33650) and shelf mushrooms (0xD49F6F0): the block behind them must
 //     hold things on the face they point out of.
 //
-// Not ported: coral blocks' and fans' dying out of water and coral plants (one tick with both),
-// and small dripleaf (its two halves and water).
+// Not ported: coral blocks' and fans' dying out of water and coral plants (one tick with both).
+// Small dripleaf is in dripleaf.go.
 
 // foliageRule is what a foliage block stands on.
 type foliageRule uint8

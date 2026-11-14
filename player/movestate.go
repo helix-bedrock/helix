@@ -212,6 +212,9 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 	}
 	p.move.climbing, p.move.inWater, p.move.onGround = m.Climbing, m.InWater, m.OnGround
 	p.trackVibrations(r, &m)
+	if m.OnGround {
+		p.standOnDripleaf(r, to.Sub(mgl32.Vec3{0, eyeHeight, 0}))
+	}
 	sys := p.s.game.sys
 	sys.Fall(p, &m)
 	// BDS's FoodExhaustionSystem leaves out anyone riding.

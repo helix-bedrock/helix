@@ -393,6 +393,15 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 			t.kelpPlaced(r, pos)
 		case kindFoliage:
 			t.doublePlantPlaced(r, pos, block)
+			t.pickleLive(r, pos, block)
+		case kindNetherVine:
+			t.netherVinePlaced(r, pos, t.state(block))
+		case kindCaveVine:
+			t.caveVinePlaced(r, pos, t.state(block))
+		case kindBigDripleaf:
+			t.bigLeafPlaced(r, pos)
+		case kindSmallDripleaf:
+			t.smallLeafPlaced(r, pos, t.state(block))
 		case kindComposter:
 			if t.state(block).age == composterReady {
 				r.ScheduleTick(pos, block, composterDelay, 0)

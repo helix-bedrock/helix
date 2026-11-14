@@ -14,9 +14,9 @@ import (
 	"github.com/helix-bedrock/helix/circuit"
 	"github.com/helix-bedrock/helix/connect"
 	"github.com/helix-bedrock/helix/daytime"
+	"github.com/helix-bedrock/helix/drip"
 	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/farm"
-	"github.com/helix-bedrock/helix/drip"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
@@ -262,6 +262,8 @@ func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
 		return nil, err
 	}
 	circuits.SetSettings(s.redstone)
+	circuits.SetPowerDripleaf(s.farm.DripleafPowered)
+	s.farm.SetPower(circuits.Powered)
 	s.circuits = circuits
 	return circuits, nil
 }

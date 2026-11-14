@@ -285,6 +285,13 @@ func (t *Ticker) Fertilizable(block uint32) bool {
 		return true
 	case kindPitcher:
 		return s.facing == pitcherLower
+	case kindNetherVine, kindSmallDripleaf:
+		return true
+	case kindCaveVine:
+		return s.facing == caveVinePlain
+	case kindBigDripleaf:
+		// BDS's canBeFertilized reads the world (room above the column); Fertilize answers.
+		return true
 	}
-	return false
+	return t.isPickle(block)
 }

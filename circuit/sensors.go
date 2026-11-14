@@ -21,6 +21,7 @@ const (
 	nameNote             = "minecraft:noteblock"
 	nameTarget           = "minecraft:target"
 	nameTrapped          = "minecraft:trapped_chest"
+	nameDripleaf         = "minecraft:big_dripleaf"
 	nameDaylight         = "minecraft:daylight_detector"
 	nameDaylightInverted = "minecraft:daylight_detector_inverted"
 	nameLightPlate       = "minecraft:light_weighted_pressure_plate"
@@ -449,6 +450,13 @@ func (t *Ticker) playNote(r *world.Region, pos cube.Pos, note uint8) {
 
 // nameTNT is the block redstone lights.
 const nameTNT = "minecraft:tnt"
+
+// SetPowerDripleaf sets what power reaching a big dripleaf does (BDS's 0xCCDBA50: a tilted
+// head goes back up). Call it before the world ticks.
+func (t *Ticker) SetPowerDripleaf(fn func(r *world.Region, pos cube.Pos)) { t.powerDripleaf = fn }
+
+// Powered reports whether the circuit part at pos has power. Runs: owner of the region.
+func (t *Ticker) Powered(r *world.Region, pos cube.Pos) bool { return t.Signal(r, pos) > 0 }
 
 // SetPowerTNT sets what power reaching a TNT block does. Call it before the world ticks.
 func (t *Ticker) SetPowerTNT(fn func(r *world.Region, pos cube.Pos)) { t.powerTNT = fn }

@@ -297,6 +297,16 @@ func (t *Ticker) plantSurvives(r *world.Region, pos cube.Pos, s stateInfo) bool 
 		return t.bambooSurvives(r, pos, s)
 	case kindKelp:
 		return t.kelpSurvives(r, pos)
+	case kindVine:
+		return t.vineSurvives(r, pos, s)
+	case kindNetherVine:
+		return t.netherVineSurvives(r, pos, s)
+	case kindCaveVine:
+		return t.caveVineSurvives(r, pos)
+	case kindBigDripleaf:
+		return t.bigLeafSurvives(r, pos)
+	case kindSmallDripleaf:
+		return t.smallLeafSurvives(r, pos, s)
 	}
 	k := t.plantKit
 	below, ok := r.Block(pos.Side(cube.FaceDown), 0)
@@ -407,6 +417,19 @@ func (t *Ticker) fertilizePlant(r *world.Region, pos cube.Pos, s stateInfo, crea
 		return t.fertilizeBamboo(r, pos, s)
 	case kindKelp:
 		return t.fertilizeKelp(r, pos)
+	case kindNetherVine:
+		return t.fertilizeNetherVine(r, pos, s)
+	case kindCaveVine:
+		return t.fertilizeCaveVine(r, pos, s)
+	case kindBigDripleaf:
+		return t.fertilizeBigLeaf(r, pos)
+	case kindSmallDripleaf:
+		return t.fertilizeSmallLeaf(r, pos, s)
+	case kindFoliage:
+		b, _ := r.Block(pos, 0)
+		if t.isPickle(b) {
+			return t.fertilizePickle(r, pos)
+		}
 	}
 	return false
 }
