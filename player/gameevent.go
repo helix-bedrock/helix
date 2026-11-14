@@ -20,6 +20,7 @@ const (
 	gameEventBlockDestroy     int32 = 6
 	gameEventBlockPlace       int32 = 9
 	gameEventEntityMove       int32 = 22
+	gameEventEntityPlace      int32 = 23
 	gameEventHitGround        int32 = 31
 	gameEventItemInteractEnd  int32 = 32
 	gameEventItemInteractBeg  int32 = 33

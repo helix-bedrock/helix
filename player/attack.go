@@ -87,7 +87,7 @@ func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
 	if p.dead() || p.entity == nil {
 		return
 	}
-	if p.useOnCart(d) || p.useOnBoat(d) || p.useOnCushion(d) || p.useOnPainting(d) || p.useOnKnot(d) || p.useOnMob(d) || p.useOnProjectile(d) {
+	if p.useOnCart(d) || p.useOnBoat(d) || p.useOnCushion(d) || p.useOnPainting(d) || p.useOnEndCrystal(d) || p.useOnKnot(d) || p.useOnMob(d) || p.useOnProjectile(d) {
 		return
 	}
 	if d.ActionType != protocol.UseItemOnEntityActionAttack {

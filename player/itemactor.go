@@ -185,6 +185,8 @@ func (s *Host) loadEntity(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity)
 		return s.loadKnot(r, at, saved)
 	case isProjectile(id):
 		return s.loadProjectile(r, at, saved, id)
+	case id == nameEnderCrystal:
+		return s.loadEndCrystal(r, at, saved)
 	case id == nameAreaEffectCloud:
 		return s.loadCloud(r, at, saved)
 	case s.CanSpawnMob(id):

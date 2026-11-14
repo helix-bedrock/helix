@@ -776,6 +776,8 @@ type projectileHit struct {
 	player *Player
 	// mob is the mob hit, when a mob and not a player was hit.
 	mob *Mob
+	// crystal is the end crystal hit, when one was.
+	crystal *EndCrystal
 	// entity is the entity hit.
 	entity *world.Entity
 	// normal is the hit block face's outward direction, zero if not worked out.
@@ -827,10 +829,12 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 				continue
 			}
 			hit.mob = target
+		case *EndCrystal:
+			hit.crystal = target
 		default:
 			continue
 		}
-		boxLo, boxHi, has := o.Owner().(Living).BlastBox()
+		boxLo, boxHi, has := o.Owner().(Blastable).BlastBox()
 		if !has {
 			continue
 		}
@@ -946,9 +950,12 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, kind projectileHitKind) {
 	t.hitSound(r, hit.pos)
 	if kind == projectileHitEntity {
-		if hit.mob != nil {
+		switch {
+		case hit.crystal != nil:
+			hit.crystal.Hurt(t.spec.DamageMax, t.owner)
+		case hit.mob != nil:
 			t.hitMob(hit.mob)
-		} else {
+		default:
 			t.hitPlayer(hit.player)
 		}
 		// BDS's Piercing (0xC9AF5C0 gives the arrow the level and level + 1 hits): it flies

@@ -195,6 +195,9 @@ func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, cli
 	if held.Name == namePowderSnowBucket {
 		return p.pourPowderSnow(clicked, face), true
 	}
+	if held.Name == nameEndCrystalItem {
+		return p.placeEndCrystal(r, clicked), true
+	}
 	if held.Name == paintingID {
 		return p.placePainting(r, clicked, face), true
 	}
