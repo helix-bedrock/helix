@@ -696,6 +696,8 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return p.storageAccepts(r, s)
 	case protocol.ContainerFurnaceFuel:
 		return p.furnaceFuelAllowed(s)
+	case protocol.ContainerFurnaceIngredient, protocol.ContainerBlastFurnaceIngredient, protocol.ContainerSmokerIngredient:
+		return p.furnaceInputAllowed(s)
 	case protocol.ContainerBrewingStandInput, protocol.ContainerBrewingStandResult, protocol.ContainerBrewingStandFuel:
 		return p.brewingAllows(r.kind, s)
 	case protocol.ContainerEnchantingInput:

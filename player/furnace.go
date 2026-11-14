@@ -739,3 +739,25 @@ func (p *Player) furnaceFuelAllowed(s ItemStack) bool {
 	}
 	return p.s.fuelAllowed(r, c.furnace, s)
 }
+
+// furnaceInputAllowed is the open furnace's ingredient slot: only an item the furnace has a
+// recipe for. BDS's server lets anything in (FurnaceIngredientContainerValidation's
+// isItemAllowed 0xC9FCC10 is true), but its client refuses an item with no recipe for the
+// furnace's tag (FurnaceInputContainerController, client 1.26.60.4 sub_101278C8); Helix
+// refuses it too, so the client puts the item back.
+func (p *Player) furnaceInputAllowed(s ItemStack) bool {
+	if p.entity == nil {
+		return false
+	}
+	r := p.entity.Region()
+	if r == nil {
+		return false
+	}
+	c := p.windowChest(r)
+	if c == nil || c.furnace == nil {
+		return false
+	}
+	_, resultFn, _ := p.s.furnaceSystems()
+	_, ok := resultFn(FurnaceInfo{Region: r, Pos: c.pos, Furnace: c.furnace}, s)
+	return ok
+}
