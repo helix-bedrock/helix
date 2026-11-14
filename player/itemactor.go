@@ -207,6 +207,10 @@ func (s *Host) loadItem(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) b
 	if stack.Empty() {
 		return false
 	}
+	// The stack holds the item now, packed; keeping the decoded copy too held every dropped
+	// shulker box of books twice, once as millions of map entries and strings. saveEntity
+	// writes Item from the stack again.
+	delete(saved.Data, "Item")
 	i := &ItemActor{s: s, stack: stack, saved: saved.Data, health: itemHealth}
 	if h, isShort := saved.Data["Health"].(int16); isShort {
 		i.health = int32(h)
