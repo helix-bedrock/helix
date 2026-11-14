@@ -24,8 +24,8 @@ github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24 h1:LfqBsExOqu
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24/go.mod h1:yQ1PGHcnA4woFMDY+OWLn49Rwp81/oZzcceMTNYCRms=
 github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10 h1:vWYgr0UyPulMmaDLMoFb2JQ4bqV9jG8OlvYyGSHtxWo=
 github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10/go.mod h1:UdQL83vfle8JIWhik6ndKLW6+brtmXKELsFwkerAvRA=
-github.com/helix-bedrock/world v0.0.0-20261114062940-4f059032a1be h1:MdisjJpIdZVDeIaiJaBu886ulNu6k1hn8CwQZ/kcUKA=
-github.com/helix-bedrock/world v0.0.0-20261114062940-4f059032a1be/go.mod h1:UViFHufUZJj+gXfRI61BpBOE/XODGGTt5LAjrPtKvpQ=
+github.com/helix-bedrock/world v0.0.0-20261114064129-62b4ad19742f h1:C+Aq4TxKZYecKfwwKHuPV4IaHYN4TKJHf9HNfxJ7rMs=
+github.com/helix-bedrock/world v0.0.0-20261114064129-62b4ad19742f/go.mod h1:UViFHufUZJj+gXfRI61BpBOE/XODGGTt5LAjrPtKvpQ=
 github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb h1:Jp5NwMaRuQsw7ImQ1gPeA+eMElA+EsLwzndDufnu3oI=
 github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/hx"
 	"github.com/helix-bedrock/world/hxdb"
@@ -98,6 +99,9 @@ func TestBDSWorldStart(t *testing.T) {
 		return c
 	}
 	start = time.Now()
+	viewed := viewWalk(t, dir, reg.Blocks)
+	t.Logf("read as shown only (terrain + block entities without Items) %+v in %v", viewed, time.Since(start).Round(time.Millisecond))
+	start = time.Now()
 	first := walk(true)
 	t.Logf("loaded and stored %+v in %v", first, time.Since(start).Round(time.Millisecond))
 	second := walk(false)
@@ -162,4 +166,37 @@ func copyDir(t *testing.T, src, dst string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// viewWalk reads every chunk as a chunk only shown is read (world/stage.go).
+func viewWalk(t *testing.T, dir string, blocks chunk.BlockRegistry) (c struct{ chunks, blockEntities, blockEntityBytes int }) {
+	t.Helper()
+	db, err := hxdb.Config{Blocks: blocks, SkipBlockEntities: true}.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hidden := func(name string) bool {
+		return name == "Items" || name == "Findable" || name == "LootTable" || name == "LootTableSeed"
+	}
+	for _, dim := range []hx.Dimension{hx.Overworld, hx.Nether, hx.End} {
+		var all []hx.ChunkPos
+		if err := db.World().EachChunk(dim, func(pos hx.ChunkPos) bool { all = append(all, pos); return true }); err != nil {
+			t.Fatal(err)
+		}
+		for _, pos := range all {
+			if _, err := db.LoadTerrain(mcdb.ChunkPos(pos), mcdb.Dimension(dim)); err != nil {
+				t.Fatal(err)
+			}
+			c.chunks++
+			if err := db.EachBlockEntityView(mcdb.ChunkPos(pos), mcdb.Dimension(dim), hidden, func(_ cube.Pos, raw []byte) error {
+				c.blockEntities++
+				c.blockEntityBytes += len(raw)
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return c
 }

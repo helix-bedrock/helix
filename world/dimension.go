@@ -427,13 +427,18 @@ func (d *Dimension) postViewer(v *Viewer, fn func(*Region)) {
 // want registers v as waiting for the encoded chunk at pos and starts
 // making it if nobody has.
 func (d *Dimension) want(pos mcdb.ChunkPos, v *Viewer) {
+	prio := viewPriority(dist2(pos, v.lastCentre))
 	d.loadMu.Lock()
 	d.waiters[pos] = append(d.waiters[pos], v)
 	start := !d.pending[pos]
 	d.pending[pos] = true
 	d.loadMu.Unlock()
-	if start && !d.postAt(pos, func(o *Region) { o.produce(pos) }) {
-		d.poolLoad(pos)
+	if !start {
+		d.pool.raise(pos, prio)
+		return
+	}
+	if !d.postAt(pos, func(o *Region) { o.produce(pos, prio) }) {
+		d.poolLoad(pos, prio, false)
 	}
 }
 
@@ -458,13 +463,19 @@ func (d *Dimension) encodedUnloaded(c *Chunk, nc *NetChunk, version uint64) {
 		d.publish(c.pos, nc)
 		return
 	}
-	d.poolLoad(c.pos)
+	d.poolLoad(c.pos, prioView, false)
 }
 
-func (d *Dimension) poolLoad(pos mcdb.ChunkPos) {
-	d.pool.do(pos, func() {
+// poolLoad queues a load of the chunk at pos: whole for a region that holds
+// it (full), else only as far as players are shown it.
+func (d *Dimension) poolLoad(pos mcdb.ChunkPos, prio priority, full bool) {
+	d.pool.do(pos, prio, func() {
 		defer d.sched.recovered(d.log)
-		d.load(pos)
+		if full {
+			d.load(pos)
+		} else {
+			d.loadView(pos)
+		}
 	})
 }
 

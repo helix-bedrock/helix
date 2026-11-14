@@ -118,7 +118,7 @@ func (h ChunkHandle) StoredLater(pos cube.Pos, done func(r *Region, saved map[st
 		return
 	}
 	d, c := h.d, h.c
-	d.pool.do(c.pos, func() {
+	d.pool.do(c.pos, prioNeeded, func() {
 		defer d.sched.recovered(d.log)
 		saved, err := h.Stored(pos)
 		d.postAt(c.pos, func(r *Region) {

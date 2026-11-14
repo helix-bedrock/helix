@@ -132,9 +132,18 @@ sibling library folders, so unreleased library changes are used.
   region (a teleport) is handed, with its player's entity and its queued
   work, to the region owning the new section or a new one, as entities
   are handed off, instead of merging the two regions. Loads, generation, network encoding and
-  saves run on a worker pool, jobs for one chunk in order on one worker. Each player is a `Viewer`
+  saves run on a worker pool (`pool.go`) that takes the most urgent first:
+  chunks held loaded and block entities being opened, then chunks shown
+  (nearest to a player first, raised when a player comes nearer), then
+  unload saves, then auto-saves; every 8th pick is the oldest, so nothing
+  starves. Jobs for one chunk run one at a time in order, on any free
+  worker. Each player is a `Viewer`
   with two zones: the simulation zone is held loaded, the view zone is
-  sent and released. Encoded chunks (`NetChunk`) are shared by every
+  sent and released. Chunks load in stages (`stage.go`): a held chunk
+  loads whole, one only shown loads its terrain and its block entities'
+  network data (`TerrainLoader`, `BlockEntityViewer`; hxdb does both,
+  never reading a chest's Items for it), with no entities or live block
+  entities. Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the
   end of each tick from a copy-on-write snapshot, then wait
   `Config.SaveDelayTicks` (5 s by default), or 100 times as long as their

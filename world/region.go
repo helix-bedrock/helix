@@ -476,7 +476,7 @@ func (r *Region) request(pos mcdb.ChunkPos) {
 		return
 	}
 	r.loading[pos] = true
-	r.d.poolLoad(pos)
+	r.d.poolLoad(pos, prioNeeded, true)
 }
 
 // requestMissing requests every held chunk not loaded, after the region
@@ -524,8 +524,10 @@ func (r *Region) runAt(pos mcdb.ChunkPos, fn func(*Region)) {
 	r.hold(pos)
 }
 
-// produce makes the encoded chunk at pos for players waiting for it.
-func (r *Region) produce(pos mcdb.ChunkPos) {
+// produce makes the encoded chunk at pos for players waiting for it, prio
+// urgent. A chunk the region holds is loaded whole; one only shown is read as
+// far as its network form needs (loadView).
+func (r *Region) produce(pos mcdb.ChunkPos, prio priority) {
 	if c, ok := r.chunks[pos]; ok {
 		switch {
 		case c.net != nil:
@@ -536,12 +538,15 @@ func (r *Region) produce(pos mcdb.ChunkPos) {
 		return
 	}
 	if r.loading[pos] {
+		r.d.pool.raise(pos, prio)
 		return
 	}
-	if r.holds[pos] > 0 && r.owns(pos) {
+	full := r.holds[pos] > 0 && r.owns(pos)
+	if full {
 		r.loading[pos] = true
+		prio = prioNeeded
 	}
-	r.d.poolLoad(pos)
+	r.d.poolLoad(pos, prio, full)
 }
 
 // netChunk returns the encoded chunk at pos if one is ready, starting an
@@ -562,7 +567,7 @@ func (r *Region) encode(c *Chunk) {
 	c.encoding = true
 	d, pos := r.d, c.pos
 	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
-	d.pool.do(pos, func() {
+	d.pool.do(pos, prioView, func() {
 		nc := encodeNetChunk(pos, d.conf.Dim, snap, entities)
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
@@ -663,7 +668,11 @@ func (r *Region) save(c *Chunk, ticks, force bool) {
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	c.saving.Add(1)
-	d.pool.do(pos, func() {
+	prio := prioAutoSave
+	if force {
+		prio = prioSave
+	}
+	d.pool.do(pos, prio, func() {
 		defer c.saving.Add(-1)
 		start := time.Now()
 		if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, &snap); err != nil {
