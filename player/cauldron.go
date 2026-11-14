@@ -146,14 +146,10 @@ func (c *Cauldron) Potion() int32 { return c.potion }
 // Colour returns the dye colour of its water (ARGB), and whether it is dyed.
 func (c *Cauldron) Colour() (uint32, bool) { return c.colour, c.dyed }
 
-// changed marks it for saving and tells the clients. The block is sent again after the data:
-// the client draws the liquid's colour into the chunk and redraws it on a block update, so
-// a colour sent after the block's update (a dye, which keeps the level) showed only when
-// something else redrew the chunk.
+// changed marks it for saving and tells the clients.
 func (c *Cauldron) changed(r *world.Region, pos cube.Pos) {
 	c.chunk.Changed()
 	r.SendBlockEntity(pos)
-	r.ResendBlock(pos)
 }
 
 // clear takes out the potion and the dye.
@@ -593,13 +589,16 @@ func (cu *cauldronUse) washShulker() {
 }
 
 // addDye is a dye in water: one is used (none in creative) and mixed into the colour; the level
-// stays.
+// stays. As BDS's use does (its dye branch sets the level one lower, then back), the level
+// changes for a moment: the client draws the colour into the chunk and redraws it only when
+// the block changes, so without it the new colour showed only when something else did.
 func (cu *cauldronUse) addDye(dye uint8) {
 	s := cu.p.s
 	if !cu.p.creative() {
 		cu.p.useHeld()
 	}
 	cu.c.mixDye(dye)
+	s.setCauldronLevel(cu.r, cu.pos, cu.c, cu.level-1, cauldronWater)
 	s.setCauldronLevel(cu.r, cu.pos, cu.c, cu.level, cauldronWater)
 	cu.post(gameEventBlockChange)
 	s.cauldronEvent(cu.r, cu.pos, cu.c, packet.LevelEventCauldronAddDye)
