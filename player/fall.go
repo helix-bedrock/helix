@@ -37,8 +37,11 @@ type DamageSource struct {
 // fallBigDamage is the damage from which BDS plays the big fall sound; fallFree is
 // how far a fall costs nothing.
 const (
-	fallBigDamage = 5
-	fallFree      = 3
+	// gameRuleFallDamage turns all fall damage off: landings and ender pearls, for
+	// players and mobs alike.
+	gameRuleFallDamage = "falldamage"
+	fallBigDamage      = 5
+	fallFree           = 3
 )
 
 // vanillaFall is BDS's fall distance (Actor::checkFallDamage, with the
@@ -71,6 +74,13 @@ func vanillaFall(p *Player, m *MoveInfo) {
 	}
 }
 
+// fallHurts reports whether the falldamage game rule lets falls hurt; a level without
+// the rule keeps fall damage on.
+func (s *Host) fallHurts() bool {
+	on, ok := s.GameRule(gameRuleFallDamage)
+	return on || !ok
+}
+
 // vanillaFallDamage is BDS's landing (the block's fall-on, then the
 // player's causeFallDamage): damage ceil(distance - 3 - jump boost level),
 // a big or small fall sound when it hurts, then the fall or land sound of
@@ -86,6 +96,9 @@ func vanillaFallDamage(p *Player, distance float32) {
 		boost = float32(amp + 1)
 	}
 	damage := float32(math.Ceil(float64(distance-p.Tuning(TuneFallFree)-boost))) * p.Tuning(TuneFallDamageScale)
+	if !p.s.fallHurts() {
+		damage = 0
+	}
 	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
 	pos := vecPos(feet)
 	p.trample(r, feet, distance)

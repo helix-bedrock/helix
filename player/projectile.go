@@ -1191,7 +1191,9 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: packet.TeleportCauseProjectile}),
 	})
 	p.flush()
-	p.s.game.sys.Hurt(p, pearlDamage, DamageSource{Cause: DamageFall})
+	if p.s.fallHurts() {
+		p.s.game.sys.Hurt(p, pearlDamage, DamageSource{Cause: DamageFall})
+	}
 }
 
 func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {

@@ -241,6 +241,9 @@ func (m *Mob) hasFamily(f string) bool { return slices.Contains(m.m.Families(), 
 // change the fall are not counted: mobs have no effects yet.
 func (s *Host) landed(r *world.Region, l Living, feet mgl32.Vec3, distance float32, typ string) {
 	damage := float32(math.Ceil(float64(distance-s.Tuning(TuneFallFree)))) * s.Tuning(TuneFallDamageScale)
+	if !s.fallHurts() {
+		damage = 0
+	}
 	pos := floorPos(feet)
 	if damage > 0 {
 		sound := packet.SoundEventFallSmall
