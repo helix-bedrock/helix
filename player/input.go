@@ -6,6 +6,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -211,6 +212,13 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		return
 	}
 	sys := p.s.game.sys
+	if req, ok := pk.ItemStackRequest.Value(); ok && pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
+		// The client sends some requests (the held tool's mine block action) inside its
+		// input, before the block actions it goes with. They need a response like any other:
+		// a client whose request is never answered keeps its slots locked and its
+		// predictions unconfirmed, so stacks stop moving and the hotbar shows stale items.
+		handleItemStackRequest(p, &packet.ItemStackRequest{Requests: []protocol.ItemStackRequest{req}})
+	}
 	if !p.dead() {
 		if actions, ok := pk.BlockActions.Value(); ok {
 			p.handleBlockActions(actions)

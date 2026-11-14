@@ -341,6 +341,8 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 		return p.craftGrindstone(a)
 	case *protocol.CraftLoomRecipeStackRequestAction:
 		return p.craftLoom(a)
+	case *protocol.MineBlockStackRequestAction:
+		return p.mineBlockAction(a)
 	case *protocol.CraftResultsDeprecatedStackRequestAction:
 		// The client follows every craft (creative ones too) with the
 		// items it expects; the server made the result itself, so the
@@ -722,4 +724,23 @@ func hasEnchant(s ItemStack, id int16) bool {
 		}
 	}
 	return false
+}
+
+// mineBlockAction is the held tool's mine block action, sent in the player's input as it
+// breaks a block. The server wears the tool itself when the block breaks, so the client's
+// predicted durability changes nothing: the action only checks the client names the stack
+// the server holds in that hotbar slot, and the response gives the slot as the server has it.
+func (p *Player) mineBlockAction(a *protocol.MineBlockStackRequestAction) (uint8, []slotRef) {
+	if a.HotbarSlot < 0 || a.HotbarSlot >= hotbarSize {
+		return protocol.ItemStackResponseStatusError, nil
+	}
+	r, ok := p.validate(protocol.StackRequestSlotInfo{
+		Container:      protocol.FullContainerName{ContainerID: containerHotbar},
+		Slot:           byte(a.HotbarSlot),
+		StackNetworkID: a.StackNetworkID,
+	}, false)
+	if !ok {
+		return protocol.ItemStackResponseStatusError, nil
+	}
+	return protocol.ItemStackResponseStatusOK, []slotRef{r}
 }
