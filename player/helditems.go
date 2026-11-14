@@ -17,6 +17,11 @@ import (
 // Helix's own rule, beyond BDS, which keeps them in the item. Nothing needs them while the
 // item only lies, moves or is shown: the client is shown them without book pages, kept with
 // the reference. They are read back only when they are taken out (a box placed).
+//
+// A book's pages go the same way (a full book is about 38 KB of text, a crafted one up to
+// 1.6 MB): the tag keeps a holder under "pages", saved as hx.PagesRefTag. They are read back
+// only where the pages are used: the book sent to its holder's own slots (where the client
+// reads it), edited, or shown on a lectern.
 
 // heldOffloadBytes is the size of contents at which they move to their own record: below
 // it a reference and a record cost more than they save.
@@ -46,6 +51,10 @@ type heldItems struct {
 	sum    [32]byte
 	// queued is set once the holder is handed to the writer.
 	queued atomic.Bool
+	// pages is set for a book's pages, saved under hx.PagesRefTag; else they are items.
+	pages bool
+	// from is the writer that stored the list, which reads it back.
+	from atomic.Pointer[heldWriter]
 }
 
 // newHeld is a holder of raw, a list, when it is big enough to go to disk, else nil.
@@ -58,6 +67,17 @@ func newHeld(raw nbt.Raw) *heldItems {
 		return nil
 	}
 	h := &heldItems{size: raw.Len(), shown: shown}
+	h.raw.Store(&raw)
+	return h
+}
+
+// newHeldPages is a holder of a book's pages, when big enough, else nil.
+func newHeldPages(pages []any) *heldItems {
+	raw, err := nbt.MarshalRaw(pages, nbt.LittleEndian)
+	if err != nil || raw.Len() < heldOffloadBytes || !raw.IsList() {
+		return nil
+	}
+	h := &heldItems{size: raw.Len(), pages: true}
 	h.raw.Store(&raw)
 	return h
 }
@@ -89,6 +109,9 @@ func heldFromRef(m map[string]any) *heldItems {
 
 // saved is the tag entry the holder saves as: the reference once stored, else the list.
 func (h *heldItems) saved() (string, any) {
+	if h.stored.Load() && h.pages {
+		return hx.PagesRefTag, hx.NewItemsRef(h.sum, int32(min(h.size, 1<<31-1)), nil) //nolint:gosec // capped
+	}
 	if h.stored.Load() {
 		var shown any
 		if !h.shown.IsZero() {
@@ -97,9 +120,17 @@ func (h *heldItems) saved() (string, any) {
 		return hx.ItemsRefTag, hx.NewItemsRef(h.sum, int32(min(h.size, 1<<31-1)), shown) //nolint:gosec // capped
 	}
 	if r := h.raw.Load(); r != nil {
-		return shulkerItemsTag, *r
+		return h.listTag(), *r
 	}
 	return "", nil
+}
+
+// listTag is the tag the holder stands in for.
+func (h *heldItems) listTag() string {
+	if h.pages {
+		return bookPagesTag
+	}
+	return shulkerItemsTag
 }
 
 // list is the held items, read from disk if they are there. Without a store, or on a read
@@ -108,7 +139,15 @@ func (h *heldItems) list(store ItemContents) (nbt.Raw, bool) {
 	if r := h.raw.Load(); r != nil {
 		return *r, true
 	}
-	if store == nil || !h.stored.Load() {
+	if !h.stored.Load() {
+		return nbt.Raw{}, false
+	}
+	if store == nil {
+		if w := h.from.Load(); w != nil {
+			store = w.store
+		}
+	}
+	if store == nil {
 		return nbt.Raw{}, false
 	}
 	b, err := store.LoadItems(h.sum, nil)
@@ -121,22 +160,78 @@ func (h *heldItems) list(store ItemContents) (nbt.Raw, bool) {
 // savedTagOf is tag as saved: every holder in it turned into its list or its reference.
 // The tag passed is not changed.
 func savedTagOf(tag map[string]any) map[string]any {
-	h, ok := tag[shulkerItemsTag].(*heldItems)
-	if !ok {
+	items, pages := tagHolder(tag), pagesHolder(tag)
+	if items == nil && pages == nil {
 		return tag
 	}
 	tag = maps.Clone(tag)
-	delete(tag, shulkerItemsTag)
-	if key, v := h.saved(); key != "" {
-		tag[key] = v
+	for _, h := range [...]*heldItems{items, pages} {
+		if h == nil {
+			continue
+		}
+		delete(tag, h.listTag())
+		if key, v := h.saved(); key != "" {
+			tag[key] = v
+		}
 	}
 	return tag
 }
 
-// tagHolder is the holder a tag keeps, or nil.
+// tagHolder is the holder of items a tag keeps, or nil.
 func tagHolder(tag map[string]any) *heldItems {
 	h, _ := tag[shulkerItemsTag].(*heldItems)
 	return h
+}
+
+// pagesHolder is the holder of book pages a tag keeps, or nil.
+func pagesHolder(tag map[string]any) *heldItems {
+	h, _ := tag[bookPagesTag].(*heldItems)
+	return h
+}
+
+// sameHeld reports whether two holders hold the same list: one holder, or both stored
+// under one sum.
+func sameHeld(a, b *heldItems) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil || !a.stored.Load() || !b.stored.Load() {
+		return false
+	}
+	return a.sum == b.sum && a.pages == b.pages
+}
+
+// pagesOf is a book's pages as a list, read from disk when they are there; a tag without a
+// holder gives its pages as they are. ok is false when stored pages cannot be read.
+func pagesOf(tag map[string]any) (any, bool) {
+	h := pagesHolder(tag)
+	if h == nil {
+		return tag[bookPagesTag], true
+	}
+	r, ok := h.list(nil)
+	if !ok {
+		return nil, false
+	}
+	v, err := r.Value()
+	if err != nil {
+		return nil, false
+	}
+	return v, true
+}
+
+// withPages is tag with its stored pages read back as a list: a copy when it had a holder,
+// else tag itself. Pages that cannot be read are left out.
+func withPages(tag map[string]any) map[string]any {
+	if pagesHolder(tag) == nil {
+		return tag
+	}
+	tag = maps.Clone(tag)
+	if v, ok := pagesOf(tag); ok {
+		tag[bookPagesTag] = v
+	} else {
+		delete(tag, bookPagesTag)
+	}
+	return tag
 }
 
 // heldWriter moves held items to disk on its own goroutine, in batches.
@@ -172,12 +267,31 @@ func (s *Host) stopHeldWriter() {
 
 // offload hands every big holder in the stack's tag to the writer. Runs: anywhere.
 func (s *Host) offload(st ItemStack) {
-	h := tagHolder(st.Tag)
-	if s.held == nil || h == nil || h.stored.Load() || !h.queued.CompareAndSwap(false, true) {
+	if s.held == nil {
+		return
+	}
+	for _, h := range [...]*heldItems{tagHolder(st.Tag), pagesHolder(st.Tag)} {
+		s.held.offload(h)
+	}
+}
+
+// offload hands the holder to the writer, unless it is stored or queued; a stored one read
+// from a reference is given the writer to read it back with.
+func (w *heldWriter) offload(h *heldItems) {
+	if h == nil {
+		return
+	}
+	if h.stored.Load() {
+		if h.from.Load() == nil {
+			h.from.CompareAndSwap(nil, w)
+		}
+		return
+	}
+	if !h.queued.CompareAndSwap(false, true) {
 		return
 	}
 	select {
-	case s.held.queue <- h:
+	case w.queue <- h:
 	default:
 		h.queued.Store(false)
 	}
@@ -257,6 +371,7 @@ func (w *heldWriter) write(batch []*heldItems) {
 		return
 	}
 	for _, h := range kept {
+		h.from.Store(w)
 		h.stored.Store(true)
 		h.raw.Store(nil)
 	}

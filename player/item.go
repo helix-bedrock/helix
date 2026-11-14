@@ -52,14 +52,15 @@ func (s ItemStack) stacksWith(o ItemStack) bool {
 // only as the same holder, which is changed from another goroutine and never compared deeply.
 func tagsEqual(a, b map[string]any) bool {
 	ha, hb := tagHolder(a), tagHolder(b)
-	if ha == nil && hb == nil {
+	pa, pb := pagesHolder(a), pagesHolder(b)
+	if ha == nil && hb == nil && pa == nil && pb == nil {
 		return reflect.DeepEqual(a, b)
 	}
-	if ha != hb || len(a) != len(b) {
+	if !sameHeld(ha, hb) || !sameHeld(pa, pb) || len(a) != len(b) {
 		return false
 	}
 	for k, v := range a {
-		if k == shulkerItemsTag {
+		if k == shulkerItemsTag && ha != nil || k == bookPagesTag && pa != nil {
 			continue
 		}
 		if w, ok := b[k]; !ok || !reflect.DeepEqual(v, w) {

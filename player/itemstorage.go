@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/helix-bedrock/world/hx"
 	"maps"
 	"slices"
 
@@ -92,7 +93,7 @@ func (s ItemStack) savedTag() map[string]any {
 // of full books is about a megabyte with them, so a chest of such boxes would be one
 // packet of 28 MB. Helix's own rule, beyond BDS: the server's items keep everything.
 func (s ItemStack) networkTag(own bool) map[string]any {
-	if s.storageID == 0 && (own || !hasPages(s.Tag)) && !holdsItems(s.Tag) {
+	if s.storageID == 0 && (own && pagesHolder(s.Tag) == nil || !hasPages(s.Tag)) && !holdsItems(s.Tag) {
 		return s.Tag
 	}
 	tag := maps.Clone(s.Tag)
@@ -102,7 +103,9 @@ func (s ItemStack) networkTag(own bool) map[string]any {
 	if s.storageID != 0 {
 		tag[storageIDTag] = s.storageID - 1
 	}
-	if !own {
+	if own {
+		tag = withPages(tag)
+	} else {
 		delete(tag, bookPagesTag)
 	}
 	showHeld(tag)
@@ -112,7 +115,8 @@ func (s ItemStack) networkTag(own bool) map[string]any {
 // hasPages reports whether a tag holds book pages.
 func hasPages(tag map[string]any) bool {
 	_, ok := tag[bookPagesTag]
-	return ok
+	_, ref := tag[hx.PagesRefTag]
+	return ok || ref
 }
 
 // holdsItems reports whether a tag holds saved items: a shulker box item's Items, or a
@@ -162,6 +166,7 @@ func shownCompound(m map[string]any) map[string]any {
 	}
 	tag := maps.Clone(t)
 	delete(tag, bookPagesTag)
+	delete(tag, hx.PagesRefTag)
 	showHeld(tag)
 	out := maps.Clone(m)
 	out["tag"] = tag

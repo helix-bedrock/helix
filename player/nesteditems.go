@@ -17,8 +17,41 @@ import (
 
 // packItems is the tag with its item list turned into a Raw, or a holder when it is big
 // (helditems.go), and a saved reference to stored items turned into a holder. The tag is
-// returned as it was when it has neither. The tag passed is not changed.
+// returned as it was when it has neither. A book's pages are kept the same way when big
+// (packPages). The tag passed is not changed.
 func packItems(tag map[string]any) map[string]any {
+	return packPages(packContents(tag))
+}
+
+// packPages is the tag with big book pages, or a saved reference to stored pages, turned
+// into a holder. The tag passed is not changed.
+func packPages(tag map[string]any) map[string]any {
+	if ref, ok := tag[hx.PagesRefTag].(map[string]any); ok {
+		h := heldFromRef(ref)
+		if h == nil {
+			return tag
+		}
+		h.pages = true
+		tag = maps.Clone(tag)
+		delete(tag, hx.PagesRefTag)
+		tag[bookPagesTag] = h
+		return tag
+	}
+	list, ok := tag[bookPagesTag].([]any)
+	if !ok {
+		return tag
+	}
+	h := newHeldPages(list)
+	if h == nil {
+		return tag
+	}
+	tag = maps.Clone(tag)
+	tag[bookPagesTag] = h
+	return tag
+}
+
+// packContents is packItems for a box's items.
+func packContents(tag map[string]any) map[string]any {
 	if ref, ok := tag[hx.ItemsRefTag].(map[string]any); ok {
 		h := heldFromRef(ref)
 		if h == nil {
@@ -95,4 +128,4 @@ func shownItemsOf(v any) (any, bool) {
 }
 
 // isPagesTag reports whether a tag name is a book's pages.
-func isPagesTag(name string) bool { return name == bookPagesTag }
+func isPagesTag(name string) bool { return name == bookPagesTag || name == hx.PagesRefTag }

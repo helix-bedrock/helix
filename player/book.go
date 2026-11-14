@@ -43,7 +43,10 @@ func handleBookEdit(p *Player, pk *packet.BookEdit) {
 	if !bookEditFits(pk) {
 		return
 	}
-	book.Tag = cloneNBT(book.Tag)
+	if _, ok := pagesOf(book.Tag); !ok {
+		return
+	}
+	book.Tag = cloneNBT(withPages(book.Tag))
 	switch pk.ActionType {
 	case packet.BookActionReplacePage:
 		replacePage(book.Tag, int(pk.PageNumber), pk.Text, pk.PhotoName)

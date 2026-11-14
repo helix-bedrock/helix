@@ -96,9 +96,10 @@ func (l *Lectern) DropBook(r *world.Region, pos cube.Pos) {
 	l.s.spillSlots(r, items, blockVec(pos), true, chestPickupDelay)
 }
 
-// bookPages is how many pages a book holds: its pages list.
+// bookPages is how many pages a book holds: its pages list, read back if it is stored.
 func bookPages(book ItemStack) int32 {
-	list, _ := book.Tag[bookPagesTag].([]any)
+	v, _ := pagesOf(book.Tag)
+	list, _ := v.([]any)
 	return int32(len(list)) //nolint:gosec // a book's pages fit
 }
 
@@ -156,8 +157,17 @@ func (l *Lectern) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is the same: the client draws the book and opens it from this.
-func (l *Lectern) NetworkData(pos cube.Pos) map[string]any { return l.SaveData(pos) }
+// NetworkData is the same with the book's pages, read back if they are stored: the client
+// draws the book and opens it from this.
+func (l *Lectern) NetworkData(pos cube.Pos) map[string]any {
+	m := l.SaveData(pos)
+	if pagesHolder(l.book.Tag) != nil {
+		book := l.book
+		book.Tag = withPages(book.Tag)
+		m[lecternBookTag] = book.nbt(0, false)
+	}
+	return m
+}
 
 // isLecternBook reports whether a lectern takes the item: a book and quill or a written book.
 func isLecternBook(item ItemStack) bool {
