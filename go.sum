@@ -48,6 +48,8 @@ github.com/helix-bedrock/helix-data v0.0.0-20261113215546-0c598d36dd7f h1:yGSANe
 github.com/helix-bedrock/helix-data v0.0.0-20261113215546-0c598d36dd7f/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261114020848-26924f7971c4 h1:N6NCSKMMHUJJ+F+aLlwN3e+CbNLPdr7R6Pa/tL9AWwQ=
 github.com/helix-bedrock/helix-data v0.0.0-20261114020848-26924f7971c4/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
+github.com/helix-bedrock/helix-data v0.0.0-20261114021846-3a878d79a7bf h1:zDWV3YUCBkJpJ60CVVjjnLd5GIVLeoR+XakKSqM1n14=
+github.com/helix-bedrock/helix-data v0.0.0-20261114021846-3a878d79a7bf/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41 h1:XTa1sWqYUCqhxDdAGL9+vldnHfNIR5/VascyZWb9qYg=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41/go.mod h1:VnXHxKcm+E0FTmpjyXwTMPweBUqZ/QNDRABUVjSwRRE=
 github.com/helix-bedrock/protocol v0.0.0-20261110170100-e596cacb3f4a h1:raHrBN5pmPK5BCsvo3XdD872FRJbDaI+fB/NLRDgGNE=
@@ -76,6 +78,8 @@ github.com/helix-bedrock/world v0.0.0-20261114010643-48052cfecf17 h1:QospxeA80+3
 github.com/helix-bedrock/world v0.0.0-20261114010643-48052cfecf17/go.mod h1:SMru1fn9mSdYxzEAORk9vK6P7E1nKPv4UBvZRRfDUWw=
 github.com/helix-bedrock/world v0.0.0-20261114015057-b5e6affd10ee h1:TSeR4yrTJEUXj/nQhEnTrAjRTjonQvsdyTk022C1mKo=
 github.com/helix-bedrock/world v0.0.0-20261114015057-b5e6affd10ee/go.mod h1:JQBrJ4x8Hu75b3C/nxehHY0uNcCrr5aykHCQQpLEnKI=
+github.com/helix-bedrock/world v0.0.0-20261114022118-f876f66e06f1 h1:ezyBX8+7bjiVkHHVAgTOWrjiOX+GhlgfVLbTvXG2kVw=
+github.com/helix-bedrock/world v0.0.0-20261114022118-f876f66e06f1/go.mod h1:JQBrJ4x8Hu75b3C/nxehHY0uNcCrr5aykHCQQpLEnKI=
 github.com/helix-bedrock/worldgen v0.0.0-20261110172032-37f34ed98cbe h1:x1EVKEhCo0GUm87RwhIwFAj4qZorZwfefaXtyHcUuIY=
 github.com/helix-bedrock/worldgen v0.0.0-20261110172032-37f34ed98cbe/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb h1:Jp5NwMaRuQsw7ImQ1gPeA+eMElA+EsLwzndDufnu3oI=
