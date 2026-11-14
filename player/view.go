@@ -75,8 +75,9 @@ func (p *Player) movePacket(e *world.Entity) packet.Packet {
 // playerWidth is the player's hitbox width in BDS 1.26.60's synched data.
 const playerWidth = 0.6
 
-// ownFlags are the actor flags BDS gives a player on joining.
-const ownFlags = 1<<protocol.EntityDataFlagHasCollision | 1<<protocol.EntityDataFlagHasGravity
+// ownFlags are the actor flags BDS gives a player on joining, and the climb flag the player's
+// minecraft:can_climb component sets: without it the client never climbs ladders or vines.
+const ownFlags = 1<<protocol.EntityDataFlagHasCollision | 1<<protocol.EntityDataFlagHasGravity | 1<<protocol.EntityDataFlagClimb
 
 // ownFlagsTwo is the second set of actor flags BDS gives a player on joining. flagsPerSet
 // is how many flags each set holds.

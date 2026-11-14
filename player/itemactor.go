@@ -319,6 +319,10 @@ func (i *ItemActor) tick(e *world.Entity) {
 	if !st.rest {
 		i.place(r, e, st.pos, st.hitY)
 	}
+	if i.onGround {
+		// An item on a big dripleaf tips it, moving or at rest, as any actor standing on one does.
+		i.s.standOnDripleaf(r, e.Position().Sub(mgl32.Vec3{0, itemHalfSize, 0}))
+	}
 	i.sendViews(e)
 	i.age++
 	if lifetime := i.lifetimeTicks(); lifetime != ItemLifetimeForever && i.age >= lifetime {

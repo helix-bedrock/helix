@@ -155,7 +155,7 @@ func (p *Player) shearPlantTip(r *world.Region, u *BlockUse) bool {
 	return true
 }
 
-// standOnDripleaf tips a big dripleaf a player or mob with its feet at feet stands on.
+// standOnDripleaf tips a big dripleaf a player, mob or item with its feet at feet stands on.
 // Runs: the region's owner, once a tick for each.
 func (s *Host) standOnDripleaf(r *world.Region, feet mgl32.Vec3) {
 	f := s.farm
