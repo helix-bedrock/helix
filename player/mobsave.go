@@ -270,7 +270,9 @@ func (o *Mob) loadEquipment(data map[string]any) {
 			return ItemStack{}
 		}
 		m, _ := l[0].(map[string]any)
-		return itemFromNBT(m)
+		it := itemFromNBT(m)
+		o.s.offload(it)
+		return it
 	}
 	if it := first(mobKeyMainhand); !it.Empty() {
 		o.setItem(mob.EquipMainhand, it)
@@ -285,6 +287,7 @@ func (o *Mob) loadEquipment(data map[string]any) {
 		}
 		m, _ := armour[i].(map[string]any)
 		if it := itemFromNBT(m); !it.Empty() {
+			o.s.offload(it)
 			o.setItem(slot, it)
 		}
 	}

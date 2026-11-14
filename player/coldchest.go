@@ -181,8 +181,7 @@ func (c *Chest) fillItems(saved map[string]any) {
 	for _, item := range compounds(saved["Items"]) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < c.halfSize() {
-			c.items[slot] = withID(itemFromNBT(item), c.s.nextStackID)
-			c.s.offload(c.items[slot])
+			c.items[slot] = c.s.loadedItem(item)
 		}
 	}
 }

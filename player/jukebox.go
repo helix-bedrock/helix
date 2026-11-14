@@ -68,7 +68,7 @@ type jukeboxEntity struct {
 func (s *Host) loadJukebox(saved map[string]any) *jukeboxEntity {
 	e := &jukeboxEntity{s: s, saved: maps.Clone(saved), finished: true}
 	if item, ok := saved[recordItemTag].(map[string]any); ok {
-		e.record = withID(itemFromNBT(item), s.nextStackID)
+		e.record = s.loadedItem(item)
 	}
 	delete(e.saved, recordItemTag)
 	return e

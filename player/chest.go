@@ -448,7 +448,7 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	for _, item := range compounds(saved["Items"]) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < chestSize {
-			c.items[slot] = withID(itemFromNBT(item), e.s.nextStackID)
+			c.items[slot] = e.s.loadedItem(item)
 		}
 	}
 	if v, ok := saved["pairlead"].(uint8); ok {

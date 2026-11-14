@@ -120,7 +120,7 @@ func (s *Host) loadDecoratedPot(saved map[string]any) *DecoratedPot {
 	dp.saved = maps.Clone(saved)
 	dp.setSherds(saved)
 	if m, ok := saved[decoratedPotItemTag].(map[string]any); ok {
-		dp.item = withID(itemFromNBT(m), s.nextStackID)
+		dp.item = s.loadedItem(m)
 	}
 	dp.anim, _ = saved[decoratedPotAnimTag].(uint8)
 	for _, k := range [...]string{decoratedPotSherdsTag, decoratedPotItemTag, decoratedPotAnimTag} {
@@ -173,8 +173,13 @@ func (dp *DecoratedPot) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is the same: the client draws the sherds, the item and the animation from it.
-func (dp *DecoratedPot) NetworkData(pos cube.Pos) map[string]any { return dp.SaveData(pos) }
+// NetworkData is the same, with the item as shown (shownNBT): the client draws the sherds,
+// the item and the animation from it.
+func (dp *DecoratedPot) NetworkData(pos cube.Pos) map[string]any {
+	m := dp.SaveData(pos)
+	m[decoratedPotItemTag] = dp.item.shownNBT()
+	return m
+}
 
 // BlockEntityRemoved is BDS's onRemove: what the pot held drops.
 func (dp *DecoratedPot) BlockEntityRemoved(r *world.Region, pos cube.Pos) {

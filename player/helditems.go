@@ -183,6 +183,14 @@ func (s *Host) offload(st ItemStack) {
 	}
 }
 
+// loadedItem is a saved item read back with a network ID, its big contents handed to the
+// writer. Every holder of items loads through it.
+func (s *Host) loadedItem(m map[string]any) ItemStack {
+	st := withID(itemFromNBT(m), s.nextStackID)
+	s.offload(st)
+	return st
+}
+
 // heldList is what a held item list holds: the holder's items, read from disk if they are
 // there, or v as it is.
 func (s *Host) heldList(v any) any {

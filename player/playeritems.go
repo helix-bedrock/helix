@@ -50,6 +50,15 @@ func (inv *playerItems) Slot(i int) ItemStack {
 	return inv.main[i]
 }
 
+// offload hands the big contents of every item to the Host's writer (helditems.go).
+func (inv *playerItems) offload(s *Host) {
+	for _, list := range [...][]ItemStack{inv.main[:], inv.armor[:], inv.offhand[:], inv.ui[:], inv.ender[:]} {
+		for _, it := range list {
+			s.offload(it)
+		}
+	}
+}
+
 // load reads the items BDS saved: Inventory and PlayerUIItems by their
 // Slot, Armor and Offhand in order. Each stack gets a network ID.
 func (inv *playerItems) load(data map[string]any, ids func() int32) {

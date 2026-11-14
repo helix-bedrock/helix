@@ -202,7 +202,7 @@ func (t *Projectile) loadTrident(data map[string]any) {
 		return
 	}
 	if m, ok := data[tridentKey].(map[string]any); ok {
-		t.item = withID(itemFromNBT(m), t.s.nextStackID)
+		t.item = t.s.loadedItem(m)
 	}
 	t.trident = &tridentState{
 		loyalty: heldEnchant(t.item, enchantLoyalty), impaling: heldEnchant(t.item, EnchantImpaling), channeling: heldEnchant(t.item, EnchantChanneling),

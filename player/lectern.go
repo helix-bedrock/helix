@@ -128,7 +128,7 @@ func (s *Host) loadLectern(saved map[string]any) *Lectern {
 	l := &Lectern{s: s, saved: maps.Clone(saved)}
 	if has, _ := saved[lecternHasBookTag].(uint8); has != 0 {
 		if m, ok := saved[lecternBookTag].(map[string]any); ok {
-			l.book = withID(itemFromNBT(m), s.nextStackID)
+			l.book = s.loadedItem(m)
 		}
 		l.page, _ = saved[lecternPageTag].(int32)
 		l.pages, _ = saved[lecternPagesTag].(int32)

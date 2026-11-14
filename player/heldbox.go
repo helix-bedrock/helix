@@ -40,7 +40,7 @@ func (c *Chest) warmFromHeld() bool {
 	}
 	for _, item := range compounds(list) {
 		if slot, ok := item["Slot"].(uint8); ok && int(slot) < chestSize {
-			c.items[slot] = withID(itemFromNBT(item), c.s.nextStackID)
+			c.items[slot] = c.s.loadedItem(item)
 		}
 	}
 	c.boxHeld, c.cold, c.idle, c.coldSlots = nil, false, 0, [chestSize]coldSlot{}

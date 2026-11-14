@@ -619,7 +619,7 @@ func (s *Host) loadBoat(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, i
 		for _, item := range compounds(saved.Data[boatKeyItems]) {
 			slot, _ := item["Slot"].(uint8)
 			if int(slot) < b.chest.halfSize() {
-				b.chest.items[slot] = withID(itemFromNBT(item), s.nextStackID)
+				b.chest.items[slot] = s.loadedItem(item)
 			}
 		}
 		delete(b.saved, boatKeyItems)

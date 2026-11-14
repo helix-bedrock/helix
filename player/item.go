@@ -119,6 +119,40 @@ func (s ItemStack) nbt(slot int, withSlot bool) map[string]any {
 	return m
 }
 
+// shownNBT is the item in its saved form as a client is shown it in a block entity's data
+// (a frame, shelf, pot...): without book pages, and what it holds (a box's items, a bundle's)
+// without pages at any depth, as networkShown sends it. Helix's own rule, beyond BDS, which
+// sends the saved item whole: a frame holding a box of books would be a megabyte in every
+// chunk sent.
+func (s ItemStack) shownNBT() map[string]any {
+	m := s.nbt(0, false)
+	if s.Empty() {
+		return m
+	}
+	tag := maps.Clone(s.networkTag(false))
+	delete(tag, storageIDTag)
+	if !s.storedEmpty() {
+		if tag == nil {
+			tag = map[string]any{}
+		}
+		list := make([]any, 0, len(s.stored))
+		for i, it := range s.stored {
+			if !it.Empty() {
+				shown := it.shownNBT()
+				shown["Slot"] = uint8(i) //nolint:gosec // bundle slots are few
+				list = append(list, shown)
+			}
+		}
+		tag[storedContentTag], tag[storedWeightTag] = list, s.storedWeight
+	}
+	if len(tag) == 0 {
+		delete(m, "tag")
+	} else {
+		m["tag"] = tag
+	}
+	return m
+}
+
 // network returns the stack as the client gets it in the player's own slots. An item
 // the registry no longer has is sent as nothing.
 func (s ItemStack) network(reg *registry.Registry) protocol.ItemInstance {
@@ -181,4 +215,13 @@ func (s ItemStack) maxStack(reg *registry.Registry) uint8 {
 		return t.MaxStack
 	}
 	return 0
+}
+
+// shownList is items as a block entity's data shows them, slot by slot (shownNBT).
+func shownList(items []ItemStack) []any {
+	out := make([]any, len(items))
+	for i, it := range items {
+		out[i] = it.shownNBT()
+	}
+	return out
 }

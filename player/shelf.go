@@ -84,7 +84,7 @@ func (s *Host) loadShelf(saved map[string]any) *Shelf {
 			break
 		}
 		if m, ok := v.(map[string]any); ok {
-			sh.items[i] = withID(itemFromNBT(m), s.nextStackID)
+			sh.items[i] = s.loadedItem(m)
 		}
 	}
 	delete(sh.saved, shelfItemsTag)
@@ -108,8 +108,13 @@ func (sh *Shelf) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is the same: the client draws the items from it.
-func (sh *Shelf) NetworkData(pos cube.Pos) map[string]any { return sh.SaveData(pos) }
+// NetworkData is the same, with the items as shown (shownNBT): the client draws the items
+// from it.
+func (sh *Shelf) NetworkData(pos cube.Pos) map[string]any {
+	m := sh.SaveData(pos)
+	m[shelfItemsTag] = shownList(sh.items[:])
+	return m
+}
 
 // BlockEntityRemoved drops what was on a destroyed shelf, as a container's contents.
 func (sh *Shelf) BlockEntityRemoved(r *world.Region, pos cube.Pos) {

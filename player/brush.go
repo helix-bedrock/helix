@@ -104,7 +104,7 @@ func (s *Host) loadBrushable(saved map[string]any) *Brushable {
 		b.dir = d
 	}
 	if item, ok := saved[brushItemTag].(map[string]any); ok {
-		b.item = withID(itemFromNBT(item), s.nextStackID)
+		b.item = s.loadedItem(item)
 	}
 	b.decayOnLoad = b.count > 0
 	for _, k := range [...]string{brushCountTag, brushDirectionTag, brushItemTag} {
@@ -132,8 +132,15 @@ func (b *Brushable) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is what is saved: the client shows the item and the face from it.
-func (b *Brushable) NetworkData(pos cube.Pos) map[string]any { return b.SaveData(pos) }
+// NetworkData is what is saved, with the item as shown (shownNBT): the client shows the
+// item and the face from it.
+func (b *Brushable) NetworkData(pos cube.Pos) map[string]any {
+	m := b.SaveData(pos)
+	if !b.item.Empty() {
+		m[brushItemTag] = b.item.shownNBT()
+	}
+	return m
+}
 
 // changed marks it for saving and tells the clients.
 func (b *Brushable) changed(r *world.Region, pos cube.Pos) {

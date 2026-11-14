@@ -91,7 +91,7 @@ func (s *Host) loadMachine(pos cube.Pos, saved map[string]any, spec *machineSpec
 	for _, item := range compounds(saved["Items"]) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < spec.size {
-			c.items[slot] = withID(itemFromNBT(item), s.nextStackID)
+			c.items[slot] = s.loadedItem(item)
 		}
 	}
 	c.cooldown, _ = saved[transferCooldownTag].(int32)

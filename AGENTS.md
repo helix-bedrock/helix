@@ -237,7 +237,13 @@ sibling library folders, so unreleased library changes are used.
   shown. Items on the ground, picked-up items and chest items read back from disk are handed to
   the writer. A box placed from such an item stays cold on that reference (`player/heldbox.go`)
   until it is opened or a hopper uses it, and breaking it unopened gives the item the same
-  reference. Records no reference uses are not removed yet. What one shulker box or one bundle holds
+  reference. Every holder loads items through `Host.loadedItem` (or offloads them itself:
+  players, mobs, items on the ground), so chests, barrels, boxes, machines, furnaces, carts,
+  boats, frames, shelves, bookshelves, pots, campfires, lecterns and inventories all keep only
+  references. Block entities that show items (frames, shelves, chiseled bookshelves, decorated
+  pots, campfires, suspicious blocks) send them as `ItemStack.shownNBT`: no book pages, a box's
+  items without pages; lecterns send their book whole, which the client reads.
+  Records no reference uses are not removed yet. What one shulker box or one bundle holds
   is capped at 2 MB saved (`heldMaxBytes`, `player/holdlimit.go`): an item that would take it over
   is refused, by request or hopper, so every holder of items holds at most its slots times that
   (Helix's own rule; BDS takes any amount). A refused request resends

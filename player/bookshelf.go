@@ -129,8 +129,8 @@ func (s *Host) loadBookshelf(saved map[string]any) *Bookshelf {
 			break
 		}
 		if m, ok := v.(map[string]any); ok {
-			if it := itemFromNBT(m); !it.Empty() && s.isShelfBook(it) {
-				b.items[i] = withID(it, s.nextStackID)
+			if it := s.loadedItem(m); !it.Empty() && s.isShelfBook(it) {
+				b.items[i] = it
 			}
 		}
 	}
@@ -157,8 +157,12 @@ func (b *Bookshelf) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is the same.
-func (b *Bookshelf) NetworkData(pos cube.Pos) map[string]any { return b.SaveData(pos) }
+// NetworkData is the same, with the books as shown (shownNBT): their pages stay on the server.
+func (b *Bookshelf) NetworkData(pos cube.Pos) map[string]any {
+	m := b.SaveData(pos)
+	m[bookshelfItemsTag] = shownList(b.items[:])
+	return m
+}
 
 // BlockEntityRemoved drops the books of a bookshelf that went, as a container's contents.
 func (b *Bookshelf) BlockEntityRemoved(r *world.Region, pos cube.Pos) {

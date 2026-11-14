@@ -82,7 +82,7 @@ func (c *Chest) placedFrom(r *world.Region, pl *Placement) {
 	}
 	for _, item := range compounds(pl.Item.Tag[shulkerItemsTag]) {
 		if slot, ok := item["Slot"].(uint8); ok && int(slot) < chestSize {
-			c.items[slot] = withID(itemFromNBT(item), c.s.nextStackID)
+			c.items[slot] = c.s.loadedItem(item)
 		}
 	}
 	if display, ok := pl.Item.Tag["display"].(map[string]any); ok {

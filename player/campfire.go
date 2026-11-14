@@ -128,7 +128,7 @@ func (s *Host) loadCampfire(saved map[string]any) *Campfire {
 	for i := range campfireSlots {
 		item, time := campfireItemTag+strconv.Itoa(i+1), campfireTimeTag+strconv.Itoa(i+1)
 		if m, ok := saved[item].(map[string]any); ok {
-			c.items[i] = withID(itemFromNBT(m), s.nextStackID)
+			c.items[i] = s.loadedItem(m)
 		}
 		c.times[i], _ = saved[time].(int32)
 		delete(c.saved, item)
@@ -155,8 +155,17 @@ func (c *Campfire) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is the same: the client draws the items from it.
-func (c *Campfire) NetworkData(pos cube.Pos) map[string]any { return c.SaveData(pos) }
+// NetworkData is the same, with the items as shown (shownNBT): the client draws the items
+// from it.
+func (c *Campfire) NetworkData(pos cube.Pos) map[string]any {
+	m := c.SaveData(pos)
+	for i := range campfireSlots {
+		if !c.items[i].Empty() {
+			m[campfireItemTag+strconv.Itoa(i+1)] = c.items[i].shownNBT()
+		}
+	}
+	return m
+}
 
 // recipeBlock is the recipe tag the campfire at pos cooks by.
 func (c *Campfire) recipeBlock(r *world.Region, pos cube.Pos) string {

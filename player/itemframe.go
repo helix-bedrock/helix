@@ -71,7 +71,7 @@ func (s *Host) loadFrame(saved map[string]any, glow bool) *ItemFrame {
 	f := s.newFrame(glow)
 	f.saved = maps.Clone(saved)
 	if item, ok := saved[frameItemTag].(map[string]any); ok {
-		f.item = withID(itemFromNBT(item), s.nextStackID)
+		f.item = s.loadedItem(item)
 	}
 	if v, ok := saved[frameRotationTag].(float32); ok {
 		f.rotation = v
@@ -105,8 +105,14 @@ func (f *ItemFrame) SaveData(pos cube.Pos) map[string]any {
 	return m
 }
 
-// NetworkData is what is saved.
-func (f *ItemFrame) NetworkData(pos cube.Pos) map[string]any { return f.SaveData(pos) }
+// NetworkData is what is saved, with the item as shown (shownNBT).
+func (f *ItemFrame) NetworkData(pos cube.Pos) map[string]any {
+	m := f.SaveData(pos)
+	if !f.item.Empty() {
+		m[frameItemTag] = f.item.shownNBT()
+	}
+	return m
+}
 
 // ComparatorSignal is BDS's frame signal: one more than the eighths turned, up to 15, with an
 // item; 0 without. The circuit package checks the frame faces the comparator's way.

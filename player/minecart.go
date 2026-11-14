@@ -1307,7 +1307,7 @@ func (s *Host) loadCart(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, i
 		for _, item := range compounds(saved.Data[cartKeyItems]) {
 			slot, _ := item["Slot"].(uint8)
 			if int(slot) < m.chest.halfSize() {
-				m.chest.items[slot] = withID(itemFromNBT(item), s.nextStackID)
+				m.chest.items[slot] = s.loadedItem(item)
 			}
 		}
 		delete(m.saved, cartKeyItems)
