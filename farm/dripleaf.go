@@ -139,8 +139,9 @@ func (t *Ticker) bigLeafSoil(below uint32) bool {
 }
 
 // bigLeafSurvives is its canSurvive: the top of its column is a head, and it stands on a
-// dripleaf or its soil.
-func (t *Ticker) bigLeafSurvives(r *world.Region, pos cube.Pos) bool {
+// dripleaf or its soil. own is the state at pos, which is not in the world yet when it is
+// being placed.
+func (t *Ticker) bigLeafSurvives(r *world.Region, pos cube.Pos, own stateInfo) bool {
 	top := pos
 	for {
 		b, ok := r.Block(top.Side(cube.FaceUp), 0)
@@ -152,7 +153,11 @@ func (t *Ticker) bigLeafSurvives(r *world.Region, pos cube.Pos) bool {
 		}
 		top = top.Side(cube.FaceUp)
 	}
-	if b, ok := r.Block(top, 0); ok && t.state(b).facing != leafHd {
+	if top == pos {
+		if own.facing != leafHd {
+			return false
+		}
+	} else if b, ok := r.Block(top, 0); ok && t.state(b).facing != leafHd {
 		return false
 	}
 	below, ok := r.Block(pos.Side(cube.FaceDown), 0)
@@ -161,7 +166,7 @@ func (t *Ticker) bigLeafSurvives(r *world.Region, pos cube.Pos) bool {
 
 // bigLeafTick is its tick.
 func (t *Ticker) bigLeafTick(r *world.Region, pos cube.Pos, block uint32, s stateInfo) {
-	if !t.bigLeafSurvives(r, pos) {
+	if !t.bigLeafSurvives(r, pos, s) {
 		if t.fall != nil {
 			t.fall(r, pos, block)
 		}

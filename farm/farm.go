@@ -464,7 +464,7 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 		case kindNetherVine:
 			t.netherVineNeighbourChanged(r, pos, from, block, s)
 		case kindBigDripleaf:
-			if (from == pos.Side(cube.FaceUp) || from == pos.Side(cube.FaceDown)) && !t.bigLeafSurvives(r, pos) {
+			if (from == pos.Side(cube.FaceUp) || from == pos.Side(cube.FaceDown)) && !t.bigLeafSurvives(r, pos, s) {
 				r.ScheduleTick(pos, block, surviveDelay, 0)
 			}
 		default:

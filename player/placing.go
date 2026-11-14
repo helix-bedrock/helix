@@ -365,13 +365,17 @@ func vanillaPlaceCheck(pl *Placement) bool {
 	if !p.s.attach.MayPlace(r, pl.Pos, pl.Block, cube.Face(pl.Face)) {
 		return false
 	}
-	if f := p.s.farm; f != nil && !f.MayPlace(r, pl.Pos, pl.Block) {
+	// BDS tests the state it would place, not the item's: a vine's sides come from the face
+	// clicked, and only a block with a collision box can be in the player's way, so a torch
+	// goes where it stands.
+	state, ok := p.s.game.sys.PlaceState(pl)
+	if !ok {
 		return false
 	}
-	// BDS tests the state it would place, not the item's: only a block with a
-	// collision box can be in the player's way, so a torch goes where it stands.
-	state, ok := p.s.game.sys.PlaceState(pl)
-	return ok && !p.inside(pl.Pos, state) && !p.s.obstructed(r, pl.Pos, state)
+	if f := p.s.farm; f != nil && !f.MayPlace(r, pl.Pos, state) {
+		return false
+	}
+	return !p.inside(pl.Pos, state) && !p.s.obstructed(r, pl.Pos, state)
 }
 
 // BuildBlocker is an entity owner that keeps blocks from being placed where it is: BDS's

@@ -304,7 +304,7 @@ func (t *Ticker) plantSurvives(r *world.Region, pos cube.Pos, s stateInfo) bool 
 	case kindCaveVine:
 		return t.caveVineSurvives(r, pos)
 	case kindBigDripleaf:
-		return t.bigLeafSurvives(r, pos)
+		return t.bigLeafSurvives(r, pos, s)
 	case kindSmallDripleaf:
 		return t.smallLeafSurvives(r, pos, s)
 	}
