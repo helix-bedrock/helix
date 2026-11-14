@@ -435,7 +435,14 @@ sibling library folders, so unreleased library changes are used.
 - `connect`: the arms of fences, panes, bars and trip wire, kept in their block states since 1.26, from helix-data's rules, and stair corners (`stairs.go`, BDS's corner rule).
 - Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
   `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`, `BlockEntityBinder` with its `ChunkHandle`; `Dimension.SetBlockEntities` names who
-  makes them; those it does not take stay saved as they were). `player/chest.go` runs chests, ender chests
+  makes them; those it does not take stay saved as they were). A chunk's block entities are read from the store
+  one at a time on the load worker (`storedBlockEntities`, mcdb's `EachBlockEntity`), never as the
+  whole stored value, which chests full of books make hundreds of megabytes. A `ColdBlockEntity`
+  leaves its big data on disk while unused (Helix's own rule, beyond BDS): chests, barrels and
+  shulker boxes (`player/coldchest.go`) unused for 3 cooling rounds (`coolEveryTicks`, 10 s) in a
+  chunk whose stored copy is current keep only each slot's count for comparators, load that way
+  from disk (`RawBlockEntities.LoadRaw`), and read their items back (`Warm`, `ChunkHandle.Stored`)
+  before anything touches them; a save copies their stored compounds as they are. `player/chest.go` runs chests, ender chests
   (items in `playerItems.ender`, reached as `Player.EnderChest`), hoppers, dispensers, droppers, crafters
   and carts' slots: BDS 1.26.60's pairing, lid and window, with `playerItems.open` as a stack request's copy
   of the open container (container `ContainerLevelEntity`), and the chest API (`Chest.Inventory`, `Kind`,

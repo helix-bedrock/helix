@@ -100,6 +100,7 @@ func (s *Host) shulkerDrops(r *world.Region, pos cube.Pos, items []ItemStack) []
 	if c == nil || !c.shulker {
 		return items
 	}
+	c.Warm(pos)
 	held := []any{}
 	for i, it := range c.items {
 		if !it.Empty() {

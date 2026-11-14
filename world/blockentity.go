@@ -1,13 +1,17 @@
 package world
 
 import (
+	"bytes"
+	"errors"
 	"maps"
 	"slices"
 
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // BlockEntity is what a block keeps beyond its state, such as a chest's items
@@ -54,6 +58,27 @@ type BlockEntityMover interface {
 	BlockEntityMoved(r *Region, to cube.Pos)
 }
 
+// ColdBlockEntity is a block entity that leaves its big data, such as a chest's items, on
+// disk while nothing uses it, so memory does not grow with what a world stores. Cold reports
+// whether its data is on disk only: a save then copies its stored compound as it is
+// (SaveData is not asked), and the world calls Warm before taking it out of its chunk. The
+// world asks it to Cool, dropping what it can read back, only while the chunk's stored copy
+// is current: nothing changed since the last save, which has reached the store. Warm reads
+// it back through its ChunkHandle's Stored. Runs: owner of the chunk.
+type ColdBlockEntity interface {
+	BlockEntity
+	Cold() bool
+	Cool(r *Region, pos cube.Pos) bool
+	Warm(pos cube.Pos)
+}
+
+// RawBlockEntities is a BlockEntities that loads a block entity from its stored bytes,
+// decoding only what it needs: a chest that starts cold reads its slot counts and leaves
+// the rest on disk. False falls back to Load. Runs: on a chunk load worker.
+type RawBlockEntities interface {
+	LoadRaw(pos cube.Pos, raw []byte) (BlockEntity, bool)
+}
+
 // BlockEntityBinder is a block entity given its chunk's handle whenever it is put in a
 // chunk, so it can mark itself for saving from code that has no region at hand.
 type BlockEntityBinder interface {
@@ -61,7 +86,27 @@ type BlockEntityBinder interface {
 }
 
 // ChunkHandle is the chunk a block entity is in. Runs: owner of that chunk.
-type ChunkHandle struct{ c *Chunk }
+type ChunkHandle struct {
+	c *Chunk
+	d *Dimension
+}
+
+// errNoBlockEntityStore is a store that cannot read one block entity back.
+var errNoBlockEntityStore = errors.New("world: store cannot load single block entities")
+
+// Stored reads the block entity at pos as its chunk last stored it, for a ColdBlockEntity
+// warming. It reads the disk, so it is for data not used every tick. Runs: owner of the
+// chunk.
+func (h ChunkHandle) Stored(pos cube.Pos) (map[string]any, error) {
+	if h.c == nil || h.d == nil {
+		return nil, errNoBlockEntityStore
+	}
+	l, ok := h.d.conf.Store.(mcdb.BlockEntityLoader)
+	if !ok {
+		return nil, errNoBlockEntityStore
+	}
+	return l.LoadBlockEntity(h.c.pos, h.d.conf.Dim, pos)
+}
 
 // Changed marks the chunk to be saved at the end of the tick, as
 // [Region.SaveBlockEntity] does. A zero handle, or one whose chunk has gone, does
@@ -115,17 +160,46 @@ func savedNetworkData(saved map[string]any) map[string]any {
 	return out
 }
 
+// rawNetworkData is the client's view of a stored compound, decoding none of what it leaves
+// out.
+func rawNetworkData(raw []byte) map[string]any {
+	m, err := nbt.DecodeWithout(raw, nbt.LittleEndian, networkHiddenTag)
+	if err != nil {
+		return map[string]any{}
+	}
+	return m
+}
+
+// networkHiddenTag reports a saved field the client never needs. The lists named are skipped
+// whole, so nothing inside them is asked about.
+func networkHiddenTag(name string) bool { return slices.Contains(networkHidden[:], name) }
+
 // savedBlockEntity is a block entity the engine does not run yet: its data is
-// kept as it was loaded, so the world loses nothing.
+// kept as it was loaded, decoded or as its stored bytes, so the world loses nothing.
 type savedBlockEntity struct {
 	data map[string]any
+	raw  []byte
 }
 
 // SaveData returns the data as it was loaded.
-func (s savedBlockEntity) SaveData(cube.Pos) map[string]any { return s.data }
+func (s savedBlockEntity) SaveData(cube.Pos) map[string]any {
+	if s.raw != nil {
+		m, err := nbt.DecodeWithout(s.raw, nbt.LittleEndian, nil)
+		if err != nil {
+			return map[string]any{}
+		}
+		return m
+	}
+	return s.data
+}
 
 // NetworkData returns the data without what the client never needs.
-func (s savedBlockEntity) NetworkData(cube.Pos) map[string]any { return savedNetworkData(s.data) }
+func (s savedBlockEntity) NetworkData(cube.Pos) map[string]any {
+	if s.raw != nil {
+		return rawNetworkData(s.raw)
+	}
+	return savedNetworkData(s.data)
+}
 
 // loadedBlockEntity is a block entity a load worker made, waiting to join its chunk.
 type loadedBlockEntity struct {
@@ -146,15 +220,58 @@ func (d *Dimension) makeBlockEntities(saved []chunk.BlockEntity) []loadedBlockEn
 	}
 	out := make([]loadedBlockEntity, 0, len(saved))
 	for _, s := range saved {
-		var be BlockEntity = savedBlockEntity{data: s.Data}
-		if maker != nil {
-			if live, ok := maker.Load(s.Pos, s.Data); ok {
-				be = live
-			}
-		}
-		out = append(out, loadedBlockEntity{pos: s.Pos, be: be})
+		out = append(out, loadedBlockEntity{pos: s.Pos, be: makeBlockEntity(maker, s)})
 	}
 	return out
+}
+
+// storedBlockEntities reads the block entities of a loaded chunk from a store that gives
+// them one at a time (mcdb.BlockEntityLoader), adding each one's network data to network:
+// the chunk's block entity value, which chests full of books make hundreds of megabytes, is
+// never held whole, only its biggest block entity. Runs: on the load worker.
+func (d *Dimension) storedBlockEntities(pos mcdb.ChunkPos, network *[]chunk.BlockEntity) ([]loadedBlockEntity, error) {
+	l, ok := d.conf.Store.(mcdb.BlockEntityLoader)
+	if !ok {
+		return nil, nil
+	}
+	var maker BlockEntities
+	if m := d.blockEntities.Load(); m != nil {
+		maker = *m
+	}
+	var out []loadedBlockEntity
+	err := l.EachBlockEntity(pos, d.conf.Dim, func(at cube.Pos, raw []byte) error {
+		*network = append(*network, chunk.BlockEntity{Pos: at, Data: rawNetworkData(raw)})
+		out = append(out, loadedBlockEntity{pos: at, be: makeBlockEntity(maker, chunk.BlockEntity{Pos: at, Raw: raw})})
+		return nil
+	})
+	return out, err
+}
+
+// makeBlockEntity is the live form of one saved block entity: from its stored bytes when the
+// maker reads them, else decoded, else kept as it was saved. Stored bytes are only read
+// during the call: what is kept of them is copied.
+func makeBlockEntity(maker BlockEntities, s chunk.BlockEntity) BlockEntity {
+	if s.Raw != nil {
+		if rl, ok := maker.(RawBlockEntities); ok {
+			if live, ok := rl.LoadRaw(s.Pos, s.Raw); ok {
+				return live
+			}
+		}
+		if maker == nil {
+			return savedBlockEntity{raw: bytes.Clone(s.Raw)}
+		}
+		data, err := nbt.DecodeWithout(s.Raw, nbt.LittleEndian, nil)
+		if err != nil {
+			return savedBlockEntity{raw: bytes.Clone(s.Raw)}
+		}
+		s.Data = data
+	}
+	if maker != nil {
+		if live, ok := maker.Load(s.Pos, s.Data); ok {
+			return live
+		}
+	}
+	return savedBlockEntity{data: s.Data}
 }
 
 // loadBlockEntities adds the block entities a load worker made to a chunk that just joined.
@@ -218,7 +335,7 @@ func (c *Chunk) addBlockEntity(pos cube.Pos, be BlockEntity) {
 	}
 	c.blockEntities[pos] = be
 	if b, ok := be.(BlockEntityBinder); ok {
-		b.BindBlockEntity(ChunkHandle{c: c})
+		b.BindBlockEntity(ChunkHandle{c: c, d: c.d})
 	}
 	if _, ok := be.(BlockEntityTicker); ok {
 		c.tickingEntities = append(c.tickingEntities, pos)
@@ -314,6 +431,9 @@ func (r *Region) TakeBlockEntity(pos cube.Pos) (BlockEntity, bool) {
 	if !ok {
 		return nil, false
 	}
+	if cb, ok := c.blockEntities[pos].(ColdBlockEntity); ok && cb.Cold() {
+		cb.Warm(pos) // its stored compound stays behind at pos
+	}
 	be, ok := c.removeBlockEntity(pos)
 	if ok {
 		c.dirty = true
@@ -363,15 +483,49 @@ func (r *Region) tickBlockEntities(c *Chunk) {
 }
 
 // savedBlockEntities returns the chunk's block entities as the store wants them.
-func (c *Chunk) savedBlockEntities() []chunk.BlockEntity {
+func (c *Chunk) savedBlockEntities() (out []chunk.BlockEntity, keep []cube.Pos) {
 	if len(c.blockEntities) == 0 {
-		return nil
+		return nil, nil
 	}
-	out := make([]chunk.BlockEntity, 0, len(c.blockEntities))
+	out = make([]chunk.BlockEntity, 0, len(c.blockEntities))
 	for pos, be := range c.blockEntities {
+		switch be := be.(type) {
+		case ColdBlockEntity:
+			if be.Cold() {
+				keep = append(keep, pos)
+				continue
+			}
+		case savedBlockEntity:
+			if be.raw != nil {
+				out = append(out, chunk.BlockEntity{Pos: pos, Raw: be.raw})
+				continue
+			}
+		}
 		out = append(out, chunk.BlockEntity{Pos: pos, Data: be.SaveData(pos)})
 	}
-	return sortedBlockEntities(out)
+	return sortedBlockEntities(out), keep
+}
+
+// coolEveryTicks is how often each chunk's block entities are asked to leave their data on
+// disk: 10 seconds, spread over the chunks by position.
+const coolEveryTicks = 200
+
+// coolRound asks the block entities of the chunks whose turn it is to leave their data on
+// disk, in chunks whose stored copy is current.
+func (r *Region) coolRound() {
+	if _, ok := r.d.conf.Store.(mcdb.BlockEntityLoader); !ok {
+		return
+	}
+	for _, c := range r.chunks {
+		if (r.ticks+autoSavePhase(c.pos))%coolEveryTicks != 0 || c.dirty || c.discard || c.saving.Load() > 0 {
+			continue
+		}
+		for pos, be := range c.blockEntities {
+			if cb, ok := be.(ColdBlockEntity); ok && !cb.Cold() {
+				cb.Cool(r, pos)
+			}
+		}
+	}
 }
 
 // networkBlockEntities returns what the client gets of the chunk's block entities.

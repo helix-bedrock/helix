@@ -195,6 +195,7 @@ type Dimension struct {
 // Chunk is a loaded chunk with what is saved alongside it. It belongs to
 // its region and moves between regions by pointer.
 type Chunk struct {
+	d   *Dimension
 	pos mcdb.ChunkPos
 	col *chunk.Column
 	net *NetChunk // nil while the network form is out of date
@@ -207,6 +208,9 @@ type Chunk struct {
 	saveWait    int32
 	fullPending bool
 	saveCost    atomic.Int64
+	// saving counts its saves still on a worker: block entities leave their data on disk
+	// only once the last one has reached the store.
+	saving atomic.Int32
 	// discard keeps it out of the store.
 	discard  bool
 	encoding bool
@@ -490,11 +494,20 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 	for _, be := range col.BlockEntities {
 		entities = append(entities, chunk.BlockEntity{Pos: be.Pos, Data: savedNetworkData(be.Data)})
 	}
+	live := d.makeBlockEntities(col.BlockEntities)
+	col.BlockEntities = nil
+	if err == nil && len(live) == 0 {
+		if stored, err := d.storedBlockEntities(pos, &entities); err != nil {
+			// As a column that failed to load: never save over it.
+			d.log.Error("load chunk block entities", "pos", pos, "err", err)
+			discard = true
+		} else {
+			live = stored
+		}
+	}
 	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
-	live := d.makeBlockEntities(col.BlockEntities)
-	col.BlockEntities = nil
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })
 }
 

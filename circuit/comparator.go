@@ -422,6 +422,15 @@ func (t *Ticker) Entities(next world.BlockEntities) world.BlockEntities {
 	return comparatorEntities{t: t, next: next}
 }
 
+// LoadRaw passes stored bytes to next if it reads them: none of the comparator's own block
+// entities are kept on disk, so they load through Load.
+func (e comparatorEntities) LoadRaw(pos cube.Pos, raw []byte) (world.BlockEntity, bool) {
+	if rl, ok := e.next.(world.RawBlockEntities); ok {
+		return rl.LoadRaw(pos, raw)
+	}
+	return nil, false
+}
+
 // New returns a comparator's block entity, or asks next.
 func (e comparatorEntities) New(block uint32) world.BlockEntity {
 	switch e.t.kind(block) {

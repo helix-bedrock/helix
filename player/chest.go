@@ -179,6 +179,12 @@ type Chest struct {
 	disabled uint16
 	crafting int32
 	items    [chestSize]ItemStack
+	// cold means the items are on disk only, coldSlots what is kept of each for
+	// comparators, idle the cooling rounds since the chest was last used
+	// (coldchest.go).
+	cold      bool
+	idle      uint8
+	coldSlots [chestSize]coldSlot
 	// saved keeps the other fields of the saved chest (CustomName, LootTable...),
 	// written back as they were.
 	saved map[string]any
@@ -236,9 +242,11 @@ func (c *Chest) Inventory(r *world.Region) *Inventory {
 		return nil
 	}
 	lead, follower := c.halves(r)
+	lead.used()
 	if follower == nil {
 		return lead.ownInventory()
 	}
+	follower.used()
 	if lead.whole == nil || lead.wholeOf != follower {
 		lead.whole = &Inventory{
 			s: c.s, kind: ContainerChest, parts: [2][]ItemStack{lead.items[:], follower.items[:]},
@@ -458,6 +466,7 @@ func (c *Chest) NetworkData(pos cube.Pos) map[string]any {
 
 // SaveData is what BDS saves of a chest: the same plus the items.
 func (c *Chest) SaveData(pos cube.Pos) map[string]any {
+	c.Warm(pos)
 	m := maps.Clone(c.saved)
 	if m == nil {
 		m = map[string]any{}
@@ -607,6 +616,7 @@ func (s *Host) chestAt(r *world.Region, pos cube.Pos) *Chest {
 // BlockEntityRemoved takes a broken chest apart from its partner and throws its
 // half of the items.
 func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
+	c.Warm(pos) // its stored compound is still on disk until the chunk saves again
 	c.pos = pos
 	if c.shulker {
 		c.closeViewers(r)
@@ -1218,6 +1228,9 @@ func (c *Chest) Unpair(r *world.Region) {
 func (c *Chest) ComparatorSignal(r *world.Region, _ cube.Pos) int32 {
 	if c.machine != nil && c.machine.crafter {
 		return c.crafterSignal()
+	}
+	if lead, follower := c.halves(r); lead.cold || follower != nil && follower.cold {
+		return coldSignal(lead, follower)
 	}
 	var sum circuit.ContainerSum
 	for _, it := range c.Inventory(r).Items() {

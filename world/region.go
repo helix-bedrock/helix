@@ -366,6 +366,7 @@ func (r *Region) tick() {
 	}
 	t.mark(PhaseFlush)
 	r.saveRound()
+	r.coolRound()
 	t.mark(PhaseSave)
 	r.flushLight()
 	r.handOff()
@@ -492,7 +493,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	if _, ok := r.chunks[pos]; ok || r.holds[pos] == 0 || !r.owns(pos) {
 		return
 	}
-	c := &Chunk{pos: pos, col: col, net: nc, discard: discard, tickedAt: neverTicked, plannedAt: -1, light: light, settle: settle}
+	c := &Chunk{d: r.d, pos: pos, col: col, net: nc, discard: discard, tickedAt: neverTicked, plannedAt: -1, light: light, settle: settle}
 	c.ticks.load(col.ScheduledBlocks, col.Tick)
 	c.ticks.rebase(r.d.sched.CurrentTick())
 	c.randomTicks.load(col.RandomTicks, col.RandomTick)
@@ -657,11 +658,13 @@ func (r *Region) save(c *Chunk, ticks, force bool) {
 	snap.Entities, c.savedLive = r.entitiesToSave(c)
 	snap.KeepBlockEntities = keepBlockEntities
 	if !keepBlockEntities {
-		snap.BlockEntities = c.savedBlockEntities()
+		snap.BlockEntities, snap.KeepBlockEntitiesAt = c.savedBlockEntities()
 	}
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
+	c.saving.Add(1)
 	d.pool.do(pos, func() {
+		defer c.saving.Add(-1)
 		start := time.Now()
 		if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, &snap); err != nil {
 			d.log.Error("save chunk", "pos", pos, "err", err)
