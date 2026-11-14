@@ -92,6 +92,7 @@ const (
 // library, whose names for some newer keys lag behind 1.26.60.
 func (p *Player) ownMetadata() protocol.EntityMetadata {
 	b := p.Breathable()
+	death := p.deathMetadata()
 	return protocol.EntityMetadata{
 		protocol.EntityDataKeyFlags:                            int64(ownFlags),
 		protocol.EntityDataKeyStructuralIntegrity:              int32(1),
@@ -152,9 +153,9 @@ func (p *Player) ownMetadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyMovementSoundDistanceOffset:      float32(1),
 		protocol.EntityDataKeyHeartbeatIntervalTicks:           int32(20),
 		protocol.EntityDataKeyHeartbeatSoundEvent:              int32(615),
-		protocol.EntityDataKeyPlayerLastDeathPosition:          protocol.BlockPos{},
-		protocol.EntityDataKeyPlayerLastDeathDimension:         int32(0),
-		protocol.EntityDataKeyPlayerHasDied:                    uint8(0),
+		protocol.EntityDataKeyPlayerLastDeathPosition:          death[protocol.EntityDataKeyPlayerLastDeathPosition],
+		protocol.EntityDataKeyPlayerLastDeathDimension:         death[protocol.EntityDataKeyPlayerLastDeathDimension],
+		protocol.EntityDataKeyPlayerHasDied:                    death[protocol.EntityDataKeyPlayerHasDied],
 		protocol.EntityDataKeyCollisionBox:                     mgl32.Vec3{playerWidth, playerHeight, 0},
 		protocol.EntityDataKeyVisibleMobEffects:                p.visibleEffects(),
 		protocol.EntityDataKeyFilteredName:                     "",

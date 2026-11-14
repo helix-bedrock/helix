@@ -169,6 +169,9 @@ type ProjectileSpec struct {
 	Cloud        *CloudSpec
 	// DouseFire puts fires out where a water potion hits a block (douse_fire).
 	DouseFire bool
+	// GrantXP leaves experience worth XPMin up to XPMax less one where it hits (grant_xp).
+	GrantXP      bool
+	XPMin, XPMax int32
 }
 
 // ExplodeSpec is a definition's minecraft:explode component.
@@ -270,7 +273,8 @@ type projectileComponent struct {
 			Reapply     int32    `json:"reapplication_delay"`
 			AffectOwner *bool    `json:"affect_owner"`
 		} `json:"spawn_aoe_cloud"`
-		WindBurst *struct{} `json:"wind_burst_on_hit"`
+		WindBurst *struct{}       `json:"wind_burst_on_hit"`
+		GrantXP   json.RawMessage `json:"grant_xp"`
 		Particle  *struct {
 			Type     string `json:"particle_type"`
 			Count    int32  `json:"num_particles"`
@@ -385,6 +389,13 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 	s.ReflectTicks = int32(math.Floor(float64(c.ReflectImmunity * reflectTicksPerSecond)))
 	if p := c.OnHit.Particle; p != nil {
 		s.Particle, s.ParticleCount, s.ParticleOnEntity, s.ParticleOnOther = p.Type, p.Count, p.OnEntity, p.OnOther
+	}
+	if len(c.OnHit.GrantXP) > 0 {
+		lo, hi, err := parseGrantXP(c.OnHit.GrantXP)
+		if err != nil {
+			return ProjectileSpec{}, fmt.Errorf("player: projectile %s: grant_xp: %w", id, err)
+		}
+		s.GrantXP, s.XPMin, s.XPMax = true, lo, hi
 	}
 	if c.OnHit.WindBurst != nil {
 		s.WindBurst = true
@@ -962,6 +973,9 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 	if t.isPotion() {
 		t.potionHit(r, e, hit, kind)
 	}
+	if t.spec.GrantXP {
+		t.grantXP(r, hit.pos)
+	}
 	if t.spec.WindBurst {
 		t.windBurst(r, hit, kind)
 		t.remove(e)
@@ -1210,7 +1224,7 @@ func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 // isProjectile reports whether a saved entity's identifier is one this runs.
 func isProjectile(id string) bool {
 	return id == nameSnowball || id == nameEgg || id == nameEnderPearl || id == nameArrow || id == nameThrownTrident || id == nameWindChargeProjectile ||
-		id == nameSplashPotion || id == nameLingeringPotion
+		id == nameSplashPotion || id == nameLingeringPotion || id == nameXPBottle
 }
 
 // isPotion reports a thrown potion.
@@ -1270,6 +1284,8 @@ func throwable(item string) string {
 		return item
 	case nameWindCharge:
 		return nameWindChargeProjectile
+	case nameXPBottleItem:
+		return nameXPBottle
 	case nameSplashPotion, nameLingeringPotion:
 		return item
 	}

@@ -111,6 +111,8 @@ type Player struct {
 	// steps tracks walking for vibrations, warden the shriekers' warnings (sculk.go).
 	steps  vibrationSteps
 	warden wardenTracker
+	// death is where the player last died, for the recovery compass (deathpos.go).
+	death lastDeath
 	// vehicle is what the player sits on, riding whether others see it so.
 	vehicle vehicle
 	riding  bool

@@ -35,6 +35,9 @@ type FoodItem struct {
 	// Becomes names the item left over, such as a bowl.
 	Becomes string
 	Effects []FoodEffect
+	// RemoveEffects are the effect IDs eating it takes away (remove_effects: the honey
+	// bottle's poison).
+	RemoveEffects []int32
 }
 
 // usingState is the item the player is using, as BDS keeps a copy of it.
@@ -112,6 +115,7 @@ func foodFromComponents(data map[string]any) (FoodItem, bool) {
 	} else if props, ok := comps["item_properties"].(map[string]any); ok {
 		f.Duration = nbtInt(props["use_duration"])
 	}
+	f.RemoveEffects = nbtInts(m["remove_effects"])
 	if list, ok := m["effects"].([]any); ok {
 		for _, e := range list {
 			if em, ok := e.(map[string]any); ok {
@@ -138,6 +142,21 @@ func nbtInt(v any) int32 {
 		return int32(n) //nolint:gosec // item data values are small
 	}
 	return 0
+}
+
+// nbtInts reads an NBT list of whole numbers.
+func nbtInts(v any) []int32 {
+	switch l := v.(type) {
+	case []int32:
+		return l
+	case []any:
+		out := make([]int32, 0, len(l))
+		for _, x := range l {
+			out = append(out, nbtInt(x))
+		}
+		return out
+	}
+	return nil
 }
 
 // nbtFloat reads an NBT float.
@@ -383,6 +402,9 @@ func vanillaEat(p *Player, held ItemStack, food FoodItem) {
 				g.sys.DropItem(p, rest, false)
 			}
 		}
+	}
+	for _, id := range food.RemoveEffects {
+		p.RemoveEffect(id)
 	}
 	for _, e := range food.Effects {
 		if p.rng.Float32() < e.Chance {
