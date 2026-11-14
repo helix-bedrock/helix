@@ -9,12 +9,14 @@ import (
 	_ "net/http/pprof" //nolint:gosec // served only with -pprof, on the address given
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/pprof"
 	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/helix-bedrock/helix"
+	"github.com/helix-bedrock/world/convert"
 )
 
 func main() {
@@ -31,6 +33,7 @@ func main() {
 	udpPorts := flag.String("udp-ports", "", "BDS's server-udp-ports: each connection takes its own UDP port from these, such as 19133-19200 or 19133-19200:29133-29200 for public:local; forward them on the router")
 	cpuProfile := flag.String("cpuprofile", "", "write a CPU profile to this file until the server stops, to find what makes ticks slow")
 	pprofAddr := flag.String("pprof", "", "serve Go's profiler (goroutines, heap, CPU) on this address, such as localhost:6060, to see where a stuck server waits")
+	exportBDS := flag.String("export-bds", "", "write the world into a new BDS world in this folder, then exit without starting the server; the server must not be running")
 	tickDistance := flag.Int("tick-distance", int(helix.DefaultConfig().TickDistance), "radius in chunks kept loaded and ticked around each player, BDS's tick-distance")
 	flag.Parse()
 	level := slog.LevelInfo
@@ -64,6 +67,10 @@ func main() {
 		log.Error("cannot start", "err", err)
 		return
 	}
+	if *exportBDS != "" {
+		exportWorld(log, conf, *exportBDS)
+		return
+	}
 	conf.NetherNet.PublicIP = *publicIP
 	conf.NetherNet.UDPPort = uint16(*udpPort) //nolint:gosec // a port number
 	conf.NetherNet.UDPPorts = *udpPorts
@@ -91,6 +98,20 @@ func main() {
 	if err := srv.Run(ctx); err != nil {
 		log.Error("server stopped", "err", err)
 	}
+}
+
+// exportWorld writes the configured world into a new BDS world in dst.
+func exportWorld(log *slog.Logger, conf helix.Config, dst string) {
+	dir := filepath.Join(conf.WorldsDir, conf.LevelName)
+	log.Info("Exporting the world to BDS's format", "from", dir, "to", dst)
+	err := helix.ExportBDSWorld(dir, dst, func(p convert.Progress) {
+		log.Info("Exporting world", "phase", p.Phase, "chunks", p.Chunks, "MB", p.Bytes>>20, "time", p.Elapsed.Round(time.Second))
+	})
+	if err != nil {
+		log.Error("export failed", "err", err)
+		return
+	}
+	log.Info("World exported; it opens in BDS", "dir", dst)
 }
 
 // startProfile starts a CPU profile written to path; the returned func ends it once the server

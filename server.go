@@ -35,6 +35,7 @@ import (
 	"github.com/helix-bedrock/nethernet"
 	"github.com/helix-bedrock/protocol/auth"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/hxdb"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -222,7 +223,7 @@ type Server struct {
 	clock    *daytime.Clock
 	redstone *circuit.Settings
 
-	db          *mcdb.DB
+	db          *hxdb.DB
 	worldStore  mcdb.WorldStore
 	playerStore mcdb.PlayerStore
 	level       player.Level

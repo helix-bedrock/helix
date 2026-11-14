@@ -63,9 +63,16 @@ sibling library folders, so unreleased library changes are used.
   worker, at the chunk's edge on its ticks once the next chunk is loaded. It
   runs on every chunk that loads, generated or saved, and skips liquid
   already ticking.
-- `world.go`: opens the world folder and its stores (`world/mcdb`; the
-  world and player stores can be replaced through `Config.Storage`) with
-  the block registry.
+- `world.go`: opens the world folder and its stores (`world/hxdb`, Helix's
+  own format `world/hx`; the world and player stores can be replaced
+  through `Config.Storage`) with the block registry. `worldformat.go`: a BDS
+  world (a `db` folder, no `world.hx`) is converted on start into
+  `<name>.converting`, then moved aside to `<name>-bds` untouched while the
+  Helix world takes its name (a stop halfway starts again; one between the
+  renames finishes them); `Server.ExportBDS` exports the running world to a
+  BDS world from a snapshot, `ExportBDSWorld` (cmd/helix `-export-bds`) a
+  stopped one. `TestBDSWorldStart` (`HELIX_BDS_WORLD`) runs a real world
+  through it.
 - `world` (package): the world in memory. A `Dimension` per dimension,
   split into regions (RFC 0002): groups of sections (8 by 8 chunks) that
   each own their chunks and viewers and tick at 20 TPS on a shared
@@ -478,7 +485,8 @@ short:
 - A player is session + entity + profile.
 - Events: priorities `First` to `Last` then `Monitor`, no allocations,
   parallel listeners by default.
-- Storage: one BDS-layout LevelDB per world by default, pluggable stores.
+- Storage: Helix's own format per world (`world/hx`), converting to and
+  from BDS worlds without loss; pluggable stores.
 
 Build order: storage (`world` library), registry, world in memory, regions,
 players (replaces `play.go`).

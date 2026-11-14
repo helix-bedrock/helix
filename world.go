@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -26,35 +25,37 @@ import (
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/hxdb"
 	"github.com/helix-bedrock/world/mcdb"
 	"github.com/helix-bedrock/world/mcdb/leveldat"
 )
 
 // StorageConfig replaces where the world and its players are kept. Every
-// field is optional: by default both live in the world folder's LevelDB,
-// with BDS's keys and format, so the folder opens in BDS as well.
+// field is optional: by default both live in the world folder, in Helix's
+// own format (world/hx), which converts to and from BDS's without loss.
 type StorageConfig struct {
-	// KV replaces the LevelDB under the default stores while keeping BDS's
-	// keys and values, for a database other than LevelDB.
-	KV mcdb.KV
 	// World replaces the default world store (chunks and level keys)
-	// completely. level.dat is still read from the world folder.
+	// completely. level.dat is still kept in the world folder.
 	World mcdb.WorldStore
 	// Players replaces the default player store, for example with one
 	// database shared by every server of a network.
 	Players mcdb.PlayerStore
 }
 
-// openWorld opens the world folder WorldsDir/LevelName, as BDS keeps its
-// worlds, and the stores. A new world gets LevelName as its name.
+// openWorld opens the world folder WorldsDir/LevelName and the stores. A BDS
+// world there is converted to Helix's format first (worldformat.go). A new
+// world gets LevelName as its name.
 func (s *Server) openWorld() error {
 	dir := filepath.Join(s.conf.WorldsDir, s.conf.LevelName)
-	_, err := os.Stat(filepath.Join(dir, "level.dat"))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("helix: open world %q: %w", dir, err)
+	if err := prepareWorld(s.log.With("part", "storage"), dir); err != nil {
+		return err
 	}
-	isNew := err != nil
-	db, err := mcdb.Config{Log: s.log.With("part", "storage"), KV: s.conf.Storage.KV, Blocks: s.reg.Blocks, SkipBlockEntities: true}.Open(dir)
+	kind, err := kindOf(dir)
+	if err != nil {
+		return err
+	}
+	isNew := kind == worldNone
+	db, err := hxdb.Config{Log: s.log.With("part", "storage"), Blocks: s.reg.Blocks, SkipBlockEntities: true}.Open(dir)
 	if err != nil {
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}
@@ -103,7 +104,7 @@ func (s *Server) newLevel(ldat *leveldat.Data) {
 
 // useStores keeps the open database and the world and player stores on it, unless the
 // configuration replaces them.
-func (s *Server) useStores(db *mcdb.DB) {
+func (s *Server) useStores(db *hxdb.DB) {
 	s.db, s.worldStore, s.playerStore = db, mcdb.WorldStore(db), mcdb.PlayerStore(db)
 	if st := s.conf.Storage.World; st != nil {
 		s.worldStore = st

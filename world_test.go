@@ -30,7 +30,7 @@ func TestNewWorld(t *testing.T) {
 	if err := s.closeWorld(); err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range []string{"level.dat", "levelname.txt", "db"} {
+	for _, f := range []string{"level.dat", "levelname.txt", "world.hx"} {
 		if _, err := os.Stat(filepath.Join(conf.WorldsDir, conf.LevelName, f)); err != nil {
 			t.Error(err)
 		}
