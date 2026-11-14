@@ -67,7 +67,7 @@ func vanillaUseBlock(u *BlockUse) bool {
 	if b, ok := p.s.game.blocks[name].(Usable); ok {
 		return b.Use(u)
 	}
-	if p.tillWithHoe(r, u) || p.pickBerries(r, u) || p.useComposter(r, u) || p.tieToFence(r, u) {
+	if p.tillWithHoe(r, u) || p.stripWithAxe(r, u) || p.pickBerries(r, u) || p.useComposter(r, u) || p.tieToFence(r, u) {
 		return true
 	}
 	if lightLevel(name) >= 0 && lightLevel(u.Item.Name) >= 0 {

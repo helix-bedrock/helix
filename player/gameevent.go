@@ -16,6 +16,7 @@ import (
 // the actor or as the event's block. The world dispatches them (world.Region.PostGameEvent); sculk
 // sensors and shriekers hear them (sculk.go).
 const (
+	gameEventBlockChange      int32 = 3
 	gameEventBlockDestroy     int32 = 6
 	gameEventBlockPlace       int32 = 9
 	gameEventEntityMove       int32 = 22

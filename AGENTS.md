@@ -388,7 +388,7 @@ sibling library folders, so unreleased library changes are used.
   `weather/rod.go`: lightning rods (a strike goes to the nearest rod within 64 blocks that is
   open to the sky and rained on; a struck rod gives power for 8 ticks, `circuit/lightningrod.go`;
   the strike cleans oxidation off the copper it stands on and copper around it, `player/copper.go`;
-  Channeling tridents on a rod call lightning). Copper ageing, axes and waxing are not built.
+  Channeling tridents on a rod call lightning). Copper ageing, scraping with axes and waxing are not built. `player/strip.go`: axes strip logs, wood, stems, hyphae and bamboo blocks (keeping pillar_axis, wear 1, ItemUseOn sound).
 - Game events (vibrations): `world/gameevent.go` is BDS's dispatcher (`Region.PostGameEvent`, a
   `GameEvent` passed by value; block entities that are `GameEventListener`s are kept per chunk and
   hear events within their range and 16 blocks; listeners in other regions' chunks do not hear;
