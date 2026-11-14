@@ -206,7 +206,9 @@ func (p *Player) stackResponse(id int32, touched []slotRef) protocol.ItemStackRe
 		listed[key] = true
 		s := p.slotStack(r)
 		slots[[2]byte{r.container, r.slot}] = s.netID
-		if inv, slot := p.inventoryOf(r); inv.viewed() {
+		// A book that came from a window the client got without pages is sent again whole
+		// once it is in the player's own slots, so it can be read.
+		if inv, slot := p.inventoryOf(r); inv.viewed() || inv != nil && inv.kind.own() && hasPages(s.Tag) {
 			st.viewed = append(st.viewed, viewedSlot{inv: inv, slot: slot})
 		}
 		addSlotInfo(&resp, r, s)

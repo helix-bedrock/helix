@@ -449,7 +449,7 @@ func (r *Region) release(pos mcdb.ChunkPos) {
 	}
 	delete(r.holds, pos)
 	if c, ok := r.chunks[pos]; ok {
-		r.save(c, true)
+		r.save(c, true, true)
 		r.unloadChunkEntities(pos)
 		delete(r.chunks, pos)
 	}
@@ -588,7 +588,7 @@ func (r *Region) encoded(c *Chunk, nc *NetChunk, version uint64) {
 // changed since the last save are copied: the snapshot shares the rest.
 func (r *Region) saveChanged(ticks bool) {
 	for _, c := range r.chunks {
-		r.save(c, ticks)
+		r.save(c, ticks, ticks)
 	}
 }
 
@@ -604,7 +604,7 @@ func (r *Region) saveRound() {
 	}
 	for _, c := range r.chunks {
 		full := every > 0 && (r.ticks+autoSavePhase(c.pos))%uint64(every) == 0
-		r.save(c, full)
+		r.save(c, full, false)
 	}
 }
 
@@ -616,25 +616,39 @@ func autoSavePhase(pos mcdb.ChunkPos) uint64 {
 // autoSaveSpreadX keeps neighbouring rows of chunks apart in the interval.
 const autoSaveSpreadX = 31
 
-// DefaultSaveDelayTicks is Config.SaveDelayTicks when it is 0: 5 seconds.
-const DefaultSaveDelayTicks = 100
+const (
+	// DefaultSaveDelayTicks is Config.SaveDelayTicks when it is 0: 5 seconds.
+	DefaultSaveDelayTicks = 100
+	// saveCostShare is how many times its last save's time a chunk waits before the
+	// next, so saving one chunk takes at most about 1/saveCostShare of a worker: a
+	// chunk of chests stuffed with books, moved by pistons, is hundreds of megabytes
+	// each save, and saving it every few seconds would keep the disk and a core busy.
+	saveCostShare = 100
+	// maxSaveDelayTicks caps how long the slowest chunk waits: 10 minutes.
+	maxSaveDelayTicks = 12000
+	// tickNanos is one tick at 20 TPS.
+	tickNanos = int64(time.Second / 20)
+)
 
 // save saves c if its blocks changed, or with ticks set, if its tick queues
 // changed or it has or had live entities: they are saved with the blocks but
-// do not make a save of their own every tick. Without ticks, a chunk saved
-// less than SaveDelayTicks ago waits.
-func (r *Region) save(c *Chunk, ticks bool) {
+// do not make a save of their own every tick. A chunk saved less than its delay
+// ago waits, the auto-save too (which then happens once it may), unless force:
+// unloading and Close.
+func (r *Region) save(c *Chunk, ticks, force bool) {
+	ticks = ticks || c.fullPending
 	if c.saveWait > 0 {
 		c.saveWait--
-		if !ticks {
+		if !force {
+			c.fullPending = ticks
 			return
 		}
 	}
 	if c.discard || !c.dirty && (!ticks || !c.ticksDirty && !c.savedLive && !r.holdsSaved(c.pos)) {
 		return
 	}
-	c.dirty, c.ticksDirty = false, false
-	c.saveWait = r.saveDelay()
+	c.dirty, c.ticksDirty, c.fullPending = false, false, false
+	c.saveWait = r.saveDelay(c)
 	d, pos, snap := r.d, c.pos, *c.col
 	snap.Chunk = c.col.Chunk.Snapshot()
 	snap.Entities, c.savedLive = r.entitiesToSave(c)
@@ -642,22 +656,26 @@ func (r *Region) save(c *Chunk, ticks bool) {
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	d.pool.do(pos, func() {
+		start := time.Now()
 		if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, &snap); err != nil {
 			d.log.Error("save chunk", "pos", pos, "err", err)
 		}
+		c.saveCost.Store(int64(time.Since(start)))
 	})
 }
 
-// saveDelay is how many ticks a chunk just saved waits before the next save.
-func (r *Region) saveDelay() int32 {
-	switch d := r.d.conf.SaveDelayTicks; {
-	case d == 0:
-		return DefaultSaveDelayTicks
-	case d < 0:
+// saveDelay is how many ticks c, just saved, waits before the next save: the set
+// delay, or longer for a chunk whose last save was slow.
+func (r *Region) saveDelay(c *Chunk) int32 {
+	base := r.d.conf.SaveDelayTicks
+	switch {
+	case base == 0:
+		base = DefaultSaveDelayTicks
+	case base < 0:
 		return 0
-	default:
-		return d
 	}
+	byCost := c.saveCost.Load() * saveCostShare / tickNanos
+	return int32(min(max(int64(base), byCost), maxSaveDelayTicks)) //nolint:gosec // capped
 }
 
 // idle reports whether the region has nothing left to do. Under d.mu.

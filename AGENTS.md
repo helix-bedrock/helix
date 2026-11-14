@@ -130,9 +130,11 @@ sibling library folders, so unreleased library changes are used.
   sent and released. Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the
   end of each tick from a copy-on-write snapshot, then wait
-  `Config.SaveDelayTicks` (5 s by default) before saving again, so a
-  machine changing a chunk every tick does not re-save its block entities
-  20 times a second; every `Config.AutoSaveTicks`
+  `Config.SaveDelayTicks` (5 s by default), or 100 times as long as their
+  last save took (up to 10 minutes), before saving again, so a machine
+  changing a chunk every tick does not re-save its block entities 20 times
+  a second and slow saves never queue up; the auto-save waits too, only
+  unloading and Close save at once; every `Config.AutoSaveTicks`
   (30 s by default, spread over the ticks by chunk) each loaded chunk also
   saves its entities and tick queues, and online players are saved on the
   same interval (`Player.autoSave`), so a crash loses at most that much.
@@ -202,7 +204,11 @@ sibling library folders, so unreleased library changes are used.
   `item.go`, `playeritems.go`, `stackrequest.go`: the server-held items
   (BDS's saved format) and BDS's checks on stack
   requests (take, place, swap, destroy, creative items), applied all or
-  nothing on a copy. The client's view of its items is never read back. A refused request resends
+  nothing on a copy. The client's view of its items is never read back. Book pages are sent only
+  with books in the player's own slots, never in other windows, other players' hands, items on the
+  ground or inside another item (`ItemStack.networkTag`, `networkShown`), and a book a request puts in
+  the player's own slots is sent again whole: Helix's own rule, so a chest of shulker boxes of full
+  books is not one packet of 28 MB. A refused request resends
   all the player's slots (Helix's own rule, beyond BDS) so a client out of step recovers.
   `inventory.go`: the `Inventory` wrapper every set of slots is reached through, and the only code
   that writes InventorySlot and InventoryContent, through the per-player view (`OnInventoryView`,

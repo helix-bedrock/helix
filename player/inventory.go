@@ -321,7 +321,7 @@ func (inv *Inventory) sendSlots(p *Player, slots []int, now bool) {
 	}
 	items = inv.viewFor(p, slots, items)
 	for i, slot := range slots {
-		p.send(slotPacket(inv.s.reg, window, slot, items[i]))
+		p.send(slotPacket(inv.s.reg, window, slot, items[i], inv.kind.own()))
 	}
 	if now {
 		p.flushNow()
@@ -342,7 +342,7 @@ func (inv *Inventory) sendAll(p *Player, now bool) {
 		}
 		items = inv.viewFor(p, slots, items)
 	}
-	p.send(contentPacket(inv.s.reg, window, items))
+	p.send(contentPacket(inv.s.reg, window, items, inv.kind.own()))
 	if now {
 		p.flushNow()
 	}
@@ -378,16 +378,17 @@ func (s *Host) callView(view func(e *InventoryViewEvent), e *InventoryViewEvent)
 	view(e)
 }
 
-// slotPacket is one slot as the client gets it.
-func slotPacket(reg *registry.Registry, window uint32, slot int, s ItemStack) packet.Packet {
-	return &packet.InventorySlot{WindowID: window, Slot: uint32(slot), NewItem: s.network(reg)} //nolint:gosec // slots are small
+// slotPacket is one slot as the client gets it; own says the slot is the player's own,
+// whose books keep their pages.
+func slotPacket(reg *registry.Registry, window uint32, slot int, s ItemStack, own bool) packet.Packet {
+	return &packet.InventorySlot{WindowID: window, Slot: uint32(slot), NewItem: s.networkAs(reg, own)} //nolint:gosec // slots are small
 }
 
 // contentPacket is a whole window's slots as the client gets them.
-func contentPacket(reg *registry.Registry, window uint32, items []ItemStack) packet.Packet {
+func contentPacket(reg *registry.Registry, window uint32, items []ItemStack, own bool) packet.Packet {
 	content := make([]protocol.ItemInstance, len(items))
 	for i, s := range items {
-		content[i] = s.network(reg)
+		content[i] = s.networkAs(reg, own)
 	}
 	return &packet.InventoryContent{WindowID: window, Content: content}
 }

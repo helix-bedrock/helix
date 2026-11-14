@@ -872,7 +872,7 @@ func (o *Mob) Carried(m *mob.Mob) {
 	pk := o.handPacket(mob.EquipMainhand)
 	if it := m.Equipment(mob.EquipMainhand); !it.Empty() {
 		if st, ok := o.s.tradeItem(it.Name, it.Aux, 1); ok {
-			pk.NewItem = st.network(o.s.reg)
+			pk.NewItem = st.networkShown(o.s.reg)
 		}
 	}
 	o.entity.Send(pk)

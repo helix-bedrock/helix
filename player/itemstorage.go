@@ -85,17 +85,71 @@ func (s ItemStack) savedTag() map[string]any {
 }
 
 // networkTag is the tag as the client gets it: a storage item's ID added, what it holds
-// sent apart, in its own window.
-func (s ItemStack) networkTag() map[string]any {
-	if s.storageID == 0 {
+// sent apart, in its own window. Book pages go only with a book in the player's own
+// slots (own), never with items inside another item (a shulker box's): the client
+// reads a book only from its own slots, and its tooltips show titles, not pages. A box
+// of full books is about a megabyte with them, so a chest of such boxes would be one
+// packet of 28 MB. Helix's own rule, beyond BDS: the server's items keep everything.
+func (s ItemStack) networkTag(own bool) map[string]any {
+	if s.storageID == 0 && (own || !hasPages(s.Tag)) && !holdsItems(s.Tag) {
 		return s.Tag
 	}
 	tag := maps.Clone(s.Tag)
 	if tag == nil {
 		tag = map[string]any{}
 	}
-	tag[storageIDTag] = s.storageID - 1
+	if s.storageID != 0 {
+		tag[storageIDTag] = s.storageID - 1
+	}
+	if !own {
+		delete(tag, bookPagesTag)
+	}
+	if list, ok := tag[shulkerItemsTag].([]any); ok {
+		tag[shulkerItemsTag] = shownItems(list)
+	}
 	return tag
+}
+
+// hasPages reports whether a tag holds book pages.
+func hasPages(tag map[string]any) bool {
+	_, ok := tag[bookPagesTag]
+	return ok
+}
+
+// holdsItems reports whether a tag holds items, as a shulker box item's does.
+func holdsItems(tag map[string]any) bool {
+	_, ok := tag[shulkerItemsTag].([]any)
+	return ok
+}
+
+// shownItems is a list of saved items as the client gets it inside another item: each
+// without book pages, and so on down.
+func shownItems(list []any) []any {
+	out := make([]any, len(list))
+	for i, v := range list {
+		if m, ok := v.(map[string]any); ok {
+			out[i] = shownCompound(m)
+			continue
+		}
+		out[i] = v
+	}
+	return out
+}
+
+// shownCompound is one saved item without its book pages, the rest shared.
+func shownCompound(m map[string]any) map[string]any {
+	t, ok := m["tag"].(map[string]any)
+	if !ok || !hasPages(t) && !holdsItems(t) {
+		return m
+	}
+	tag := maps.Clone(t)
+	delete(tag, bookPagesTag)
+	if list, ok := tag[shulkerItemsTag].([]any); ok {
+		tag[shulkerItemsTag] = shownItems(list)
+	}
+	out := maps.Clone(m)
+	out["tag"] = tag
+	return out
 }
 
 // storedEmpty reports whether the stack holds no items.
@@ -364,7 +418,7 @@ func (p *Player) sendStorage(owner ItemStack, id int32, slots int) {
 	if !ok {
 		content := make([]protocol.ItemInstance, len(items))
 		for i, it := range items {
-			content[i] = it.network(reg)
+			content[i] = it.networkShown(reg)
 		}
 		p.send(&packet.InventoryContent{WindowID: storageWindow, Content: content, Container: name, StorageItem: storage})
 	} else {
@@ -374,7 +428,7 @@ func (p *Player) sendStorage(owner ItemStack, id int32, slots int) {
 			}
 			p.send(&packet.InventorySlot{
 				WindowID: storageWindow, Slot: uint32(i), //nolint:gosec // slots are small
-				Container: protocol.Option(name), StorageItem: protocol.Option(storage), NewItem: it.network(reg),
+				Container: protocol.Option(name), StorageItem: protocol.Option(storage), NewItem: it.networkShown(reg),
 			})
 		}
 	}

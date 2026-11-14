@@ -336,7 +336,7 @@ func (p *Player) sendEquipment() {
 		return
 	}
 	r.Broadcast(p.blockPos(), &packet.MobEquipment{
-		EntityRuntimeID: p.runtimeID, NewItem: held.network(p.s.reg), InventorySlot: inv.held, HotBarSlot: inv.held, WindowID: protocol.WindowIDInventory,
+		EntityRuntimeID: p.runtimeID, NewItem: held.networkShown(p.s.reg), InventorySlot: inv.held, HotBarSlot: inv.held, WindowID: protocol.WindowIDInventory,
 	}, p.viewer)
 }
 
@@ -350,7 +350,7 @@ func (p *Player) offhandChanged() bool {
 // offhandEquipment is the offhand item as those who see the player get it, as BDS
 // sends a change of that slot: slots 0 in the offhand window.
 func (p *Player) offhandEquipment() *packet.MobEquipment {
-	return &packet.MobEquipment{EntityRuntimeID: p.runtimeID, NewItem: p.inventory.offhand[0].network(p.s.reg), WindowID: protocol.WindowIDOffHand}
+	return &packet.MobEquipment{EntityRuntimeID: p.runtimeID, NewItem: p.inventory.offhand[0].networkShown(p.s.reg), WindowID: protocol.WindowIDOffHand}
 }
 
 // showOffhand shows those who see the player its offhand item. Its own client has it
@@ -378,8 +378,8 @@ func (p *Player) armorChanged() bool {
 func (p *Player) armorEquipment() *packet.MobArmourEquipment {
 	a, reg := &p.inventory.armor, p.s.reg
 	return &packet.MobArmourEquipment{
-		EntityRuntimeID: p.runtimeID, Helmet: a[0].network(reg), Chestplate: a[1].network(reg),
-		Leggings: a[2].network(reg), Boots: a[3].network(reg), Body: a[4].network(reg),
+		EntityRuntimeID: p.runtimeID, Helmet: a[0].networkShown(reg), Chestplate: a[1].networkShown(reg),
+		Leggings: a[2].networkShown(reg), Boots: a[3].networkShown(reg), Body: a[4].networkShown(reg),
 	}
 }
 

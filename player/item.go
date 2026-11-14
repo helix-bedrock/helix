@@ -97,9 +97,21 @@ func (s ItemStack) nbt(slot int, withSlot bool) map[string]any {
 	return m
 }
 
-// network returns the stack as the client gets it. An item the registry
-// no longer has is sent as nothing.
+// network returns the stack as the client gets it in the player's own slots. An item
+// the registry no longer has is sent as nothing.
 func (s ItemStack) network(reg *registry.Registry) protocol.ItemInstance {
+	return s.networkAs(reg, true)
+}
+
+// networkShown returns the stack as a client gets it anywhere but its own slots (a
+// chest's window, another player's hand, an item on the ground): without book pages,
+// which only a book in the player's own slots can be read from (networkTag).
+func (s ItemStack) networkShown(reg *registry.Registry) protocol.ItemInstance {
+	return s.networkAs(reg, false)
+}
+
+// networkAs is network or networkShown, by own.
+func (s ItemStack) networkAs(reg *registry.Registry, own bool) protocol.ItemInstance {
 	if s.Empty() {
 		return protocol.ItemInstance{}
 	}
@@ -109,7 +121,7 @@ func (s ItemStack) network(reg *registry.Registry) protocol.ItemInstance {
 	}
 	st := protocol.ItemStack{
 		ItemType: protocol.ItemType{NetworkID: int32(t.ID), MetadataValue: uint32(uint16(s.Meta))},
-		Count:    uint16(s.Count), NBTData: s.networkTag(),
+		Count:    uint16(s.Count), NBTData: s.networkTag(own),
 	}
 	if s.Block != nil {
 		name, _ := s.Block["name"].(string)

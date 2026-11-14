@@ -201,8 +201,12 @@ type Chunk struct {
 	// dirty means changed since it was last saved.
 	dirty bool
 	// saveWait is how many more ticks a changed chunk waits before its next save
-	// (Config.SaveDelayTicks).
-	saveWait int32
+	// (Config.SaveDelayTicks, longer for a slow one); fullPending is an auto-save
+	// that came while it waited. saveCost is how long its last save took on the
+	// worker, in nanoseconds, written there.
+	saveWait    int32
+	fullPending bool
+	saveCost    atomic.Int64
 	// discard keeps it out of the store.
 	discard  bool
 	encoding bool

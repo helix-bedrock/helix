@@ -21,7 +21,7 @@ const chestBombCommand = "chestbomb"
 const (
 	// chestBombDefault is how many chests /chestbomb builds without a count, chestBombMax
 	// the most it builds: one chest is about 28 MB once saved.
-	chestBombDefault = 100
+	chestBombDefault = 10
 	chestBombMax     = 1000
 	// chestBombSlots is the slots of a chest and of a shulker box.
 	chestBombSlots = 27

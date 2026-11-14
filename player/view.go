@@ -44,7 +44,7 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		UUID:        p.uuid, Username: p.name, EntityRuntimeID: p.runtimeID, PlatformChatID: p.conn.Client().PlatformOnlineID,
 		Position: pos.Sub(mgl32.Vec3{0, eyeHeight, 0}), Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		GameType: p.gameMode, EntityMetadata: meta,
-		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().network(p.s.reg),
+		AbilityData: p.abilities.Data(p.uniqueID), HeldItem: p.inventory.Held().networkShown(p.s.reg),
 		DeviceID: string(p.conn.Client().DeviceID), BuildPlatform: int32(p.conn.Client().DeviceOS),
 	}, p.armorEquipment(), p.offhandEquipment()}
 }

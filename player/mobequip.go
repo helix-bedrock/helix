@@ -144,14 +144,14 @@ func (m *Mob) handPacket(slot int) *packet.MobEquipment {
 	if slot == mob.EquipOffhand {
 		window = protocol.WindowIDOffHand
 	}
-	return &packet.MobEquipment{EntityRuntimeID: m.m.RuntimeID(), NewItem: m.items.stacks[slot].network(m.s.reg), WindowID: window}
+	return &packet.MobEquipment{EntityRuntimeID: m.m.RuntimeID(), NewItem: m.items.stacks[slot].networkShown(m.s.reg), WindowID: window}
 }
 
 func (m *Mob) armourPacket() *packet.MobArmourEquipment {
 	a, reg := &m.items.stacks, m.s.reg
 	return &packet.MobArmourEquipment{
-		EntityRuntimeID: m.m.RuntimeID(), Helmet: a[mob.EquipHead].network(reg), Chestplate: a[mob.EquipChest].network(reg),
-		Leggings: a[mob.EquipLegs].network(reg), Boots: a[mob.EquipFeet].network(reg), Body: a[mob.EquipBody].network(reg),
+		EntityRuntimeID: m.m.RuntimeID(), Helmet: a[mob.EquipHead].networkShown(reg), Chestplate: a[mob.EquipChest].networkShown(reg),
+		Leggings: a[mob.EquipLegs].networkShown(reg), Boots: a[mob.EquipFeet].networkShown(reg), Body: a[mob.EquipBody].networkShown(reg),
 	}
 }
 
