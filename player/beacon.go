@@ -31,8 +31,8 @@ const (
 	beaconLayers = 4
 	// beaconPaymentSlot is the payment's slot in the player's UI slots.
 	beaconPaymentSlot = 27
-	// beaconMaxEffect is the highest effect ID a payment may name.
-	beaconMaxEffect = 36
+	// beaconMaxEffect is the highest effect ID a payment may name (BDS 1.26.60's 0x26).
+	beaconMaxEffect = 38
 	// effectRegeneration is the only secondary effect besides the primary's second level.
 	effectRegeneration = 10
 	// beaconDurationBase and beaconDurationPerLevel are the effects' ticks: 180 + 40 a level.
@@ -186,6 +186,31 @@ func (b *Beacon) available(effect int32) bool {
 	return false
 }
 
+// tier is BDS's tier of an effect: the layer count that opens it, -1 for one in no tier.
+func tier(effect int32) int32 {
+	for t := range beaconTiers {
+		if slices.Contains(beaconTiers[t], effect) {
+			return int32(t) + 1 //nolint:gosec // at most 4
+		}
+	}
+	return -1
+}
+
+// setSecondary is BDS's setSecondaryEffect: an effect the layers open is taken, then the
+// secondary is kept only while the layers open it and it is regeneration or the primary.
+func (b *Beacon) setSecondary(effect int32) {
+	if b.levels <= 0 {
+		b.secondary = 0
+		return
+	}
+	if b.available(effect) {
+		b.secondary = effect
+	}
+	if s := b.secondary; !b.available(s) || (s != effectRegeneration && s != b.primary) {
+		b.secondary = 0
+	}
+}
+
 // applyEffects is BDS's _applyEffects: the primary, and with four layers a secondary that is
 // regeneration or the primary again, which then gives the primary at level II instead.
 func (b *Beacon) applyEffects(r *world.Region, pos cube.Pos) {
@@ -243,9 +268,10 @@ type beaconPayment struct {
 	primary, secondary int32
 }
 
-// payBeacon is BDS's _handleBeaconPaymentAction: an open beacon, a primary from 1 to 36 its
-// layers open, a secondary only with four layers, and an item in the payment slot. The item
-// must be consumed by the request's own actions.
+// payBeacon is BDS 1.26.60's beacon payment action (0xCA037C0): an open beacon, a primary
+// from 1 to 38 whose tier the layers reach, a secondary only with four layers, and an item
+// in the payment slot. The item must be consumed by the request's own actions. Nothing stops
+// a beacon whose effects are already chosen from being paid again for new ones.
 func (p *Player) payBeacon(a *protocol.BeaconPaymentStackRequestAction) (uint8, []slotRef) {
 	r := p.entity.Region()
 	if p.window.kind != ContainerBeacon || r == nil {
@@ -256,11 +282,13 @@ func (p *Player) payBeacon(a *protocol.BeaconPaymentStackRequestAction) (uint8, 
 	if !ok || !isBeacon {
 		return protocol.ItemStackResponseStatusError, nil
 	}
-	if a.PrimaryEffect <= 0 || a.PrimaryEffect > beaconMaxEffect || !b.available(a.PrimaryEffect) {
+	// BDS compares the effect's tier with the layers, so an effect in no tier (-1) passes
+	// and is only left unset when the request ends.
+	if a.PrimaryEffect <= 0 || a.PrimaryEffect > beaconMaxEffect || tier(a.PrimaryEffect) > b.levels {
 		return protocol.ItemStackResponseStatusError, nil
 	}
 	if a.SecondaryEffect != 0 {
-		if b.levels < beaconLayers || a.SecondaryEffect < 0 || a.SecondaryEffect > beaconMaxEffect || !b.available(a.SecondaryEffect) {
+		if b.levels != beaconLayers || a.SecondaryEffect < 0 || a.SecondaryEffect > beaconMaxEffect || tier(a.SecondaryEffect) > b.levels {
 			return protocol.ItemStackResponseStatusError, nil
 		}
 	}
@@ -309,8 +337,8 @@ func (p *Player) commitBeacon() {
 	if pay.primary > 0 && b.available(pay.primary) {
 		b.primary = pay.primary
 	}
-	if pay.secondary > 0 && b.available(pay.secondary) {
-		b.secondary = pay.secondary
+	if pay.secondary > 0 {
+		b.setSecondary(pay.secondary)
 	}
 	b.chunk.Changed()
 	r.SendBlockEntity(p.window.pos)
