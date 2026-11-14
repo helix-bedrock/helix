@@ -87,7 +87,7 @@ func (s ItemStack) savedTag() map[string]any {
 
 // networkTag is the tag as the client gets it: a storage item's ID added, what it holds
 // sent apart, in its own window. Book pages go only with a book in the player's own
-// slots (own), never with items inside another item (a shulker box's): the client
+// slots (own), never with items inside another item (a shulker box's or a bundle's): the client
 // reads a book only from its own slots, and its tooltips show titles, not pages. A box
 // of full books is about a megabyte with them, so a chest of such boxes would be one
 // packet of 28 MB. Helix's own rule, beyond BDS: the server's items keep everything.
@@ -105,9 +105,7 @@ func (s ItemStack) networkTag(own bool) map[string]any {
 	if !own {
 		delete(tag, bookPagesTag)
 	}
-	if list, ok := shownItemsOf(tag[shulkerItemsTag]); ok {
-		tag[shulkerItemsTag] = list
-	}
+	showHeld(tag)
 	return tag
 }
 
@@ -117,17 +115,33 @@ func hasPages(tag map[string]any) bool {
 	return ok
 }
 
-// holdsItems reports whether a tag holds items, as a shulker box item's does.
+// holdsItems reports whether a tag holds saved items: a shulker box item's Items, or a
+// storage item's (a bundle's) contents as saved inside another item.
 func holdsItems(tag map[string]any) bool {
-	switch tag[shulkerItemsTag].(type) {
-	case []any, nbt.Raw:
-		return true
+	for _, key := range heldItemTags {
+		switch tag[key].(type) {
+		case []any, nbt.Raw:
+			return true
+		}
 	}
 	return false
 }
 
+// heldItemTags are the tags saved items are held under.
+var heldItemTags = [...]string{shulkerItemsTag, storedContentTag}
+
+// showHeld replaces the saved items a tag holds with what the client gets of them
+// (shownItemsOf). The tag must be the caller's own copy.
+func showHeld(tag map[string]any) {
+	for _, key := range heldItemTags {
+		if list, ok := shownItemsOf(tag[key]); ok {
+			tag[key] = list
+		}
+	}
+}
+
 // shownItems is a list of saved items as the client gets it inside another item: each
-// without book pages, and so on down.
+// without book pages, and so on down, through shulker boxes and bundles alike.
 func shownItems(list []any) []any {
 	out := make([]any, len(list))
 	for i, v := range list {
@@ -148,9 +162,7 @@ func shownCompound(m map[string]any) map[string]any {
 	}
 	tag := maps.Clone(t)
 	delete(tag, bookPagesTag)
-	if list, ok := shownItemsOf(tag[shulkerItemsTag]); ok {
-		tag[shulkerItemsTag] = list
-	}
+	showHeld(tag)
 	out := maps.Clone(m)
 	out["tag"] = tag
 	return out
@@ -338,6 +350,9 @@ func (p *Player) commitStorage() bool {
 		owner := storageOwner(&st.work, w.id)
 		if owner == nil {
 			// The item left the player's slots in the same request.
+			return false
+		}
+		if heldOver(w.items, owner.stored) {
 			return false
 		}
 		*owner = owner.withStored(p.s.reg, w.items)

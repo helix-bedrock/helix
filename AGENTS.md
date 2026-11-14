@@ -206,12 +206,16 @@ sibling library folders, so unreleased library changes are used.
   requests (take, place, swap, destroy, creative items), applied all or
   nothing on a copy. The client's view of its items is never read back. Book pages are sent only
   with books in the player's own slots, never in other windows, other players' hands, items on the
-  ground or inside another item (`ItemStack.networkTag`, `networkShown`), and a book a request puts in
+  ground or inside another item, a shulker box's or a bundle's, at any depth (`ItemStack.networkTag`,
+  `networkShown`), and a book a request puts in
   the player's own slots is sent again whole: Helix's own rule, so a chest of shulker boxes of full
   books is not one packet of 28 MB. A book edit is ignored when a page is over 4096 bytes or the
   photo name, title, author or XUID is over 256 bytes (`player/book.go`; Helix's own rule, BDS has
   no limit). An item's nested `Items` (a shulker box's contents) is kept as an `nbt.Raw`, encoded
-  bytes the collector never scans (`player/nesteditems.go`). A refused request resends
+  bytes the collector never scans (`player/nesteditems.go`). What one shulker box or one bundle holds
+  is capped at 2 MB saved (`heldMaxBytes`, `player/holdlimit.go`): an item that would take it over
+  is refused, by request or hopper, so every holder of items holds at most its slots times that
+  (Helix's own rule; BDS takes any amount). A refused request resends
   all the player's slots (Helix's own rule, beyond BDS) so a client out of step recovers.
   `inventory.go`: the `Inventory` wrapper every set of slots is reached through, and the only code
   that writes InventorySlot and InventoryContent, through the per-player view (`OnInventoryView`,

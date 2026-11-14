@@ -167,7 +167,7 @@ func (p *Player) checkRequest() uint8 {
 	if status := p.finishCraft(); status != protocol.ItemStackResponseStatusOK {
 		return status
 	}
-	if !p.commitStorage() || p.shulkerInShulker() || !p.fireChestItems() {
+	if !p.commitStorage() || p.shulkerInShulker() || p.shulkerTooFull() || !p.fireChestItems() {
 		return protocol.ItemStackResponseStatusCannotPlaceItem
 	}
 	return protocol.ItemStackResponseStatusOK

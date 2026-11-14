@@ -374,7 +374,7 @@ func (c *Chest) putOne(r *world.Region, to *Chest, s ItemStack) bool {
 
 // takeOne puts one of s in the first slot that has room for it.
 func (c *Chest) takeOne(r *world.Region, s ItemStack) bool {
-	if c.shulker && isShulkerBox(s.Name) {
+	if c.shulker && isShulkerBox(s.Name) || !c.shulkerRoomFor(s) {
 		return false
 	}
 	limit := s.maxStack(c.s.reg)
