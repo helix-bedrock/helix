@@ -116,6 +116,7 @@ func (s *Host) spawnItem(d *world.Dimension, stack ItemStack, pos, vel mgl32.Vec
 func (s *Host) newItem(stack ItemStack, vel mgl32.Vec3, pickupDelay, throwTime int32) *ItemActor {
 	// A stack in the world has no slot, so no network ID the client names.
 	stack.netID = 0
+	s.offload(stack)
 	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime, health: itemHealth}
 }
 
@@ -211,6 +212,7 @@ func (s *Host) loadItem(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) b
 	// shulker box of books twice, once as millions of map entries and strings. saveEntity
 	// writes Item from the stack again.
 	delete(saved.Data, "Item")
+	s.offload(stack)
 	i := &ItemActor{s: s, stack: stack, saved: saved.Data, health: itemHealth}
 	if h, isShort := saved.Data["Health"].(int16); isShort {
 		i.health = int32(h)

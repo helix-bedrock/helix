@@ -20,6 +20,8 @@ github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41 h1:XTa1sWq
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41/go.mod h1:VnXHxKcm+E0FTmpjyXwTMPweBUqZ/QNDRABUVjSwRRE=
 github.com/helix-bedrock/protocol v0.0.0-20261114051721-6bc95f374de8 h1:N3d5ULGXEgGL7c7NbsixUceprlTlUNSom2Pt5CMomO0=
 github.com/helix-bedrock/protocol v0.0.0-20261114051721-6bc95f374de8/go.mod h1:7uEwDr3AXskn3a6zfs+6e+zXH51WVJX+dfUgOyC1TWE=
+github.com/helix-bedrock/protocol v0.0.0-20261114194732-93fcc32c6430 h1:R4LJ+EX22cNvxHSwMWCPfrx/+IrG5+MX1LxPkImzlUA=
+github.com/helix-bedrock/protocol v0.0.0-20261114194732-93fcc32c6430/go.mod h1:7uEwDr3AXskn3a6zfs+6e+zXH51WVJX+dfUgOyC1TWE=
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24 h1:LfqBsExOquDKBnujD/ZXu8tlLKW6WKtV4gPW4siyCw8=
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24/go.mod h1:yQ1PGHcnA4woFMDY+OWLn49Rwp81/oZzcceMTNYCRms=
 github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10 h1:vWYgr0UyPulMmaDLMoFb2JQ4bqV9jG8OlvYyGSHtxWo=
@@ -30,6 +32,8 @@ github.com/helix-bedrock/world v0.0.0-20261114180157-032f8c28c3b9 h1:yU9NNfUGvGd
 github.com/helix-bedrock/world v0.0.0-20261114180157-032f8c28c3b9/go.mod h1:UViFHufUZJj+gXfRI61BpBOE/XODGGTt5LAjrPtKvpQ=
 github.com/helix-bedrock/world v0.0.0-20261114192422-e5a695916048 h1:xwoArM1NDu70xOqOcRDS168MuY2ozAZmJg8Z/aqPvpk=
 github.com/helix-bedrock/world v0.0.0-20261114192422-e5a695916048/go.mod h1:UViFHufUZJj+gXfRI61BpBOE/XODGGTt5LAjrPtKvpQ=
+github.com/helix-bedrock/world v0.0.0-20261114195614-817a7925e35b h1:3vbD7Owb5eRk+Myp0kn9I0pUWF1WUd+4AVNn/hmKElM=
+github.com/helix-bedrock/world v0.0.0-20261114195614-817a7925e35b/go.mod h1:Gmjtdffxf087mTYJL6tDYq05iKj0bkwcKdreo4FoUpU=
 github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb h1:Jp5NwMaRuQsw7ImQ1gPeA+eMElA+EsLwzndDufnu3oI=
 github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=

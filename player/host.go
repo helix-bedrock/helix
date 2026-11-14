@@ -100,6 +100,9 @@ type HostConfig struct {
 	// OnPanic is told of a panic in a player's or the global goroutine, recovered so the
 	// server can tell everyone and stop. Nil only logs it.
 	OnPanic func(v any, stack []byte)
+	// Items stores big contents of items (shulker boxes of books) on their own, so items
+	// keep only a reference (helditems.go). Nil keeps them in the items.
+	Items ItemContents
 }
 
 // Host runs the players of one server: it admits them, owns the player
@@ -120,6 +123,8 @@ type Host struct {
 	farm         *farm.Ticker
 	onEnterEnd   func()
 	playerStore  mcdb.PlayerStore
+	// held moves big contents of items to disk; nil without HostConfig.Items.
+	held         *heldWriter
 	level        Level
 	viewDistance int32
 	maxPlayers   int
@@ -240,6 +245,9 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 		return nil, err
 	}
 	h.maps = newMapStore(conf.WorldStore)
+	if conf.Items != nil {
+		h.startHeldWriter(conf.Items)
+	}
 	h.global = newGlobal(h.panicked)
 	h.setUpCommands()
 	h.setUpMobs()
@@ -430,6 +438,7 @@ func (h *Host) Close(reason int32) {
 	h.global.close()
 	h.saveMaps()
 	h.saveVillages()
+	h.stopHeldWriter()
 }
 
 // isClosed reports whether err only says the connection was closed.

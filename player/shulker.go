@@ -77,6 +77,9 @@ func (c *Chest) placedFrom(r *world.Region, pl *Placement) {
 		c.facing = uint8(pl.Face) //nolint:gosec // checked just here
 	}
 	c.changed = true
+	if h := tagHolder(pl.Item.Tag); h != nil && h.stored.Load() {
+		c.holdFrom(h)
+	}
 	for _, item := range compounds(pl.Item.Tag[shulkerItemsTag]) {
 		if slot, ok := item["Slot"].(uint8); ok && int(slot) < chestSize {
 			c.items[slot] = withID(itemFromNBT(item), c.s.nextStackID)
@@ -99,6 +102,9 @@ func (s *Host) shulkerDrops(r *world.Region, pos cube.Pos, items []ItemStack) []
 	c := s.chestAt(r, pos)
 	if c == nil || !c.shulker {
 		return items
+	}
+	if c.boxHeld != nil {
+		return c.dropsHeld(items)
 	}
 	c.Warm(pos)
 	held := []any{}

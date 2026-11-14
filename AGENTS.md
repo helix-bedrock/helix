@@ -229,7 +229,15 @@ sibling library folders, so unreleased library changes are used.
   books is not one packet of 28 MB. A book edit is ignored when a page is over 4096 bytes or the
   photo name, title, author or XUID is over 256 bytes (`player/book.go`; Helix's own rule, BDS has
   no limit). An item's nested `Items` (a shulker box's contents) is kept as an `nbt.Raw`, encoded
-  bytes the collector never scans (`player/nesteditems.go`). What one shulker box or one bundle holds
+  bytes the collector never scans (`player/nesteditems.go`). Contents of 16 KB or more go further
+  (`player/helditems.go`, Helix's own rule): a `heldItems` holder whose bytes a background
+  writer moves into the world's `items.hx` records (`HostConfig.Items`, hxdb), keyed by SHA-256;
+  the item then keeps only a reference and the items as shown (no pages), saves write the
+  `helix:items` reference, and nothing reads the contents while the item lies, moves or is
+  shown. Items on the ground, picked-up items and chest items read back from disk are handed to
+  the writer. A box placed from such an item stays cold on that reference (`player/heldbox.go`)
+  until it is opened or a hopper uses it, and breaking it unopened gives the item the same
+  reference. Records no reference uses are not removed yet. What one shulker box or one bundle holds
   is capped at 2 MB saved (`heldMaxBytes`, `player/holdlimit.go`): an item that would take it over
   is refused, by request or hopper, so every holder of items holds at most its slots times that
   (Helix's own rule; BDS takes any amount). A refused request resends

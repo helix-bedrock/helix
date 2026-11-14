@@ -64,6 +64,7 @@ func (i *ItemActor) SetView(view func(p *Player, v *ItemView)) {
 // or in an [ItemDropEvent].
 func (i *ItemActor) SetStack(s ItemStack) {
 	s.netID = 0
+	i.s.offload(s)
 	same := s.stacksWith(i.stack)
 	i.stack = s
 	if i.entity == nil {

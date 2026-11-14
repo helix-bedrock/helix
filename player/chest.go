@@ -193,6 +193,9 @@ type Chest struct {
 	warmAt  int64 // the world tick the read was asked at
 	coldGen uint32
 	waiters []func(*world.Region)
+	// boxHeld is where a cold box placed from an item finds its items: the item's stored
+	// contents, never read until something uses them (heldbox.go).
+	boxHeld *heldItems
 	// saved keeps the other fields of the saved chest (CustomName, LootTable...),
 	// written back as they were.
 	saved map[string]any
@@ -461,9 +464,14 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	findable, _ := saved["Findable"].(uint8)
 	c.findable = findable != 0
+	if ref, ok := saved[hx.ItemsRefTag].(map[string]any); ok && c.shulker {
+		if h := heldFromRef(ref); h != nil {
+			c.holdFrom(h)
+		}
+	}
 	// hx.LightMarker comes with items read light (counts only, hxdb): the chest reads them
 	// whole before it saves, so its saves must not carry the mark.
-	for _, k := range [...]string{"Items", "Findable", "pairlead", "pairx", "pairz", "forceunpair", hx.LightMarker} {
+	for _, k := range [...]string{"Items", "Findable", "pairlead", "pairx", "pairz", "forceunpair", hx.LightMarker, hx.ItemsRefTag} {
 		delete(c.saved, k)
 	}
 	return c, true
@@ -506,6 +514,9 @@ func (c *Chest) NetworkData(pos cube.Pos) map[string]any {
 
 // SaveData is what BDS saves of a chest: the same plus the items.
 func (c *Chest) SaveData(pos cube.Pos) map[string]any {
+	if c.boxHeld != nil {
+		return c.heldSaveData(pos)
+	}
 	c.Warm(pos)
 	m := maps.Clone(c.saved)
 	if m == nil {
@@ -656,7 +667,9 @@ func (s *Host) chestAt(r *world.Region, pos cube.Pos) *Chest {
 // BlockEntityRemoved takes a broken chest apart from its partner and throws its
 // half of the items.
 func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
-	c.Warm(pos) // its stored compound is still on disk until the chunk saves again
+	if c.boxHeld == nil {
+		c.Warm(pos) // its stored compound is still on disk until the chunk saves again
+	}
 	c.pos = pos
 	if c.shulker {
 		c.closeViewers(r)

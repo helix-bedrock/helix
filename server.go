@@ -372,6 +372,14 @@ func (s *Server) startAuth(ctx context.Context) {
 	s.log.Info("Xbox Live checks ready", "issuer", s.auth.Issuer(), "clock offset", s.auth.Offset())
 }
 
+// itemContents is the world store's item contents records, if it keeps them (hxdb).
+func (s *Server) itemContents() player.ItemContents {
+	if ic, ok := s.worldStore.(player.ItemContents); ok {
+		return ic
+	}
+	return nil
+}
+
 // newHost makes the player Host over the open world and hooks it to the server's
 // systems.
 func (s *Server) newHost() (*player.Host, error) {
@@ -392,6 +400,7 @@ func (s *Server) newHost() (*player.Host, error) {
 		Farm:         s.farm,
 		Fire:         s.fire,
 		OnPanic:      s.panicked,
+		Items:        s.itemContents(),
 	}, s.setup)
 	if err != nil {
 		return nil, err

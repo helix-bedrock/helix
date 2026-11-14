@@ -45,7 +45,28 @@ func (s ItemStack) Empty() bool { return s.Count == 0 || s.Name == "" }
 // stacksWith reports whether o can join s in one slot, as BDS matches
 // stacks: same item, aux value, block and data.
 func (s ItemStack) stacksWith(o ItemStack) bool {
-	return s.Name == o.Name && s.Meta == o.Meta && reflect.DeepEqual(s.Block, o.Block) && reflect.DeepEqual(s.Tag, o.Tag)
+	return s.Name == o.Name && s.Meta == o.Meta && reflect.DeepEqual(s.Block, o.Block) && tagsEqual(s.Tag, o.Tag)
+}
+
+// tagsEqual reports whether two tags are the same. Held items (helditems.go) are the same
+// only as the same holder, which is changed from another goroutine and never compared deeply.
+func tagsEqual(a, b map[string]any) bool {
+	ha, hb := tagHolder(a), tagHolder(b)
+	if ha == nil && hb == nil {
+		return reflect.DeepEqual(a, b)
+	}
+	if ha != hb || len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if k == shulkerItemsTag {
+			continue
+		}
+		if w, ok := b[k]; !ok || !reflect.DeepEqual(v, w) {
+			return false
+		}
+	}
+	return true
 }
 
 // itemFromNBT reads an item as BDS saves it. An empty compound or a zero

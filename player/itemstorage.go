@@ -68,9 +68,9 @@ func (s *ItemStack) readStored() {
 // runtime ID left out.
 func (s ItemStack) savedTag() map[string]any {
 	if s.storedEmpty() {
-		return s.Tag
+		return savedTagOf(s.Tag)
 	}
-	tag := maps.Clone(s.Tag)
+	tag := maps.Clone(savedTagOf(s.Tag))
 	if tag == nil {
 		tag = map[string]any{}
 	}
@@ -120,7 +120,7 @@ func hasPages(tag map[string]any) bool {
 func holdsItems(tag map[string]any) bool {
 	for _, key := range heldItemTags {
 		switch tag[key].(type) {
-		case []any, nbt.Raw:
+		case []any, nbt.Raw, *heldItems:
 			return true
 		}
 	}

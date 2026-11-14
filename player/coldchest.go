@@ -32,7 +32,9 @@ func (c *Chest) coolable() bool {
 }
 
 // Cold reports whether the chest's items are on disk only.
-func (c *Chest) Cold() bool { return c.cold }
+// A box holding its item's stored contents (boxHeld) is not: it has no stored copy of its
+// own, so its saves write the reference (SaveData).
+func (c *Chest) Cold() bool { return c.cold && c.boxHeld == nil }
 
 // Cool leaves the chest's items on disk once it has gone unused for coolIdleRounds rounds.
 // The world asks only while the chunk's stored copy is current.
@@ -82,7 +84,7 @@ func (c *Chest) coldSlotOf(s ItemStack) coldSlot {
 // Warm reads the chest's items back from its chunk's stored copy. On a read error the chest
 // stays cold, so its save keeps the stored items rather than writing none.
 func (c *Chest) Warm(pos cube.Pos) {
-	if !c.cold {
+	if !c.cold || c.warmFromHeld() {
 		return
 	}
 	saved, err := c.chunk.Stored(pos)
@@ -121,6 +123,13 @@ func (c *Chest) whenWarm(r *world.Region, fn func(*world.Region)) bool {
 // warmLater reads the items on a worker and applies them on the owner if the chest is still
 // as cold as when asked, then runs waiter, if not nil.
 func (c *Chest) warmLater(r *world.Region, waiter func(*world.Region)) {
+	if c.boxHeld != nil {
+		// A placed box's items are one record of at most heldMaxBytes: read at once.
+		if c.warmFromHeld(); !c.cold && waiter != nil {
+			waiter(r)
+		}
+		return
+	}
 	if waiter != nil {
 		c.waiters = append(c.waiters, waiter)
 	}
@@ -173,6 +182,7 @@ func (c *Chest) fillItems(saved map[string]any) {
 		slot, _ := item["Slot"].(uint8)
 		if int(slot) < c.halfSize() {
 			c.items[slot] = withID(itemFromNBT(item), c.s.nextStackID)
+			c.s.offload(c.items[slot])
 		}
 	}
 }
@@ -238,7 +248,9 @@ func (e chestEntities) LoadRaw(pos cube.Pos, raw []byte) (world.BlockEntity, boo
 	if !ok || !isChest || !c.coolable() {
 		return nil, false
 	}
-	c.goCold()
+	if c.boxHeld == nil {
+		c.goCold()
+	}
 	return c, true
 }
 

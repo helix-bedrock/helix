@@ -59,6 +59,8 @@ func valueBytes(v any) int {
 		return 2 + len(v)
 	case nbt.Raw:
 		return v.Len()
+	case *heldItems:
+		return v.size
 	case []byte:
 		return 4 + len(v)
 	case []int32:
