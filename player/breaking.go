@@ -403,6 +403,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	}
 	p.s.brokenTNT(r, pos, b.Block, p)
 	p.hitLectern(r, pos)
+	p.potWillDestroy(r, pos, b.Block)
 	p.breakDoublePlantLower(r, pos, b.Block)
 	if destroy := p.s.circuits.Destroy; destroy != nil {
 		destroy(r, pos, b.Block, p.inventory.main[p.inventory.held].Name)

@@ -466,6 +466,9 @@ func vanillaPlace(pl *Placement) bool {
 		if c := p.s.chestAt(r, pl.Pos); c != nil && c.shulker {
 			c.placedFrom(r, pl)
 		}
+		if dp, ok := DecoratedPotAt(r, pl.Pos); ok {
+			dp.placedFrom(pl)
+		}
 		r.UpdateNeighbours(pl.Pos)
 	}
 	playSound(r, pl.Pos, p.s.blockSound(packet.SoundEventPlace, blockCenter(pl.Pos), pl.Block), nil)

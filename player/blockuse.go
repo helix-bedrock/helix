@@ -111,6 +111,10 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useCake(r, u)
 	case anvilBlock, anvilChipped, anvilDamaged, anvilDeprecated:
 		return p.useAnvil(r, u)
+	case flowerPotBlock:
+		return p.useFlowerPot(r, u)
+	case decoratedPotBlock:
+		return p.useDecoratedPot(r, u)
 	}
 	if isSignBlock(name) {
 		return p.useSign(r, u)

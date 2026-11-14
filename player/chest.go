@@ -332,6 +332,12 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == nameCauldron {
 		return e.s.newCauldron()
 	}
+	switch e.s.reg.Blocks.Name(block) {
+	case flowerPotBlock:
+		return &FlowerPot{s: e.s}
+	case decoratedPotBlock:
+		return e.s.newDecoratedPot()
+	}
 	if isBrushable(e.s.reg.Blocks.Name(block)) {
 		return e.s.newBrushable()
 	}
@@ -399,6 +405,12 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == cauldronEntityID {
 		return e.s.loadCauldron(saved), true
+	}
+	switch id {
+	case flowerPotEntityID:
+		return e.s.loadFlowerPot(saved), true
+	case decoratedPotEntityID:
+		return e.s.loadDecoratedPot(saved), true
 	}
 	if id == brushableEntityID {
 		return e.s.loadBrushable(saved), true
