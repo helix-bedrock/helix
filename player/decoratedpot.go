@@ -56,8 +56,8 @@ const (
 	potContainerMax = 64
 	potLootTag      = "LootTable"
 	potLootSeedTag  = "LootTableSeed"
-	tagTrident  = "minecraft:is_trident"
-	tagTool     = "minecraft:is_tool"
+	tagTrident      = "minecraft:is_trident"
+	tagTool         = "minecraft:is_tool"
 )
 
 // DecoratedPot is a decorated pot's block entity: its four sherds (back, left, right, front
