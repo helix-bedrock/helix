@@ -492,6 +492,16 @@ func (r *Region) SendBlockEntity(pos cube.Pos) {
 	}, nil)
 }
 
+// ResendBlock sends the block at pos on layer 0 to the chunk's viewers again, unchanged. A
+// client draws some block entity data (a cauldron's colour) into the chunk's mesh and only
+// redraws on a block update, so data sent after the block's own update needs another one.
+// Runs: owner.
+func (r *Region) ResendBlock(pos cube.Pos) {
+	if b, ok := r.Block(pos, 0); ok {
+		r.updateBlock(pos, 0, b)
+	}
+}
+
 // tickBlockEntities ticks the chunk's block entities, in the order they came. A
 // tick may remove some.
 func (r *Region) tickBlockEntities(c *Chunk) {

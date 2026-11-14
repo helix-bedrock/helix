@@ -146,10 +146,14 @@ func (c *Cauldron) Potion() int32 { return c.potion }
 // Colour returns the dye colour of its water (ARGB), and whether it is dyed.
 func (c *Cauldron) Colour() (uint32, bool) { return c.colour, c.dyed }
 
-// changed marks it for saving and tells the clients.
+// changed marks it for saving and tells the clients. The block is sent again after the data:
+// the client draws the liquid's colour into the chunk and redraws it on a block update, so
+// a colour sent after the block's update (a dye, which keeps the level) showed only when
+// something else redrew the chunk.
 func (c *Cauldron) changed(r *world.Region, pos cube.Pos) {
 	c.chunk.Changed()
 	r.SendBlockEntity(pos)
+	r.ResendBlock(pos)
 }
 
 // clear takes out the potion and the dye.
