@@ -281,6 +281,10 @@ func (b *Boat) tick(e *world.Entity) {
 	} else {
 		b.driven = true
 		b.motion.vel = mgl32.Vec3{}
+		// A move worked out before the driver got in (the think step runs before player
+		// input) starts from where the boat was then: applied once they get out, it would
+		// put the boat back there.
+		b.next = thought{}
 	}
 	changed := false
 	if b.hurtTime > 0 {
