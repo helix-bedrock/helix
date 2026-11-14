@@ -34,8 +34,8 @@ import (
 //     body or head form by whether a cave vine is under it; the tip grows down at odds 0.1 up
 //     to age 25, the new tip with berries at 0.11), bone meal 0xCB53340 (berries on one without:
 //     the head form at the tip, else the body form), use 0xCB517C0 (picking the berries).
-//   - Shears on the tip of weeping, twisting or cave vines stop it growing: age 25 (the use
-//     handlers 0xD428AE0, 0xCB517C0 read the held item; their whole bodies were not read).
+//   - Shears on the tip of weeping, twisting or cave vines stop it growing: age 25, with the
+//     shear sound (LevelSoundEvent 45; the use handlers 0xD428AE0, 0xCB517C0).
 //
 // Not ported: VineBlock's last sideways case (a vine with no side, which BDS does not keep),
 // and cave vines' liquid rule (not read).

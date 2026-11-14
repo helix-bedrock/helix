@@ -970,6 +970,9 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 		}
 	} else {
 		t.s.HitTarget(r, hit.block, hit.pos, t.spec.Stick)
+		if f := t.s.farm; f != nil {
+			f.ProjectileHitDripleaf(r, hit.block)
+		}
 		t.tridentOnRod(r, hit.block)
 		if t.spec.Stick {
 			t.stickIn(e, hit)

@@ -24,8 +24,9 @@ import (
 //     water, 0xD4F8C20), bone meal 0xD4F9480 and 0xCCDD810 (a big dripleaf 2 to 5 high where
 //     there is air, water or the small dripleaf).
 //
-// Not ported: the block_change game event a reset posts, projectiles tilting a leaf, and mobs
-// and items standing on one (players only).
+// A projectile hitting a head (0xCCDEBD0) tilts it fully at once. Players and mobs tip it by
+// standing on it, checked every tick. Not ported: the block_change game event a reset posts,
+// and items lying on a leaf.
 
 // Blocks and states of the dripleaves.
 const (
@@ -239,6 +240,18 @@ func (t *Ticker) StandOnDripleaf(r *world.Region, pos cube.Pos, feetY float32) {
 	}
 	if feetY > float32(pos[1])+leafStandHeight {
 		t.setTilt(r, pos, s, tiltUnstable)
+	}
+}
+
+// ProjectileHitDripleaf is a projectile hitting the block at pos (BDS's 0xCCDEBD0): a big
+// dripleaf head not fully tilted tilts fully at once. Runs: owner of the region.
+func (t *Ticker) ProjectileHitDripleaf(r *world.Region, pos cube.Pos) {
+	b, ok := r.Block(pos, 0)
+	if !ok {
+		return
+	}
+	if s := t.state(b); s.kind == kindBigDripleaf && s.facing == leafHd && s.age != tiltFull {
+		t.setTilt(r, pos, s, tiltFull)
 	}
 }
 

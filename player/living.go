@@ -226,6 +226,9 @@ func (m *Mob) tickHazards(r *world.Region) {
 	box := m.m.Box()
 	moved := mglVec(b.Pos).Sub(mglVec(b.PrevPos))
 	m.s.tickHazards(r, m, mglVec(box.Min), mglVec(box.Max), moved)
+	if b.OnGround && !m.Dead() {
+		m.s.standOnDripleaf(r, mglVec(b.Pos))
+	}
 	if b.Landed && !m.Dead() {
 		m.s.landed(r, m, mglVec(b.Pos), b.LandedFall, m.m.Type())
 	}

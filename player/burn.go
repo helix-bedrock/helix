@@ -199,6 +199,8 @@ func (p *Player) tickBurning() {
 		c.contact = contactNone
 	}
 	p.s.tickHazardsFrom(r, p, lo, hi, moved, c)
+	// Every tick, so a player who joins or stands still on a leaf tips it too.
+	p.s.standOnDripleaf(r, lo)
 }
 
 // showBurning tells everyone, the player too, when the fire flag changes.

@@ -151,12 +151,14 @@ func (p *Player) shearPlantTip(r *world.Region, u *BlockUse) bool {
 		return false
 	}
 	p.hurtHeld(1)
+	playSound(r, u.Pos, soundEvent{name: packet.SoundEventShear, pos: blockCenter(u.Pos), extra: -1}, nil)
 	return true
 }
 
-// standOnDripleaf tips a big dripleaf the player stands on.
-func (p *Player) standOnDripleaf(r *world.Region, feet mgl32.Vec3) {
-	f := p.s.farm
+// standOnDripleaf tips a big dripleaf a player or mob with its feet at feet stands on.
+// Runs: the region's owner, once a tick for each.
+func (s *Host) standOnDripleaf(r *world.Region, feet mgl32.Vec3) {
+	f := s.farm
 	if f == nil {
 		return
 	}
