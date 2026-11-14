@@ -441,8 +441,10 @@ sibling library folders, so unreleased library changes are used.
   leaves its big data on disk while unused (Helix's own rule, beyond BDS): chests, barrels and
   shulker boxes (`player/coldchest.go`) unused for 3 cooling rounds (`coolEveryTicks`, 10 s) in a
   chunk whose stored copy is current keep only each slot's count for comparators, load that way
-  from disk (`RawBlockEntities.LoadRaw`), and read their items back (`Warm`, `ChunkHandle.Stored`)
-  before anything touches them; a save copies their stored compounds as they are. `player/chest.go` runs chests, ender chests
+  from disk (`RawBlockEntities.LoadRaw`), and read their items back before anything touches them; a save
+  copies their stored compounds as they are. Opening one and hoppers read them on the chunk's worker
+  (`Chest.whenWarm`, `ChunkHandle.StoredLater`): the window opens once they are back, a hopper tries
+  again later; other code reads them on the tick (`Warm`, `ChunkHandle.Stored`). `player/chest.go` runs chests, ender chests
   (items in `playerItems.ender`, reached as `Player.EnderChest`), hoppers, dispensers, droppers, crafters
   and carts' slots: BDS 1.26.60's pairing, lid and window, with `playerItems.open` as a stack request's copy
   of the open container (container `ContainerLevelEntity`), and the chest API (`Chest.Inventory`, `Kind`,

@@ -185,6 +185,13 @@ type Chest struct {
 	cold      bool
 	idle      uint8
 	coldSlots [chestSize]coldSlot
+	// warming is a read of the items on a worker under way (warmLater), coldGen counts
+	// the times the chest went cold so a read from an earlier time is not applied, and
+	// waiters run once the items are back.
+	warming bool
+	warmAt  int64 // the world tick the read was asked at
+	coldGen uint32
+	waiters []func(*world.Region)
 	// saved keeps the other fields of the saved chest (CustomName, LootTable...),
 	// written back as they were.
 	saved map[string]any
@@ -885,16 +892,36 @@ func (p *Player) useChest(r *world.Region, u *BlockUse) bool {
 	if p.window.open {
 		return true
 	}
-	blocked := !c.canOpen(r, u.Pos)
+	// A cold chest's items are read on a worker first, so a chest in a giant chunk does
+	// not stall the tick; the window opens once they are back.
+	pos := u.Pos
+	if !c.whenWarm(r, func(r *world.Region) { p.openWhenWarm(r, c, pos) }) {
+		return true
+	}
+	p.openChestChecked(r, c, pos)
+	return true
+}
+
+// openWhenWarm opens c for p once its items are back, if p is still here, has no window
+// open and c is still at pos.
+func (p *Player) openWhenWarm(r *world.Region, c *Chest, pos cube.Pos) {
+	if p.entity == nil || p.entity.Region() != r || p.window.open || p.s.chestAt(r, pos) != c {
+		return
+	}
+	p.openChestChecked(r, c, pos)
+}
+
+// openChestChecked opens c unless the block above stops a lid or a plugin refuses it.
+func (p *Player) openChestChecked(r *world.Region, c *Chest, pos cube.Pos) {
+	blocked := !c.canOpen(r, pos)
 	if o := c.mate(r); o != nil && !o.canOpen(r, o.pos) {
 		blocked = true
 	}
-	o := p.chestOpening(r, c, u.Pos)
+	o := p.chestOpening(r, c, pos)
 	o.blocked = blocked
 	if p.mayOpen(r, &o) {
-		p.openChest(r, c, u.Pos)
+		p.openChest(r, c, pos)
 	}
-	return true
 }
 
 // chestOpening is the window a chest opens.

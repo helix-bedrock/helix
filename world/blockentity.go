@@ -108,6 +108,27 @@ func (h ChunkHandle) Stored(pos cube.Pos) (map[string]any, error) {
 	return l.LoadBlockEntity(h.c.pos, h.d.conf.Dim, pos)
 }
 
+// StoredLater is Stored read on the chunk's load worker, so a block entity in a chunk of
+// hundreds of megabytes does not stall its region's tick while it is found: done runs on the
+// chunk's owner afterwards, unless the chunk unloaded meanwhile. The read waits for the
+// chunk's saves already queued. Runs: owner of the chunk.
+func (h ChunkHandle) StoredLater(pos cube.Pos, done func(r *Region, saved map[string]any, err error)) {
+	if h.c == nil || h.d == nil {
+		done(nil, nil, errNoBlockEntityStore)
+		return
+	}
+	d, c := h.d, h.c
+	d.pool.do(c.pos, func() {
+		defer d.sched.recovered(d.log)
+		saved, err := h.Stored(pos)
+		d.postAt(c.pos, func(r *Region) {
+			if r.chunks[c.pos] == c {
+				done(r, saved, err)
+			}
+		})
+	})
+}
+
 // Changed marks the chunk to be saved at the end of the tick, as
 // [Region.SaveBlockEntity] does. A zero handle, or one whose chunk has gone, does
 // nothing that lasts.

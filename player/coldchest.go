@@ -62,6 +62,7 @@ func (c *Chest) goCold() {
 	}
 	c.items = [chestSize]ItemStack{}
 	c.cold, c.idle = true, 0
+	c.coldGen++
 }
 
 // coldSlotOf is what a cold chest keeps of s.
@@ -89,6 +90,76 @@ func (c *Chest) Warm(pos cube.Pos) {
 	}
 	c.fillItems(saved)
 	c.cold, c.idle, c.coldSlots = false, 0, [chestSize]coldSlot{}
+}
+
+// whenWarm reports whether the chest and its mate hold their items. If not, it starts reading
+// them on the chunk's worker (warmLater) and runs fn, if not nil, once they are back. Code
+// on the tick uses it instead of Inventory where it can wait, so a chest in a chunk of
+// hundreds of megabytes does not stall the tick while its items are found.
+func (c *Chest) whenWarm(r *world.Region, fn func(*world.Region)) bool {
+	lead, follower := c.halves(r)
+	for _, h := range [...]*Chest{lead, follower} {
+		if h != nil && h.cold {
+			var waiter func(*world.Region)
+			if fn != nil {
+				// Once this half is back, check both again: the other may still be cold.
+				waiter = func(r *world.Region) {
+					if c.whenWarm(r, fn) {
+						fn(r)
+					}
+				}
+			}
+			h.warmLater(r, waiter)
+			return false
+		}
+	}
+	return true
+}
+
+// warmLater reads the items on a worker and applies them on the owner if the chest is still
+// as cold as when asked, then runs waiter, if not nil.
+func (c *Chest) warmLater(r *world.Region, waiter func(*world.Region)) {
+	if waiter != nil {
+		c.waiters = append(c.waiters, waiter)
+	}
+	// A read whose answer was dropped (its chunk moved to another region meanwhile) is
+	// asked again after a while.
+	if c.warming && r.CurrentTick()-c.warmAt < warmRetryTicks {
+		return
+	}
+	c.warming, c.warmAt = true, r.CurrentTick()
+	gen := c.coldGen
+	c.chunk.StoredLater(c.pos, func(r *world.Region, saved map[string]any, err error) {
+		c.warming = false
+		waiters := c.waiters
+		c.waiters = nil
+		if !c.cold || c.coldGen != gen {
+			// Warmed meanwhile on the tick, maybe cold again since: this read is old.
+			c.runWaiters(r, waiters)
+			return
+		}
+		if err != nil {
+			c.s.log.Error("read chest items from disk", "pos", c.pos, "err", err)
+			return
+		}
+		c.fillItems(saved)
+		c.cold, c.idle, c.coldSlots = false, 0, [chestSize]coldSlot{}
+		c.runWaiters(r, waiters)
+	})
+}
+
+// warmRetryTicks is how long a read of a cold chest's items may take before it is asked
+// again.
+const warmRetryTicks = 100
+
+// runWaiters runs what waited for the items.
+func (c *Chest) runWaiters(r *world.Region, waiters []func(*world.Region)) {
+	if r == nil {
+		return
+	}
+	for _, w := range waiters {
+		w(r)
+	}
 }
 
 // warm is Warm at the chest's own position, for code that holds the chest.

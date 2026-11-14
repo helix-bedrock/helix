@@ -360,6 +360,9 @@ func (c *Chest) pushInto(r *world.Region, to *Chest) bool {
 // putOne puts one of s into to: a furnace takes it by the side it comes from, any other
 // container in its first slot with room.
 func (c *Chest) putOne(r *world.Region, to *Chest, s ItemStack) bool {
+	if !to.whenWarm(r, nil) {
+		return false // its items are being read; the next try finds them
+	}
 	if to.furnace != nil {
 		return to.furnaceTakeOne(r, s, c.cart == nil && c.pos[1] > to.pos[1])
 	}
@@ -406,6 +409,9 @@ func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
 
 // pullOne takes one item from a container, from its first slot this one has room for.
 func (c *Chest) pullOne(r *world.Region, from *Chest) bool {
+	if !from.whenWarm(r, nil) {
+		return false // its items are being read; the next try finds them
+	}
 	if from.furnace != nil {
 		return from.furnaceGiveOne(r, c)
 	}
