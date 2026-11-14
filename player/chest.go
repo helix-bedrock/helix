@@ -326,6 +326,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == lecternBlock {
 		return &Lectern{s: e.s}
 	}
+	if isBrushable(e.s.reg.Blocks.Name(block)) {
+		return e.s.newBrushable()
+	}
 	switch e.s.reg.Blocks.Name(block) {
 	case sculkSensorBlock, calibratedBlock:
 		return e.s.newSculkSensor(e.s.reg.Blocks.Name(block) == calibratedBlock)
@@ -384,6 +387,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == lecternEntityID {
 		return e.s.loadLectern(saved), true
+	}
+	if id == brushableEntityID {
+		return e.s.loadBrushable(saved), true
 	}
 	switch id {
 	case sculkSensorID, calibratedSensorID:

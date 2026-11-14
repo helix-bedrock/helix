@@ -154,6 +154,9 @@ type Player struct {
 	shield shieldState
 	// respawn is how far the respawn sequence got (respawnNone when alive).
 	respawn int
+	// brushSoundAt is the tick after which a brush may play its sound again
+	// (BDS's BrushEffectsCooldownComponent).
+	brushSoundAt int64
 	// lastUse is what the first click of the held button did, a use constant.
 	lastUse int
 	// touching is the pick-up scan's buffer; shownHeld and shownSlot are what

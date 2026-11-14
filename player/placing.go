@@ -168,6 +168,9 @@ func (p *Player) useSpecialOn(r *world.Region, clicked cube.Pos, face int32, cli
 	if held.Name == nameFireworkRocket {
 		return p.useFireworkOn(r, clicked, click, held), true
 	}
+	if held.Name == brushItem {
+		return p.useBrushOn(r, clicked, face), true
+	}
 	if held.Name == nameShears {
 		return p.useShearsOn(r, clicked, face), true
 	}
