@@ -330,6 +330,9 @@ func (c *Chest) pushTo(r *world.Region, at cube.Pos) bool {
 	if to := c.s.chestAt(r, at); to != nil && to != c && !to.ender && c.pushInto(r, to) {
 		return true
 	}
+	if dp, ok := DecoratedPotAt(r, at); ok {
+		return c.pushIntoPot(r, at, dp)
+	}
 	return c.s.cartsAt(r, at, c, func(to *Chest) bool { return c.pushInto(r, to) })
 }
 
@@ -398,11 +401,36 @@ func (c *Chest) takeOne(r *world.Region, s ItemStack) bool {
 	return false
 }
 
+// pushIntoPot moves one item into a decorated pot: from the first filled slot the pot
+// takes it from.
+func (c *Chest) pushIntoPot(r *world.Region, at cube.Pos, dp *DecoratedPot) bool {
+	for i := range c.halfSize() {
+		if c.putSlotInPot(r, at, dp, i) {
+			return true
+		}
+	}
+	return false
+}
+
+// putSlotInPot moves one item of a slot into a decorated pot, false if it has no room.
+func (c *Chest) putSlotInPot(r *world.Region, at cube.Pos, dp *DecoratedPot, slot int) bool {
+	s := c.items[slot]
+	if !dp.hopperPut(r, at, s) {
+		return false
+	}
+	s.Count--
+	c.Inventory(r).SetItem(slot, s)
+	return true
+}
+
 // pullFrom takes one item from the container at at, from its first slot that this
 // one has room for.
 func (c *Chest) pullFrom(r *world.Region, at cube.Pos) bool {
 	if from := c.s.chestAt(r, at); from != nil && from != c && !from.ender && c.pullOne(r, from) {
 		return true
+	}
+	if dp, ok := DecoratedPotAt(r, at); ok {
+		return dp.hopperTake(r, at, c)
 	}
 	return c.s.cartsAt(r, at, c, func(from *Chest) bool { return c.pullOne(r, from) })
 }
@@ -857,7 +885,8 @@ func (s *Host) machinePour(r *world.Region, pos cube.Pos, liq bucketLiquid) bool
 func (c *Chest) pushOne(r *world.Region, at cube.Pos, slot int) bool {
 	to := c.s.chestAt(r, at)
 	if to == nil || to.ender {
-		return false
+		dp, ok := DecoratedPotAt(r, at)
+		return ok && c.putSlotInPot(r, at, dp, slot)
 	}
 	s := c.items[slot]
 	if !c.putOne(r, to, s) {

@@ -59,6 +59,9 @@ type Level struct {
 	RespawnBlocksExplode, DoDayLightCycle bool
 	// MobGriefing is whether mobs may change blocks.
 	MobGriefing bool
+	// ProjectilesCanBreakBlocks is whether projectiles shatter the blocks that break on a
+	// hit, such as decorated pots.
+	ProjectilesCanBreakBlocks bool
 	// DoMobSpawning is whether mobs spawn on their own.
 	DoMobSpawning bool
 	// DoEntityDrops is whether broken entities such as cushions leave their item.

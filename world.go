@@ -132,6 +132,7 @@ func levelOf(ldat *leveldat.Data) player.Level {
 		TNTExplosionDropDecay:     ldat.TNTExplosionDropDecay,
 		DoTileDrops:               ldat.DoTileDrops,
 		RespawnBlocksExplode:      ldat.RespawnBlocksExplode,
+		ProjectilesCanBreakBlocks: ldat.ProjectilesCanBreakBlocks,
 		DoDayLightCycle:           ldat.DoDayLightCycle,
 		DoEntityDrops:             ldat.DoEntityDrops,
 		MobGriefing:               ldat.MobGriefing,

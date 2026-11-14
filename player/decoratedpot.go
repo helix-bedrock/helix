@@ -5,6 +5,8 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/circuit"
+	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -13,13 +15,16 @@ import (
 // Decorated pots as BDS 1.26.60: DecoratedPotBlockActor (saved as "DecoratedPot") with its
 // save 0xD408E60 (sherds when not all bricks, item, animation), its tick 0xD409070 (the
 // animation ends after 10 ticks for a wobble, 7 for an insert) and tryAddItem 0xD409480; the
-// block's playerWillDestroy 0xCB102F0 (break or shatter sound). The rest follows
-// DecoratedPotBlock and DecoratedPotBlockActor in the 1.21.3 names build: use adds the held
-// item, onRemove drops what is inside, the dropped pot item keeps the sherds.
-//
-// Not built: hoppers and comparators (BDS's pot is a one-slot container), the loot table a
-// generated pot unpacks on first use, and a projectile shattering a pot (onProjectileHit
-// 0xCB10990, behind a game rule).
+// block's playerWillDestroy 0xCB102F0 (break or shatter sound), its resource drops 0x4BA4C10
+// (a shattered pot drops its four sherds, 0xCB10CD0, else the pot item with them; the held
+// item shatters it by 0xCB106B0), onProjectileHit 0xCB10990 (shatters it under the
+// projectilescanbreakblocks game rule) and getComparatorSignal 0xCB10C20. The pot is a
+// one-slot container (size 0xD40AA80, at most 64, 0xD40AAA0) that hoppers, hopper minecarts
+// and droppers fill and empty like any other; it is not a container block (slot 23), so a
+// hopper under it still picks up items. tryAddItem first unpacks its loot table
+// (0xD3DB930). The rest follows DecoratedPotBlock and DecoratedPotBlockActor in the 1.21.3
+// names build: use adds the held item, onRemove drops what is inside, the dropped pot item
+// keeps the sherds.
 const (
 	decoratedPotBlock     = "minecraft:decorated_pot"
 	decoratedPotEntityID  = "DecoratedPot"
@@ -47,6 +52,10 @@ const (
 
 	// silkTouchID is the enchantment that keeps a pot whole.
 	silkTouchID = 16
+	// potContainerMax is the most the pot's container holds of anything (0xD40AAA0).
+	potContainerMax = 64
+	potLootTag      = "LootTable"
+	potLootSeedTag  = "LootTableSeed"
 	tagTrident  = "minecraft:is_trident"
 	tagTool     = "minecraft:is_tool"
 )
@@ -62,6 +71,9 @@ type DecoratedPot struct {
 	anim   uint8
 	ticks  int32
 	chunk  world.ChunkHandle
+	// shatter is set as the pot is broken in a way that shatters it, so it drops its sherds
+	// rather than the pot.
+	shatter bool
 }
 
 // DecoratedPotAt returns the decorated pot block entity at pos. Runs: owner of the chunk.
@@ -198,11 +210,18 @@ func (dp *DecoratedPot) placedFrom(pl *Placement) {
 	}
 }
 
-// decoratedPotDrops gives a dropped decorated pot item its sherds, as BDS's asItemInstance
-// puts the block entity's sherds in the item's data.
+// decoratedPotDrops is the pot's resource drops: a shattered pot drops its four sherds in
+// place of the pot, any other the pot item with its sherds, as BDS's asItemInstance puts the
+// block entity's sherds in the item's data.
 func decoratedPotDrops(r *world.Region, pos cube.Pos, items []ItemStack) []ItemStack {
 	dp, ok := DecoratedPotAt(r, pos)
-	if !ok || dp.defaultSherds() {
+	if !ok {
+		return items
+	}
+	if dp.shatter {
+		return dp.shards(items)
+	}
+	if dp.defaultSherds() {
 		return items
 	}
 	for i, it := range items {
@@ -213,6 +232,96 @@ func decoratedPotDrops(r *world.Region, pos cube.Pos, items []ItemStack) []ItemS
 	return items
 }
 
+// ComparatorSignal is getComparatorSignal: how full its one slot is.
+func (dp *DecoratedPot) ComparatorSignal(_ *world.Region, _ cube.Pos) int32 {
+	var sum circuit.ContainerSum
+	if !dp.item.Empty() {
+		sum.Add(int(dp.item.Count), int(dp.item.maxStack(dp.s.reg)))
+	}
+	return sum.Signal(1)
+}
+
+// hopperPut puts one of s in, as a hopper or dropper fills the pot's container: into the
+// empty slot, or onto the same item while it has room. BDS's setItem (0xD40A3D0) plays no
+// animation or sound for it.
+func (dp *DecoratedPot) hopperPut(r *world.Region, pos cube.Pos, s ItemStack) bool {
+	if s.Empty() {
+		return false
+	}
+	next := dp.item
+	switch {
+	case next.Empty():
+		next = s
+		next.Count = 1
+	case next.stacksWith(s) && next.Count < min(next.maxStack(dp.s.reg), potContainerMax):
+		next.Count++
+	default:
+		return false
+	}
+	dp.SetItem(r, pos, next)
+	return true
+}
+
+// hopperTake moves one of what the pot holds into to, a hopper or hopper minecart under it.
+func (dp *DecoratedPot) hopperTake(r *world.Region, pos cube.Pos, to *Chest) bool {
+	if dp.item.Empty() {
+		return false
+	}
+	one := dp.item
+	one.Count = 1
+	if !to.takeOne(r, one) {
+		return false
+	}
+	rest := dp.item
+	rest.Count--
+	if rest.Count == 0 {
+		rest = ItemStack{}
+	}
+	dp.SetItem(r, pos, rest)
+	return true
+}
+
+// unpack rolls a generated pot's loot table into its slot, as RandomizableBlockActorContainer's
+// unpackLootTable: the table is used once and forgotten. A one-slot pot keeps the first stack.
+func (dp *DecoratedPot) unpack(r *world.Region, pos cube.Pos) {
+	table, _ := dp.saved[potLootTag].(string)
+	if table == "" {
+		return
+	}
+	delete(dp.saved, potLootTag)
+	delete(dp.saved, potLootSeedTag)
+	dp.chunk.Changed()
+	s := dp.s
+	if s.entityLoot == nil || !s.entityLoot.Has(table) {
+		return
+	}
+	c := &loot.EntityContext{Random: lootRandom{}, Difficulty: s.level.Difficulty}
+	for _, d := range s.entityLoot.Roll(table, c, nil) {
+		if stacks := s.lootStacks(d); len(stacks) > 0 {
+			dp.SetItem(r, pos, s.freshStack(stacks[0]))
+			return
+		}
+	}
+}
+
+// shards puts its four sherds in place of the pot item: a side whose item does not exist
+// drops a brick, as 0xCB10CD0 does.
+func (dp *DecoratedPot) shards(items []ItemStack) []ItemStack {
+	out := make([]ItemStack, 0, len(items)+decoratedPotSherds)
+	for _, it := range items {
+		if it.Name != decoratedPotBlock {
+			out = append(out, it)
+		}
+	}
+	for _, name := range dp.sherds {
+		if _, ok := dp.s.reg.Items.ByName(name); !ok {
+			name = decoratedPotBrick
+		}
+		out = append(out, ItemStack{Name: name, Count: 1})
+	}
+	return out
+}
+
 // useDecoratedPot is DecoratedPotBlock::use and the block entity's tryAddItem: one of the
 // held item goes in when the pot is empty, or holds the same item with room left; otherwise
 // the pot wobbles. Either way the pot plays its sound and posts block_change. Always taken.
@@ -221,6 +330,7 @@ func (p *Player) useDecoratedPot(r *world.Region, u *BlockUse) bool {
 	if !ok {
 		return true
 	}
+	dp.unpack(r, u.Pos)
 	held := p.inventory.Held()
 	next, ok := p.potAdd(dp, held)
 	if ok {
@@ -274,15 +384,40 @@ func (p *Player) potInsertFeedback(r *world.Region, pos cube.Pos, item ItemStack
 }
 
 // decoratedPotBreakSound is playerWillDestroy's sound: a trident, or a tool without silk
-// touch, out of creative shatters the pot; anything else breaks it.
+// touch, out of creative shatters the pot; anything else breaks it. A shattered pot drops
+// its sherds.
 func (p *Player) decoratedPotBreakSound(r *world.Region, pos cube.Pos, block uint32) {
 	sound := packet.SoundEventBreakDecoratedPot
-	if !p.creative() {
-		held := p.inventory.Held()
-		tags := p.s.craftItem(held).Tags
-		if slices.Contains(tags, tagTrident) || (slices.Contains(tags, tagTool) && !hasEnchant(held, silkTouchID)) {
-			sound = packet.SoundEventShatterDecoratedPot
+	if !p.creative() && p.shattersPot(p.inventory.Held()) {
+		sound = packet.SoundEventShatterDecoratedPot
+		if dp, ok := DecoratedPotAt(r, pos); ok {
+			dp.shatter = true
 		}
 	}
 	playSound(r, pos, p.s.blockSound(sound, blockVec(pos), block), nil)
+}
+
+// shattersPot is 0xCB106B0: a trident, or a tool without silk touch.
+func (p *Player) shattersPot(held ItemStack) bool {
+	tags := p.s.craftItem(held).Tags
+	return slices.Contains(tags, tagTrident) || slices.Contains(tags, tagTool) && !hasEnchant(held, silkTouchID)
+}
+
+// ProjectileHitPot is onProjectileHit: with projectilescanbreakblocks on, a projectile
+// shatters the pot it hits, which drops its sherds and what it held. Runs: owner of the chunk.
+func (s *Host) ProjectileHitPot(r *world.Region, pos cube.Pos) {
+	if !s.level.ProjectilesCanBreakBlocks {
+		return
+	}
+	dp, ok := DecoratedPotAt(r, pos)
+	if !ok {
+		return
+	}
+	block, ok := r.Block(pos, 0)
+	if !ok {
+		return
+	}
+	playSound(r, pos, s.blockSound(packet.SoundEventShatterDecoratedPot, blockVec(pos), block), nil)
+	dp.shatter = true
+	s.FallBlock(r, pos, block)
 }

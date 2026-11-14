@@ -248,6 +248,9 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 	if isCake(name) {
 		return t.solidMaterial(r, pos.Side(cube.FaceDown))
 	}
+	if name == flowerPot {
+		return t.onFloor(r, pos)
+	}
 	if strings.HasSuffix(name, "candle") {
 		// CandleBlockItem's useOn (0xC9A3560): the block below must hold it on its top.
 		return t.onFloor(r, pos)
@@ -430,6 +433,10 @@ func (t *Table) survives(r *world.Region, pos, from cube.Pos, block uint32) bool
 		below := pos.Side(cube.FaceDown)
 		return from != below || !loaded(r, below) || t.solidMaterial(r, below)
 	}
+	if t.blocks.Name(block) == flowerPot {
+		below := pos.Side(cube.FaceDown)
+		return from != below || !loaded(r, below) || t.onFloor(r, pos)
+	}
 	if isFrame(t.blocks.Name(block)) {
 		holder, ok := t.frameHolder(pos, block)
 		return !ok || from != holder || !loaded(r, holder) || t.solidMaterial(r, holder)
@@ -491,6 +498,10 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 	}
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }
+
+// flowerPot is the flower pot, whose canSurvive (BDS 1.26.60 0xCB053F0) needs the block below
+// to hold it on its top face; both mayPlace and neighborChanged ask it.
+const flowerPot = "minecraft:flower_pot"
 
 // isCake reports whether name is a cake or a candle cake. BDS 1.26.60's CakeBlock and
 // CandleCakeBlock canSurvive (0xCB895B0, 0xCB48690) need a solid material below; both
