@@ -5,11 +5,14 @@ import (
 	"context"
 	"flag"
 	"log/slog"
+	"net/http"
+	_ "net/http/pprof" //nolint:gosec // served only with -pprof, on the address given
 	"os"
 	"os/signal"
 	"runtime/pprof"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/helix-bedrock/helix"
 )
@@ -27,6 +30,7 @@ func main() {
 	lan := flag.Bool("lan", true, "answer players looking for games on this network")
 	udpPorts := flag.String("udp-ports", "", "BDS's server-udp-ports: each connection takes its own UDP port from these, such as 19133-19200 or 19133-19200:29133-29200 for public:local; forward them on the router")
 	cpuProfile := flag.String("cpuprofile", "", "write a CPU profile to this file until the server stops, to find what makes ticks slow")
+	pprofAddr := flag.String("pprof", "", "serve Go's profiler (goroutines, heap, CPU) on this address, such as localhost:6060, to see where a stuck server waits")
 	tickDistance := flag.Int("tick-distance", int(helix.DefaultConfig().TickDistance), "radius in chunks kept loaded and ticked around each player, BDS's tick-distance")
 	flag.Parse()
 	level := slog.LevelInfo
@@ -41,6 +45,9 @@ func main() {
 			return
 		}
 		defer stopProfile(log)
+	}
+	if *pprofAddr != "" {
+		go servePprof(log, *pprofAddr)
 	}
 	// Ctrl-C, and on Windows Ctrl-Break and closing the window (SIGTERM), stop the server:
 	// everyone is told it shut down and the world is saved. A second one kills it at once.
@@ -105,4 +112,13 @@ func startProfile(path string) (func(*slog.Logger), error) {
 		}
 		log.Info("CPU profile written", "file", path)
 	}, nil
+}
+
+// servePprof serves net/http/pprof's handlers on addr until the process exits.
+func servePprof(log *slog.Logger, addr string) {
+	srv := &http.Server{Addr: addr, ReadHeaderTimeout: time.Minute}
+	log.Info("profiler listening", "addr", "http://"+addr+"/debug/pprof/")
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("profiler stopped", "err", err)
+	}
 }

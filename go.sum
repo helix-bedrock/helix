@@ -80,6 +80,8 @@ github.com/helix-bedrock/world v0.0.0-20261114015057-b5e6affd10ee h1:TSeR4yrTJEU
 github.com/helix-bedrock/world v0.0.0-20261114015057-b5e6affd10ee/go.mod h1:JQBrJ4x8Hu75b3C/nxehHY0uNcCrr5aykHCQQpLEnKI=
 github.com/helix-bedrock/world v0.0.0-20261114022118-f876f66e06f1 h1:ezyBX8+7bjiVkHHVAgTOWrjiOX+GhlgfVLbTvXG2kVw=
 github.com/helix-bedrock/world v0.0.0-20261114022118-f876f66e06f1/go.mod h1:JQBrJ4x8Hu75b3C/nxehHY0uNcCrr5aykHCQQpLEnKI=
+github.com/helix-bedrock/world v0.0.0-20261114024500-1441b348b7eb h1:0qD/4WLiekBdTFbQ9t8lw8NuRUHOC2IPgoyTbhTC37M=
+github.com/helix-bedrock/world v0.0.0-20261114024500-1441b348b7eb/go.mod h1:JQBrJ4x8Hu75b3C/nxehHY0uNcCrr5aykHCQQpLEnKI=
 github.com/helix-bedrock/worldgen v0.0.0-20261110172032-37f34ed98cbe h1:x1EVKEhCo0GUm87RwhIwFAj4qZorZwfefaXtyHcUuIY=
 github.com/helix-bedrock/worldgen v0.0.0-20261110172032-37f34ed98cbe/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/helix-bedrock/worldgen v0.0.0-20261113164659-0b2c7cdecffb h1:Jp5NwMaRuQsw7ImQ1gPeA+eMElA+EsLwzndDufnu3oI=
