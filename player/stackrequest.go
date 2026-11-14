@@ -65,6 +65,8 @@ type requestState struct {
 	// viewed are the slots passed requests changed in inventories with a view, sent
 	// again after the response: the client keeps what it moved as it saw it.
 	viewed []viewedSlot
+	// beacon is the running request's beacon payment.
+	beacon beaconPayment
 }
 
 // viewedSlot is a slot of an inventory with a view.
@@ -140,6 +142,7 @@ func (p *Player) startRequest(req protocol.ItemStackRequest) {
 	st.craft = craftState{}
 	st.filter = req.FilterStrings
 	st.storage = st.storage[:0]
+	st.beacon = beaconPayment{}
 }
 
 // runActions checks and applies each action on the copy in order and returns the slots
@@ -167,6 +170,9 @@ func (p *Player) checkRequest() uint8 {
 	if status := p.finishCraft(); status != protocol.ItemStackResponseStatusOK {
 		return status
 	}
+	if !p.beaconPaid() {
+		return protocol.ItemStackResponseStatusError
+	}
 	if !p.commitStorage() || p.shulkerInShulker() || p.shulkerTooFull() || !p.fireChestItems() {
 		return protocol.ItemStackResponseStatusCannotPlaceItem
 	}
@@ -184,6 +190,7 @@ func (p *Player) commitRequest() {
 	p.spawnDrops()
 	p.afterCraft(st.craft.after)
 	p.refreshEnchantOptions()
+	p.commitBeacon()
 	p.sendEquipment()
 }
 
@@ -314,7 +321,12 @@ func (p *Player) stackAction(a protocol.StackRequestAction) (uint8, []slotRef) {
 	case *protocol.AutoCraftRecipeStackRequestAction:
 		return p.craftAuto(a)
 	case *protocol.ConsumeStackRequestAction:
+		if status, refs, ok := p.consumeBeaconPayment(a); ok {
+			return status, refs
+		}
 		return p.consumeAction(a)
+	case *protocol.BeaconPaymentStackRequestAction:
+		return p.payBeacon(a)
 	case *protocol.CreateStackRequestAction:
 		return p.createAction(a)
 	case *protocol.CraftCreativeStackRequestAction:
@@ -397,7 +409,7 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 		protocol.ContainerGrindstoneInput, protocol.ContainerGrindstoneAdditional,
 		protocol.ContainerLoomInput, protocol.ContainerLoomDye, protocol.ContainerLoomMaterial,
 		protocol.ContainerStonecutterInput, protocol.ContainerCartographyInput, protocol.ContainerCartographyAdditional,
-		protocol.ContainerTradeTwoIngredientOne, protocol.ContainerTradeTwoIngredientTwo:
+		protocol.ContainerTradeTwoIngredientOne, protocol.ContainerTradeTwoIngredientTwo, protocol.ContainerBeaconPayment:
 		if !p.window.holds(container, slot) {
 			return r, false
 		}

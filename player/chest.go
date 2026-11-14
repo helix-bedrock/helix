@@ -326,6 +326,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == lecternBlock {
 		return &Lectern{s: e.s}
 	}
+	if e.s.reg.Blocks.Name(block) == nameBeacon {
+		return &Beacon{s: e.s}
+	}
 	if e.s.reg.Blocks.Name(block) == nameCauldron {
 		return e.s.newCauldron()
 	}
@@ -390,6 +393,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == lecternEntityID {
 		return e.s.loadLectern(saved), true
+	}
+	if id == beaconEntityID {
+		return e.s.loadBeacon(saved), true
 	}
 	if id == cauldronEntityID {
 		return e.s.loadCauldron(saved), true

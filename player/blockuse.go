@@ -103,6 +103,8 @@ func vanillaUseBlock(u *BlockUse) bool {
 		return p.useBookshelf(r, u)
 	case lecternBlock:
 		return p.useLectern(r, u)
+	case nameBeacon:
+		return p.useBeacon(r, u)
 	case nameCauldron:
 		return p.useCauldron(r, u)
 	case nameCake:

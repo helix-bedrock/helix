@@ -286,6 +286,8 @@ func (w *windowState) holds(container, slot byte) bool {
 		return w.kind == ContainerTrade && slot == tradeSlotA
 	case protocol.ContainerTradeTwoIngredientTwo:
 		return w.kind == ContainerTrade && slot == tradeSlotB
+	case protocol.ContainerBeaconPayment:
+		return w.kind == ContainerBeacon && slot == beaconPaymentSlot
 	}
 	return false
 }

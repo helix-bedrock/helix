@@ -61,6 +61,8 @@ const (
 	// ContainerTrade is a villager's trade window, its two ingredients in the player's UI
 	// slots.
 	ContainerTrade
+	// ContainerBeacon is a beacon's screen, its payment in the player's UI slots.
+	ContainerBeacon
 )
 
 // own reports whether the kind is a player's own slots, shown in fixed windows.
