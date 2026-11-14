@@ -94,7 +94,14 @@ type Config struct {
 	// ground.
 	Strike StrikeFunc
 	Mobs   MobsFunc
+	// Precipitation is BDS's handlePrecipitation on the block under the rain's top, after each
+	// snow try where it rains or snows: downfall is the rain level times the biome's
+	// downfall, temperature the biome's at the top. Nil does nothing.
+	Precipitation PrecipitationFunc
 }
+
+// PrecipitationFunc is rain or snow reaching the block at pos. Runs: owner of the region.
+type PrecipitationFunc func(r *world.Region, pos cube.Pos, downfall, temperature float32)
 
 // Ticker runs the weather on every ticking chunk: lightning, then water freezing and snow
 // settling, randomtickspeed tries. It is the world's WeatherTicker.
@@ -279,6 +286,11 @@ func (t *Ticker) precipitate(r *world.Region, s *regionState, pos mcdb.ChunkPos)
 	n := max(int(amount*snowScale), snowFloor)
 	if s.rng.IntN(n+snowBase) == 0 {
 		t.PlaceSnow(r, at, true, true)
+	}
+	if t.conf.Precipitation != nil {
+		if temp, ok := t.Temperature(r, at); ok {
+			t.conf.Precipitation(r, at.Side(cube.FaceDown), amount, temp)
+		}
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/fall"
 	"github.com/helix-bedrock/helix/farm"
+	"github.com/helix-bedrock/helix/drip"
 	"github.com/helix-bedrock/helix/fire"
 	"github.com/helix-bedrock/helix/generator"
 	"github.com/helix-bedrock/helix/liquid"
@@ -249,7 +250,8 @@ func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
 	s.fire.SetCampfireWet(s.campfireWet)
 	s.falling = falls
 
-	portals := portal.NewTicker(s.portals, s.dimensionOf, s.fire)
+	dripping := drip.NewTicker(s.reg.Blocks, serverCauldrons{s}, s.fire)
+	portals := portal.NewTicker(s.portals, s.dimensionOf, dripping)
 	connections := connect.NewTicker(table, portals)
 	uses := blockuse.NewTicker(s.reg.Blocks, connections)
 	attachments := attach.NewTicker(attached, s.fallBlock, uses)
@@ -287,7 +289,10 @@ func (s *Server) findSurface(gen world.Generator, r [2]int) {
 // it to the systems that read it.
 func (s *Server) startWeather(gen world.Generator) *weather.Ticker {
 	climate, _ := gen.(weather.Climate)
-	s.chunkWeather = weather.NewTicker(weather.Config{Registry: s.reg, Weather: s.weather, Climate: climate, Strike: s.strike, Mobs: s.mobsIn})
+	s.chunkWeather = weather.NewTicker(weather.Config{
+		Registry: s.reg, Weather: s.weather, Climate: climate, Strike: s.strike, Mobs: s.mobsIn,
+		Precipitation: s.precipitation,
+	})
 	if s.fire != nil {
 		s.fire.SetWeather(s.chunkWeather)
 	}
@@ -432,6 +437,29 @@ func (s *Server) Farm() *farm.Ticker { return s.farm }
 func (s *Server) fallBlock(r *world.Region, pos cube.Pos, block uint32) {
 	if host := s.players.Load(); host != nil {
 		host.FallBlock(r, pos, block)
+	}
+}
+
+// serverCauldrons hands dripstone's drips to the players' host once it exists.
+type serverCauldrons struct{ s *Server }
+
+func (c serverCauldrons) DripAccepts(r *world.Region, pos cube.Pos, lava bool) bool {
+	if host := c.s.players.Load(); host != nil {
+		return host.DripAccepts(r, pos, lava)
+	}
+	return false
+}
+
+func (c serverCauldrons) Drip(r *world.Region, pos cube.Pos, lava bool) {
+	if host := c.s.players.Load(); host != nil {
+		host.Drip(r, pos, lava)
+	}
+}
+
+// precipitation is rain or snow reaching the block at pos: cauldrons fill.
+func (s *Server) precipitation(r *world.Region, pos cube.Pos, downfall, temperature float32) {
+	if host := s.players.Load(); host != nil {
+		host.CauldronPrecipitation(r, pos, downfall, temperature)
 	}
 }
 
