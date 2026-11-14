@@ -15,6 +15,7 @@ import (
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/hx"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -460,7 +461,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	findable, _ := saved["Findable"].(uint8)
 	c.findable = findable != 0
-	for _, k := range [...]string{"Items", "Findable", "pairlead", "pairx", "pairz", "forceunpair"} {
+	// hx.LightMarker comes with items read light (counts only, hxdb): the chest reads them
+	// whole before it saves, so its saves must not carry the mark.
+	for _, k := range [...]string{"Items", "Findable", "pairlead", "pairx", "pairz", "forceunpair", hx.LightMarker} {
 		delete(c.saved, k)
 	}
 	return c, true
@@ -1130,6 +1133,9 @@ func (p *Player) commitChestWork() {
 		}
 		*cur = s
 		inv.holder.inventoryChanged(i)
+		if c := p.windowChest(r); c != nil {
+			p.linkContainer(c)
+		}
 		for _, v := range inv.Viewers() {
 			if v != p {
 				inv.sendSlot(v, i, true)

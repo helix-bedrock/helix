@@ -51,12 +51,15 @@ type Player struct {
 	traceSends atomic.Int32
 
 	// Session: fixed once the player joined. Runs: anywhere.
-	uuid     uuid.UUID
-	name     string
-	xuid     string
-	skin     protocol.Skin
-	ids      mcdb.PlayerIDs
-	uniqueID int64
+	uuid uuid.UUID
+	name string
+	xuid string
+	skin protocol.Skin
+	ids  mcdb.PlayerIDs
+	// linkChunks are the chunks of containers whose items a request changed this tick, saved
+	// with the player at the end of it (linksave.go).
+	linkChunks []mcdb.ChunkPos
+	uniqueID   int64
 	// index is the player's index (synched actor data 27), set when it goes on the list.
 	index int32
 	// mapIndex numbers the maps the player makes, BDS's map_name_index. Not saved yet.

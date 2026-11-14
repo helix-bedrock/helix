@@ -1,6 +1,8 @@
 package player
 
 import (
+	"maps"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/mcdb"
@@ -98,6 +100,25 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	if data == nil {
 		data = map[string]any{}
 	}
+	p.fillSaveData(data, pos, rot)
+	if err := p.s.playerStore.StorePlayer(p.ids, data); err != nil {
+		p.s.log.Error("save player", "name", p.name, "err", err)
+	}
+}
+
+// saveCopy is the player's saved data as save writes it, in a map of its own, for a save
+// that runs on another goroutine.
+func (p *Player) saveCopy(pos mgl32.Vec3, rot world.Rotation) map[string]any {
+	data := maps.Clone(p.saved)
+	if data == nil {
+		data = map[string]any{}
+	}
+	p.fillSaveData(data, pos, rot)
+	return data
+}
+
+// fillSaveData writes the player's state into data.
+func (p *Player) fillSaveData(data map[string]any, pos mgl32.Vec3, rot world.Rotation) {
 	data["Pos"] = []float32{pos[0], pos[1], pos[2]}
 	data["Rotation"] = []float32{rot.Yaw, rot.Pitch}
 	data["DimensionId"] = int32(p.s.dimensionID(p.dim))
@@ -114,9 +135,6 @@ func (p *Player) save(pos mgl32.Vec3, rot world.Rotation) {
 	p.saveDeath(data)
 	if p.enchant.seeded {
 		data[enchantSeedTag] = p.enchant.seed
-	}
-	if err := p.s.playerStore.StorePlayer(p.ids, data); err != nil {
-		p.s.log.Error("save player", "name", p.name, "err", err)
 	}
 }
 

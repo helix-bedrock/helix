@@ -653,6 +653,16 @@ func (r *Region) save(c *Chunk, ticks, force bool) {
 	if c.discard || !c.dirty && (!ticks || !c.ticksDirty && !c.savedLive && !r.holdsSaved(c.pos)) {
 		return
 	}
+	prio := prioAutoSave
+	if force {
+		prio = prioSave
+	}
+	r.saveSnapshot(c, prio, nil)
+}
+
+// saveSnapshot takes a copy of the chunk as it is now and stores it on the chunk's worker,
+// with players' data in the same commit when there are any and the store can.
+func (r *Region) saveSnapshot(c *Chunk, prio priority, players []mcdb.LinkedPlayer) {
 	// Block entities change only with a change that marks the chunk dirty; a save for
 	// entities or tick queues alone keeps the stored ones instead of encoding them again.
 	keepBlockEntities := !c.dirty
@@ -668,18 +678,51 @@ func (r *Region) save(c *Chunk, ticks, force bool) {
 	snap.ScheduledBlocks, snap.Tick = c.ticks.save(), c.ticks.clock
 	snap.RandomTicks, snap.RandomTick = c.randomTicks.save(), c.randomTicks.clock
 	c.saving.Add(1)
-	prio := prioAutoSave
-	if force {
-		prio = prioSave
-	}
 	d.pool.do(pos, prio, func() {
 		defer c.saving.Add(-1)
 		start := time.Now()
-		if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, &snap); err != nil {
+		if err := d.storeSnapshot(pos, &snap, players); err != nil {
 			d.log.Error("save chunk", "pos", pos, "err", err)
 		}
 		c.saveCost.Store(int64(time.Since(start)))
 	})
+}
+
+// storeSnapshot stores a chunk's copy and, if any, players' data: in one commit on a
+// mcdb.LinkedStore, else the chunk first, then each player on a mcdb.PlayerStore.
+func (d *Dimension) storeSnapshot(pos mcdb.ChunkPos, snap *chunk.Column, players []mcdb.LinkedPlayer) error {
+	if len(players) == 0 {
+		return d.conf.Store.StoreColumn(pos, d.conf.Dim, snap)
+	}
+	if ls, ok := d.conf.Store.(mcdb.LinkedStore); ok {
+		return ls.StoreLinked(pos, d.conf.Dim, snap, players)
+	}
+	if err := d.conf.Store.StoreColumn(pos, d.conf.Dim, snap); err != nil {
+		return err
+	}
+	ps, ok := d.conf.Store.(mcdb.PlayerStore)
+	if !ok {
+		return nil
+	}
+	for _, p := range players {
+		if err := ps.StorePlayer(p.IDs, p.Data); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SaveLinked saves the chunk at pos now, with the players' data in the same commit where
+// the store can (mcdb.LinkedStore): for items a player moved between itself and a container
+// there, so they are never saved on one side only. The save is queued after the chunk's
+// saves already queued. False if the region does not hold the chunk. Runs: the region.
+func (r *Region) SaveLinked(pos mcdb.ChunkPos, players []mcdb.LinkedPlayer) bool {
+	c := r.chunks[pos]
+	if c == nil || c.discard {
+		return false
+	}
+	r.saveSnapshot(c, prioSave, players)
+	return true
 }
 
 // saveDelay is how many ticks c, just saved, waits before the next save: the set

@@ -15,8 +15,10 @@ import (
 // them again once that copy is current (world.ColdBlockEntity).
 
 // coolIdleRounds is how many cooling rounds (world.coolEveryTicks apart) a chest goes unused
-// before it leaves its items on disk.
-const coolIdleRounds = 3
+// before it leaves its items on disk: one, so a chest nobody uses holds its items for at most
+// about two rounds. Its slots are stored one record each (hxdb), so warming it again reads
+// only what it holds.
+const coolIdleRounds = 1
 
 // coldSlot is what a cold chest keeps of a slot: enough for a comparator.
 type coldSlot struct {
@@ -201,6 +203,11 @@ func coldSignal(lead, follower *Chest) int32 {
 	}
 	return sum.Signal(size)
 }
+
+// LoadsCold reports whether block entities saved with this id load with their items left on
+// disk (counts only): a store may give their Items light, without each item's tag
+// (hxdb.Config.LightItems). Runs: anywhere.
+func LoadsCold(id string) bool { return coldEntityID(id) }
 
 // coldEntityID reports a saved ID of block entities that may load cold.
 func coldEntityID(id string) bool {

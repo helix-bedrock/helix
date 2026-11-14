@@ -56,7 +56,7 @@ func (s *Server) openWorld() error {
 		return err
 	}
 	isNew := kind == worldNone
-	db, err := hxdb.Config{Log: s.log.With("part", "storage"), Blocks: s.reg.Blocks, SkipBlockEntities: true}.Open(dir)
+	db, err := hxdb.Config{Log: s.log.With("part", "storage"), Blocks: s.reg.Blocks, SkipBlockEntities: true, LightItems: player.LoadsCold}.Open(dir)
 	if err != nil {
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
 	}

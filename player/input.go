@@ -115,6 +115,7 @@ func (p *Player) handleInput(*world.Entity) {
 		run[i] = nil
 	}
 	p.runQueued()
+	p.saveLinked()
 	if p.entity != nil {
 		p.tickPortal()
 	}

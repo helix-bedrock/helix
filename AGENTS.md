@@ -466,9 +466,11 @@ sibling library folders, so unreleased library changes are used.
   one at a time on the load worker (`storedBlockEntities`, mcdb's `EachBlockEntity`), never as the
   whole stored value, which chests full of books make hundreds of megabytes. A `ColdBlockEntity`
   leaves its big data on disk while unused (Helix's own rule, beyond BDS): chests, barrels and
-  shulker boxes (`player/coldchest.go`) unused for 3 cooling rounds (`coolEveryTicks`, 10 s) in a
+  shulker boxes (`player/coldchest.go`) unused for a cooling round (`coolEveryTicks`, 10 s) in a
   chunk whose stored copy is current keep only each slot's count for comparators, load that way
-  from disk (`RawBlockEntities.LoadRaw`), and read their items back before anything touches them; a save
+  from disk (`RawBlockEntities.LoadRaw`; hxdb gives their Items light from each container's
+  summary, `player.LoadsCold`, and keeps every slot as its own record, so a save writes only
+  the slots that changed and never holds a chest whole), and read their items back before anything touches them; a save
   copies their stored compounds as they are. Opening one and hoppers read them on the chunk's worker
   (`Chest.whenWarm`, `ChunkHandle.StoredLater`): the window opens once they are back, a hopper tries
   again later; other code reads them on the tick (`Warm`, `ChunkHandle.Stored`). `player/chest.go` runs chests, ender chests
@@ -476,7 +478,11 @@ sibling library folders, so unreleased library changes are used.
   and carts' slots: BDS 1.26.60's pairing, lid and window, with `playerItems.open` as a stack request's copy
   of the open container (container `ContainerLevelEntity`), and the chest API (`Chest.Inventory`, `Kind`,
   `OnChestPair`, `OnChestSpill`, name and pairing). A `Chest` marks its chunk for saving through the
-  `world.ChunkHandle` it is bound to, so `Inventory` methods need no region. `player/shulker.go` is what a
+  `world.ChunkHandle` it is bound to, so `Inventory` methods need no region. Items a stack
+  request moves between the player and a container saved with a chunk (chests, machines, chest
+  boats and carts) are saved with the player in one commit at the end of the tick
+  (`player/linksave.go`, `Region.SaveLinked`, the store's `mcdb.LinkedStore`), so a crash or a
+  kill never leaves them on both sides or neither: Helix's own rule, beyond BDS. `player/shulker.go` is what a
   shulker box does differently, as a `Chest` with `shulker` set (container `ContainerShulkerBox` in stack
   requests). `ContainerOpenEvent`, `ContainerItemEvent` and the methods, which fire no events, are in
   `window.go` and `inventory.go`. `player/blockdrop.go`: what a player's break drops (`Systems.Drops`, from

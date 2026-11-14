@@ -301,6 +301,9 @@ func (e *Entity) Owner() any { return e.conf.Owner }
 // Position returns where the entity is. Runs: owner.
 func (e *Entity) Position() mgl32.Vec3 { return e.pos }
 
+// Chunk returns the chunk the entity is kept and saved in. Runs: owner.
+func (e *Entity) Chunk() mcdb.ChunkPos { return e.chunk }
+
 // Rotation returns the entity's rotation. Runs: owner.
 func (e *Entity) Rotation() Rotation { return e.rot }
 
