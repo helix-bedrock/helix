@@ -20,8 +20,8 @@ const chestBombCommand = "chestbomb"
 
 const (
 	// chestBombDefault is how many chests /chestbomb builds without a count, chestBombMax
-	// the most it builds: one chest is about 28 MB once saved.
-	chestBombDefault = 10
+	// the most it builds: one chest is about 28 MB once saved, so 1000 write about 28 GB.
+	chestBombDefault = 1000
 	chestBombMax     = 1000
 	// chestBombSlots is the slots of a chest and of a shulker box.
 	chestBombSlots = 27
@@ -35,10 +35,13 @@ const (
 	chestBombRuneSpan  = 0x5000
 	// chestBombColumn is how far apart machines stand along X (power spot, piston, chest,
 	// the place the chest is pushed into), chestBombRow along Z: a gap keeps chests from
-	// pairing. chestBombPerRow machines go in a row.
+	// pairing. chestBombPerRow machines go in a row and chestBombRows rows in a layer; the
+	// layers stack up (chests never pair across heights), so 1000 machines stand in a
+	// 40 by 20 block area 10 high, inside the chunks loaded around the player.
 	chestBombColumn = 4
 	chestBombRow    = 2
-	chestBombPerRow = 16
+	chestBombPerRow = 10
+	chestBombRows   = 10
 	// chestBombAhead is how far east of the player the first machine stands.
 	chestBombAhead = 3
 	// chestBombPistonEast is a piston's facing_direction pointing east.
@@ -76,7 +79,7 @@ func chestBomb(srv *helix.Server, p *player.Player, args []string) string {
 	origin := cube.Pos{int(math.Floor(float64(at[0]))) + chestBombAhead, int(math.Floor(float64(at[1]))), int(math.Floor(float64(at[2])))}
 	built := 0
 	for i := range count {
-		piston := origin.Add(cube.Pos{i % chestBombPerRow * chestBombColumn, 0, i / chestBombPerRow * chestBombRow})
+		piston := origin.Add(chestBombOffset(i))
 		if buildChestBomb(r, p.Host(), piston, states, box, pistons) {
 			built++
 		}
@@ -86,6 +89,13 @@ func chestBomb(srv *helix.Server, p *player.Player, args []string) string {
 		msg += " Power the free block west of each piston to push them."
 	}
 	return msg
+}
+
+// chestBombOffset is where machine i stands from the first: along a row, then rows, then
+// layers up.
+func chestBombOffset(i int) cube.Pos {
+	layer := chestBombPerRow * chestBombRows
+	return cube.Pos{i % chestBombPerRow * chestBombColumn, i / layer, i % layer / chestBombPerRow * chestBombRow}
 }
 
 // chestBombArgs reads the count and the pistons word.
