@@ -442,6 +442,37 @@ func (d *Dimension) want(pos mcdb.ChunkPos, v *Viewer) {
 	}
 }
 
+// unwant takes v off the players waiting for the chunk at pos: it left
+// their view before the chunk came. A view-only load nobody waits for any
+// more is skipped (wanted).
+func (d *Dimension) unwant(pos mcdb.ChunkPos, v *Viewer) {
+	d.loadMu.Lock()
+	defer d.loadMu.Unlock()
+	vs := d.waiters[pos]
+	if i := slices.Index(vs, v); i >= 0 {
+		vs = slices.Delete(vs, i, i+1)
+	}
+	if len(vs) == 0 {
+		delete(d.waiters, pos)
+		return
+	}
+	d.waiters[pos] = vs
+}
+
+// wanted reports whether a player still waits for the chunk at pos, and if
+// not, forgets the request, so a player asking later starts a new one. A
+// player that walks fast past a view's worth of chunks would otherwise make
+// the workers read every chunk on the way, long after it left them.
+func (d *Dimension) wanted(pos mcdb.ChunkPos) bool {
+	d.loadMu.Lock()
+	defer d.loadMu.Unlock()
+	if len(d.waiters[pos]) > 0 {
+		return true
+	}
+	delete(d.pending, pos)
+	return false
+}
+
 // publish caches an encoded chunk and gives it to the players waiting.
 func (d *Dimension) publish(pos mcdb.ChunkPos, nc *NetChunk) {
 	d.cache.put(pos, nc)
@@ -471,9 +502,10 @@ func (d *Dimension) encodedUnloaded(c *Chunk, nc *NetChunk, version uint64) {
 func (d *Dimension) poolLoad(pos mcdb.ChunkPos, prio priority, full bool) {
 	d.pool.do(pos, prio, func() {
 		defer d.sched.recovered(d.log)
-		if full {
+		switch {
+		case full:
 			d.load(pos)
-		} else {
+		case d.wanted(pos):
 			d.loadView(pos)
 		}
 	})

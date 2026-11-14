@@ -209,6 +209,9 @@ func (r *Region) dropViewer(v *Viewer) {
 		r.release(pos)
 	}
 	clear(v.held)
+	for pos := range v.waiting {
+		r.d.unwant(pos, v)
+	}
 	clear(v.waiting)
 	r.d.mu.Lock()
 	delete(r.d.viewers, v)
@@ -224,7 +227,10 @@ func (r *Region) rezone(v *Viewer, centre mcdb.ChunkPos, radius, sim int32) {
 	for pos := range v.known {
 		if dist2(pos, centre) > int64(radius)*int64(radius) {
 			delete(v.known, pos)
-			delete(v.waiting, pos)
+			if v.waiting[pos] {
+				delete(v.waiting, pos)
+				r.d.unwant(pos, v)
+			}
 			delete(v.nets, pos)
 		}
 	}

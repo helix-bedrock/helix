@@ -143,7 +143,8 @@ sibling library folders, so unreleased library changes are used.
   loads whole, one only shown loads its terrain and its block entities'
   network data (`TerrainLoader`, `BlockEntityViewer`; hxdb does both,
   never reading a chest's Items for it), with no entities or live block
-  entities. Encoded chunks (`NetChunk`) are shared by every
+  entities. A view load whose players all moved away before it ran is
+  skipped (`Dimension.wanted`). Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the
   end of each tick from a copy-on-write snapshot, then wait
   `Config.SaveDelayTicks` (5 s by default), or 100 times as long as their
