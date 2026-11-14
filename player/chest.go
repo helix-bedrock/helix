@@ -326,6 +326,9 @@ func (e chestEntities) New(block uint32) world.BlockEntity {
 	if e.s.reg.Blocks.Name(block) == lecternBlock {
 		return &Lectern{s: e.s}
 	}
+	if e.s.reg.Blocks.Name(block) == nameCauldron {
+		return e.s.newCauldron()
+	}
 	if isBrushable(e.s.reg.Blocks.Name(block)) {
 		return e.s.newBrushable()
 	}
@@ -387,6 +390,9 @@ func (e chestEntities) Load(pos cube.Pos, saved map[string]any) (world.BlockEnti
 	}
 	if id == lecternEntityID {
 		return e.s.loadLectern(saved), true
+	}
+	if id == cauldronEntityID {
+		return e.s.loadCauldron(saved), true
 	}
 	if id == brushableEntityID {
 		return e.s.loadBrushable(saved), true
