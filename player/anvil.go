@@ -499,10 +499,12 @@ func (p *Player) craftAnvil(a *protocol.CraftRecipeOptionalStackRequestAction) (
 func vanillaAnvilWear(p *Player, r *world.Region, pos cube.Pos) {
 	b, ok := r.Block(pos, 0)
 	if !ok {
+		p.s.log.Debug("anvil wear: block not loaded", "name", p.name, "pos", pos)
 		return
 	}
 	blocks := p.s.reg.Blocks
 	var next string
+	p.s.log.Debug("anvil wear", "name", p.name, "pos", pos, "block", blocks.Name(b), "creative", p.creative(), "chance", p.Tuning(TuneAnvilWearChance))
 	switch blocks.Name(b) {
 	case anvilBlock, anvilDeprecated:
 		next = anvilChipped
@@ -523,6 +525,7 @@ func vanillaAnvilWear(p *Player, r *world.Region, pos cube.Pos) {
 		if becomes != b && r.SetBlock(pos, 0, becomes) {
 			r.UpdateNeighbours(pos)
 		}
+		p.s.log.Debug("anvil wore", "name", p.name, "pos", pos, "becomes", blocks.Name(becomes))
 	}
 	levelEvent(r, pos, blockVec(pos), event, 0)
 }
