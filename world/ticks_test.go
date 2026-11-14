@@ -182,3 +182,34 @@ func TestTickQueueMerge(t *testing.T) {
 		t.Errorf("saved %v, want the type 9 tick at 12", got)
 	}
 }
+
+// chainTicker sets off a chain of neighbour updates that never ends by itself: each told block
+// tells its own neighbours again, as a plugin's block behaviour could.
+type chainTicker struct {
+	*testTicker
+	told, max, deepest int
+}
+
+func (c *chainTicker) NeighbourChanged(r *Region, pos, _ cube.Pos, _ uint32, layer uint8) {
+	if layer != 0 || c.told >= c.max {
+		return
+	}
+	c.told++
+	c.deepest = max(c.deepest, r.updateDepth)
+	r.UpdateNeighbours(pos)
+}
+
+// TestUpdateNeighboursDeepChain checks a chain far deeper than any vanilla one never nests past
+// maxUpdateDepth, runs to its end and leaves nothing waiting.
+func TestUpdateNeighboursDeepChain(t *testing.T) {
+	reg := vanillaRegistry(t)
+	c := &chainTicker{testTicker: &testTicker{air: reg.Blocks.Air()}, max: 50 * maxUpdateDepth}
+	d, db := openDimWith(t, reg, t.TempDir(), func(conf *Config) { conf.Ticker = c })
+	defer func() { _ = d.Close(); _ = db.Close() }()
+	runAt(t, d, mcdb.ChunkPos{}, func(r *Region) {
+		r.UpdateNeighbours(cube.Pos{8, -62, 8})
+		if c.told != c.max || c.deepest > maxUpdateDepth || r.updateDepth != 0 || len(r.deferred) != 0 {
+			t.Errorf("told %d of %d, deepest %d, depth %d, %d waiting", c.told, c.max, c.deepest, r.updateDepth, len(r.deferred))
+		}
+	})
+}

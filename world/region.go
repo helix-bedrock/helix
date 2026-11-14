@@ -132,6 +132,10 @@ type Region struct {
 	chunkPackets []chunkPacket
 	// locals is the working state systems keep on the region (Local).
 	locals map[any]any
+	// updateDepth is how many UpdateNeighbours calls are running inside each other, and
+	// deferred the positions whose neighbours wait to be told because the chain got too deep.
+	updateDepth int
+	deferred    []cube.Pos
 }
 
 // RegionInfo describes a region, as of the end of its last tick.
@@ -280,12 +284,65 @@ func (r *Region) set(c *Chunk, pos cube.Pos, layer uint8, block uint32) {
 // BDS's updateNeighborsAt: for each, in BDS's order, the Ticker's
 // NeighbourChanged runs for its block on layer 0, then for the one in its
 // second layer, skipping air. Neighbours outside the region are skipped.
-// Runs: owner.
+//
+// A handler that changes a block and tells its neighbours runs UpdateNeighbours inside
+// UpdateNeighbours, as BDS does. Beyond BDS: past maxUpdateDepth calls inside each other, the
+// position waits on the region's list instead, and the outermost call tells its neighbours
+// once the chain above has returned, so no chain can overflow the goroutine's stack, which
+// would end the server with nothing to recover. No vanilla chain comes near the depth (the
+// tallest is a column of the world's height), so vanilla's order is unchanged. A chain that
+// never ends stops after maxDeferredUpdates waiting positions, with a warning, instead of
+// holding the tick forever. Runs: owner.
 func (r *Region) UpdateNeighbours(pos cube.Pos) {
 	t := r.d.conf.Ticker
 	if t == nil {
 		return
 	}
+	if r.updateDepth >= maxUpdateDepth {
+		r.deferred = append(r.deferred, pos)
+		return
+	}
+	r.updateDepth++
+	// Deferred, so a handler's panic, recovered further up, does not leave the depth raised.
+	defer func() { r.updateDepth-- }()
+	r.notifyNeighbours(t, pos)
+	if r.updateDepth == 1 && len(r.deferred) > 0 {
+		r.runDeferred(t)
+	}
+}
+
+const (
+	// maxUpdateDepth is how many UpdateNeighbours calls may run inside each other before the
+	// next waits: twice the height of the tallest dimension, far above any vanilla chain, and a
+	// few megabytes of stack.
+	maxUpdateDepth = 1024
+	// maxDeferredUpdates is how many waiting positions one outermost call works through before
+	// it gives up on a chain that never ends.
+	maxDeferredUpdates = 1 << 20
+)
+
+// runDeferred tells the neighbours of the positions that waited, last first, so the chain goes
+// on depth first as it would have. Each may go maxUpdateDepth deep again.
+func (r *Region) runDeferred(t BlockTicker) {
+	for n := 0; len(r.deferred) > 0; n++ {
+		if n == maxDeferredUpdates {
+			r.d.log.Warn("neighbour updates: a chain that does not end was stopped", "region", r.id, "left", len(r.deferred))
+			clear(r.deferred)
+			r.deferred = r.deferred[:0]
+			break
+		}
+		last := len(r.deferred) - 1
+		pos := r.deferred[last]
+		r.deferred = r.deferred[:last]
+		r.notifyNeighbours(t, pos)
+	}
+	if cap(r.deferred) > maxUpdateDepth {
+		r.deferred = nil
+	}
+}
+
+// notifyNeighbours runs NeighbourChanged for the six neighbours of pos, as UpdateNeighbours says.
+func (r *Region) notifyNeighbours(t BlockTicker, pos cube.Pos) {
 	air := r.d.conf.Blocks.Air()
 	for _, f := range direction.Updates() {
 		n := pos.Side(f)

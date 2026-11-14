@@ -115,7 +115,7 @@ sibling library folders, so unreleased library changes are used.
   behaviour through `Config.Ticker` (`BlockTicker`): ticks, `Placed`
   (BDS's onPlace, from `Region.SetBlock` when the state changes) and
   `NeighbourChanged` (from `Region.UpdateNeighbours`, BDS's order -x +x
-  +z -z +y -y, layer 0 then the second layer). Gameplay that changes a
+  +z -z +y -y, layer 0 then the second layer). Beyond BDS: past 1024 calls inside each other (`maxUpdateDepth`; no vanilla chain is deeper than the world is tall) a position waits and the outermost call tells its neighbours afterwards, so no chain can overflow the stack; a chain that never ends is stopped after 2^20 waiting positions with a warning. Gameplay that changes a
   block calls `SetBlock` then `UpdateNeighbours`, as BDS's update flag.
   `SetBlock` of air on layer 0 moves a block's second layer (water in a
   waterlogged block) down, as BDS's chunk does. `Region.ScheduleTick`
