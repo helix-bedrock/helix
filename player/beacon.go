@@ -48,7 +48,7 @@ var beaconBases = []string{
 	"minecraft:diamond_block", "minecraft:netherite_block",
 }
 
-// beaconPayments are the items the screen takes.
+// beaconPayments are the items the screen takes, BDS 1.26.60 isPaymentItem (0xD437310).
 var beaconPayments = []string{
 	"minecraft:iron_ingot", "minecraft:gold_ingot", "minecraft:emerald",
 	"minecraft:diamond", "minecraft:netherite_ingot",

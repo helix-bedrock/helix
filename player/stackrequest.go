@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -699,6 +700,10 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return p.brewingAllows(r.kind, s)
 	case protocol.ContainerEnchantingInput:
 		return s.Count == 1
+	case protocol.ContainerBeaconPayment:
+		// BeaconPaymentContainerValidation (1.26.60 0xC9FB170): one item, and only an iron
+		// ingot, gold ingot, diamond, emerald or netherite ingot (isPaymentItem 0xD437310).
+		return s.Count == 1 && slices.Contains(beaconPayments, s.Name)
 	case protocol.ContainerEnchantingMaterial:
 		material := p.s.game.rules().material
 		return material == "" || s.Name == material
