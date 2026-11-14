@@ -129,7 +129,10 @@ sibling library folders, so unreleased library changes are used.
   with two zones: the simulation zone is held loaded, the view zone is
   sent and released. Encoded chunks (`NetChunk`) are shared by every
   player and kept in a byte-budget cache. Changed chunks are saved at the
-  end of each tick from a copy-on-write snapshot; every `Config.AutoSaveTicks`
+  end of each tick from a copy-on-write snapshot, then wait
+  `Config.SaveDelayTicks` (5 s by default) before saving again, so a
+  machine changing a chunk every tick does not re-save its block entities
+  20 times a second; every `Config.AutoSaveTicks`
   (30 s by default, spread over the ticks by chunk) each loaded chunk also
   saves its entities and tick queues, and online players are saved on the
   same interval (`Player.autoSave`), so a crash loses at most that much.
@@ -329,7 +332,7 @@ sibling library folders, so unreleased library changes are used.
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.
 - `direction`: every direction beyond `cube`'s faces and positions: `Cardinal` and the numberings block states use for it, the orders BDS walks a block's sides in (`Updates`, `Spread`, `Clockwise`, `Sides`), yaw to direction, axes and BDS's table sine. Systems name what they mean here instead of keeping tables of numbers; a test pins each numbering and order to BDS's.
-- `circuit` (written from BDS's code and not fully tested: only the basics have been tried in game, nothing compared with BDS): vanilla's redstone blocks on the `redstone` library, one System per region (`Ticker`, a `world.RegionTicker`); its components move with their chunks on merges and splits. `comparator.go` has what wire connects to, what comparators read (`SignalEntity` for block entities that work it out themselves) and the comparator's block entity (`Ticker.Entities` wraps the world's list). `piston.go` has pistons and the blocks they move, as block entities (`SetEntityPush` is how they move entities: `Host.PistonPush` moves a player on the server and sends `CorrectPlayerMovePrediction`); `TakeBlockEntity` moves one without spilling it. Hoppers, dispensers and droppers are in `player/machine.go`, as `Chest`s with a `machineSpec`, since they share the chest's slots and window.
+- `circuit` (written from BDS's code and not fully tested: only the basics have been tried in game, nothing compared with BDS): vanilla's redstone blocks on the `redstone` library, one System per region (`Ticker`, a `world.RegionTicker`); its components move with their chunks on merges and splits. `comparator.go` has what wire connects to, what comparators read (`SignalEntity` for block entities that work it out themselves) and the comparator's block entity (`Ticker.Entities` wraps the world's list). `piston.go` has pistons and the blocks they move, as block entities (`SetEntityPush` is how they move entities: `Host.PistonPush` moves a player on the server and sends `CorrectPlayerMovePrediction`); `TakeBlockEntity` moves one without spilling it; a `world.BlockEntityMover` (every `Chest`) is carried as the live object, as BDS's moving block keeps its block actor, others as saved data loaded again where they land. `-testcmds` adds /chestbomb [count] [pistons]: chests full of shulker boxes full of 50-page books, to try lag machines. Hoppers, dispensers and droppers are in `player/machine.go`, as `Chest`s with a `machineSpec`, since they share the chest's slots and window.
 - `player/bed.go`: beds and straw beds (`bedEntity`, the colour block entity; placing; using; sleeping,
   the sleep counter and the night skip on the global owner's tick; the bed respawn point, saved under
   BDS's Spawn keys with its dimension). `player/respawnanchor.go`: respawn anchors (glowstone charges

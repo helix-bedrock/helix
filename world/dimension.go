@@ -88,6 +88,14 @@ type Config struct {
 	// DefaultAutoSaveTicks; below 0 they are saved only when a chunk unloads
 	// and on Close. Helix's own: BDS does not save like this.
 	AutoSaveTicks int32
+	// SaveDelayTicks is the least time between two saves of a chunk whose blocks
+	// keep changing: the first change saves at the end of its tick, later ones wait
+	// until this many ticks have passed, so a machine changing a chunk every tick
+	// does not save it, block entities and all, 20 times a second. A crash loses at
+	// most this much of such a chunk. Unloading, Close and the auto-save always
+	// save. 0 is DefaultSaveDelayTicks; below 0 saves every tick. Helix's own: BDS
+	// does not save like this.
+	SaveDelayTicks int32
 	// Weather runs on every ticking chunk before its random ticks, as BDS's chunk tick runs
 	// lightning, freezing and snow. Nil has no weather.
 	Weather WeatherTicker
@@ -192,6 +200,9 @@ type Chunk struct {
 	net *NetChunk // nil while the network form is out of date
 	// dirty means changed since it was last saved.
 	dirty bool
+	// saveWait is how many more ticks a changed chunk waits before its next save
+	// (Config.SaveDelayTicks).
+	saveWait int32
 	// discard keeps it out of the store.
 	discard  bool
 	encoding bool

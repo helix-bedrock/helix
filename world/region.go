@@ -616,14 +616,25 @@ func autoSavePhase(pos mcdb.ChunkPos) uint64 {
 // autoSaveSpreadX keeps neighbouring rows of chunks apart in the interval.
 const autoSaveSpreadX = 31
 
+// DefaultSaveDelayTicks is Config.SaveDelayTicks when it is 0: 5 seconds.
+const DefaultSaveDelayTicks = 100
+
 // save saves c if its blocks changed, or with ticks set, if its tick queues
 // changed or it has or had live entities: they are saved with the blocks but
-// do not make a save of their own every tick.
+// do not make a save of their own every tick. Without ticks, a chunk saved
+// less than SaveDelayTicks ago waits.
 func (r *Region) save(c *Chunk, ticks bool) {
+	if c.saveWait > 0 {
+		c.saveWait--
+		if !ticks {
+			return
+		}
+	}
 	if c.discard || !c.dirty && (!ticks || !c.ticksDirty && !c.savedLive && !r.holdsSaved(c.pos)) {
 		return
 	}
 	c.dirty, c.ticksDirty = false, false
+	c.saveWait = r.saveDelay()
 	d, pos, snap := r.d, c.pos, *c.col
 	snap.Chunk = c.col.Chunk.Snapshot()
 	snap.Entities, c.savedLive = r.entitiesToSave(c)
@@ -635,6 +646,18 @@ func (r *Region) save(c *Chunk, ticks bool) {
 			d.log.Error("save chunk", "pos", pos, "err", err)
 		}
 	})
+}
+
+// saveDelay is how many ticks a chunk just saved waits before the next save.
+func (r *Region) saveDelay() int32 {
+	switch d := r.d.conf.SaveDelayTicks; {
+	case d == 0:
+		return DefaultSaveDelayTicks
+	case d < 0:
+		return 0
+	default:
+		return d
+	}
 }
 
 // idle reports whether the region has nothing left to do. Under d.mu.

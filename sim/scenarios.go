@@ -50,6 +50,7 @@ func loadScenarios() []Scenario {
 		{Name: "mobs", About: "cows wandering the area", Unit: "cows", Start: startMobs},
 		{Name: "clouds", About: "lingering Regeneration clouds (no players to touch, so only their own tick)", Unit: "clouds", Start: startClouds},
 		{Name: "redstone", About: "observer clocks (two observers facing each other) each driving a line of redstone dust", Unit: "clocks", Size: redstoneSize, Start: startClocks},
+		{Name: "chests", About: "sticky pistons pushing and pulling chests full of items with 2 KB of lore each", Unit: "chests", Size: redstoneSize, Start: startChests, Tick: tickChests},
 	}
 }
 

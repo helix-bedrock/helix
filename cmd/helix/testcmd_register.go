@@ -194,7 +194,13 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return tpsRun(srv.Load(), p)
 		}},
-		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
+		{chestBombCommand, "Builds chests full of shulker boxes full of 50-page books: [count] [pistons].", nil, func(p *player.Player, args []string) string {
+			if !registry() {
+				return ""
+			}
+			return chestBomb(srv.Load(), p, args)
+		}},
+		{timeCommand,"Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""
 			}

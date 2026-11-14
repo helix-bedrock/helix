@@ -630,6 +630,18 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	c.items = [chestSize]ItemStack{}
 }
 
+// BlockEntityMoving closes the chest on everyone who has it open as a piston takes it:
+// their windows would stand at a block that is no longer there. Its slots and pairing
+// go along as they are, so a push costs no save and load however much it holds.
+func (c *Chest) BlockEntityMoving(r *world.Region, from cube.Pos) {
+	c.pos = from
+	c.closeViewers(r)
+}
+
+// BlockEntityMoved keeps the chest's new position once it is set down. A partner left
+// behind is dropped by the chest's next pair check.
+func (c *Chest) BlockEntityMoved(_ *world.Region, to cube.Pos) { c.pos = to }
+
 // spillSlots drops the slots of a broken container, each slot as one whole item, so
 // a slot of 63 ends as one item of 63. Every container spills through it: chests,
 // barrels, hoppers, dispensers, droppers, crafters, furnaces and carts.

@@ -431,12 +431,10 @@ func (e *pistonEntity) spawnMoving(r *world.Region, pos cube.Pos, move pistonFac
 		}
 	}
 	blocks := make([]uint32, len(e.attached))
-	saved := make([]map[string]any, len(e.attached))
+	carried := make([]carriedEntity, len(e.attached))
 	for i, at := range e.attached {
 		blocks[i], _ = r.Block(at, 0)
-		if be, ok := r.TakeBlockEntity(at); ok {
-			saved[i] = be.SaveData(at)
-		}
+		carried[i] = takeCarried(r, at)
 	}
 	for _, at := range e.attached {
 		r.SetBlock(at, 0, t.blocks.Air())
@@ -451,7 +449,7 @@ func (e *pistonEntity) spawnMoving(r *world.Region, pos cube.Pos, move pistonFac
 			continue
 		}
 		if m, ok := be.(*movingEntity); ok {
-			m.block, m.entity, m.piston, m.expanding = blocks[i], saved[i], pos, expanding
+			m.block, m.carried, m.piston, m.expanding = blocks[i], carried[i], pos, expanding
 			r.SendBlockEntity(to)
 		}
 	}
@@ -496,32 +494,60 @@ func (e *pistonEntity) moveSound(r *world.Region, pos cube.Pos) {
 type movingEntity struct {
 	t         *Ticker
 	block     uint32
-	entity    map[string]any
+	carried   carriedEntity
 	piston    cube.Pos
 	expanding bool
 }
 
+// carriedEntity is the block entity a moving block carries: the live one when it is
+// a world.BlockEntityMover, else its saved data, which is also what a moving block
+// loaded from the save has.
+type carriedEntity struct {
+	live  world.BlockEntity
+	saved map[string]any
+}
+
+// takeCarried takes the block entity at pos out of its chunk to be carried.
+func takeCarried(r *world.Region, pos cube.Pos) carriedEntity {
+	be, ok := r.TakeBlockEntity(pos)
+	if !ok {
+		return carriedEntity{}
+	}
+	if m, ok := be.(world.BlockEntityMover); ok {
+		m.BlockEntityMoving(r, pos)
+		return carriedEntity{live: be}
+	}
+	return carriedEntity{saved: be.SaveData(pos)}
+}
+
+// data is the carried block entity as BDS saves it inside the moving block, or nil.
+func (c carriedEntity) data(pos cube.Pos) map[string]any {
+	if c.live != nil {
+		return c.live.SaveData(pos)
+	}
+	return c.saved
+}
+
 // SaveData is the moving block as BDS saves it.
 func (m *movingEntity) SaveData(pos cube.Pos) map[string]any {
+	out := m.NetworkData(pos)
+	if data := m.carried.data(pos); data != nil {
+		out[tagMovingEntity] = data
+	}
+	return out
+}
+
+// NetworkData is all of it but the carried block entity: the client draws the block
+// from it.
+func (m *movingEntity) NetworkData(pos cube.Pos) map[string]any {
 	blocks := m.t.blocks
-	out := map[string]any{
+	return map[string]any{
 		"id": movingEntityID, tagMovable: uint8(0), tagExpanding: flag(m.expanding),
 		"x": int32(pos[0]), "y": int32(pos[1]), "z": int32(pos[2]), //nolint:gosec // block coordinates fit int32
 		tagMovingBlock: blockCompound(blocks, m.block),
 		tagMovingExtra: blockCompound(blocks, blocks.Air()),
 		tagPistonX:     int32(m.piston[0]), tagPistonY: int32(m.piston[1]), tagPistonZ: int32(m.piston[2]), //nolint:gosec // block coordinates fit int32
 	}
-	if m.entity != nil {
-		out[tagMovingEntity] = m.entity
-	}
-	return out
-}
-
-// NetworkData is all of it: the client draws the block from it.
-func (m *movingEntity) NetworkData(pos cube.Pos) map[string]any {
-	out := m.SaveData(pos)
-	delete(out, tagMovingEntity)
-	return out
 }
 
 // TickBlockEntity sets the block down if its piston is gone.
@@ -540,20 +566,38 @@ func (m *movingEntity) place(r *world.Region, pos cube.Pos) {
 	if !r.SetBlock(pos, 0, m.block) {
 		return
 	}
-	if m.entity != nil {
-		restore := maps.Clone(m.entity)
-		restore["x"], restore["y"], restore["z"] = int32(pos[0]), int32(pos[1]), int32(pos[2]) //nolint:gosec // block coordinates fit int32
-		if maker := r.Dimension().BlockEntityMaker(); maker != nil {
-			if be, ok := maker.Load(pos, restore); ok {
-				r.SetBlockEntity(pos, be)
-				r.SendBlockEntity(pos)
-			}
-		}
-	}
+	m.setDown(r, pos)
 	r.UpdateNeighbours(pos)
 	// An observer that was moved fires.
 	if m.t.kind(m.block) == kindObserver {
 		m.t.turnObserver(m.t.circuitOf(r), pos, m.t.with(m.block, statePowered, flag(false)), true)
+	}
+}
+
+// setDown puts the carried block entity in at pos: the live one as it is, saved data
+// loaded again.
+func (m *movingEntity) setDown(r *world.Region, pos cube.Pos) {
+	c := m.carried
+	m.carried = carriedEntity{}
+	if c.live != nil {
+		if r.SetBlockEntity(pos, c.live) {
+			if mover, ok := c.live.(world.BlockEntityMover); ok {
+				mover.BlockEntityMoved(r, pos)
+			}
+			r.SendBlockEntity(pos)
+		}
+		return
+	}
+	if c.saved == nil {
+		return
+	}
+	restore := maps.Clone(c.saved)
+	restore["x"], restore["y"], restore["z"] = int32(pos[0]), int32(pos[1]), int32(pos[2]) //nolint:gosec // block coordinates fit int32
+	if maker := r.Dimension().BlockEntityMaker(); maker != nil {
+		if be, ok := maker.Load(pos, restore); ok {
+			r.SetBlockEntity(pos, be)
+			r.SendBlockEntity(pos)
+		}
 	}
 }
 
@@ -572,7 +616,7 @@ func (t *Ticker) loadMoving(saved map[string]any) *movingEntity {
 			m.block = id
 		}
 	}
-	m.entity, _ = saved[tagMovingEntity].(map[string]any)
+	m.carried.saved, _ = saved[tagMovingEntity].(map[string]any)
 	x, _ := saved[tagPistonX].(int32)
 	y, _ := saved[tagPistonY].(int32)
 	z, _ := saved[tagPistonZ].(int32)

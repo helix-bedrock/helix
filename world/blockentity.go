@@ -44,6 +44,16 @@ type BlockEntityKeeper interface {
 	KeepBlockEntity(block uint32) bool
 }
 
+// BlockEntityMover is a block entity a piston may carry as it is, as BDS's moving
+// block keeps its block actor: Moving is told when it is taken out at from, Moved
+// when it is set down at to, after it is back in a chunk. One that is not a mover is
+// carried as its saved data and loaded again where it lands, which costs a save and
+// a load per push, so a block entity with much data should be one.
+type BlockEntityMover interface {
+	BlockEntityMoving(r *Region, from cube.Pos)
+	BlockEntityMoved(r *Region, to cube.Pos)
+}
+
 // BlockEntityBinder is a block entity given its chunk's handle whenever it is put in a
 // chunk, so it can mark itself for saving from code that has no region at hand.
 type BlockEntityBinder interface {
