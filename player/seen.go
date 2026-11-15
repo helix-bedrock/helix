@@ -182,6 +182,12 @@ func (s *Host) NewItem(name string, count int, meta int16) (ItemStack, bool) {
 }
 
 // MaxStack is how many of an item fit in one slot, 0 for an unknown item. Runs: anywhere.
+// BlockExists reports whether the registry has a block called name. Runs: anywhere.
+func (s *Host) BlockExists(name string) bool {
+	_, ok := s.reg.Blocks.Block(name)
+	return ok
+}
+
 func (s *Host) MaxStack(name string) int { return int(ItemStack{Name: name}.maxStack(s.reg)) }
 
 // Drop throws a stack out of the player as dropping it would, or gives it back if it

@@ -66,7 +66,7 @@ type Target interface {
 // its arguments, in order. Run is called on a copy filled with what was typed.
 //
 // Field types: int kinds, float32, float64, bool, string (one word or quoted), Text (the
-// rest of the line), Position, BlockPosition, Targets, Literal (a fixed word, given in the
+// rest of the line), JSON (a JSON value, the rest of the line), Position, BlockPosition, Targets, Literal (a fixed word, given in the
 // field's cmd tag), Item, Block, any string type implementing Enum, and Optional of any
 // of these. The tag `cmd:"name"` names the argument; without it the field's name is used,
 // starting lower case.

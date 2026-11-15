@@ -14,6 +14,9 @@ import (
 // Text is the rest of the line, spaces and all: a chat message, say.
 type Text string
 
+// JSON is a JSON value taking the rest of the line, such as /give's components.
+type JSON string
+
 // Literal is a fixed word, such as "set" in /time set. Its word is the field's cmd tag.
 type Literal struct{}
 
@@ -146,6 +149,7 @@ const (
 	kindBool
 	kindString
 	kindText
+	kindJSON
 	kindPosition
 	kindBlockPosition
 	kindRelativeFloat
@@ -175,6 +179,7 @@ type overload struct {
 
 var (
 	typeText          = reflect.TypeFor[Text]()
+	typeJSON          = reflect.TypeFor[JSON]()
 	typeLiteral       = reflect.TypeFor[Literal]()
 	typePosition      = reflect.TypeFor[Position]()
 	typeBlockPosition = reflect.TypeFor[BlockPosition]()
@@ -199,6 +204,8 @@ func paramOf(name string, t reflect.Type, literal string) (param, error) {
 	switch {
 	case t == typeText:
 		p.kind = kindText
+	case t == typeJSON:
+		p.kind = kindJSON
 	case t == typeLiteral:
 		if literal == "" {
 			return param{}, fmt.Errorf("argument %s: a Literal needs its word in the cmd tag", name)
@@ -244,7 +251,7 @@ func checkParams(params []param) error {
 		} else if optional {
 			return fmt.Errorf("argument %s: required after an optional one", p.name)
 		}
-		if p.kind == kindText && i != len(params)-1 {
+		if (p.kind == kindText || p.kind == kindJSON) && i != len(params)-1 {
 			return fmt.Errorf("argument %s: Text takes the rest of the line, so it comes last", p.name)
 		}
 	}

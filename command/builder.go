@@ -61,6 +61,8 @@ func (a Args) String(name string) string {
 		return v
 	case Text:
 		return string(v)
+	case JSON:
+		return string(v)
 	}
 	return ""
 }

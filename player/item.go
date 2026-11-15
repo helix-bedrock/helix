@@ -179,6 +179,7 @@ func (s ItemStack) networkAs(reg *registry.Registry, own bool) protocol.ItemInst
 	st := protocol.ItemStack{
 		ItemType: protocol.ItemType{NetworkID: int32(t.ID), MetadataValue: uint32(uint16(s.Meta))},
 		Count:    uint16(s.Count), NBTData: s.networkTag(own),
+		CanBePlacedOn: s.CanPlaceOn(), CanBreak: s.CanDestroy(),
 	}
 	if s.Block != nil {
 		name, _ := s.Block["name"].(string)

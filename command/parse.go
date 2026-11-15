@@ -260,6 +260,11 @@ func (m *matcher) read(sc *scanner, p param) (reflect.Value, *parseError) {
 		text := sc.s[sc.i:]
 		sc.i = len(sc.s)
 		return reflect.ValueOf(Text(text)), nil
+	case kindJSON:
+		sc.skipSpace()
+		text := sc.s[sc.i:]
+		sc.i = len(sc.s)
+		return reflect.ValueOf(JSON(text)), nil
 	case kindPosition, kindBlockPosition:
 		pos, err := sc.position()
 		if err != nil {

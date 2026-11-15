@@ -9,7 +9,8 @@ import (
 )
 
 // BDS 1.26.60's /give (GiveCommand: setup 0x9FC1530, execute 0x9FC1C30): give <player>
-// <itemName> [amount] [data]. The components argument is not built yet.
+// <itemName> [amount] [data] [components]. Of the components, can_place_on and can_destroy are
+// built (givecomponents.go).
 
 // giveMax is the most amount and data take, as BDS checks them.
 const giveMax = 0x7fff
@@ -21,10 +22,11 @@ var give = command.Spec{
 
 // giveOverload is /give's one overload.
 type giveOverload struct {
-	Player   command.Targets
-	ItemName command.Item `cmd:"itemName"`
-	Amount   command.Optional[int32]
-	Data     command.Optional[int32]
+	Player     command.Targets
+	ItemName   command.Item `cmd:"itemName"`
+	Amount     command.Optional[int32]
+	Data       command.Optional[int32]
+	Components command.Optional[command.JSON]
 }
 
 // Run gives every target the items, each on its own region: whole stacks into the
@@ -51,6 +53,13 @@ func (c giveOverload) Run(_ command.Source, out *command.Output) {
 			out.Fail("commands.give.item.notFound", string(c.ItemName))
 			return
 		}
+		if c.Components.Set {
+			var msg string
+			if item, msg, ok = applyComponents(p.Host(), item, string(c.Components.Value)); !ok {
+				componentFailed(out, msg)
+				return
+			}
+		}
 		names = append(names, p.Name())
 		name := string(c.ItemName)
 		p.Run(func(p *player.Player) { giveItems(p, item, amount, name) })
@@ -60,6 +69,16 @@ func (c giveOverload) Run(_ command.Source, out *command.Output) {
 		return
 	}
 	out.Success("commands.give.success", string(c.ItemName), strconv.Itoa(int(amount)), strings.Join(names, ", "))
+}
+
+// componentFailed reports components that could not be set: BDS's own message, or its
+// commands.generic.componentError when there was none.
+func componentFailed(out *command.Output, msg string) {
+	if msg == "" {
+		out.Fail("commands.generic.componentError")
+		return
+	}
+	out.Error(msg)
 }
 
 // giveItems puts amount of an item on a player in whole stacks, drops the rest and tells

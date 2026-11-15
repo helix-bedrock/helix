@@ -53,7 +53,7 @@ func (b *listBuilder) soft(enumType string, values []string) uint32 {
 // argTypes are the protocol's types for the plain kinds.
 var argTypes = map[kind]uint32{
 	kindInt: protocol.CommandArgTypeInt, kindFloat: protocol.CommandArgTypeFloat, kindString: protocol.CommandArgTypeString,
-	kindText: protocol.CommandArgTypeMessage, kindPosition: protocol.CommandArgTypePosition,
+	kindText: protocol.CommandArgTypeMessage, kindJSON: protocol.CommandArgTypeJSON, kindPosition: protocol.CommandArgTypePosition,
 	kindBlockPosition: protocol.CommandArgTypeBlockPosition, kindTargets: protocol.CommandArgTypeTarget,
 	kindRelativeFloat: protocol.CommandArgTypeRValue,
 }
