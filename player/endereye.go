@@ -93,6 +93,8 @@ func (p *Player) throwEnderEye(held ItemStack) bool {
 	at := pos.Add(mgl32.Vec3{enderEyeSpawnOffset, enderEyeSpawnOffset, enderEyeSpawnOffset})
 	y := &EnderEye{s: p.s}
 	y.signalTo(at, mgl32.Vec3{float32(target[0]), float32(target[1]), float32(target[2])})
+	// The throw sound snowballs and pearls make, heard on BDS (not found in EnderEyeItem::use).
+	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
 	y.entity = r.Dimension().AddEntity(y.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), p.s.runtimeIDs.Add(1), at)) //nolint:gosec // an entity ID, not a secret
 	if !p.creative() {
 		p.useHeld()
