@@ -68,6 +68,9 @@ func (l lootRandom) Intn(n int32) int32 {
 	return l.r.NextInt(n)
 }
 
+// Int32N is Intn, for item wear's Unbreaking roll.
+func (l lootRandom) Int32N(n int32) int32 { return l.Intn(n) }
+
 func (l lootRandom) Float() float32 {
 	if l.r == nil {
 		return rand.Float32() //nolint:gosec // gameplay randomness
