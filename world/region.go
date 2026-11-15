@@ -622,8 +622,9 @@ func (r *Region) encode(c *Chunk) {
 	c.encoding = true
 	d, pos := r.d, c.pos
 	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
+	border := c.col.Extra[borderTag]
 	d.pool.do(pos, prioView, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap, entities)
+		nc := encodeNetChunk(pos, d.conf.Dim, snap, border, entities)
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
 		}
@@ -641,6 +642,10 @@ func (r *Region) encoded(c *Chunk, nc *NetChunk, version uint64) {
 	default:
 		c.encoding, c.net = false, nc
 		r.d.publish(c.pos, nc)
+		if c.resendNet {
+			c.resendNet = false
+			r.chunkPackets = append(r.chunkPackets, chunkPacket{chunk: c.pos, pk: nc.level, net: nc})
+		}
 	}
 }
 

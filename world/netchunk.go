@@ -32,12 +32,12 @@ type netSub struct {
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, entities []chunk.BlockEntity) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
-	// Biomes, then no border blocks. Block entities go with their sub chunk.
-	payload := append(chunk.EncodeBiomes(c, chunk.NetworkHashEncoding), 0)
+	// Biomes, then the border map. Block entities go with their sub chunk.
+	payload := append(chunk.EncodeBiomes(c, chunk.NetworkHashEncoding), netBorder(border)...)
 	// BDS sends no sub chunks in the packet (count 0) and tells the
 	// client how many to request, from the bottom, as the limit.
 	nc.level = &packet.LevelChunk{

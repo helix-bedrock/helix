@@ -389,6 +389,7 @@ func (r *Region) blockTypeChanged(c *Chunk, pos cube.Pos, old, block uint32) {
 	if blocks.Name(old) == blocks.Name(block) {
 		return
 	}
+	r.borderChanged(c, pos, old, block)
 	if k, ok := c.blockEntities[pos].(BlockEntityKeeper); ok && k.KeepBlockEntity(block) {
 		c.dirty = true
 		c.netChanged()

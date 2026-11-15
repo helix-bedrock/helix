@@ -214,6 +214,9 @@ type Chunk struct {
 	// discard keeps it out of the store.
 	discard  bool
 	encoding bool
+	// resendNet sends the next network form to the players that have the chunk: its border
+	// map changed, which the client reads only from LevelChunk.
+	resendNet bool
 	// version counts changes, so a stale encode is recognised.
 	version uint64
 	// ticks and randomTicks are the chunk's tick queues; ticksDirty means
@@ -548,7 +551,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, entities)
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, col.Extra[borderTag], entities)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })

@@ -16,6 +16,9 @@ type chunkPacket struct {
 	chunk  mcdb.ChunkPos
 	pk     packet.Packet
 	except *Viewer
+	// net is the chunk sent again, pk its LevelChunk: the client asks for its sub chunks
+	// from it next.
+	net *NetChunk
 }
 
 // Broadcast sends pk at the end of the tick to every player whose client
@@ -90,6 +93,9 @@ func (r *Region) packetsFor(v *Viewer) []packet.Packet {
 			continue
 		}
 		if _, ok := v.nets[c.chunk]; ok {
+			if c.net != nil {
+				v.nets[c.chunk] = c.net
+			}
 			list = append(list, c.pk)
 		}
 	}
