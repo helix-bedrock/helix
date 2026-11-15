@@ -36,6 +36,7 @@ const (
 	opDoor
 	opDoorEvent
 	opCarried
+	opExplode
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -159,6 +160,10 @@ func (m *Mob) run(o op) {
 	case opCarried:
 		if h, ok := m.hooks.(ShowHooks); ok {
 			h.Carried(m)
+		}
+	case opExplode:
+		if h, ok := m.hooks.(ExplodeHooks); ok {
+			h.Explode(m, o.at, m.blast)
 		}
 	case opDwellerTick:
 		m.runDwellerTick(r)

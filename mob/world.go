@@ -34,6 +34,8 @@ type Env interface {
 	DefaultGameMode() int
 	Difficulty() int32
 	MobGriefing() bool
+	// TNTExplodes is the tntexplodes game rule.
+	TNTExplodes() bool
 	// SkyDarken is BDS's sky darkening in r's dimension, 0 to 11.
 	SkyDarken(r *world.Region) int32
 	// Rain and Thunder are the dimension's weather levels, 0 to 1.

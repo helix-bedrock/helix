@@ -457,6 +457,9 @@ type Projectile struct {
 	// then it passes through its owner.
 	owner     *Player
 	separated bool
+	// shooter is the mob that shot it (a skeleton's arrow), nil for none. Like an owner,
+	// it is passed through until the projectile leaves its box. It is not an attacker yet.
+	shooter *Mob
 
 	// age is how many ticks it has flown; stuckTicks how long it has been stuck.
 	age, stuckTicks int32
@@ -555,6 +558,8 @@ func (t *Projectile) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	if t.owner != nil && t.owner.entity != nil {
 		meta[protocol.EntityDataKeyOwner] = t.owner.entity.UniqueID()
+	} else if t.shooter != nil && t.shooter.entity != nil {
+		meta[protocol.EntityDataKeyOwner] = t.shooter.entity.UniqueID()
 	}
 	if t.isPotion() {
 		meta[protocol.EntityDataKeyAuxValueData] = t.potion
@@ -738,11 +743,19 @@ func (t *Projectile) checkSeparated(r *world.Region, from, to mgl32.Vec3) {
 	if t.separated {
 		return
 	}
-	if t.owner == nil || t.owner.entity == nil || t.owner.entity.Region() != r {
+	var src Blastable
+	var e *world.Entity
+	switch {
+	case t.owner != nil:
+		src, e = t.owner, t.owner.entity
+	case t.shooter != nil:
+		src, e = t.shooter, t.shooter.entity
+	}
+	if src == nil || e == nil || e.Region() != r {
 		t.separated = true
 		return
 	}
-	lo, hi, ok := t.owner.BlastBox()
+	lo, hi, ok := src.BlastBox()
 	if !ok {
 		t.separated = true
 		return
@@ -825,7 +838,7 @@ func (t *Projectile) firstHit(r *world.Region, from, to mgl32.Vec3) (projectileH
 			}
 			hit.player = target
 		case *Mob:
-			if target.Dead() {
+			if target.Dead() || target == t.shooter && !t.separated {
 				continue
 			}
 			hit.mob = target

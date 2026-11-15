@@ -105,6 +105,13 @@ func (rt *Runtime) Parse(typ string, raw json.RawMessage) error {
 // Has reports a parsed definition for typ.
 func (rt *Runtime) Has(typ string) bool { _, ok := rt.defs[typ]; return ok }
 
+// ArmorHooks is what an engine that knows the mob's armour implements on its Hooks: what
+// the armour leaves of damage amount of cause, as BDS's Mob hurt (armour, then protection
+// enchantments), after the hurt time has taken its part.
+type ArmorHooks interface {
+	AfterArmor(m *Mob, amount float32, cause int) float32
+}
+
 // Hooks are what the engine does for one mob: its packets and its effects on others. They
 // run on the region's goroutine, never while mobs think.
 type Hooks interface {
@@ -214,10 +221,14 @@ type Mob struct {
 	air, maxAir int16
 	// sensors are the definition's sensors and event components (sensors.go), sensorEnv what
 	// they run with, sensorComps the components they were read from.
-	sensors      *sensor.Set
-	sensorEnv    sensor.Env
-	sensorComps  definition.Group
-	swellDir     int32
+	sensors     *sensor.Set
+	sensorEnv   sensor.Env
+	sensorComps definition.Group
+	swellDir    int32
+	// swell is the creeper's swell, 0 to 30 (creeper.go); blast the explosion its
+	// minecraft:explode queued for Apply.
+	swell        int32
+	blast        state.Explosion
 	noActionTime int32
 	// data is the actor data the components wrote (data.go).
 	data []DataValue
@@ -364,6 +375,7 @@ func (m *Mob) think() (remove bool) {
 		m.deathTime++
 		return m.deathTime >= deathTicks
 	}
+	m.creeperTick()
 	if m.stateTick() {
 		return true
 	}
@@ -765,6 +777,9 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 		m.hurtTime = hurtTicks
 	}
 	m.lastHurtAmount = amount
+	if h, ok := m.hooks.(ArmorHooks); ok {
+		dealt = h.AfterArmor(m, dealt, cause)
+	}
 	m.health = max(m.health-dealt, 0)
 	m.lastCause = cause
 	if by != behavior.NoID {

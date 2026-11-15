@@ -227,7 +227,9 @@ func (m *Mob) apply(e *world.Entity) {
 		m.dropLeashOnDeath(e.Region())
 	}
 	if m.ended {
-		if r := e.Region(); r != nil {
+		// A despawned mob (a creeper that blew up) leaves no experience, as BDS's
+		// Actor::despawn.
+		if r := e.Region(); r != nil && m.m.Dead() {
 			m.dropExperience(r)
 		}
 		m.remove(e)
@@ -301,17 +303,31 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 		id = behavior.ID(by.entity.UniqueID())
 		m.lastPlayer = by
 	}
-	dealt := m.m.Hurt(amount, id, int(cause), uint64(max(r.CurrentTick(), 0))) //nolint:gosec // clamped
+	dealt := m.hurtBy(amount, id, cause)
 	if dealt <= 0 {
 		return 0
 	}
-	m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventHurt))
 	if by != nil && by.entity != nil {
 		away := m.entity.Position().Sub(by.feet())
 		v := by.knockbackStep(mglVec(m.m.Body().Vel), away[0], away[2], by.Tuning(TuneKnockbackPush), by.Tuning(TuneKnockbackLift))
 		m.m.Knock(vec(v))
 		m.entity.Send(&packet.SetActorMotion{EntityRuntimeID: m.entity.RuntimeID(), Velocity: v, Tick: m.entity.Tick()})
 	}
+	return dealt
+}
+
+// hurtBy hurts the mob by the entity with ID by (behavior.NoID for none) and shows the
+// hurt, or the death and its drops. It reports the damage taken.
+func (m *Mob) hurtBy(amount float32, by behavior.ID, cause DamageCause) float32 {
+	r := m.entity.Region()
+	if r == nil || m.gone {
+		return 0
+	}
+	dealt := m.m.Hurt(amount, by, int(cause), uint64(max(r.CurrentTick(), 0))) //nolint:gosec // clamped
+	if dealt <= 0 {
+		return 0
+	}
+	m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventHurt))
 	if m.m.Dead() && !m.died {
 		m.died = true
 		m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventDeath))
@@ -327,9 +343,9 @@ func (p *Player) feet() mgl32.Vec3 {
 
 // --- mob.Hooks ---
 
-// Attack is the mob's melee hit on a player: its attack damage through the TakeHit
-// system, then a push away from the mob. BDS's difficulty scaling of mob damage and hits
-// on other mobs are not built yet.
+// Attack is the mob's melee hit: on a player its attack damage through the TakeHit system,
+// then a push away from the mob; on another mob, attackMob. BDS's difficulty scaling of
+// mob damage is not built yet.
 func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	// Mob::doHurtTarget (0xBFEE420, 1.26.60) swings and broadcasts ActorEvent 4 before it
 	// looks at the target.
@@ -337,6 +353,9 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	r := m.entity.Region()
 	if r == nil {
 		return false, false
+	}
+	if o, ok := m.s.entityByID(r, target).(*Mob); ok {
+		return m.attackMob(o)
 	}
 	p, ok := m.s.entityByID(r, target).(*Player)
 	if !ok || p.entity == nil || p.dead() {
@@ -355,6 +374,29 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 		p.flush()
 	}
 	return true, p.dead()
+}
+
+// attackMob is the mob's melee hit on another mob (a zombie on a villager): its attack
+// damage as an entity attack from the mob, with the server's knockback tuning, as a
+// player's hit on a mob pushes it. Mob difficulty scaling is not built.
+func (m *Mob) attackMob(o *Mob) (hit, killed bool) {
+	r := m.entity.Region()
+	if o == m || o.entity == nil || o.Dead() || o.stand != nil || r == nil {
+		return false, false
+	}
+	dealt := o.hurtBy(m.m.AttackDamage(), behavior.ID(m.entity.UniqueID()), DamageEntityAttack)
+	if dealt <= 0 {
+		return false, false
+	}
+	if !o.Dead() {
+		s := m.s
+		away := o.entity.Position().Sub(m.entity.Position())
+		v := knockbackOf(mglVec(o.m.Body().Vel), away[0], away[2], s.Tuning(TuneKnockbackPush), s.Tuning(TuneKnockbackLift),
+			s.Tuning(TuneKnockbackRetain), s.Tuning(TuneKnockbackLiftScale), s.Tuning(TuneKnockbackCap))
+		o.m.Knock(vec(v))
+		o.entity.Send(&packet.SetActorMotion{EntityRuntimeID: o.entity.RuntimeID(), Velocity: v, Tick: o.entity.Tick()})
+	}
+	return true, o.Dead()
 }
 
 // Swing is the attack goals' swing. BDS's melee goal swings and sends ActorEvent 4 (data
@@ -630,6 +672,9 @@ func (s *Host) Difficulty() int32 { return s.level.Difficulty }
 
 // MobGriefing is the mobgriefing game rule.
 func (s *Host) MobGriefing() bool { return s.level.MobGriefing }
+
+// TNTExplodes is the tntexplodes game rule.
+func (s *Host) TNTExplodes() bool { return s.level.TNTExplodes }
 
 // SkyDarken is the sky darkening from the clock and the overworld's weather.
 func (s *Host) SkyDarken(r *world.Region) int32 {

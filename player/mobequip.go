@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/loot"
 	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/world"
@@ -354,8 +355,9 @@ func (m *Mob) dropExperience(r *world.Region) {
 // eyes with the projectile's offset, toward the middle of the target's box, starting a
 // block out toward it; with gravity the pitch is the lower of the two that reach it at
 // that speed (45 degrees up when none does). power above 0 replaces the projectile's own.
-// The arrow's aux value (a stray's slowness arrow) is not carried yet, and the shot has no
-// owner, so the mob is not its attacker.
+// The arrow's aux value (a stray's slowness arrow) is not carried yet. The mob is the
+// arrow's owner (passed through until the arrow leaves its box, shown to clients) but not
+// yet its attacker: no kill credit or death message.
 func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power float32, sound int) {
 	r := m.entity.Region()
 	if r == nil || m.gone {
@@ -398,8 +400,35 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 		p, y := pitch*math.Pi/180, yawDeg*math.Pi/180
 		dir = mgl32.Vec3{float32(-math.Sin(y) * math.Cos(p)), float32(-math.Sin(p)), float32(math.Cos(y) * math.Cos(p))}
 	}
-	m.s.SpawnProjectile(r.Dimension(), spec, start, dir, speed, nil)
+	if pr := m.s.SpawnProjectile(r.Dimension(), spec, start, dir, speed, nil); pr != nil {
+		pr.shooter, pr.separated = m, false
+	}
 	if sound != behavior.NoSound {
 		m.Sound(m.m, sound, m.m.Eyes())
 	}
+}
+
+// Explode is minecraft:explode going off (ExplodeComponent::explode, 1.21.3 0x1405AFFF0):
+// Level::explode with the mob as the source, so it is not hurt and distances are measured
+// from it. Damage is an entity explosion; the creeper is not credited as the attacker yet
+// (Explosion has players only). An empty particle or sound effect keeps the default.
+func (m *Mob) Explode(_ *mob.Mob, at behavior.Vec3, e state.Explosion) {
+	r := m.entity.Region()
+	if r == nil || m.gone {
+		return
+	}
+	x := NewExplosion(mglVec(at), e.Power)
+	x.Source, x.Cause = m.entity, DamageEntityExplosion
+	x.Kind = ExplosionPlugin
+	if m.m.Type() == "minecraft:creeper" {
+		x.Kind = ExplosionCreeper
+	}
+	x.Fire, x.BreaksBlocks = e.Fire, e.Breaks
+	x.AllowUnderwater, x.MaxResistance = e.AllowUnderwater, e.MaxResistance
+	x.DamageScale, x.KnockbackScale = e.DamageScaling, e.KnockbackScaling
+	x.ToggleBlocks, x.NegatesFallDamage = e.TogglesBlocks, e.NegatesFallDamage
+	if e.SoundEffect != "" {
+		x.Sound = e.SoundEffect
+	}
+	m.s.Explode(r, x)
 }

@@ -58,7 +58,7 @@ func (m *Mob) stateTick() bool {
 	if m.states != nil {
 		// A transformation that comes due is not run yet: making the new entity is the
 		// engine's and not hooked up.
-		m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}, LeashChunks: despawnChunks{m}})
+		m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}, LeashChunks: despawnChunks{m}, Actions: stateActions{m}})
 	}
 	return m.despawned
 }

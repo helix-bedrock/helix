@@ -243,14 +243,18 @@ func vanillaKnockback(target, attacker *Player, extra float32) {
 
 // knockbackStep is one push of BDS's knockback on the player in the direction (x, z).
 func (p *Player) knockbackStep(vel mgl32.Vec3, x, z, push, lift float32) mgl32.Vec3 {
-	retain := p.Tuning(TuneKnockbackRetain)
+	return knockbackOf(vel, x, z, push, lift, p.Tuning(TuneKnockbackRetain), p.Tuning(TuneKnockbackLiftScale), p.Tuning(TuneKnockbackCap))
+}
+
+// knockbackOf is BDS's knockback with the tuned retain, lift scale and cap.
+func knockbackOf(vel mgl32.Vec3, x, z, push, lift, retain, liftScale, liftCap float32) mgl32.Vec3 {
 	var dx, dz float32
 	if l := float32(math.Sqrt(float64(x*x + z*z))); l >= knockbackMinLength {
 		dx, dz = x/l, z/l
 	}
 	return mgl32.Vec3{
 		clampKnockback(vel[0]*retain + dx*push),
-		min(vel[1]*retain+lift*p.Tuning(TuneKnockbackLiftScale), p.Tuning(TuneKnockbackCap)),
+		min(vel[1]*retain+lift*liftScale, liftCap),
 		clampKnockback(vel[2]*retain + dz*push),
 	}
 }
