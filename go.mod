@@ -12,7 +12,7 @@ require (
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24
 	github.com/helix-bedrock/redstone v0.0.0-20261114213817-51ee10bb236a
 	github.com/helix-bedrock/world v0.0.0-20261114213802-2d626cb278db
-	github.com/helix-bedrock/worldgen v0.0.0-20261115193946-3e8c90a12a79
+	github.com/helix-bedrock/worldgen v0.0.0-20261115195333-03a92cc75f84
 	github.com/pion/ice/v4 v4.4.8
 	github.com/pion/webrtc/v4 v4.2.26
 	golang.org/x/net v0.62.0
