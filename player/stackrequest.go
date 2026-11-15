@@ -616,6 +616,10 @@ func (p *Player) destroy(count byte, srcInfo protocol.StackRequestSlotInfo) (uin
 	if !p.creative() || !p.mayRemove(src, *src.stack) {
 		return protocol.ItemStackResponseStatusCannotDestroyItem, nil
 	}
+	// The same check as a drop's (0xC9F3510 with the destroy action): no locked item.
+	if itemLocked(*src.stack) {
+		return protocol.ItemStackResponseStatusError, nil
+	}
 	if count == 0 || count > src.stack.Count {
 		return protocol.ItemStackResponseStatusInvalidRemovedAmount, nil
 	}
