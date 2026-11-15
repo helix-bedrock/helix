@@ -422,7 +422,12 @@ func (e *pistonEntity) walk(r *world.Region, pos, at cube.Pos, reached, move pis
 }
 
 // spawnMoving breaks what is in the way and turns what moves into moving blocks, one
-// on from where they stood. Their block entities go with them.
+// on from where they stood. Their block entities go with them. As BDS's move start
+// (0xD3D7A90, each block by 0xD3D4DD0) it takes the blocks one at a time, the one
+// farthest along the move first, so each goes into a place already emptied: the
+// moving block is set where it goes and the old place emptied, both telling their
+// neighbours (BDS's flag 3), so observers, wire and falling blocks next to either
+// place react.
 func (e *pistonEntity) spawnMoving(r *world.Region, pos cube.Pos, move pistonFacing, expanding bool) {
 	t := e.t
 	for _, at := range e.breaks {
@@ -430,30 +435,43 @@ func (e *pistonEntity) spawnMoving(r *world.Region, pos cube.Pos, move pistonFac
 			t.fall(r, at, b)
 		}
 	}
-	blocks := make([]uint32, len(e.attached))
-	carried := make([]carriedEntity, len(e.attached))
-	for i, at := range e.attached {
-		blocks[i], _ = r.Block(at, 0)
-		carried[i] = takeCarried(r, at)
-	}
+	sortAlong(e.attached, pos, move)
 	for _, at := range e.attached {
-		r.SetBlock(at, 0, t.blocks.Air())
+		e.moveOne(r, pos, at, at.Side(pistonFaces[move]), expanding)
 	}
-	for i, at := range e.attached {
-		to := at.Side(pistonFaces[move])
-		if !r.SetBlock(to, 0, t.moving) {
-			continue
-		}
-		be, ok := r.BlockEntity(to)
-		if !ok {
-			continue
-		}
-		if m, ok := be.(*movingEntity); ok {
-			m.block, m.carried, m.piston, m.expanding = blocks[i], carried[i], pos, expanding
-			r.SendBlockEntity(to)
-		}
+}
+
+// sortAlong puts the blocks farthest along move first (BDS's sort 0xD3D4C50), which is
+// also the order BDS sets them down in.
+func sortAlong(l []cube.Pos, pos cube.Pos, move pistonFacing) {
+	step := pos.Side(pistonFaces[move])
+	dx, dy, dz := step[0]-pos[0], step[1]-pos[1], step[2]-pos[2]
+	slices.SortStableFunc(l, func(a, b cube.Pos) int {
+		da := (a[0]-pos[0])*dx + (a[1]-pos[1])*dy + (a[2]-pos[2])*dz
+		db := (b[0]-pos[0])*dx + (b[1]-pos[1])*dy + (b[2]-pos[2])*dz
+		return db - da
+	})
+}
+
+// moveOne turns the block at at into a moving block at to. A piston's arm is never
+// moved (BDS skips it).
+func (e *pistonEntity) moveOne(r *world.Region, pos, at, to cube.Pos, expanding bool) {
+	t := e.t
+	block, ok := r.Block(at, 0)
+	if !ok || t.isArm(block) {
+		return
 	}
-	for _, at := range e.attached {
+	carried := takeCarried(r, at)
+	if r.SetBlock(to, 0, t.moving) {
+		if be, ok := r.BlockEntity(to); ok {
+			if m, ok := be.(*movingEntity); ok {
+				m.block, m.carried, m.piston, m.expanding = block, carried, pos, expanding
+				r.SendBlockEntity(to)
+			}
+		}
+		r.UpdateNeighbours(to)
+	}
+	if r.SetBlock(at, 0, t.blocks.Air()) {
 		r.UpdateNeighbours(at)
 	}
 }
