@@ -195,7 +195,6 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		e.moveSound(r, pos)
 		e.lastState = e.state
 	}
-	moving := e.state == pistonExpanding || e.state == pistonRetracting
 	if !sys.SignalTick() {
 		e.readPower(strength)
 		e.settle()
@@ -203,12 +202,14 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 			if !e.change(r, pos, block, dir) {
 				return
 			}
-			moving = true
+			// BDS sends the piston only when its state changes, before the arm steps;
+			// the client moves the arm on its own from there. Sent on every tick, the
+			// client's arm and its collision are reset to a step behind.
+			r.SendBlockEntity(pos)
 		}
 	}
 	e.step()
-	if moving {
-		r.SendBlockEntity(pos)
+	if e.state == pistonExpanding || e.state == pistonRetracting {
 		e.pushEntities(r, pos, dir)
 	}
 }
