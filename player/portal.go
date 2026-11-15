@@ -353,6 +353,11 @@ func (p *Player) finishArrival() {
 
 // teleportFeet moves the player to feet and tells its client, as a teleport.
 func (p *Player) teleportFeet(feet mgl32.Vec3, rot world.Rotation) {
+	p.teleportFeetCause(feet, rot, packet.TeleportCauseUnknown)
+}
+
+// teleportFeetCause is teleportFeet telling the client the teleport's cause.
+func (p *Player) teleportFeetCause(feet mgl32.Vec3, rot world.Rotation, cause int32) {
 	eyes := feet.Add(mgl32.Vec3{0, eyeHeight, 0})
 	if !p.entity.Apply(world.Movement{Pos: eyes, Rot: rot, Tick: p.entity.Tick()}) {
 		return
@@ -365,7 +370,7 @@ func (p *Player) teleportFeet(feet mgl32.Vec3, rot world.Rotation) {
 		// A teleport always carries its cause: the client (1.26.60, sub_DC17774) rejects one
 		// without and disconnects with BadPacket. BDS's dimension transfer builds it with
 		// cause and source 0 (sub_CDE8520 into sub_85B0F00).
-		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: packet.TeleportCauseUnknown}),
+		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: cause}),
 	})
 	p.flush()
 }

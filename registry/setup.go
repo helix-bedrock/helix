@@ -96,6 +96,7 @@ const (
 	MaterialWater        = 5
 	MaterialLava         = 6
 	MaterialPowderSnow   = 14
+	MaterialPortal       = 16
 	MaterialBubbleColumn = 18
 )
 

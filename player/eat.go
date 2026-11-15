@@ -38,6 +38,14 @@ type FoodItem struct {
 	// RemoveEffects are the effect IDs eating it takes away (remove_effects: the honey
 	// bottle's poison).
 	RemoveEffects []int32
+	// OnUseAction is what eating it does besides feeding (on_use_action): "chorus_teleport"
+	// moves the player within OnUseRange blocks each way on x, y and z.
+	OnUseAction string
+	OnUseRange  [3]float32
+	// CooldownType and CooldownTime are the cooldown eating it starts, in ticks; while it
+	// runs the food is not eaten.
+	CooldownType string
+	CooldownTime int32
 }
 
 // usingState is the item the player is using, as BDS keeps a copy of it.
@@ -116,6 +124,12 @@ func foodFromComponents(data map[string]any) (FoodItem, bool) {
 		f.Duration = nbtInt(props["use_duration"])
 	}
 	f.RemoveEffects = nbtInts(m["remove_effects"])
+	f.OnUseAction = onUseAction(m["on_use_action"])
+	if reach := nbtFloats(m["on_use_range"]); len(reach) == len(f.OnUseRange) {
+		copy(f.OnUseRange[:], reach)
+	}
+	f.CooldownType, _ = m["cooldown_type"].(string)
+	f.CooldownTime = nbtInt(m["cooldown_time"])
 	if list, ok := m["effects"].([]any); ok {
 		for _, e := range list {
 			if em, ok := e.(map[string]any); ok {
@@ -153,6 +167,44 @@ func nbtInts(v any) []int32 {
 		out := make([]int32, 0, len(l))
 		for _, x := range l {
 			out = append(out, nbtInt(x))
+		}
+		return out
+	}
+	return nil
+}
+
+// onUseAction reads a food's on_use_action: the name, or BDS's number in the item's network
+// data (0 chorus_teleport, 1 suspicious_stew_effect, -1 none).
+func onUseAction(v any) string {
+	if name, ok := v.(string); ok {
+		return name
+	}
+	switch nbtInt(v) {
+	case 0:
+		if v != nil {
+			return onUseChorusTeleport
+		}
+	case 1:
+		return onUseSuspiciousStew
+	}
+	return ""
+}
+
+// nbtFloats reads an NBT list of numbers.
+func nbtFloats(v any) []float32 {
+	switch l := v.(type) {
+	case []float32:
+		return l
+	case []int32:
+		out := make([]float32, 0, len(l))
+		for _, x := range l {
+			out = append(out, float32(x))
+		}
+		return out
+	case []any:
+		out := make([]float32, 0, len(l))
+		for _, x := range l {
+			out = append(out, nbtFloat(x))
 		}
 		return out
 	}
@@ -247,7 +299,7 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		return true
 	}
 	food, ok := g.sys.FoodOf(p, held)
-	if !ok || !p.mayEat(food) {
+	if !ok || !p.mayEat(food) || food.CooldownType != "" && p.Cooldown(food.CooldownType) > 0 {
 		return false
 	}
 	p.startUsing(held, food)
@@ -393,6 +445,11 @@ func vanillaEat(p *Player, held ItemStack, food FoodItem) {
 		}
 		food = e.Food
 	}
+	// BDS runs the food's on_use_action before it is eaten, so the burp is heard where the
+	// player arrives.
+	if food.OnUseAction == onUseChorusTeleport {
+		p.chorusTeleport(food.OnUseRange)
+	}
 	p.feed(food.Nutrition, food.SaturationModifier)
 	if r := p.entity.Region(); r != nil {
 		playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBurp, pos: p.entity.Position(), extra: -1, entity: "minecraft:player"}, nil)
@@ -413,6 +470,9 @@ func vanillaEat(p *Player, held ItemStack, food FoodItem) {
 		if p.rng.Float32() < e.Chance {
 			p.AddEffect(e.ID, e.Amplifier, e.Duration)
 		}
+	}
+	if food.CooldownType != "" && food.CooldownTime > 0 {
+		p.StartCooldown(food.CooldownType, food.CooldownTime)
 	}
 	p.flush()
 }
