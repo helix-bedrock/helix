@@ -1,7 +1,11 @@
 package mob
 
 import (
+	"math"
+	"strings"
+
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/entity/trace"
 )
 
@@ -16,6 +20,7 @@ func (m *Mob) SetTrace(l *trace.Log) {
 	m.trace = l
 	m.sel.Trace = l
 	m.body.Trace = l
+	m.stateEnv.Trace = l
 	if m.inst != nil {
 		m.inst.Trace = l
 	}
@@ -43,6 +48,7 @@ func (m *Mob) traceTick() {
 	m.trace.SetTick(uint64(m.v.r.CurrentTick())) //nolint:gosec // ticks are positive
 	p := m.body.Pos
 	m.trace.Add(trace.Record{Kind: trace.KindTick, What: "tick", N: int64(m.target), V: [3]float32{p.X, p.Y, p.Z}, F: m.health})
+	m.traceLook()
 }
 
 // traceWanted records the path when it or the node walked to changes, and the move
@@ -130,4 +136,157 @@ func (m *Mob) tracePath() {
 	default:
 		m.trace.Note(trace.KindNav, "path done", "", int64(i))
 	}
+}
+
+// traceTarget records a target change, the target's place and the code that changed it.
+func (m *Mob) traceTarget(id behavior.ID) {
+	if !m.trace.Wants(trace.KindTarget) {
+		return
+	}
+	r := trace.Record{Kind: trace.KindTarget, What: "target set", N: int64(id), Who: trace.Callers(2, 2)}
+	if id == behavior.NoID {
+		r.What = "target cleared"
+	} else if a := m.actor(id); a != nil {
+		p := a.Pos()
+		r.V, r.F = [3]float32{p.X, p.Y, p.Z}, traceDist(p, m.body.Pos)
+		r.Name = a.Type()
+	}
+	m.trace.Add(r)
+}
+
+// traceVel records a change of velocity v of the kind what, and the code that made it.
+func (m *Mob) traceVel(what string, v behavior.Vec3) {
+	if m.trace.Wants(trace.KindVelocity) {
+		m.trace.Add(trace.Record{Kind: trace.KindVelocity, What: what, V: [3]float32{v.X, v.Y, v.Z}, Who: trace.Callers(2, 2)})
+	}
+}
+
+// traceLook records the mob's rotation and where its target is, after the tick record.
+func (m *Mob) traceLook() {
+	if !m.trace.Wants(trace.KindNote) {
+		return
+	}
+	m.trace.Add(trace.Record{Kind: trace.KindNote, What: "look yaw/pitch/head", V: [3]float32{m.yaw, m.pitch, m.headYaw}})
+	if a := m.actor(m.target); a != nil {
+		p := a.Pos()
+		m.trace.Add(trace.Record{Kind: trace.KindNote, What: "target at", Name: a.Type(), N: int64(m.target), V: [3]float32{p.X, p.Y, p.Z}, F: traceDist(p, m.body.Pos)})
+	}
+}
+
+// traceOp records an action Apply carried out.
+func (m *Mob) traceOp(o *op, what string, ok bool) {
+	if !m.trace.Wants(trace.KindAttack) {
+		return
+	}
+	r := trace.Record{Kind: trace.KindAttack, What: what, N: int64(o.id), V: [3]float32{o.at.X, o.at.Y, o.at.Z}, F: o.amount, Name: o.name}
+	if !ok {
+		r.Why = "did not land"
+	}
+	m.trace.Add(r)
+}
+
+// traceSound records a sound the mob plays.
+func (m *Mob) traceSound(n int, at behavior.Vec3) {
+	if m.trace.Wants(trace.KindSound) {
+		m.trace.Add(trace.Record{Kind: trace.KindSound, What: "sound", Name: SoundName(n), N: int64(n), V: [3]float32{at.X, at.Y, at.Z}})
+	}
+}
+
+// touchReach is how far past the box the touched-block scan looks.
+const touchReach = 0.01
+
+// traceBlocks records the block the mob stands on when it changes, the block its feet are
+// in when that changes, and every block it pushes against this tick (walls on the sides
+// it collided on, a ceiling), with names and positions.
+func (m *Mob) traceBlocks() {
+	if !m.trace.Wants(trace.KindBlock) || m.v.r == nil {
+		return
+	}
+	b := &m.body
+	below := path.Pos{X: floor32(b.Pos.X), Y: floor32(b.Box.Min.Y - 0.1), Z: floor32(b.Pos.Z)}
+	if b.OnGround && below != m.traceGround {
+		m.traceGround = below
+		m.traceBlock("standing on", below)
+	}
+	feet := path.Pos{X: floor32(b.Pos.X), Y: floor32(b.Pos.Y), Z: floor32(b.Pos.Z)}
+	if feet != m.traceFeet {
+		m.traceFeet = feet
+		m.traceBlock("feet in", feet)
+	}
+	box := b.Box
+	if b.HorizontalCollision[0] {
+		m.traceSide(path.Box{Min: path.Vec3{X: box.Min.X - touchReach, Y: box.Min.Y, Z: box.Min.Z}, Max: path.Vec3{X: box.Min.X, Y: box.Max.Y, Z: box.Max.Z}}, "wall -x")
+		m.traceSide(path.Box{Min: path.Vec3{X: box.Max.X, Y: box.Min.Y, Z: box.Min.Z}, Max: path.Vec3{X: box.Max.X + touchReach, Y: box.Max.Y, Z: box.Max.Z}}, "wall +x")
+	}
+	if b.HorizontalCollision[1] {
+		m.traceSide(path.Box{Min: path.Vec3{X: box.Min.X, Y: box.Min.Y, Z: box.Min.Z - touchReach}, Max: path.Vec3{X: box.Max.X, Y: box.Max.Y, Z: box.Min.Z}}, "wall -z")
+		m.traceSide(path.Box{Min: path.Vec3{X: box.Min.X, Y: box.Min.Y, Z: box.Max.Z}, Max: path.Vec3{X: box.Max.X, Y: box.Max.Y, Z: box.Max.Z + touchReach}}, "wall +z")
+	}
+	if b.VerticalCollision && !b.OnGround {
+		m.traceSide(path.Box{Min: path.Vec3{X: box.Min.X, Y: box.Max.Y, Z: box.Min.Z}, Max: path.Vec3{X: box.Max.X, Y: box.Max.Y + touchReach, Z: box.Max.Z}}, "ceiling")
+	}
+}
+
+// traceSide records each block whose collision boxes reach into the thin box s.
+func (m *Mob) traceSide(s path.Box, what string) {
+	cells(s, func(p path.Pos) bool {
+		var buf [4]path.Box
+		for _, bx := range m.v.boxesAt(buf[:0], p) {
+			if overlap(bx, s) {
+				m.traceBlock(what, p)
+				break
+			}
+		}
+		return true
+	})
+}
+
+// traceBlock records the block at p by name.
+func (m *Mob) traceBlock(what string, p path.Pos) {
+	id := m.v.block(p, 0)
+	m.trace.Add(trace.Record{Kind: trace.KindBlock, What: what, Name: m.rt.Blocks.reg.Name(id), V: [3]float32{float32(p.X), float32(p.Y), float32(p.Z)}})
+}
+
+// TraceHeader is the dump's header lines about the mob: its component groups, the flags
+// set and the running goals.
+func (m *Mob) TraceHeader() []string {
+	var groups []string
+	if m.inst != nil {
+		for _, e := range m.inst.Stack() {
+			sign := "+"
+			if !e.Added {
+				sign = "-"
+			}
+			groups = append(groups, sign+e.Group)
+		}
+	}
+	var flags []string
+	for n := range len(flagNames) {
+		if m.flags.Has(n) {
+			flags = append(flags, flagNames[n])
+		}
+	}
+	return []string{
+		"groups: " + strings.Join(groups, " "),
+		"flags: " + strings.Join(flags, " "),
+		"goals running: " + strings.Join(m.RunningGoals(nil), " "),
+	}
+}
+
+// traceDist is the distance between two points.
+func traceDist(a, b behavior.Vec3) float32 {
+	dx, dy, dz := a.X-b.X, a.Y-b.Y, a.Z-b.Z
+	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+}
+
+// BlocksAt is the name of the block under the mob's feet and the block its feet are in.
+// Runs: the mob's region.
+func (m *Mob) BlocksAt() (below, in string) {
+	if m.v.r == nil {
+		return "", ""
+	}
+	b := &m.body
+	under := path.Pos{X: floor32(b.Pos.X), Y: floor32(b.Box.Min.Y - 0.1), Z: floor32(b.Pos.Z)}
+	feet := path.Pos{X: floor32(b.Pos.X), Y: floor32(b.Pos.Y), Z: floor32(b.Pos.Z)}
+	return m.rt.Blocks.reg.Name(m.v.block(under, 0)), m.rt.Blocks.reg.Name(m.v.block(feet, 0))
 }

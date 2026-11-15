@@ -126,22 +126,25 @@ func (m *Mob) CanSit() bool                         { return false }
 func (m *Mob) OnGround() bool                       { return m.body.OnGround }
 func (m *Mob) OnFire() bool                         { return m.fireTicks > 0 }
 func (m *Mob) Velocity() behavior.Vec3              { return m.body.Vel }
-func (m *Mob) SetVelocity(v behavior.Vec3)          { m.body.Vel = v }
-func (m *Mob) HasEffect(int) bool                   { return false }
-func (m *Mob) SetHijackable(bool)                   {}
-func (m *Mob) NoActionTime() int32                  { return m.noActionTime }
-func (m *Mob) ResetFlock()                          {}
-func (m *Mob) SetPersistSit(bool)                   {}
-func (m *Mob) HelmetEmpty() bool                    { return true }
-func (m *Mob) Speed() float32                       { return m.speed }
-func (m *Mob) UnderwaterSpeed() float32             { return m.underwaterSpeed }
-func (m *Mob) FollowRange() float32                 { return m.followRange }
-func (m *Mob) PrevRotation() (pitch, yaw float32)   { return m.prevPitch, m.prevYaw }
-func (m *Mob) SetYaw(yaw float32)                   { m.yaw = yaw }
-func (m *Mob) Breathable() bool                     { return true }
-func (m *Mob) AirSupply() int16                     { return 300 }
-func (m *Mob) VerticalCollision() bool              { return m.body.VerticalCollision }
-func (m *Mob) Persistent() bool                     { return m.persistent }
+func (m *Mob) SetVelocity(v behavior.Vec3) {
+	m.traceVel("set", v)
+	m.body.Vel = v
+}
+func (m *Mob) HasEffect(int) bool                 { return false }
+func (m *Mob) SetHijackable(bool)                 {}
+func (m *Mob) NoActionTime() int32                { return m.noActionTime }
+func (m *Mob) ResetFlock()                        {}
+func (m *Mob) SetPersistSit(bool)                 {}
+func (m *Mob) HelmetEmpty() bool                  { return true }
+func (m *Mob) Speed() float32                     { return m.speed }
+func (m *Mob) UnderwaterSpeed() float32           { return m.underwaterSpeed }
+func (m *Mob) FollowRange() float32               { return m.followRange }
+func (m *Mob) PrevRotation() (pitch, yaw float32) { return m.prevPitch, m.prevYaw }
+func (m *Mob) SetYaw(yaw float32)                 { m.yaw = yaw }
+func (m *Mob) Breathable() bool                   { return true }
+func (m *Mob) AirSupply() int16                   { return 300 }
+func (m *Mob) VerticalCollision() bool            { return m.body.VerticalCollision }
+func (m *Mob) Persistent() bool                   { return m.persistent }
 
 // OverWater is in water, or water is the first non-air block below.
 func (m *Mob) OverWater() bool {
@@ -164,6 +167,7 @@ func (m *Mob) OverWater() bool {
 
 // Move adds to the mob's move request.
 func (m *Mob) Move(v behavior.Vec3) {
+	m.traceVel("added", v)
 	m.body.Vel.X += v.X
 	m.body.Vel.Y += v.Y
 	m.body.Vel.Z += v.Z

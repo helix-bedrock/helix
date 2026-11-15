@@ -36,3 +36,5 @@ Thumbs.db
 # Server identity key and local runs
 /keys/
 server.properties
+# /mobdebug dumps
+/mobdebug/

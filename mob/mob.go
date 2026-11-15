@@ -180,11 +180,13 @@ type Mob struct {
 	// tracePathAt is the path length and node last recorded.
 	trace       *trace.Log
 	tracePathAt [2]int
-	look        move.Look
-	jump        move.Jump
-	lookSet     bool
-	body        physics.Body
-	flags       path.ActorFlags
+	// traceGround and traceFeet are the blocks last recorded as stood on and stood in.
+	traceGround, traceFeet path.Pos
+	look                   move.Look
+	jump                   move.Jump
+	lookSet                bool
+	body                   physics.Body
+	flags                  path.ActorFlags
 	// doors is minecraft:annotation.open_door's state, nil without the component.
 	doors *nav.OpenDoors
 	// teleported is set by Teleport until the engine sends the move (TakeTeleport).
@@ -692,6 +694,7 @@ func (m *Mob) physicsTick() {
 	m.body.Box = boxAt(m.body.Pos, m.body.Width, m.body.Height)
 	m.body.UpdateLiquid(physWorld{&m.v}, m.ridingBoat())
 	m.body.HeadInWater = m.headInWater()
+	m.traceBlocks()
 }
 
 // liquidPush is BDS 1.26.60's LiquidPhysicsSystem push (sub_77DCDE0) before the mob moves: the
@@ -702,6 +705,9 @@ func (m *Mob) liquidPush() {
 	m.body.Vel.X += push[0]
 	m.body.Vel.Y += push[1]
 	m.body.Vel.Z += push[2]
+	if push != [3]float32{} {
+		m.traceVel("liquid current", behavior.Vec3{X: push[0], Y: push[1], Z: push[2]})
+	}
 }
 
 // blockArea is the blocks a box covers.
@@ -825,7 +831,10 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 }
 
 // Knock pushes the mob as a hit does.
-func (m *Mob) Knock(v behavior.Vec3) { m.body.Vel = v }
+func (m *Mob) Knock(v behavior.Vec3) {
+	m.traceVel("knocked", v)
+	m.body.Vel = v
+}
 
 // SetPos moves the mob, as a teleport does.
 func (m *Mob) SetPos(p behavior.Vec3) {

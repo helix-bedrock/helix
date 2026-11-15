@@ -36,6 +36,8 @@ const (
 type mobDebug struct {
 	watched []*Mob
 	ticks   int
+	// level is the detail level new logs start at, 0 for the most.
+	level uint8
 }
 
 // MobDebug runs /mobdebug for p and tells p the result. Runs: anywhere; the work runs on
@@ -85,10 +87,20 @@ func (p *Player) mobDebugRun(args []string) string {
 		return fmt.Sprintf("%d watched mobs step %d ticks.", len(d.watched), int(n))
 	case "dump":
 		return p.mobDebugDump(r)
+	case "level":
+		n := int(radiusArg(args, 1, 0))
+		if n < trace.LevelLow || n > trace.LevelHigh {
+			return "Use: /mobdebug level 1|2|3 (1 goals, targets, events, hurts, actions; 2 adds navigation, flags, state, velocity, sounds, goal reasons; 3 adds every movement step and the blocks touched)"
+		}
+		d.level = uint8(n)
+		for _, o := range d.watched {
+			o.m.Trace().Level = uint8(n)
+		}
+		return fmt.Sprintf("Detail level %d for %d watched mobs and those watched next.", n, len(d.watched))
 	case "list":
 		return p.mobDebugList()
 	}
-	return "Use: /mobdebug (the mob you look at), near [radius], type <id> [radius], list, pause, resume, step [n], dump, off"
+	return "Use: /mobdebug (the mob you look at), near [radius], type <id> [radius], list, level 1|2|3, pause, resume, step [n], dump, off"
 }
 
 // radiusArg reads args[i] as a number, def when missing or bad.
@@ -141,7 +153,11 @@ func (p *Player) mobDebugAdd(r *world.Region, typ string, radius float32) string
 // watches keeps its log.
 func (p *Player) mobDebugWatch(o *Mob) {
 	if o.m.Trace() == nil {
-		o.m.SetTrace(trace.New(0))
+		l := trace.New(0)
+		if lv := p.mobDebugState.level; lv != 0 {
+			l.Level = lv
+		}
+		o.m.SetTrace(l)
 	}
 	p.mobDebugState.watched = append(p.mobDebugState.watched, o)
 }
@@ -274,7 +290,11 @@ func writeMobDump(name string, o *Mob) error {
 		return err
 	}
 	at := o.entity.Position()
-	fmt.Fprintf(f, "%s at (%.3f %.3f %.3f) health %.2f, %d records\n", mobLabel(o), at[0], at[1], at[2], o.Health(), o.m.Trace().Len())
+	fmt.Fprintf(f, "%s at (%.3f %.3f %.3f) health %.2f, %d records, detail level %d\n", mobLabel(o), at[0], at[1], at[2], o.Health(), o.m.Trace().Len(), o.m.Trace().Level)
+	for _, line := range o.m.TraceHeader() {
+		fmt.Fprintln(f, line)
+	}
+	fmt.Fprintln(f, "---")
 	if _, err := o.m.Trace().WriteTo(f); err != nil {
 		_ = f.Close()
 		return err
@@ -318,6 +338,9 @@ func mobSummary(o *Mob) string {
 	}
 	fmt.Fprintf(&s, "\npos %.2f %.2f %.2f  vel %.3f %.3f %.3f", b.Pos.X, b.Pos.Y, b.Pos.Z, b.Vel.X, b.Vel.Y, b.Vel.Z)
 	fmt.Fprintf(&s, "\nground %v  wall %v  target %d", b.OnGround, b.HorizontalCollision[0] || b.HorizontalCollision[1], m.Target())
+	if below, in := m.BlocksAt(); below != "" {
+		fmt.Fprintf(&s, "  on %s in %s", strings.TrimPrefix(below, "minecraft:"), strings.TrimPrefix(in, "minecraft:"))
+	}
 	if w, ok := m.Wanted(); ok {
 		fmt.Fprintf(&s, "  to %.1f %.1f %.1f", w.X, w.Y, w.Z)
 	}

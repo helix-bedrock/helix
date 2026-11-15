@@ -89,6 +89,7 @@ func (pushWorld) Velocity(a behavior.Actor) behavior.Vec3 {
 
 func (pushWorld) SetVelocity(a behavior.Actor, v behavior.Vec3) {
 	if o := mobOf(a); o != nil {
+		o.traceVel("set by push", v)
 		o.body.Vel = v
 	}
 }
@@ -96,6 +97,7 @@ func (pushWorld) SetVelocity(a behavior.Actor, v behavior.Vec3) {
 // Push adds the push to the mob's velocity; it moves by it on its next tick.
 func (pushWorld) Push(a, _ behavior.Actor, v behavior.Vec3) {
 	if o := mobOf(a); o != nil {
+		o.traceVel("pushed", v)
 		o.body.Vel.X += v.X
 		o.body.Vel.Y += v.Y
 		o.body.Vel.Z += v.Z

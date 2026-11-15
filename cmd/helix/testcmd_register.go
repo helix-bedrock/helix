@@ -188,7 +188,7 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return lightning(srv.Load(), p, args)
 		}},
-		{"mobdebug", "Watches mobs: (look at one), near [r], type <id> [r], list, pause, resume, step [n], dump, off.", nil, func(p *player.Player, args []string) string {
+		{"mobdebug", "Watches mobs: (look at one), near [r], type <id> [r], list, level 1-3, pause, resume, step [n], dump, off.", nil, func(p *player.Player, args []string) string {
 			if !registry() {
 				return ""
 			}

@@ -32,6 +32,7 @@ func (m *Mob) readStates(c component.Context, comps definition.Group) {
 			},
 			HasFamily:    func(a behavior.Actor, f string) bool { return slices.Contains(families(a), f) },
 			BlockMatches: m.blockMatches,
+			Trace:        m.trace,
 		}
 	}
 	s, errs := component.States(c, &m.stateEnv, m.states, m.stateComps, comps)

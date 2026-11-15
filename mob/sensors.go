@@ -66,6 +66,7 @@ func (m *Mob) SetTarget(id behavior.ID) {
 	if id == m.target {
 		return
 	}
+	m.traceTarget(id)
 	old := m.target
 	m.target = id
 	// Mob::setTarget writes the target's unique ID to actor data 6 (1.21.3 names), which

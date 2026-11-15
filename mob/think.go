@@ -107,10 +107,12 @@ func (m *Mob) run(o op) {
 	}
 	switch o.kind {
 	case opSound:
+		m.traceSound(int(o.n), o.at)
 		if m.hooks != nil {
 			m.hooks.Sound(m, int(o.n), o.at)
 		}
 	case opSwing:
+		m.traceOp(&o, "swing", true)
 		if m.hooks != nil {
 			m.hooks.Swing(m)
 		}
@@ -123,6 +125,10 @@ func (m *Mob) run(o op) {
 			m.lastHurtMob = o.id
 			m.lastHurtStamp++
 			m.noActionTime = 0
+		}
+		m.traceOp(&o, "attack", hit)
+		if killed {
+			m.traceOp(&o, "killed target", true)
 		}
 		if o.then != nil {
 			o.then.AttackResult(o.id, hit, killed)
@@ -141,6 +147,7 @@ func (m *Mob) run(o op) {
 			t.snapshot()
 		}
 	case opShoot:
+		m.traceOp(&o, "shoot", true)
 		if m.hooks != nil && !m.Dead() {
 			m.hooks.Shoot(m, o.id, o.name, o.n, o.amount, int(o.other))
 		}
@@ -163,11 +170,13 @@ func (m *Mob) run(o op) {
 			h.Carried(m)
 		}
 	case opTransform:
+		m.traceOp(&o, "transform", true)
 		m.transforming = false
 		if h, ok := m.hooks.(TransformHooks); ok && m.states != nil && m.states.Transformation != nil && !m.Dead() {
 			h.Transform(m, m.states.Transformation.Config())
 		}
 	case opExplode:
+		m.traceOp(&o, "explode", true)
 		if h, ok := m.hooks.(ExplodeHooks); ok {
 			h.Explode(m, o.at, m.blast)
 		}
