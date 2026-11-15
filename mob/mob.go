@@ -43,6 +43,9 @@ const (
 const (
 	defaultMaxAutoStep = 0.5625
 	defaultAirSpeed    = 0.02
+	// defaultLiquidSpeed is the underwater and lava movement every BDS mob
+	// registers (Mob attribute setup 0xBFEF1F0); definitions may override it.
+	defaultLiquidSpeed = 0.02
 	defaultFollowRange = 16
 	defaultHealth      = 10
 	// hurtTicks is how long a mob only takes damage above its last hurt.
@@ -197,6 +200,7 @@ type Mob struct {
 
 	health, maxHealth                   float32
 	speed, underwaterSpeed, followRange float32
+	lavaSpeed                           float32
 	attackDamage                        float32
 
 	target, lastHurtBy, lastHurtMob behavior.ID
@@ -295,6 +299,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,
+		underwaterSpeed: defaultLiquidSpeed, lavaSpeed: defaultLiquidSpeed,
 	}
 	m.rnd = NewRandom(uint64(uniqueID)) //nolint:gosec // the bits of the ID seed the random
 	m.v = view{blocks: rt.Blocks, env: rt.Env, rnd: m.rnd, m: m}
@@ -504,6 +509,9 @@ func (m *Mob) readAttributes(comps definition.Group) {
 	if v, _, ok := attribute(comps["minecraft:underwater_movement"]); ok {
 		m.underwaterSpeed = v
 	}
+	if v, _, ok := attribute(comps["minecraft:lava_movement"]); ok {
+		m.lavaSpeed = v
+	}
 	if v, _, ok := attribute(comps["minecraft:follow_range"]); ok {
 		m.followRange = v
 	}
@@ -677,6 +685,7 @@ func (m *Mob) physicsTick() {
 	m.body.Yaw = m.yaw
 	m.body.Flags = m.flags
 	m.body.MovementSpeed = m.speed
+	m.body.Attrs.Underwater, m.body.Attrs.Lava = &m.underwaterSpeed, &m.lavaSpeed
 	m.body.Jumping = m.jump.Jumping
 	m.jump.Jumping = false
 	m.body.Nav = physics.Nav{Present: m.nv != nil, Following: m.nv != nil && !m.nv.Done()}
