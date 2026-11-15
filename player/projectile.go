@@ -1194,10 +1194,6 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 	if !p.entity.Apply(world.Movement{Pos: eyes, Rot: rot, Tick: p.entity.Tick()}) {
 		return
 	}
-	// BDS's projectile teleport (sub_714F4B0) plays the pearl's sound, LevelEvent 1032, where
-	// the player left and where they arrived.
-	levelEvent(r, vecPos(from), from, packet.LevelEventSoundTeleportEnderPearl, 0)
-	levelEvent(r, vecPos(eyes), eyes, packet.LevelEventSoundTeleportEnderPearl, 0)
 	p.move.fall = 0
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
@@ -1207,6 +1203,14 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 		// actor type as the source; that number is not looked up yet, so the source is 0.
 		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: packet.TeleportCauseProjectile}),
 	})
+	// BDS's projectile teleport (sub_714F4B0) plays the pearl's sound, LevelEvent 1032, where
+	// the player left and where they arrived. Both go after the teleport, so the client hears
+	// the arrival where it now is; the player gets the arrival themselves, as the chunk they
+	// landed in may not be in their view yet.
+	levelEvent(r, vecPos(from), from, packet.LevelEventSoundTeleportEnderPearl, 0)
+	arrive := &packet.LevelEvent{EventType: packet.LevelEventSoundTeleportEnderPearl, Position: eyes}
+	r.Broadcast(vecPos(eyes), arrive, p.viewer)
+	p.send(arrive)
 	p.flush()
 	if p.s.fallHurts() {
 		p.s.game.sys.Hurt(p, pearlDamage, DamageSource{Cause: DamageFall})
