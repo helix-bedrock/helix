@@ -551,6 +551,7 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 		return
 	}
 	c := &Chunk{d: r.d, pos: pos, col: col, net: nc, discard: discard, tickedAt: neverTicked, plannedAt: -1, light: light, settle: settle}
+	c.border = borderBits(col.Extra[borderTag])
 	r.loadTicks(c, col)
 	col.ScheduledBlocks, col.RandomTicks = nil, nil
 	r.chunks[pos] = c

@@ -4,6 +4,7 @@ import (
 	"maps"
 
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // Border blocks wall off their whole column, as BDS 1.26.60 keeps it: each chunk has a map
@@ -50,6 +51,7 @@ func (r *Region) borderChanged(c *Chunk, pos cube.Pos, old, block uint32) {
 		delete(extra, borderTag)
 	}
 	c.col.Extra = extra
+	c.border = borderBits(extra[borderTag])
 	c.dirty, c.resendNet = true, true
 	if !c.encoding {
 		r.encode(c)
@@ -106,4 +108,30 @@ func netBorder(b []byte) []byte {
 		return []byte{0}
 	}
 	return b
+}
+
+// borderBits is a stored border map as a bit per column.
+func borderBits(b []byte) (bits [columns / 64]uint64) {
+	set := decodeBorder(b)
+	for i, on := range set {
+		if on {
+			bits[i/64] |= 1 << (i % 64)
+		}
+	}
+	return bits
+}
+
+// BorderColumn reports whether the column x, z holds a border block, which walls the whole
+// column off, and whether its chunk is loaded in this region. Runs: owner, also from
+// Parallel.
+func (r *Region) BorderColumn(x, z int) (border, loaded bool) {
+	if !r.ticking.Load() {
+		return false, false
+	}
+	c, ok := r.chunks[mcdb.ChunkPos{int32(x >> 4), int32(z >> 4)}] //nolint:gosec // block X and Z fit int32 chunks
+	if !ok {
+		return false, false
+	}
+	i := (z&15)<<4 | x&15
+	return c.border[i/64]&(1<<(i%64)) != 0, true
 }

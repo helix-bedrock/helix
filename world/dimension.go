@@ -217,6 +217,9 @@ type Chunk struct {
 	// resendNet sends the next network form to the players that have the chunk: its border
 	// map changed, which the client reads only from LevelChunk.
 	resendNet bool
+	// border has a bit for each column holding a border block, z*16+x, read from the
+	// border map when the chunk arrives and kept with it, so mobs can ask without decoding.
+	border [columns / 64]uint64
 	// version counts changes, so a stale encode is recognised.
 	version uint64
 	// ticks and randomTicks are the chunk's tick queues; ticksDirty means

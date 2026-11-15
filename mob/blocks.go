@@ -19,6 +19,9 @@ type Blocks struct {
 	goals []behavior.Block
 	// full is set for states whose collision is one whole block.
 	full []bool
+	// wall is what a cell of a border column reads as: the barrier, a solid block of one
+	// whole box. BDS walls the column off for actors without IgnoresBorderCollisions.
+	wall uint32
 }
 
 // The BDS material types the tables test (MaterialType numbers, as the registry keeps them).
@@ -41,6 +44,7 @@ func NewBlocks(reg *registry.Blocks) *Blocks {
 	for id := range n {
 		b.fill(uint32(id)) //nolint:gosec // n is a state count
 	}
+	b.wall, _ = reg.Block("minecraft:barrier")
 	return b
 }
 

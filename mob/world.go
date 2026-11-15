@@ -79,11 +79,18 @@ type view struct {
 	boxes []registry.Box
 }
 
+// block is the block at p on layer as mobs see it: every cell of a border column on layer 0
+// reads as a barrier, so mobs neither move nor path into the column.
 func (v *view) block(p path.Pos, layer uint8) uint32 {
 	b, ok := v.r.Block(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, layer)
 	if !ok {
 		// An unloaded block reads as air; the world refuses moves into unloaded chunks.
 		return v.blocks.reg.Air()
+	}
+	if layer == 0 {
+		if border, _ := v.r.BorderColumn(int(p.X), int(p.Z)); border {
+			return v.blocks.wall
+		}
 	}
 	return b
 }
@@ -220,7 +227,7 @@ func (w pathWorld) Height(x, z int32) (int32, bool) {
 func (w pathWorld) IsDay() bool { return w.env.SkyDarken(w.r) < 4 }
 
 func (w pathWorld) BorderBlock(x, z int32) (border, loaded bool) {
-	return false, w.loaded(path.Pos{X: x, Y: int32(w.r.Dimension().Range()[0]), Z: z}) //nolint:gosec // world heights fit
+	return w.r.BorderColumn(int(x), int(z))
 }
 
 func (w pathWorld) BlocksMotion(b path.Block) bool { return w.blocks.Goal(uint32(b)).BlocksMotion }
