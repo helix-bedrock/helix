@@ -169,14 +169,40 @@ func (w pathWorld) Pathable(b path.Block, _, _ path.Pos) bool {
 	return !w.blocks.Goal(uint32(b)).BlocksMotion
 }
 
-func (w pathWorld) Door(b path.Block) (facing int32, open, hinge bool) {
-	s := w.blocks.reg.States(uint32(b))
+func (w pathWorld) Door(p path.Pos) (facing int32, open, hinge bool) { return w.door(p) }
+
+// door reads the door at p, either half, as BDS's DoorBlock does (0xCB17EC0): facing
+// (minecraft:cardinal_direction's value index, or the older direction state) and open_bit
+// from the lower half, door_hinge_bit from the upper half. Helix keeps the hinge only on the
+// upper half and open_bit only on the lower one.
+func (v *view) door(p path.Pos) (facing int32, open, hinge bool) {
+	lower, upper := p, p
+	if stateTrue(v.blocks.reg.States(v.block(p, 0)), "upper_block_bit") {
+		lower.Y--
+	} else {
+		upper.Y++
+	}
+	s := v.blocks.reg.States(v.block(lower, 0))
 	if d, ok := s["direction"].(int32); ok {
 		facing = d
 	} else if d, ok := s["minecraft:cardinal_direction"].(string); ok {
-		facing = map[string]int32{"south": 0, "west": 1, "north": 2, "east": 3}[d]
+		facing = cardinalIndex(d)
 	}
-	return facing, stateTrue(s, "open_bit"), stateTrue(s, "door_hinge_bit")
+	return facing, stateTrue(s, "open_bit"), stateTrue(v.blocks.reg.States(v.block(upper, 0)), "door_hinge_bit")
+}
+
+// cardinalIndex is the value index of minecraft:cardinal_direction, which BDS's door code
+// reads as the door's facing.
+func cardinalIndex(d string) int32 {
+	switch d {
+	case "west":
+		return 1
+	case "north":
+		return 2
+	case "east":
+		return 3
+	}
+	return 0
 }
 
 func (w pathWorld) HeightRange() (lo, hi int32) {

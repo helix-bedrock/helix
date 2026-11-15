@@ -19,6 +19,7 @@ func (p pathfinder) settings() *path.Settings {
 		MinY: float32(pathWorld{&m.v}.MinY()), StepHeight: max(1.2, m.body.MaxAutoStep),
 		Swim: m.flags.Has(nav.ActorCanSwim), Fly: m.flags.Has(nav.ActorCanFly), Walk: m.flags.Has(nav.ActorCanWalk),
 		InWater: m.body.WasInWater, MobGriefing: m.rt.Env.MobGriefing(),
+		DoorOpener: m.flags.Has(behavior.FlagDoorOpener),
 	}
 }
 

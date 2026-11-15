@@ -162,6 +162,8 @@ type Mob struct {
 	lookSet     bool
 	body        physics.Body
 	flags       path.ActorFlags
+	// doors is minecraft:annotation.open_door's state, nil without the component.
+	doors *nav.OpenDoors
 
 	pitch, yaw, headYaw, bodyYaw float32
 	prevPitch, prevYaw           float32
@@ -371,9 +373,12 @@ func (m *Mob) think() (remove bool) {
 
 	noAI := m.flags.Has(FlagNoAI)
 	m.sel.Tick(noAI)
-	if m.nv != nil && nav.ShouldTick(false, noAI, m.health) {
+	if m.nv != nil {
 		nm := m.navMob()
-		m.nv.Tick(pathWorld{&m.v}, &nm)
+		if nav.ShouldTick(false, noAI, m.health) {
+			m.nv.Tick(pathWorld{&m.v}, &nm)
+		}
+		m.openDoorsTick(&nm)
 	}
 	m.moveControl()
 	m.lookControl()
@@ -398,6 +403,7 @@ func (m *Mob) rebuild(comps definition.Group) {
 	m.readMovement(order, comps)
 	ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
 	m.readStates(ctx, comps)
+	m.readOpenDoors()
 	m.scale = 1
 	if m.states != nil && m.states.Scale != nil {
 		m.scale = m.states.Scale.Value
@@ -535,7 +541,7 @@ func (m *Mob) navMob() nav.Mob {
 		OnGround: m.body.OnGround, WasInWater: m.body.WasInWater, InLava: m.body.Travel() == physics.TravelLava,
 		HorizontalCollision: m.body.HorizontalCollision[0] || m.body.HorizontalCollision[1],
 		Actor:               flagActor{m}, Difficulty: m.rt.Env.Difficulty(), MobGriefing: m.rt.Env.MobGriefing(),
-		FireImmune: m.flags.Has(behavior.FlagFireImmune),
+		FireImmune: m.flags.Has(behavior.FlagFireImmune), OpensDoors: m.flags.Has(behavior.FlagDoorOpener),
 	}
 	if m.hasMove {
 		nm.MoveControl = &m.ctl

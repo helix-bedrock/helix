@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/entity/nav"
 	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/helix/village"
 	"github.com/helix-bedrock/helix/world"
@@ -398,11 +399,35 @@ func (m *Mob) Door(p behavior.Pos) (behavior.DoorState, bool) {
 	if info == nil || info.Props&path.PropDoor == 0 || info.Kind == path.KindIronDoor {
 		return behavior.DoorState{}, false
 	}
-	w := goalWorld{&m.v}
-	dir, _ := w.BlockState(p, "direction")
-	open, _ := w.BlockState(p, "open_bit")
-	hinge, _ := w.BlockState(p, "door_hinge_bit")
-	return behavior.DoorState{Direction: dir, Open: open != 0, Hinge: hinge != 0}, true
+	dir, open, hinge := m.v.door(path.Pos(p))
+	return behavior.DoorState{Direction: dir, Open: open, Hinge: hinge}, true
+}
+
+// openDoorsTick runs minecraft:annotation.open_door's system (nav.OpenDoors) for the mob.
+// Like BDS's system it runs whether or not the navigation ticked (no AI included).
+// Runs: think.
+func (m *Mob) openDoorsTick(nm *nav.Mob) {
+	if m.doors == nil || m.nv == nil {
+		return
+	}
+	m.doors.Tick(pathWorld{&m.v}, nm, m.nv, m)
+}
+
+// readOpenDoors adds or drops the open_door annotation's state as the component comes and
+// goes, with actor flag 81 (DoorOpener), as BDS's actor reload does (0xBFD62E0 sets the
+// flag; 0x7141F90 clears it and forgets the doors without closing them).
+func (m *Mob) readOpenDoors() {
+	has := m.UsesDoors()
+	switch {
+	case has && m.doors == nil:
+		m.doors = nav.NewOpenDoors(nav.DefaultOpenDoors())
+	case !has && m.doors != nil:
+		m.doors.Reset()
+		m.doors = nil
+	case !has:
+		return
+	}
+	m.flags.Set(behavior.FlagDoorOpener, has)
 }
 
 // SetDoorOpen opens or closes the door at p.
