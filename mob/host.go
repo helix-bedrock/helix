@@ -246,7 +246,16 @@ func families(a behavior.Actor) []string {
 	if a.IsPlayer() {
 		return []string{"player", "mob"}
 	}
+	if f, ok := a.(Familied); ok {
+		return f.Families()
+	}
 	return nil
+}
+
+// Familied is an actor that is not a mob or player but has type families the filters read:
+// a lightning bolt is "lightning".
+type Familied interface {
+	Families() []string
 }
 
 func ns(name string) string {

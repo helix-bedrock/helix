@@ -88,6 +88,17 @@ func SoundName(n int) string {
 	return soundEvents[n]
 }
 
+// SoundKnown reports whether name is a level sound event. BDS reads a definition's sound
+// names into these numbers, so a name that is not one plays nothing.
+func SoundKnown(name string) bool {
+	for _, s := range soundEvents {
+		if s == name && s != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // Parse reads and caches the definition of an entity type. Call it at boot for every type,
 // so regions only read the cache.
 func (rt *Runtime) Parse(typ string, raw json.RawMessage) error {
@@ -227,7 +238,9 @@ type Mob struct {
 	swellDir    int32
 	// swell is the creeper's swell, 0 to 30 (creeper.go); blast the explosion its
 	// minecraft:explode queued for Apply.
-	swell        int32
+	swell int32
+	// transforming is set while a due transformation waits for Apply.
+	transforming bool
 	blast        state.Explosion
 	noActionTime int32
 	// data is the actor data the components wrote (data.go).

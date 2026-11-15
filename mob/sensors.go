@@ -86,3 +86,19 @@ func (m *Mob) actor(id behavior.ID) behavior.Actor {
 	}
 	return m.rt.Env.Actor(m.v.r, id)
 }
+
+// causeEntityAttack is BDS's entity_attack damage cause.
+const causeEntityAttack = 2
+
+// StruckByLightning is a lightning bolt reaching the mob, before it is hurt: BDS 1.26.60's
+// LightningBolt::normalTick (0xBD52630) runs the mob's damage sensor first (0x7239A20) with
+// the bolt as the attacker, cause entity_attack, no damage and the event always fired, so a
+// trigger filtering on the "lightning" family fires (a creeper becomes charged, a pig turns
+// into a zombified piglin). It reports whether the trigger stops the damage, in which case
+// the bolt neither hurts nor lights the mob. Runs: the mob's region, outside its think.
+func (m *Mob) StruckByLightning(bolt behavior.Actor) (stopped bool) {
+	if m.sensors == nil || m.sensors.Damage == nil || m.Dead() {
+		return false
+	}
+	return m.sensors.Damage.Damage(&m.sensorEnv, causeEntityAttack, 0, m.health, m.tester(bolt), true) != sensor.DealsYes
+}

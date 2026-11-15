@@ -23,6 +23,13 @@ type ExplodeHooks interface {
 	Explode(m *Mob, at behavior.Vec3, e state.Explosion)
 }
 
+// TransformHooks is what an engine that turns mobs into other mobs implements on its Hooks:
+// minecraft:transformation came due (TransformationComponent::transformIfAble). The engine
+// makes the new entity from c and removes m. It runs in m's Apply.
+type TransformHooks interface {
+	Transform(m *Mob, c state.TransformationConfig)
+}
+
 // creeperTick is the creeper's own tick. Runs: think.
 func (m *Mob) creeperTick() {
 	if m.typ != creeperType {

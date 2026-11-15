@@ -68,3 +68,7 @@ func (m *Mob) SetRotation(yaw, pitch float32) {
 	m.yaw, m.headYaw, m.bodyYaw, m.prevYaw = yaw, yaw, yaw, yaw
 	m.pitch, m.prevPitch = pitch, pitch
 }
+
+// AddGroup adds a component group to the mob, as an event's add does; it takes effect at
+// the next refresh. Runs: the mob's region, outside its think.
+func (m *Mob) AddGroup(name string) { m.inst.AddGroup(name) }

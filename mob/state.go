@@ -56,9 +56,12 @@ func (m *Mob) stateTick() bool {
 		m.states.Genetics.FireEvents(&m.stateEnv)
 	}
 	if m.states != nil {
-		// A transformation that comes due is not run yet: making the new entity is the
-		// engine's and not hooked up.
-		m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}, LeashChunks: despawnChunks{m}, Actions: stateActions{m}})
+		if m.states.Tick(&m.stateEnv, state.TickInput{Chunks: despawnChunks{m}, LeashChunks: despawnChunks{m}, Actions: stateActions{m}}) && !m.transforming {
+			// Making the new entity is the engine's (TransformHooks), at Apply. Asked once:
+			// the engine removes the mob, or leaves it if it cannot make the new one.
+			m.transforming = true
+			m.do(op{kind: opTransform})
+		}
 	}
 	return m.despawned
 }

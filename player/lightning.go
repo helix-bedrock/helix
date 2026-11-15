@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -175,9 +176,26 @@ func (b *LightningBolt) hitAround(r *world.Region, at mgl32.Vec3) {
 		if ehi[0] < lo[0] || elo[0] > hi[0] || ehi[1] < lo[1] || elo[1] > hi[1] || ehi[2] < lo[2] || elo[2] > hi[2] {
 			continue
 		}
+		if o, ok := l.(*Mob); ok && o.m.StruckByLightning(b.actor()) {
+			continue
+		}
 		l.TakeDamage(boltDamage, DamageSource{Cause: DamageLightning})
 		if !l.FireImmune() {
 			l.SetOnFire(boltBurnSeconds)
 		}
 	}
 }
+
+// actor is the bolt as the mob runtime sees it: the "lightning" family the damage sensors of
+// creepers, pigs, villagers and mooshrooms filter on.
+func (b *LightningBolt) actor() behavior.Actor {
+	return boltActor{knotActor{id: behavior.ID(b.entity.UniqueID()), pos: vec(b.entity.Position())}}
+}
+
+// boltActor is a lightning bolt as the mob runtime sees it.
+type boltActor struct{ knotActor }
+
+func (boltActor) Type() string { return nameLightningBolt }
+
+// Families is the bolt's type_family.
+func (boltActor) Families() []string { return []string{"lightning"} }
