@@ -310,6 +310,35 @@ func (t *Table) ButtonHeld(r *world.Region, pos cube.Pos, block uint32) bool {
 	return !ok || t.Supports(b, face)
 }
 
+// LeverHeld is BDS's canSurvive for levers (LeverBlock 0xD556630): the block behind holds
+// things on the face the lever sits on, as a button's holder does. What is not loaded counts
+// as holding.
+func (t *Table) LeverHeld(r *world.Region, pos cube.Pos, block uint32) bool {
+	face := LeverFace(stateString(t.blocks.States(block), "lever_direction"))
+	b, ok := r.Block(pos.Side(face.Opposite()), 0)
+	return !ok || t.Supports(b, face)
+}
+
+// LeverHolder is where the block holding the lever at pos is.
+func (t *Table) LeverHolder(pos cube.Pos, block uint32) cube.Pos {
+	return pos.Side(LeverFace(stateString(t.blocks.States(block), "lever_direction")).Opposite())
+}
+
+// LeverFace is the face of its holder a lever with lever_direction state sits on: up on a
+// floor, down under a ceiling, else the side it points out of.
+func LeverFace(state string) cube.Face {
+	switch state {
+	case "up_north_south", "up_east_west":
+		return cube.FaceUp
+	case "down_north_south", "down_east_west":
+		return cube.FaceDown
+	}
+	if c, ok := direction.Parse(state); ok {
+		return c.Face()
+	}
+	return cube.FaceUp
+}
+
 // DiodeSurvives is BDS's canSurvive for repeaters and comparators: below them a
 // top face that holds things.
 func (t *Table) DiodeSurvives(r *world.Region, pos cube.Pos) bool {

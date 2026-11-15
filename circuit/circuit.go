@@ -492,6 +492,11 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			if !t.attach.ButtonHeld(r, pos, block) {
 				r.ScheduleTick(pos, block, 1, 0)
 			}
+		case kindLever:
+			// LeverBlock's neighborChanged (0xD556440) looks only when its holder changed.
+			if from == t.attach.LeverHolder(pos, block) && !t.attach.LeverHeld(r, pos, block) {
+				r.ScheduleTick(pos, block, 1, 0)
+			}
 		case kindPlate:
 			if !t.attach.DiodeSurvives(r, pos) {
 				r.ScheduleTick(pos, block, 1, 0)
@@ -686,6 +691,11 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 		t.targetTick(r, pos)
 	case kindButton:
 		t.buttonTick(r, pos, block)
+	case kindLever:
+		if now, ok := r.Block(pos, 0); ok && now == block && !t.attach.LeverHeld(r, pos, block) {
+			t.fall(r, pos, block)
+			return
+		}
 	case kindPlate:
 		t.plateTick(t.circuitOf(r), pos, block)
 	case kindHook:
