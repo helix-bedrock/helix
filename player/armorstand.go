@@ -118,12 +118,9 @@ func (s *Host) standItemSlot(it ItemStack) int {
 	return standSlotMainhand
 }
 
-// itemLocked reports an item with the minecraft:item_lock tag set, which BDS never lets
-// onto an armour stand.
-func itemLocked(it ItemStack) bool {
-	v, ok := tagInt(it.Tag, "minecraft:item_lock")
-	return ok && v != 0
-}
+// itemLocked reports an item with the minecraft:item_lock tag set (a byte, as BDS saves
+// it), which BDS never lets onto an armour stand, a shelf, a pot or a frame.
+func itemLocked(it ItemStack) bool { return it.Lock() != ItemUnlocked }
 
 // interactArmorStand is a player's click on an armour stand: sneaking turns the pose on
 // by one; otherwise the held item goes on, or the item at the clicked height comes off.

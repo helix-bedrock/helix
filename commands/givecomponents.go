@@ -12,14 +12,19 @@ import (
 // item's component update 0xC8F57A0): a JSON object whose keys are component names,
 // minecraft's when they have no namespace. can_place_on and can_destroy take {"blocks":
 // [names]}, a list that is replaced whole; a block that does not exist leaves the list empty
-// and fails. item_lock and keep_on_death are BDS components Helix does not build yet.
+// and fails. item_lock takes {"mode": "lock_in_slot" or "lock_in_inventory"} (0xC93F320),
+// keep_on_death any object (0xC93F700).
 const (
 	componentCanPlaceOn  = "minecraft:can_place_on"
 	componentCanDestroy  = "minecraft:can_destroy"
 	componentItemLock    = "minecraft:item_lock"
 	componentKeepOnDeath = "minecraft:keep_on_death"
 	componentBlocksKey   = "blocks"
+	componentModeKey     = "mode"
 )
+
+// lockModes are item_lock's modes.
+var lockModes = map[string]player.ItemLock{"lock_in_slot": player.ItemLockedInSlot, "lock_in_inventory": player.ItemLockedInInventory}
 
 // applyComponents sets the components of text on item. The error is the message BDS gives,
 // or "" for BDS's commands.generic.componentError (text is not JSON or is null).
@@ -51,14 +56,26 @@ func applyComponents(h *player.Host, item player.ItemStack, text string) (player
 func applyComponent(h *player.Host, item player.ItemStack, name string, value json.RawMessage) (player.ItemStack, string) {
 	var fields map[string]json.RawMessage
 	switch name {
-	case componentCanPlaceOn, componentCanDestroy:
-	case componentItemLock, componentKeepOnDeath:
-		return item, "Component '" + name + "' is not built in Helix yet."
+	case componentCanPlaceOn, componentCanDestroy, componentItemLock, componentKeepOnDeath:
 	default:
 		return item, "Component '" + name + "' is not a supported component."
 	}
 	if err := json.Unmarshal(value, &fields); err != nil || fields == nil {
 		return item, "Component '" + name + "' was not an object."
+	}
+	switch name {
+	case componentKeepOnDeath:
+		return item.WithKeepOnDeath(true), ""
+	case componentItemLock:
+		var mode string
+		lock, ok := player.ItemLock(0), json.Unmarshal(fields[componentModeKey], &mode) == nil
+		if ok {
+			lock, ok = lockModes[mode]
+		}
+		if !ok {
+			return item, "Component '" + name + "' could not be updated."
+		}
+		return item.WithLock(lock), ""
 	}
 	blocks, ok := componentBlocks(h, fields[componentBlocksKey])
 	if !ok {

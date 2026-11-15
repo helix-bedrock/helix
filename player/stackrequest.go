@@ -20,8 +20,12 @@ const (
 	containerLevelEntity   = protocol.ContainerLevelEntity
 )
 
-// Item locks, as BDS keeps them in an item's "minecraft:item_lock" tag.
-const itemLockInSlot = 1
+// Item locks, as BDS keeps them in an item's "minecraft:item_lock" tag: locked in its slot,
+// or kept in the player's inventory.
+const (
+	itemLockInSlot      = 1
+	itemLockInInventory = 2
+)
 
 // assignmentsKept is how many past requests' slots a request may name by
 // request ID (the client does so for requests not yet answered).
@@ -683,6 +687,11 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	if lock, _ := s.Tag["minecraft:item_lock"].(uint8); lock == itemLockInSlot {
 		return false
 	}
+	// A locked item stays with the player: BDS 1.26.60's validation of every other container
+	// (chests, barrels, boxes, crafting, furnaces... 0xC9FCB40) refuses it.
+	if itemLocked(s) && !playerOwnSlot(r.kind) {
+		return false
+	}
 	t, _ := p.s.reg.Items.ByName(s.Name)
 	switch r.kind {
 	case containerArmor:
@@ -713,6 +722,16 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return material == "" || s.Name == material
 	}
 	return true
+}
+
+// playerOwnSlot reports whether a slot kind is one of the player's own: the inventory, armour,
+// offhand and cursor.
+func playerOwnSlot(kind byte) bool {
+	switch kind {
+	case containerCombined, containerArmor, containerOffhand, containerCursor:
+		return true
+	}
+	return false
 }
 
 // hasEnchant reports whether the item has an enchantment, read from the

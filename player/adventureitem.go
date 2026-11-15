@@ -77,3 +77,53 @@ func listsBlock(list []string, name string) bool {
 		return b == name
 	})
 }
+
+// ItemLock is how an item is locked (BDS's item_lock component, kept in the item's
+// "minecraft:item_lock" tag).
+type ItemLock uint8
+
+// The item locks.
+const (
+	// ItemUnlocked is no lock.
+	ItemUnlocked ItemLock = 0
+	// ItemLockedInSlot keeps the item in its slot.
+	ItemLockedInSlot ItemLock = itemLockInSlot
+	// ItemLockedInInventory keeps the item in the player's own slots.
+	ItemLockedInInventory ItemLock = itemLockInInventory
+)
+
+// itemLockTag is the item tag that holds an ItemLock.
+const itemLockTag = "minecraft:item_lock"
+
+// Lock is how the item is locked.
+func (s ItemStack) Lock() ItemLock {
+	switch v := s.Tag[itemLockTag].(type) {
+	case uint8:
+		return ItemLock(v)
+	case int32:
+		return ItemLock(v) //nolint:gosec // only ever a byte's value
+	}
+	return ItemUnlocked
+}
+
+// WithLock returns the stack locked as l; ItemUnlocked removes the lock.
+func (s ItemStack) WithLock(l ItemLock) ItemStack {
+	if l == ItemUnlocked {
+		return withTag(s, itemLockTag, nil)
+	}
+	return withTag(s, itemLockTag, uint8(l))
+}
+
+// KeptOnDeath reports whether the item stays with a player who dies (BDS's keep_on_death).
+func (s ItemStack) KeptOnDeath() bool {
+	_, keep := s.Tag[keepOnDeathTag]
+	return keep
+}
+
+// WithKeepOnDeath returns the stack kept on death or not.
+func (s ItemStack) WithKeepOnDeath(keep bool) ItemStack {
+	if !keep {
+		return withTag(s, keepOnDeathTag, nil)
+	}
+	return withTag(s, keepOnDeathTag, uint8(1))
+}

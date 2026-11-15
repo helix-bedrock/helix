@@ -208,7 +208,7 @@ func FrameAt(r *world.Region, pos cube.Pos) (*ItemFrame, bool) {
 
 // useFrame is BDS's frame interaction (0xCAEAF10): an empty frame takes one of the held item,
 // which is used up outside creative; a full one turns its item. An empty hand on an empty
-// frame does not take the click.
+// frame does not take the click, and neither does a locked item.
 func (p *Player) useFrame(r *world.Region, u *BlockUse) bool {
 	f, ok := FrameAt(r, u.Pos)
 	if !ok {
@@ -218,7 +218,7 @@ func (p *Player) useFrame(r *world.Region, u *BlockUse) bool {
 		f.Turn(r, u.Pos)
 		return true
 	}
-	if u.Item.Empty() {
+	if u.Item.Empty() || itemLocked(u.Item) {
 		return false
 	}
 	f.Put(r, u.Pos, u.Item)
