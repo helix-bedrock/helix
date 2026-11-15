@@ -49,6 +49,15 @@ func (c *netCache) put(pos mcdb.ChunkPos, nc *NetChunk) {
 	}
 }
 
+// clear drops every chunk.
+func (c *netCache) clear() {
+	c.mu.Lock()
+	c.order.Init()
+	clear(c.byPos)
+	c.used = 0
+	c.mu.Unlock()
+}
+
 func (c *netCache) drop(pos mcdb.ChunkPos) {
 	c.mu.Lock()
 	c.remove(pos)

@@ -182,6 +182,12 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return tickSpeed(srv.Load(), args)
 		}},
+		{borderBlocksCommand, "Turns the walls of border blocks on or off until the server stops: on or off.", nil, func(_ *player.Player, args []string) string {
+			if !registry() {
+				return ""
+			}
+			return borderBlocks(srv.Load(), args)
+		}},
 		{lightningCommand, "Strikes you with lightning, or sets the odds: odds <n> (BDS: 100000), reset.", nil, func(p *player.Player, args []string) string {
 			if !registry() {
 				return ""

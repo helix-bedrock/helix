@@ -179,6 +179,8 @@ type Dimension struct {
 	entityView atomic.Int32
 	// randomTickSpeed is the live RandomTickSpeed.
 	randomTickSpeed atomic.Int32
+	// bordersOff turns the walls of border blocks off (see SetBorderBlocks).
+	bordersOff atomic.Bool
 	// entityLoader turns saved entities into live ones.
 	entityLoader atomic.Pointer[EntityLoader]
 	// blockEntities makes block entities; listenerStates marks the states whose block entity
@@ -220,6 +222,9 @@ type Chunk struct {
 	// border has a bit for each column holding a border block, z*16+x, read from the
 	// border map when the chunk arrives and kept with it, so mobs can ask without decoding.
 	border [columns / 64]uint64
+	// staleNet is set when the network form being encoded was started before a border
+	// switch: it is encoded again when it comes back.
+	staleNet bool
 	// version counts changes, so a stale encode is recognised.
 	version uint64
 	// ticks and randomTicks are the chunk's tick queues; ticksDirty means
@@ -554,7 +559,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, col.Extra[borderTag], entities)
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })

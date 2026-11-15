@@ -41,6 +41,8 @@ type Systems struct {
 	Loom         LoomFunc
 	ShieldBanner ShieldBannerFunc
 	CraftRepair  CraftRepairFunc
+	// BlockPermission decides where a player may break blocks and use items on them.
+	BlockPermission BlockPermissionFunc
 	// Breaking.
 	BreakStart  BreakStartFunc
 	BreakTime   BreakTimeFunc
@@ -449,7 +451,10 @@ func vanillaGameplay(s *Setup) error {
 	sys.Loom = vanillaLoom
 	sys.ShieldBanner = vanillaShieldBanner
 	sys.CraftRepair = vanillaCraftRepair
-	sys.BreakStart = func(*Player, cube.Pos, int32) bool { return true }
+	sys.BlockPermission = vanillaBlockPermission
+	sys.BreakStart = func(p *Player, pos cube.Pos, face int32) bool {
+		return p.s.game.sys.BlockPermission(p, pos, face, true)
+	}
 	sys.ToolSpeed = func(b *BreakInfo) float32 { return g.mining.toolSpeed(b) }
 	sys.BreakTime = g.vanillaBreakTime
 	sys.Wear = func(b *BreakInfo) int32 { return g.wear(b) }

@@ -723,6 +723,17 @@ func (s *Server) SetRandomTickSpeed(speed int32) {
 	}
 }
 
+// SetBorderBlocks turns the walls of border blocks on or off in every dimension (see
+// world.Dimension.SetBorderBlocks; BDS has no such switch). A restart turns them on again.
+// Valid once the world is open. Safe from any goroutine.
+func (s *Server) SetBorderBlocks(on bool) {
+	for _, d := range []*world.Dimension{s.overworld, s.nether, s.end} {
+		if d != nil {
+			d.SetBorderBlocks(on)
+		}
+	}
+}
+
 // crashError is a panic the server recovered and stopped for.
 type crashError struct{ v any }
 

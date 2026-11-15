@@ -625,7 +625,7 @@ func (r *Region) encode(c *Chunk) {
 	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
 	border := c.col.Extra[borderTag]
 	d.pool.do(pos, prioView, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap, border, entities)
+		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities)
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
 		}
@@ -638,7 +638,8 @@ func (r *Region) encoded(c *Chunk, nc *NetChunk, version uint64) {
 		r.d.encodedUnloaded(c, nc, version)
 	case cur != c:
 		// Reloaded meanwhile, with its own network form.
-	case c.version != version:
+	case c.version != version || c.staleNet:
+		c.staleNet = false
 		r.encode(c) // changed again: encode the newer state
 	default:
 		c.encoding, c.net = false, nc

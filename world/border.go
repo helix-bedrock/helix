@@ -122,8 +122,8 @@ func borderBits(b []byte) (bits [columns / 64]uint64) {
 }
 
 // BorderColumn reports whether the column x, z holds a border block, which walls the whole
-// column off, and whether its chunk is loaded in this region. Runs: owner, also from
-// Parallel.
+// column off while border blocks are on, and whether its chunk is loaded in this region.
+// Runs: owner, also from Parallel.
 func (r *Region) BorderColumn(x, z int) (border, loaded bool) {
 	if !r.ticking.Load() {
 		return false, false
@@ -132,6 +132,56 @@ func (r *Region) BorderColumn(x, z int) (border, loaded bool) {
 	if !ok {
 		return false, false
 	}
+	if r.d.bordersOff.Load() {
+		return false, true
+	}
 	i := (z&15)<<4 | x&15
 	return c.border[i/64]&(1<<(i%64)) != 0, true
+}
+
+// SetBorderBlocks turns the walls of border blocks on or off. BDS 1.26.60 has no such
+// switch: border blocks always wall their column off. Off, the blocks stay and their map is
+// still kept and saved, but no column is walled off: clients are sent no border columns and
+// the server's own checks (mobs, building) see none. Every loaded chunk with border columns
+// goes to its players again. Chunks players are only shown, outside every region, keep what
+// they were sent until they are sent again. Not saved: a restart turns them on. Safe from
+// any goroutine.
+func (d *Dimension) SetBorderBlocks(on bool) {
+	if d.bordersOff.Swap(!on) == !on {
+		return
+	}
+	d.cache.clear()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, r := range d.regions {
+		r.post(entry{fn: (*Region).resendBorders, every: true})
+	}
+}
+
+// BorderBlocks reports whether border blocks wall their columns off (see SetBorderBlocks).
+// Safe from any goroutine.
+func (d *Dimension) BorderBlocks() bool { return !d.bordersOff.Load() }
+
+// netBorderOf is the border map a chunk is sent with: none while border blocks are off.
+func (d *Dimension) netBorderOf(b []byte) []byte {
+	if d.bordersOff.Load() {
+		return nil
+	}
+	return b
+}
+
+// resendBorders encodes every chunk of the region with border columns again and sends it to
+// the players that have it, after border blocks were turned on or off.
+func (r *Region) resendBorders() {
+	for _, c := range r.chunks {
+		if c.border == [columns / 64]uint64{} {
+			continue
+		}
+		c.resendNet = true
+		if c.encoding {
+			c.staleNet = true
+			continue
+		}
+		r.encode(c)
+	}
 }

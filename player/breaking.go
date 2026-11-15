@@ -381,7 +381,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		return false
 	}
 	b, ok := p.breakInfo(r, pos)
-	if !ok || b.Block == p.s.reg.Blocks.Air() {
+	if !ok || b.Block == p.s.reg.Blocks.Air() || !p.s.game.sys.BlockPermission(p, pos, p.brk.face, true) {
 		return false
 	}
 	if !p.creative() && p.brk.progress < breakEnd && !(b.DestroyTime <= 0 && p.s.game.sys.BreakTime(&b) >= breakEnd) {

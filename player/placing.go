@@ -136,7 +136,7 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 	if p.lastUse == useBlock {
 		return true
 	}
-	if held.Empty() {
+	if held.Empty() || !g.sys.BlockPermission(p, clicked, face, false) {
 		return false
 	}
 	if !p.useHeldOn(r, clicked, face, click, held) {
