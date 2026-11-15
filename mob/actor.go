@@ -112,7 +112,6 @@ func (m *Mob) Event(name string, other behavior.ID) {
 	m.inst.Execute(name, m.tester(o))
 }
 
-func (m *Mob) Teleport(p behavior.Vec3)             { m.SetPos(p) }
 func (m *Mob) Dwelling() (behavior.Pos, bool, bool) { return behavior.Pos{}, false, false }
 func (m *Mob) Home() (behavior.Pos, int32, bool)    { return behavior.Pos{}, 0, false }
 func (m *Mob) InLava() bool                         { return m.body.Travel() == physics.TravelLava }
@@ -272,3 +271,19 @@ var (
 	_ definition.Host   = (*Mob)(nil)
 	_ definition.Tester = tester{}
 )
+
+// Teleport moves the mob as BDS's Actor::teleportTo: viewers get the move as a teleport
+// (TakeTeleport), so they snap the mob to its new place and rotation instead of walking it
+// there. A sleeping villager is laid in its bed this way.
+func (m *Mob) Teleport(p behavior.Vec3) {
+	m.SetPos(p)
+	m.teleported = true
+}
+
+// TakeTeleport reports whether the mob teleported since the last call, and clears it.
+// Runs: apply.
+func (m *Mob) TakeTeleport() bool {
+	t := m.teleported
+	m.teleported = false
+	return t
+}

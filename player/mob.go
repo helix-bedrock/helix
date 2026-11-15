@@ -252,6 +252,29 @@ func (m *Mob) apply(e *world.Entity) {
 		m.m.SetPos(vec(e.Position()))
 		b.Vel = behavior.Vec3{}
 	}
+	if m.m.TakeTeleport() {
+		m.sendTeleport(e)
+	}
+}
+
+// sendTeleport tells the mob's viewers it teleported, as BDS's Actor::teleportTo does with a
+// MoveActorAbsolute marked as a teleport: the client snaps it there with its rotation, body
+// included, instead of walking it over. The delta sync starts again from there. It is sent
+// only when the place or rotation changed, so a mob held in place (a sleeping villager is
+// teleported every tick) costs nothing.
+func (m *Mob) sendTeleport(e *world.Entity) {
+	pos, rot := e.Position(), e.Rotation()
+	if pos == m.moves.pos && rotationByte(rot.Pitch) == rotationByte(m.moves.rot.Pitch) &&
+		rotationByte(rot.Yaw) == rotationByte(m.moves.rot.Yaw) && rotationByte(rot.HeadYaw) == rotationByte(m.moves.rot.HeadYaw) {
+		return
+	}
+	m.moves.pos, m.moves.rot, m.moves.ground = pos, rot, e.OnGround()
+	flags := byte(packet.MoveFlagTeleport)
+	if e.OnGround() {
+		flags |= packet.MoveFlagOnGround
+	}
+	pk := &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Flags: flags, Position: pos, Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw}}
+	e.EachSeer(func(p *world.Entity) { p.SendTo(pk) })
 }
 
 func (m *Mob) remove(e *world.Entity) {

@@ -164,6 +164,8 @@ type Mob struct {
 	flags       path.ActorFlags
 	// doors is minecraft:annotation.open_door's state, nil without the component.
 	doors *nav.OpenDoors
+	// teleported is set by Teleport until the engine sends the move (TakeTeleport).
+	teleported bool
 
 	pitch, yaw, headYaw, bodyYaw float32
 	prevPitch, prevYaw           float32
