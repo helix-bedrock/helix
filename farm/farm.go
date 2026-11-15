@@ -149,6 +149,10 @@ const (
 	// direction); kindSmallDripleaf a small dripleaf half (facing 1 for the upper).
 	kindBigDripleaf
 	kindSmallDripleaf
+	// kindChorusPlant is a chorus plant (age its connection mask); kindChorusFlower a chorus
+	// flower (age its age).
+	kindChorusPlant
+	kindChorusFlower
 )
 
 // plant reports whether k is one of the plants in plants.go.
@@ -219,6 +223,8 @@ type Ticker struct {
 	vineKit   *vineKit
 	leafKit   *leafKit
 	pickleKit *pickleKit
+	// chorusKit holds chorus plants and flowers.
+	chorusKit *chorusKit
 	// support says which block faces hold things; nil for none.
 	support atomic.Pointer[SupportFunc]
 	// power says whether redstone powers a block; nil for never.
@@ -308,6 +314,7 @@ func NewTicker(reg *registry.Registry, fall FallFunc, next world.BlockTicker) *T
 	t.vineKit = t.newVineKit()
 	t.leafKit = t.newLeafKit()
 	t.pickleKit = t.newPickleKit()
+	t.chorusKit = t.newChorusKit()
 	return t
 }
 
@@ -368,7 +375,7 @@ func (t *Ticker) skyDarken() uint8 {
 func (t *Ticker) RandomTicks(block uint32, layer uint8) bool {
 	k := t.state(block).kind
 	return layer == 0 && k != kindNone && k != kindKelp && k != kindComposter && k != kindFoliage &&
-		k != kindNetherVine && k != kindBigDripleaf && k != kindSmallDripleaf || t.BlockTicker.RandomTicks(block, layer)
+		k != kindNetherVine && k != kindBigDripleaf && k != kindSmallDripleaf && k != kindChorusPlant || t.BlockTicker.RandomTicks(block, layer)
 }
 
 // RandomTick runs farmland's, a crop's or a stem's random tick, and the next ticker's for
@@ -430,6 +437,12 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 			t.pickleTick(r, pos)
 			return
 		}
+		if s := t.state(block); s.kind == kindChorusPlant || s.kind == kindChorusFlower {
+			if now, ok := r.Block(pos, 0); ok && t.state(now).kind == s.kind && !t.plantSurvives(r, pos, t.state(now)) {
+				t.chorusFall(r, pos, now)
+			}
+			return
+		}
 		if s := t.state(block); s.kind.plant() {
 			if now, ok := r.Block(pos, 0); ok && t.state(now).kind == s.kind && !t.plantSurvives(r, pos, t.state(now)) && t.fall != nil {
 				t.fall(r, pos, now)
@@ -471,6 +484,9 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 			if t.isPickle(block) {
 				r.ScheduleTick(pos, block, surviveDelay, 0)
 				break
+			}
+			if s.kind == kindChorusPlant {
+				t.joinChorus(r, pos)
 			}
 			if s.kind.plant() && !t.plantSurvives(r, pos, s) {
 				r.ScheduleTick(pos, block, surviveDelay, 0)

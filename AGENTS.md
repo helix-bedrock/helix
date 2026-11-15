@@ -379,6 +379,7 @@ sibling library folders, so unreleased library changes are used.
   landing wears the anvil by chance 0.05 + 0.05 a block, chipped, damaged, then it breaks and
   vanishes; LevelEvent 1022 when one lands). Not done: concrete powder hardening, suspicious sand and gravel, entities that break
   falling blocks.
+- `farm/chorus.go`: chorus plants and flowers as BDS 1.26.60: plant connections kept in their states (each side joins chorus, the bottom also end stone) on place and neighbour changes, both blocks' survival (a tick 1 later, then a plant breaks with its drops and a flower with none), flowers growing on random ticks (up, side branches, or dying at age 5, with BDS's grow and death sounds), and projectiles breaking flowers under projectilescanbreakblocks. Chorus fruit teleporting is not built.
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.
 - `direction`: every direction beyond `cube`'s faces and positions: `Cardinal` and the numberings block states use for it, the orders BDS walks a block's sides in (`Updates`, `Spread`, `Clockwise`, `Sides`), yaw to direction, axes and BDS's table sine. Systems name what they mean here instead of keeping tables of numbers; a test pins each numbering and order to BDS's.

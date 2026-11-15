@@ -402,6 +402,8 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 			t.bigLeafPlaced(r, pos)
 		case kindSmallDripleaf:
 			t.smallLeafPlaced(r, pos, t.state(block))
+		case kindChorusPlant:
+			t.joinChorus(r, pos)
 		case kindComposter:
 			if t.state(block).age == composterReady {
 				r.ScheduleTick(pos, block, composterDelay, 0)

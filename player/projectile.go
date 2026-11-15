@@ -985,6 +985,7 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 		t.s.HitTarget(r, hit.block, hit.pos, t.spec.Stick)
 		if f := t.s.farm; f != nil {
 			f.ProjectileHitDripleaf(r, hit.block)
+			f.ProjectileHitChorus(r, hit.block, t.s.level.ProjectilesCanBreakBlocks)
 		}
 		t.tridentOnRod(r, hit.block)
 		t.tridentBreaksDripstone(r, hit.block)

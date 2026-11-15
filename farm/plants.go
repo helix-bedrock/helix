@@ -190,6 +190,8 @@ func (t *Ticker) plantTick(r *world.Region, pos cube.Pos, s stateInfo) {
 		t.bambooTick(r, pos, s)
 	case kindSapling:
 		t.saplingTick(r, pos, s)
+	case kindChorusFlower:
+		t.chorusFlowerTick(r, pos, s)
 	case kindPitcher:
 		if s.facing != pitcherLower || r.Brightness(pos, t.skyDarken()) < DefaultCrop().GrowLight {
 			return
@@ -307,6 +309,10 @@ func (t *Ticker) plantSurvives(r *world.Region, pos cube.Pos, s stateInfo) bool 
 		return t.bigLeafSurvives(r, pos, s)
 	case kindSmallDripleaf:
 		return t.smallLeafSurvives(r, pos, s)
+	case kindChorusPlant:
+		return t.chorusPlantSurvives(r, pos)
+	case kindChorusFlower:
+		return t.chorusFlowerSurvives(r, pos)
 	}
 	k := t.plantKit
 	below, ok := r.Block(pos.Side(cube.FaceDown), 0)
