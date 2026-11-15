@@ -173,10 +173,16 @@ func (e villageEnv) Dweller(r *world.Region, id behavior.ID) (village.Dweller, b
 	return m, true
 }
 
-// LevelEvent shows a level event with no data.
-func (e villageEnv) LevelEvent(r *world.Region, id int32, p behavior.Vec3) {
+// LevelEvent shows a level event with its data.
+func (e villageEnv) LevelEvent(r *world.Region, id, data int32, p behavior.Vec3) {
 	pos := mglVec(p)
-	levelEvent(r, vecPos(pos), pos, id, 0)
+	levelEvent(r, vecPos(pos), pos, id, data)
+}
+
+// Sound plays a level sound with no entity and no data, as the village's sounds are sent.
+func (e villageEnv) Sound(r *world.Region, name string, p behavior.Vec3) {
+	pos := mglVec(p)
+	playSound(r, vecPos(pos), soundEvent{name: name, pos: pos, extra: -1}, nil)
 }
 
 // --- the mob runtime's village and door questions (mob.Env) ---

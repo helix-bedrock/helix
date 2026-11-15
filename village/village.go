@@ -36,9 +36,16 @@ const (
 	deadTicks = 120
 	// radiusScale is getApproximateRadius's factor on the half sizes.
 	radiusScale = 0.6
-	// happyEvent is the happy villager particle level event a claim shows four times.
-	happyEvent = 2009
-	happyCount = 4
+	// particleEvent is the level event that spawns a particle of the type in its data
+	// (ParticleGenericSpawn). A claim shows happyCount happy villager particles over the
+	// dweller (_claimPOI 0xBEDFC60); losing a POI shows lostCount angry ones and plays
+	// lostSound at its head (0xBEE19A0). BDS's own particle numbers.
+	particleEvent = 2009
+	happyParticle = 41
+	happyCount    = 4
+	angryParticle = 40
+	lostCount     = 5
+	lostSound     = "haggle.no"
 )
 
 // Env is the engine's side: what a block is and which dwellers are in a region. Runs: the
@@ -49,8 +56,10 @@ type Env interface {
 	POIAt(r *world.Region, pos cube.Pos) (d *Def, loaded bool)
 	// Dweller is the dweller with the ID in r, false when it is not there.
 	Dweller(r *world.Region, id behavior.ID) (Dweller, bool)
-	// LevelEvent shows a level event at p.
-	LevelEvent(r *world.Region, id int32, p behavior.Vec3)
+	// LevelEvent shows a level event with its data at p.
+	LevelEvent(r *world.Region, id, data int32, p behavior.Vec3)
+	// Sound plays the named level sound at p, made by no entity.
+	Sound(r *world.Region, name string, p behavior.Vec3)
 }
 
 // Dweller is a mob with minecraft:dweller as the village sees it. The engine's mob
@@ -60,6 +69,9 @@ type Dweller interface {
 	Pos() behavior.Vec3
 	// HeadY is the height of the mob's head above its feet.
 	HeadY() float32
+	// BodySpot is a random point over the mob where BDS shows its claim particles: x and z
+	// within its width either side of its position, y up to its height above, plus 1.
+	BodySpot() behavior.Vec3
 	// Baby reports a baby.
 	Baby() bool
 	// Role is dweller_role; only "inhabitant" takes job sites.
@@ -494,7 +506,8 @@ func (m *Manager) sync(r *world.Region, d Dweller, v *Village, now int64) {
 	}
 	if mem.lostJob {
 		mem.lostJob = false
-		m.loseJob(d, Job, unskilled)
+		d.SetPOI(Job, behavior.POI{}, false)
+		dropProfession(d, unskilled)
 	}
 	for k := range Kind(kinds) {
 		if p := mem.pois[k]; p != nil {
@@ -506,11 +519,25 @@ func (m *Manager) sync(r *world.Region, d Dweller, v *Village, now int64) {
 	_ = r
 }
 
-// loseJob is the job loss of _updateClaimedPOIs (0xBEE19A0): a dweller not locked into its
-// profession forgets it and runs the job site's end event.
-func (m *Manager) loseJob(d Dweller, kind Kind, end string) {
-	d.SetPOI(kind, behavior.POI{}, false)
-	if kind != Job || d.Locked() {
+// lose is a claimed POI going, in _updateClaimedPOIs (0xBEE19A0), for any kind of POI, beds
+// too: the dweller forgets it, drops its profession unless locked into it (running the POI's
+// end event, which beds have none of), and shows angry villager particles and the haggle.no
+// sound at its head.
+func (m *Manager) lose(r *world.Region, d Dweller, def *Def) {
+	d.SetPOI(def.Kind, behavior.POI{}, false)
+	dropProfession(d, def.EndEvent)
+	for range lostCount {
+		m.env.LevelEvent(r, particleEvent, angryParticle, d.BodySpot())
+	}
+	at := d.Pos()
+	at.Y += d.HeadY()
+	m.env.Sound(r, lostSound, at)
+}
+
+// dropProfession clears the preferred profession of a dweller not locked into it and runs
+// end. BDS keeps the profession only when the dweller is locked and has one.
+func dropProfession(d Dweller, end string) {
+	if d.Locked() && d.Profession() != "" {
 		return
 	}
 	d.SetProfession("")
@@ -570,7 +597,7 @@ func (m *Manager) releasePOI(r *world.Region, v *Village, p *POI) {
 		}
 		mem.pois[p.Def.Kind] = nil
 		if d, ok := m.env.Dweller(r, id); ok {
-			m.loseJob(d, p.Def.Kind, p.Def.EndEvent)
+			m.lose(r, d, p.Def)
 		} else if p.Def.Kind == Job {
 			mem.lostJob = true
 		}
@@ -705,9 +732,7 @@ func (m *Manager) give(r *world.Region, d Dweller, mem *member, p *POI) {
 	if p.Def.Kind == Job && !d.Locked() {
 		d.SetProfession(p.Def.Name)
 	}
-	at := d.Pos()
-	at.Y += d.HeadY()
 	for range happyCount {
-		m.env.LevelEvent(r, happyEvent, at)
+		m.env.LevelEvent(r, particleEvent, happyParticle, d.BodySpot())
 	}
 }

@@ -160,6 +160,15 @@ func (m *Mob) Village(search int32) (behavior.Box, bool) {
 // HeadY is the height of the mob's eyes.
 func (m *Mob) HeadY() float32 { return m.eyeHeight() }
 
+// BodySpot is a random point over the mob, as BDS places claim particles (0xBEDFC60).
+func (m *Mob) BodySpot() behavior.Vec3 {
+	w, h, p := m.body.Width, m.body.Height, m.body.Pos
+	x := p.X + m.rnd.NextFloat()*w*2 - w
+	y := p.Y + m.rnd.NextFloat()*h + 1
+	z := p.Z + m.rnd.NextFloat()*w*2 - w
+	return behavior.Vec3{X: x, Y: y, Z: z}
+}
+
 // Baby reports a baby.
 func (m *Mob) Baby() bool { return m.flags.Has(behavior.FlagBaby) }
 
