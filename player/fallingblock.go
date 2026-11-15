@@ -58,10 +58,18 @@ type FallingBlock struct {
 	noDrop bool
 	gone   bool
 	// next is the move its think step worked out.
-	next thought
-	saved  map[string]any
+	next  thought
+	saved map[string]any
 	// moves is what those who see it were last told of its movement.
 	moves actorMoves
+	// fallen is how far it has fallen, as an actor's fall distance.
+	fallen float32
+	// hurtPerBlock is what each block fallen hurts the mobs it lands in, 0 for none, with
+	// hurtCause the cause; shatters breaks it where it lands (a stalactite). See dripstone.go.
+	hurtPerBlock float32
+	hurtCause    DamageCause
+	shatters     bool
+	found        []*world.Entity
 }
 
 // Entity returns its entity.
@@ -95,21 +103,27 @@ func OnBlockFall(s *Setup, fn func(e *BlockFallEvent), p Priority) error {
 // the middle of the block, then the block taken away. False if a BlockFallEvent listener
 // stopped it. Runs: owner of the region.
 func (s *Host) StartFalling(r *world.Region, pos cube.Pos, block uint32) bool {
+	_, ok := s.startFallingBlock(r, pos, block)
+	return ok
+}
+
+// startFallingBlock is StartFalling, with the falling block it made.
+func (s *Host) startFallingBlock(r *world.Region, pos cube.Pos, block uint32) (*FallingBlock, bool) {
 	if s.game != nil && s.game.blockFallEv.Has() {
 		e := BlockFallEvent{Region: r, Pos: pos, Block: block}
 		s.game.blockFallEv.fire(s.log, &e)
 		if e.Cancelled() {
-			return false
+			return nil, false
 		}
 	}
-	s.SpawnFallingBlock(r.Dimension(), blockCenter(pos), block)
+	f := s.SpawnFallingBlock(r.Dimension(), blockCenter(pos), block)
 	if s.falling != nil {
 		s.falling.Lift(r, pos)
 	} else {
 		r.SetBlock(pos, 0, s.reg.Blocks.Air())
 		r.UpdateNeighbours(pos)
 	}
-	return true
+	return f, true
 }
 
 // DestroySnow removes a snow layer left with nothing to lie on, with the break particles.
@@ -177,18 +191,29 @@ func (f *FallingBlock) tick(e *world.Entity) {
 		return
 	}
 	f.time++
+	fromY := e.Position()[1]
 	onGround := f.move(r, e)
 	f.vel = f.vel.Mul(fallingDrag)
 	pos := e.Position()
+	if dy := pos[1] - fromY; dy < 0 {
+		f.fallen -= dy
+	}
 	at := cube.Pos{itemFloor(pos[0]), itemFloor(pos[1]), itemFloor(pos[2])}
 	if f.s.falling != nil && f.s.falling.StopsFalling(r, at, f.block, onGround) {
 		f.vel = mgl32.Vec3{f.vel[0] * fallingGroundDrag, f.vel[1] * fallingBounce, f.vel[2] * fallingGroundDrag}
+		if onGround {
+			f.hurtLanding(r, e)
+			f.fallen = 0
+		}
 		if f.noDrop {
 			f.remove(e)
 			return
 		}
 		if f.s.falling.Land(r, at, f.block) {
 			f.landed, f.wait, f.vel = true, 0, mgl32.Vec3{}
+			if f.shatters {
+				f.shatter(r, at)
+			}
 			return
 		}
 		f.breakApart(r, e, at)

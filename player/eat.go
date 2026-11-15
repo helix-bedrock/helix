@@ -209,6 +209,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 	if p.throwItem(held) {
 		return true
 	}
+	if held.Name == nameEnderEye {
+		return p.throwEnderEye(held)
+	}
 	if p.useEmptyMap(held) {
 		return true
 	}

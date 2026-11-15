@@ -53,6 +53,10 @@ const (
 	// kindWater and kindLava are sources (liquid_depth 0).
 	kindWater
 	kindLava
+	// kindStanding is a standing pointed dripstone (a stalagmite) that is not its tip,
+	// kindStandingTip its tip.
+	kindStanding
+	kindStandingTip
 )
 
 // Cauldrons is the cauldron side. Runs: owner of the region.
@@ -63,17 +67,19 @@ type Cauldrons interface {
 	Drip(r *world.Region, pos cube.Pos, lava bool)
 }
 
-// Ticker adds dripping into cauldrons to another BlockTicker.
+// Ticker adds dripping into cauldrons, and pointed dripstone breaking and falling, to another
+// BlockTicker.
 type Ticker struct {
 	world.BlockTicker
 	air       uint32
 	kinds     []kind
 	cauldrons Cauldrons
+	falls     Falls
 }
 
 // NewTicker returns a Ticker that hands everything else to next.
-func NewTicker(blocks *registry.Blocks, cauldrons Cauldrons, next world.BlockTicker) *Ticker {
-	t := &Ticker{BlockTicker: next, air: blocks.Air(), cauldrons: cauldrons, kinds: make([]kind, blocks.Count())}
+func NewTicker(blocks *registry.Blocks, cauldrons Cauldrons, falls Falls, next world.BlockTicker) *Ticker {
+	t := &Ticker{BlockTicker: next, air: blocks.Air(), cauldrons: cauldrons, falls: falls, kinds: make([]kind, blocks.Count())}
 	for id := range uint32(blocks.Count()) { //nolint:gosec // block counts fit
 		t.kinds[id] = kindOf(blocks, id)
 	}
@@ -85,10 +91,14 @@ func kindOf(blocks *registry.Blocks, id uint32) kind {
 	states := blocks.States(id)
 	switch blocks.Name(id) {
 	case nameDripstone:
+		th, _ := states[stateThickness].(string)
 		if hanging, _ := states[stateHanging].(uint8); hanging == 0 {
-			return kindOther
+			if th == thicknessTip {
+				return kindStandingTip
+			}
+			return kindStanding
 		}
-		if th, _ := states[stateThickness].(string); th == thicknessTip {
+		if th == thicknessTip {
 			return kindTip
 		}
 		return kindHanging
@@ -174,30 +184,20 @@ func (t *Ticker) dripFromBase(r *world.Region, base cube.Pos, lava bool) {
 	}
 }
 
-// tipBelow follows a stalactite down from pos to its tip, within reach.
+// tipBelow follows a stalactite down from pos to its tip, within reach (see lowestHanging).
 func (t *Ticker) tipBelow(r *world.Region, pos cube.Pos) (cube.Pos, bool) {
-	for range reach {
-		switch t.kind(r, pos) {
-		case kindTip:
-			return pos, true
-		case kindHanging:
-			pos = pos.Side(cube.FaceDown)
-		default:
-			return pos, false
-		}
-	}
-	return pos, false
+	return t.lowestHanging(r, pos, reach)
 }
 
-// fluidAbove is BDS's 0xD5531E0: from a hanging dripstone up to its base (within reach), the
-// source above the base, lava or water.
+// fluidAbove is BDS's 0xD5531E0: from a hanging dripstone up past the stalactite to the block
+// it hangs from (0xD500250, within reach), then the source on top of that block, lava or water.
 func (t *Ticker) fluidAbove(r *world.Region, pos cube.Pos) (lava, ok bool) {
 	for range reach {
-		above := pos.Side(cube.FaceUp)
-		switch t.kind(r, above) {
-		case kindHanging, kindTip:
-			pos = above
+		pos = pos.Side(cube.FaceUp)
+		if k := t.kind(r, pos); k == kindHanging || k == kindTip {
 			continue
+		}
+		switch t.kind(r, pos.Side(cube.FaceUp)) {
 		case kindWater:
 			return false, true
 		case kindLava:
@@ -229,8 +229,13 @@ func (t *Ticker) cauldronBelow(r *world.Region, tip cube.Pos, lava bool) (cube.P
 }
 
 // QueuedTick is the cauldron's queued tick, its dripstone part: a tip within reach above,
-// through air, with a source above its base, fills the cauldron if it takes the fluid.
+// through air, with a source above its base, fills the cauldron if it takes the fluid. A
+// pointed dripstone's own tick is in fall.go.
 func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
+	if int(block) < len(t.kinds) && isDripstone(t.kinds[block]) {
+		t.tickDripstone(r, pos, block)
+		return
+	}
 	if int(block) >= len(t.kinds) || t.kinds[block] != kindCauldron {
 		if t.BlockTicker != nil {
 			t.BlockTicker.QueuedTick(r, pos, block)
@@ -256,7 +261,7 @@ func (t *Ticker) tipAbove(r *world.Region, pos cube.Pos) (cube.Pos, bool) {
 		if pos[1] > rg[1] {
 			return pos, false
 		}
-		if t.kind(r, pos) == kindTip {
+		if isHanging(t.kind(r, pos)) {
 			return pos, true
 		}
 		if b, ok := r.Block(pos, 0); !ok || b != t.air {

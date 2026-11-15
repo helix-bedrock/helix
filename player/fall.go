@@ -95,12 +95,17 @@ func vanillaFallDamage(p *Player, distance float32) {
 	if amp, ok := p.Effect(EffectJumpBoost); ok {
 		boost = float32(amp + 1)
 	}
-	damage := float32(math.Ceil(float64(distance-p.Tuning(TuneFallFree)-boost))) * p.Tuning(TuneFallDamageScale)
+	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
+	pos := vecPos(feet)
+	scale, cause := float32(1), DamageFall
+	if p.s.onStalagmiteTip(r, pos) {
+		distance += stalagmiteExtraFall
+		scale, cause = stalagmiteScale, causeStalagmite
+	}
+	damage := float32(math.Ceil(float64(scale*(distance-p.Tuning(TuneFallFree)-boost)))) * p.Tuning(TuneFallDamageScale)
 	if !p.s.fallHurts() {
 		damage = 0
 	}
-	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
-	pos := vecPos(feet)
 	p.trample(r, feet, distance)
 	if damage > 0 && !p.invulnerable() {
 		sound := packet.SoundEventFallSmall
@@ -108,7 +113,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 			sound = packet.SoundEventFallBig
 		}
 		playSound(r, pos, soundEvent{name: sound, pos: feet, extra: -1, entity: "minecraft:player"}, p.viewer)
-		p.s.game.sys.Hurt(p, damage, DamageSource{Cause: DamageFall})
+		p.s.game.sys.Hurt(p, damage, DamageSource{Cause: cause})
 	}
 	sound := packet.SoundEventLand
 	if damage > 0 {

@@ -173,6 +173,13 @@ func (v *Vanilla) fill(pos mcdb.ChunkPos, c *chunk.Chunk, col *chunk.Column) {
 
 // SpawnHeight is the Y above the highest block of the column at x, z that
 // is not air or water, in the undecorated terrain, never below sea level.
+// EnderEyeTarget is where an eye of ender thrown at block (x, z) flies to: the stronghold the
+// worldgen library's search finds (BDS's StrongholdFeature search).
+func (v *Vanilla) EnderEyeTarget(x, z int32) (cube.Pos, bool) {
+	bx, by, bz, ok := v.gen.EnderEyeTarget(x, z)
+	return cube.Pos{int(bx), int(by), int(bz)}, ok
+}
+
 // BDS's own spawn search is not ported; this is a stand-in.
 func (v *Vanilla) SpawnHeight(x, z int32) int32 {
 	wc, ok := v.pool.Get().(*overworld.Chunk)

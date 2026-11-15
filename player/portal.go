@@ -402,6 +402,7 @@ func (p *Player) useEnderEye(r *world.Region, pos cube.Pos) bool {
 	r.UpdateNeighbours(pos)
 	playSound(r, pos, soundEvent{name: packet.SoundEventEnderEyePlaced, pos: blockCenter(pos), extra: -1}, nil)
 	p.useUpHeld()
+	p.thrownAt = r.CurrentTick()
 	if mid, opened := p.s.portals.OpenEndPortal(r, pos); opened {
 		playSound(r, mid, soundEvent{name: packet.SoundEventEndPortalCreated, pos: blockCenter(mid), extra: -1}, nil)
 	}

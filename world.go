@@ -251,7 +251,7 @@ func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
 	s.fire.SetCampfireWet(s.campfireWet)
 	s.falling = falls
 
-	dripping := drip.NewTicker(s.reg.Blocks, serverCauldrons{s}, s.fire)
+	dripping := drip.NewTicker(s.reg.Blocks, serverCauldrons{s}, serverDripstone{s: s, attached: attached}, s.fire)
 	portals := portal.NewTicker(s.portals, s.dimensionOf, dripping)
 	connections := connect.NewTicker(table, portals)
 	uses := blockuse.NewTicker(s.reg.Blocks, connections)
@@ -457,6 +457,27 @@ func (c serverCauldrons) Drip(r *world.Region, pos cube.Pos, lava bool) {
 	if host := c.s.players.Load(); host != nil {
 		host.Drip(r, pos, lava)
 	}
+}
+
+// serverDripstone hands pointed dripstone losing its hold to the players' host once it exists.
+type serverDripstone struct {
+	s        *Server
+	attached *attach.Table
+}
+
+func (d serverDripstone) Supports(block uint32, face cube.Face) bool {
+	return d.attached.Supports(block, face)
+}
+
+func (d serverDripstone) FallStalactite(r *world.Region, pos cube.Pos, block uint32, hurtPerBlock float32) bool {
+	if host := d.s.players.Load(); host != nil {
+		return host.FallStalactite(r, pos, block, hurtPerBlock)
+	}
+	return false
+}
+
+func (d serverDripstone) Break(r *world.Region, pos cube.Pos, block uint32) {
+	d.s.fallBlock(r, pos, block)
 }
 
 // precipitation is rain or snow reaching the block at pos: cauldrons fill.

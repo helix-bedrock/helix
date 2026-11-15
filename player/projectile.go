@@ -974,6 +974,7 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 			f.ProjectileHitDripleaf(r, hit.block)
 		}
 		t.tridentOnRod(r, hit.block)
+		t.tridentBreaksDripstone(r, hit.block)
 		t.s.ProjectileHitPot(r, hit.block)
 		if t.spec.Stick {
 			t.stickIn(e, hit)
@@ -1189,9 +1190,14 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 	}
 	eyes := at.Add(mgl32.Vec3{0, eyeHeight, 0})
 	rot := p.entity.Rotation()
+	from := p.entity.Position()
 	if !p.entity.Apply(world.Movement{Pos: eyes, Rot: rot, Tick: p.entity.Tick()}) {
 		return
 	}
+	// BDS's projectile teleport (sub_714F4B0) plays the pearl's sound, LevelEvent 1032, where
+	// the player left and where they arrived.
+	levelEvent(r, vecPos(from), from, packet.LevelEventSoundTeleportEnderPearl, 0)
+	levelEvent(r, vecPos(eyes), eyes, packet.LevelEventSoundTeleportEnderPearl, 0)
 	p.move.fall = 0
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,

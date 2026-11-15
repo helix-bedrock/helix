@@ -59,6 +59,23 @@ func (d *Dimension) GeneratedMobs(pos mcdb.ChunkPos) []GeneratedMob {
 	return nil
 }
 
+// EnderEyeTargeter is a Generator that places strongholds. EnderEyeTarget returns where an
+// eye of ender thrown at block (x, z) flies to, false when there is none. It may be called
+// from any goroutine.
+type EnderEyeTargeter interface {
+	EnderEyeTarget(x, z int32) (cube.Pos, bool)
+}
+
+// EnderEyeTarget asks the dimension's generator where an eye of ender thrown at block (x, z)
+// flies to (see EnderEyeTargeter); false when the generator places no strongholds, as in the
+// Nether and the End. Runs: anywhere.
+func (d *Dimension) EnderEyeTarget(x, z int32) (cube.Pos, bool) {
+	if g, ok := d.conf.Generator.(EnderEyeTargeter); ok {
+		return g.EnderEyeTarget(x, z)
+	}
+	return cube.Pos{}, false
+}
+
 // Spawner is a Generator that knows where a player can stand: the Y of the
 // block above the ground of the column at x, z. Joining players start there
 // while the world has not placed its spawn. It may be called from any
