@@ -54,10 +54,11 @@ func (f *FallingBlock) hurtLanding(r *world.Region, e *world.Entity) {
 	if f.hurtPerBlock <= 0 {
 		return
 	}
-	blocks := float32(math.Ceil(float64(f.fallen - 1)))
+	blocks := fallenBlocks(f.fallen)
 	if blocks <= 0 {
 		return
 	}
+	defer f.wearAnvil(blocks)
 	damage := min(float32(math.Floor(float64(blocks*f.hurtPerBlock))), fallingHurtMost)
 	if damage <= 0 {
 		return

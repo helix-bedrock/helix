@@ -375,8 +375,9 @@ sibling library folders, so unreleased library changes are used.
   with its drops (`Ticker.SetBreak`), so a tower whose base goes comes down. `player/scaffolding.go`
   is the item: using it on scaffolding builds on top of the column. A falling block can hurt the mobs
   it lands in (FallingBlockActor's causeFallDamage: floor(ceil(fallen - 1) * per block), at
-  most 40); only falling stalactites use it so far. Not done: anvil damage, chipping and
-  landing sound, concrete powder hardening, suspicious sand and gravel, entities that break
+  most 40): falling stalactites, and anvils (`player/anvilfall.go`: 2 a block, cause Anvil; a
+  landing wears the anvil by chance 0.05 + 0.05 a block, chipped, damaged, then it breaks and
+  vanishes; LevelEvent 1022 when one lands). Not done: concrete powder hardening, suspicious sand and gravel, entities that break
   falling blocks.
 - `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
   with its `Ticker` for buttons popping out and doors breaking.

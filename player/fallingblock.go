@@ -70,6 +70,8 @@ type FallingBlock struct {
 	hurtCause    DamageCause
 	shatters     bool
 	found        []*world.Entity
+	// anvil is set for a falling anvil, broken once its landing wore it out (anvilfall.go).
+	anvil, broken bool
 }
 
 // Entity returns its entity.
@@ -143,6 +145,7 @@ func (s *Host) SpawnFallingBlock(d *world.Dimension, pos mgl32.Vec3, block uint3
 }
 
 func (f *FallingBlock) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
+	f.setupHurt()
 	f.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	return world.EntityConfig{
 		UniqueID: uniqueID, RuntimeID: runtimeID, Pos: pos, Rot: rot,
@@ -205,7 +208,7 @@ func (f *FallingBlock) tick(e *world.Entity) {
 			f.hurtLanding(r, e)
 			f.fallen = 0
 		}
-		if f.noDrop {
+		if f.noDrop || f.broken {
 			f.remove(e)
 			return
 		}
@@ -213,6 +216,9 @@ func (f *FallingBlock) tick(e *world.Entity) {
 			f.landed, f.wait, f.vel = true, 0, mgl32.Vec3{}
 			if f.shatters {
 				f.shatter(r, at)
+			}
+			if f.anvil {
+				anvilLanded(r, at)
 			}
 			return
 		}
