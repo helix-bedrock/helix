@@ -67,6 +67,7 @@ func (m *Mob) SetFlag(n int, on bool) {
 		return
 	}
 	m.flags.Set(n, on)
+	m.traceFlag(n, on)
 	m.flagsChanged()
 }
 

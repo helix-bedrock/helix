@@ -212,6 +212,7 @@ func (p *Player) entityRemoved(e *world.Entity) {
 	p.StopSleeping()
 	p.leaveChest(nil, false)
 	p.dropLeashes(e.Region())
+	p.mobDebugStop(e.Region())
 	if mv := p.moving; mv != nil {
 		p.moving = nil
 		p.arrive(mv)

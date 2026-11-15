@@ -23,6 +23,7 @@ import (
 	"github.com/helix-bedrock/entity/physics"
 	"github.com/helix-bedrock/entity/sensor"
 	"github.com/helix-bedrock/entity/state"
+	"github.com/helix-bedrock/entity/trace"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -175,6 +176,10 @@ type Mob struct {
 	movement    component.Movement
 	hasMove     bool
 	ctl         move.Control
+	// trace records what the mob does each tick while someone watches it (trace.go);
+	// tracePathAt is the path length and node last recorded.
+	trace       *trace.Log
+	tracePathAt [2]int
 	look        move.Look
 	jump        move.Jump
 	lookSet     bool
@@ -368,6 +373,10 @@ func boxAt(p path.Vec3, w, h float32) path.Box {
 // ended and it should be removed.
 func (m *Mob) Tick(r *world.Region) (remove bool) {
 	m.v.r = r
+	if !m.trace.Step() {
+		return false
+	}
+	m.traceTick()
 	m.thinking = true
 	remove = m.think()
 	m.thinking = false
@@ -406,6 +415,7 @@ func (m *Mob) think() (remove bool) {
 			m.nv.Tick(pathWorld{&m.v}, &nm)
 		}
 		m.openDoorsTick(&nm)
+		m.traceWanted()
 	}
 	m.moveControl()
 	m.lookControl()
@@ -567,7 +577,7 @@ func (m *Mob) navMob() nav.Mob {
 		CanFly: m.flags.Has(nav.ActorCanFly), CanSwim: m.flags.Has(nav.ActorCanSwim), CanWalk: m.flags.Has(nav.ActorCanWalk),
 		OnGround: m.body.OnGround, WasInWater: m.body.WasInWater, InLava: m.body.Travel() == physics.TravelLava,
 		HorizontalCollision: m.body.HorizontalCollision[0] || m.body.HorizontalCollision[1],
-		Actor:               flagActor{m}, Difficulty: m.rt.Env.Difficulty(), MobGriefing: m.rt.Env.MobGriefing(),
+		Actor:               flagActor{m}, Difficulty: m.rt.Env.Difficulty(), MobGriefing: m.rt.Env.MobGriefing(), Trace: m.trace,
 		FireImmune: m.flags.Has(behavior.FlagFireImmune), OpensDoors: m.flags.Has(behavior.FlagDoorOpener),
 	}
 	if m.hasMove {
@@ -778,11 +788,13 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 	attacker := m.actor(by)
 	amount, ok := m.damageSensed(amount, cause, attacker)
 	if !ok || amount <= 0 {
+		m.traceHurt("hurt stopped by damage sensor", amount, cause)
 		return 0
 	}
 	dealt := amount
 	if m.hurtTime > 0 {
 		if amount <= m.lastHurtAmount {
+			m.traceHurt("hurt ignored in hurt time", amount, cause)
 			return 0
 		}
 		dealt = amount - m.lastHurtAmount
@@ -793,6 +805,7 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 	if h, ok := m.hooks.(ArmorHooks); ok {
 		dealt = h.AfterArmor(m, dealt, cause)
 	}
+	m.traceHurt("hurt", dealt, cause)
 	m.health = max(m.health-dealt, 0)
 	m.lastCause = cause
 	if by != behavior.NoID {

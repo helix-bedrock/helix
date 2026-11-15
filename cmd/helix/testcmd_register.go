@@ -188,6 +188,15 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return lightning(srv.Load(), p, args)
 		}},
+		{"mobdebug", "Watches mobs: (look at one), near [r], type <id> [r], list, pause, resume, step [n], dump, off.", nil, func(p *player.Player, args []string) string {
+			if !registry() {
+				return ""
+			}
+			if !p.MobDebug(args) {
+				return "Could not reach your region."
+			}
+			return ""
+		}},
 		{tpsCommand, "Shows the server's, your region's and your client's ticks per second.", nil, func(p *player.Player, _ []string) string {
 			if !registry() {
 				return ""
