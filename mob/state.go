@@ -241,7 +241,6 @@ func (s stateMob) SetAirSupply(air, maxAir int16) {
 func (stateMob) SetOwner(behavior.ID)                         {}
 func (stateMob) DropItem(string) bool                         { return false }
 func (stateMob) AddEffect(string, int32, int32)               {}
-func (stateMob) CanAttack(behavior.Actor, bool) bool          { return false }
 func (stateMob) Particles(int, int)                           {}
 func (stateMob) MakeMad()                                     {}
 func (stateMob) SlotEmpty(string) bool                        { return true }
@@ -284,4 +283,17 @@ func (m *Mob) Interact(player behavior.Actor) (json.RawMessage, bool) {
 	raw := in.Config().Interactions[i].Raw
 	in.Run(&m.stateEnv, i, player)
 	return raw, true
+}
+
+// CanAttack is Actor::canAttack for the state components (minecraft:angry asks it before
+// staying angry). It answered false for everything before, so an angry mob calmed down on
+// its first tick, and a spider re-angered by hurt_by_target flipped calm and angry every
+// tick, rebuilding its goals and leaping again in mid-air. A forced check (an anger a
+// plugin or command forces) leaves out the game mode test; that reading of forced is
+// assumed, not traced.
+func (s stateMob) CanAttack(a behavior.Actor, forced bool) bool {
+	if forced {
+		return a != nil && a.Alive() && a.ID() != s.id
+	}
+	return s.Mob.CanAttack(a)
 }
