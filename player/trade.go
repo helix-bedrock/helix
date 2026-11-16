@@ -242,6 +242,7 @@ func (o *Mob) tickTrades(r *world.Region) {
 	switch on := o.m.Resupplying(); {
 	case on && !t.resupplied:
 		o.resupplyTrades()
+		o.syncTradeWants()
 		t.resupplied = true
 	case !on:
 		t.resupplied = false
@@ -519,7 +520,7 @@ func (o *Mob) syncTradeWants() {
 	if o.trades != nil {
 		w = make([]mob.TradeWant, 0, len(o.trades.offers))
 		for _, off := range o.trades.offers {
-			w = append(w, mob.TradeWant{BuyA: behaviorItem(off.buyA), BuyB: behaviorItem(off.buyB), Sell: behaviorItem(off.sell), Tier: off.tier})
+			w = append(w, mob.TradeWant{BuyA: behaviorItem(off.buyA), BuyB: behaviorItem(off.buyB), Sell: behaviorItem(off.sell), Tier: off.tier, Uses: off.uses, MaxUses: off.maxUses})
 		}
 	}
 	o.m.SetTradeWants(w)
@@ -776,6 +777,7 @@ func (p *Player) afterTrade(index int, times uint8) {
 			p.s.SpawnExperience(r, at, orbs)
 		}
 	}
+	o.syncTradeWants()
 	if o.m.TradeTier() != tierBefore {
 		p.sendTrade(o)
 	}

@@ -27,6 +27,9 @@ const (
 type TradeWant struct {
 	BuyA, BuyB, Sell behavior.Item
 	Tier             int32
+	// Uses and MaxUses are how often the offer was used since the last
+	// restock and how often it may be; a negative MaxUses has no limit.
+	Uses, MaxUses int32
 }
 
 // tradeState is the mob's trade state.
@@ -115,20 +118,25 @@ func (m *Mob) HeldItem(id behavior.ID) behavior.Item {
 // CanSeePlayer is the visibility cache's answer: villagers have none, so always.
 func (m *Mob) CanSeePlayer(behavior.ID) bool { return true }
 
-// TradeShow is the sell item of the first unlocked offer from index from on that wants the
-// held item, and the index after it.
-func (m *Mob) TradeShow(held behavior.Item, from int) (behavior.Item, int, bool) {
-	tier := m.TradeTier()
-	for i := max(from, 0); i < len(m.trade.wants); i++ {
-		w := m.trade.wants[i]
-		if w.Tier > tier {
-			continue
-		}
-		if sameKind(w.BuyA, held) || sameKind(w.BuyB, held) {
-			return w.Sell, i + 1, true
-		}
+// TradeCount is the number of offers.
+func (m *Mob) TradeCount() int { return len(m.trade.wants) }
+
+// TradeWants is offer i's sell item when it is in stock, at or below the trade tier and its
+// first buy item is held (TradeInterestGoal reads only buyA).
+func (m *Mob) TradeWants(i int, held behavior.Item) (behavior.Item, bool) {
+	if i < 0 || i >= len(m.trade.wants) {
+		return behavior.Item{}, false
 	}
-	return behavior.Item{}, 0, false
+	w := m.trade.wants[i]
+	if w.MaxUses >= 0 && w.Uses >= w.MaxUses || w.Tier > m.TradeTier() || !sameKind(w.BuyA, held) {
+		return behavior.Item{}, false
+	}
+	return w.Sell, true
+}
+
+// MatchesItem is the same item, aux 0 matching any.
+func (m *Mob) MatchesItem(a, b behavior.Item) bool {
+	return !a.Empty() && a.Name == b.Name && (a.Aux == 0 || b.Aux == 0 || a.Aux == b.Aux)
 }
 
 func sameKind(want, held behavior.Item) bool {
