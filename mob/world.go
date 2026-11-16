@@ -59,6 +59,9 @@ type Env interface {
 	GameRule(name string) (value, ok bool)
 	// RainingAt reports rain falling on pos: the weather, the biome and the sky.
 	RainingAt(r *world.Region, pos cube.Pos) bool
+	// BiomeRains reports that the biome at pos has rain (BDS Biome +64); false where the
+	// chunk is not loaded.
+	BiomeRains(r *world.Region, pos cube.Pos) bool
 	// SetDoorOpen opens or closes the door at p as a mob does, with its sound.
 	SetDoorOpen(r *world.Region, p behavior.Pos, open bool)
 	// LevelEventData sends the level event at p with a number as its data.

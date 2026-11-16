@@ -35,6 +35,16 @@ func (s *Host) BiomeName(r *world.Region, pos cube.Pos) (string, bool) {
 	return b.Name, ok
 }
 
+// BiomeRains reports that the biome at pos has rain.
+func (s *Host) BiomeRains(r *world.Region, pos cube.Pos) bool {
+	id, ok := r.Biome(pos)
+	if !ok {
+		return false
+	}
+	b, ok := s.reg.Biomes.ByID(id)
+	return ok && b.Rain
+}
+
 // DayTime is the overworld clock's time.
 func (s *Host) DayTime() int32 {
 	if s.clock == nil {

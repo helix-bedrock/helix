@@ -7,6 +7,7 @@ import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/nav"
 	"github.com/helix-bedrock/entity/path"
+	"github.com/helix-bedrock/helix/blockuse"
 	"github.com/helix-bedrock/helix/village"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -333,12 +334,47 @@ func (m *Mob) PlayWorkSound(sound string) {
 // the iron golem spawn, which is not built.
 func (m *Mob) StampWork() {}
 
-// WantsShelter reports a reason to be indoors: night or rain on the mob.
-func (m *Mob) WantsShelter() bool {
+// The move_indoors facts (BDS 1.26.60 MoveIndoorsGoal::canUse 0x5437360).
+const (
+	// shelterRain is the rain level above which the level counts as raining.
+	shelterRain = 0.2
+	// dimensionOverworld and dimensionNether are BDS's dimension numbers: only the
+	// overworld is a natural dimension, only the nether has a ceiling.
+	dimensionOverworld = 0
+	dimensionNether    = 1
+)
+
+// HasCeiling reports that the mob's dimension has a ceiling.
+func (m *Mob) HasCeiling() bool { return m.Dimension() == dimensionNether }
+
+// ShelterTime is the time part of BDS's villager gate on move_indoors: true for a mob
+// that is not a villager, outside the overworld, or once the sky is dark.
+func (m *Mob) ShelterTime() bool {
+	if m.typ != "minecraft:villager" && m.typ != "minecraft:villager_v2" {
+		return true
+	}
+	if m.Dimension() != dimensionOverworld || m.v.r == nil {
+		return true
+	}
+	return m.rt.Env.SkyDarken(m.v.r) >= nightDarken
+}
+
+// RainOver reports that the level rains and the biome at p has rain; cover and
+// temperature are not checked.
+func (m *Mob) RainOver(p behavior.Pos) bool {
+	if m.v.r == nil || m.rt.Env.Rain(m.v.r) <= shelterRain {
+		return false
+	}
+	return m.rt.Env.BiomeRains(m.v.r, cube.Pos{int(p.X), int(p.Y), int(p.Z)})
+}
+
+// SecondPart reports a two-part block at p (a bed).
+func (m *Mob) SecondPart(p behavior.Pos) bool {
 	if m.v.r == nil {
 		return false
 	}
-	return m.rt.Env.SkyDarken(m.v.r) >= nightDarken || m.RainingAt(blockAt(m.body.Pos))
+	b, ok := m.v.r.Block(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, 0)
+	return ok && blockuse.IsBed(m.v.blocks.reg, b)
 }
 
 func blockAt(p behavior.Vec3) behavior.Pos {
