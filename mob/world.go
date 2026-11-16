@@ -363,13 +363,23 @@ func (w goalWorld) IsDay() bool        { return w.env.SkyDarken(w.r) < 4 }
 func (w goalWorld) RainLevel() float32 { return w.env.Rain(w.r) }
 
 func (w goalWorld) AboveTopSolid(x, z int32) int32 {
-	rg := w.r.Dimension().Range()
-	for y := int32(rg[1]); y >= int32(rg[0]); y-- { //nolint:gosec // world heights fit
+	return w.aboveTopSolidFrom(x, int32(w.r.Dimension().Range()[1]), z) //nolint:gosec // world heights fit
+}
+
+// AboveTopSolidAt is the BlockPos form of getAboveTopSolidBlock: the search
+// starts at p.Y, or the top when that is lower.
+func (w goalWorld) AboveTopSolidAt(p behavior.Pos) int32 {
+	return w.aboveTopSolidFrom(p.X, min(p.Y, int32(w.r.Dimension().Range()[1])), p.Z) //nolint:gosec // world heights fit
+}
+
+func (w goalWorld) aboveTopSolidFrom(x, top, z int32) int32 {
+	low := int32(w.r.Dimension().Range()[0]) //nolint:gosec // world heights fit
+	for y := top; y >= low; y-- {
 		if w.blocks.Goal(w.block(path.Pos{X: x, Y: y, Z: z}, 0)).Solid {
 			return y + 1
 		}
 	}
-	return int32(rg[0]) //nolint:gosec // world heights fit
+	return low
 }
 
 func (w goalWorld) MaxHeight() int32 { return int32(w.r.Dimension().Range()[1]) + 1 } //nolint:gosec // world heights fit
