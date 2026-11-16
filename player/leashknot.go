@@ -258,6 +258,7 @@ func (a knotActor) Eyes() behavior.Vec3                { return a.pos }
 func (a knotActor) Alive() bool                        { return true }
 func (a knotActor) Removed() bool                      { return false }
 func (a knotActor) Pickable() bool                     { return false }
+func (a knotActor) Interacts() bool                    { return true }
 func (a knotActor) IsMob() bool                        { return false }
 func (a knotActor) IsPlayer() bool                     { return false }
 func (a knotActor) Flag(int) bool                      { return false }

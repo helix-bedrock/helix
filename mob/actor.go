@@ -21,10 +21,14 @@ func (m *Mob) Eyes() behavior.Vec3 { p := m.body.Pos; p.Y += m.eyeHeight(); retu
 func (m *Mob) Alive() bool         { return !m.Dead() }
 func (m *Mob) Removed() bool       { return false }
 func (m *Mob) Pickable() bool      { return !m.Dead() }
-func (m *Mob) IsMob() bool         { return true }
-func (m *Mob) IsPlayer() bool      { return false }
-func (m *Mob) Flag(n int) bool     { return m.flags.Has(n) }
-func (m *Mob) GameMode() int       { return -1 }
+
+// Interacts is Actor::canInteractWithOtherEntitiesInGame, true for every
+// mob, dead or not.
+func (m *Mob) Interacts() bool { return true }
+func (m *Mob) IsMob() bool     { return true }
+func (m *Mob) IsPlayer() bool  { return false }
+func (m *Mob) Flag(n int) bool { return m.flags.Has(n) }
+func (m *Mob) GameMode() int   { return -1 }
 
 func (m *Mob) Riders() []behavior.ID              { return nil }
 func (m *Mob) Vehicle() behavior.ID               { return behavior.NoID }

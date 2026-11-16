@@ -260,6 +260,7 @@ func (s *Snapshot) Eyes() behavior.Vec3                { return s.eyes }
 func (s *Snapshot) Alive() bool                        { return s.alive }
 func (s *Snapshot) Removed() bool                      { return false }
 func (s *Snapshot) Pickable() bool                     { return s.alive }
+func (s *Snapshot) Interacts() bool                    { return true }
 func (s *Snapshot) IsMob() bool                        { return true }
 func (s *Snapshot) IsPlayer() bool                     { return false }
 func (s *Snapshot) Flag(n int) bool                    { return s.flags.Has(n) }

@@ -767,8 +767,16 @@ func (a playerActor) Eyes() behavior.Vec3 { return vec(a.p.entity.Position()) }
 func (a playerActor) Alive() bool         { return !a.p.dead() }
 func (a playerActor) Removed() bool       { return false }
 func (a playerActor) Pickable() bool      { return !a.p.dead() && a.p.gameMode != GameModeSpectator }
-func (a playerActor) IsMob() bool         { return true }
-func (a playerActor) IsPlayer() bool      { return true }
+
+// Interacts is Player::canInteractWithOtherEntitiesInGame: not a spectator,
+// dead or not.
+func (a playerActor) Interacts() bool { return a.p.gameMode != GameModeSpectator }
+
+// HasFamily is the is_family test on the player's type_family (player,
+// mob), the same families mob filters give players.
+func (a playerActor) HasFamily(f string) bool { return f == "player" || f == "mob" }
+func (a playerActor) IsMob() bool             { return true }
+func (a playerActor) IsPlayer() bool          { return true }
 
 // Flag answers no actor flag yet; goals read only baby, sitting and the like from players.
 func (a playerActor) Flag(int) bool         { return false }
