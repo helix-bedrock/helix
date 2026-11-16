@@ -71,6 +71,9 @@ func (m *Mob) SetFlag(n int, on bool) {
 	m.flagsChanged()
 }
 
+// SetPanicking implements behavior.Mob.
+func (m *Mob) SetPanicking(on bool) { m.panicking = on }
+
 // WalkTargetValue is PathfinderMob's: 0 everywhere in the minimal hookup (animals preferring
 // grass and monsters darkness is not ported yet).
 func (m *Mob) WalkTargetValue(behavior.Pos) float32 { return 0 }

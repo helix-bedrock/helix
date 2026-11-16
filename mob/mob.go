@@ -190,6 +190,9 @@ type Mob struct {
 	lookSet                bool
 	body                   physics.Body
 	flags                  path.ActorFlags
+	// panicking is BDS's IsPanickingFlagComponent: set while the panic
+	// goal runs, read by the is_panicking filter, never sent.
+	panicking bool
 	// doors is minecraft:annotation.open_door's state, nil without the component.
 	doors *nav.OpenDoors
 	// teleported is set by Teleport until the engine sends the move (TakeTeleport).

@@ -114,6 +114,8 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		return definition.CompareBool(op, moving, rawBool(test.Value, true)), true
 	case "on_fire":
 		return definition.CompareBool(op, a.Flag(flagOnFire), rawBool(test.Value, true)), true
+	case "is_panicking":
+		return definition.CompareBool(op, m != nil && m.panicking, rawBool(test.Value, true)), true
 	case "is_sitting":
 		return definition.CompareBool(op, a.Flag(behavior.FlagSitting), rawBool(test.Value, true)), true
 	case "is_sleeping":
