@@ -198,9 +198,17 @@ type Mob struct {
 	traceGround, traceFeet path.Pos
 	look                   move.Look
 	jump                   move.Jump
-	lookSet                bool
-	body                   physics.Body
-	flags                  path.ActorFlags
+	// jumpCtl is BDS's JumpControlComponent (jump.static or jump.dynamic).
+	jumpCtl bool
+	// slimer is movement.jump's slime move control state.
+	slimer move.Slimer
+	// swimDir is a squid's swim direction (Squid +1172) and squidPitch its body pitch
+	// (Squid +1156); see squid.go.
+	swimDir    behavior.Vec3
+	squidPitch float32
+	lookSet    bool
+	body       physics.Body
+	flags      path.ActorFlags
 	// panicking is BDS's IsPanickingFlagComponent: set while the panic
 	// goal runs, read by the is_panicking filter, never sent.
 	panicking bool
@@ -441,6 +449,7 @@ func (m *Mob) think() (remove bool) {
 	m.noActionTime++
 
 	noAI := m.flags.Has(FlagNoAI)
+	m.squidPreStep()
 	m.sel.Tick(noAI)
 	if m.nv != nil {
 		nm := m.navMob()
@@ -453,6 +462,7 @@ func (m *Mob) think() (remove bool) {
 	m.moveControl()
 	m.lookControl()
 	m.physicsTick()
+	m.squidStep()
 	m.bodyControl()
 	return false
 }
@@ -471,6 +481,7 @@ func (m *Mob) rebuild(comps definition.Group) {
 	m.readAttributes(comps)
 	m.readNavigation(order, comps)
 	m.readMovement(order, comps)
+	m.readJump(comps)
 	ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
 	m.readStates(ctx, comps)
 	m.readOpenDoors()
@@ -514,6 +525,14 @@ func (m *Mob) readMovement(order []string, comps definition.Group) {
 	}
 	m.movement, m.hasMove = mv, true
 	m.ctl.MaxTurn = mv.MaxTurn
+}
+
+// readJump reads whether the mob has a jump control, and gives squids their flag.
+func (m *Mob) readJump(comps definition.Group) {
+	_, static := comps[jumpStatic]
+	_, dynamic := comps[jumpDynamic]
+	m.jumpCtl = static || dynamic
+	m.body.Squid = isSquid(m.typ)
 }
 
 // readAttributes reads the attribute components the minimal hookup uses.
@@ -664,8 +683,10 @@ func (m *Mob) moveControl() {
 		move.Fly(&b, &m.ctl)
 	case "minecraft:movement.hover":
 		move.Hover(&b, &m.ctl)
+	case "minecraft:movement.jump":
+		m.slimeMove(&b)
 	default:
-		// Basic, skip, jump, sway, glide and dolphin fall back to basic walking in this
+		// Basic, skip, sway, glide and dolphin fall back to basic walking in this
 		// first hookup.
 		move.Basic(&b, &m.ctl)
 	}
@@ -691,6 +712,12 @@ func (m *Mob) lookControl() {
 		m.headYaw = approach(m.headYaw, yaw, m.look.YawSpeed)
 		m.pitch = approach(m.pitch, pitch, m.look.PitchSpeed)
 		m.look.Has = false
+		return
+	}
+	if m.look.HasYaw {
+		m.headYaw = approach(m.headYaw, m.look.Yaw, m.look.YawSpeed)
+		m.pitch = approach(m.pitch, m.look.Pitch, m.look.PitchSpeed)
+		m.look.HasYaw = false
 		return
 	}
 	m.headYaw = approach(m.headYaw, m.bodyYaw, 10)
