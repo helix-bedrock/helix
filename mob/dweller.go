@@ -398,6 +398,9 @@ func (m *Mob) SetHide(hiding, triggered bool) { m.dw.hiding, m.dw.triggered = hi
 // Raid reports a raid on the mob's village. Raids are not built.
 func (m *Mob) Raid() (exists, running bool) { return false, false }
 
+// HasVillage reports that the mob's village is loaded.
+func (m *Mob) HasVillage() bool { return m.dw.village != nil }
+
 // CanReach reports a path to p.
 func (m *Mob) CanReach(p behavior.Vec3) bool {
 	if m.nv == nil {

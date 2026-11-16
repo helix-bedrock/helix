@@ -212,10 +212,13 @@ type Mob struct {
 	attackDamage                        float32
 
 	target, lastHurtBy, lastHurtMob behavior.ID
-	lastHurtTick                    uint64
-	lastHurtStamp                   int32
-	lastHurtAmount                  float32
-	hurtTime                        int32
+	// lastHurtByPlayer is BDS's mLastHurtByPlayerId: the last player that
+	// hurt the mob.
+	lastHurtByPlayer behavior.ID
+	lastHurtTick     uint64
+	lastHurtStamp    int32
+	lastHurtAmount   float32
+	hurtTime         int32
 	// playerHitTime counts down from playerHitTicks after a player hurt the mob: Molang's
 	// query.last_hit_by_player.
 	playerHitTime int32
@@ -303,7 +306,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	}
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
-		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID},
+		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,
@@ -837,6 +840,7 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 	m.noActionTime = 0
 	m.fire(onHurt, attacker)
 	if attacker != nil && attacker.IsPlayer() {
+		m.lastHurtByPlayer = attacker.ID()
 		m.playerHitTime = playerHitTicks
 		m.fire(onHurtByPlayer, attacker)
 	}

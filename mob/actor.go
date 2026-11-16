@@ -45,6 +45,7 @@ func (m *Mob) WearsHeadOf(string) bool            { return false }
 func (m *Mob) Target() behavior.ID                { return m.target }
 func (m *Mob) HijacksMount() bool                 { return false }
 func (m *Mob) LastHurtByMob() behavior.ID         { return m.lastHurtBy }
+func (m *Mob) LastHurtByPlayer() behavior.ID      { return m.lastHurtByPlayer }
 func (m *Mob) LastHurtMob() (behavior.ID, int32)  { return m.lastHurtMob, m.lastHurtStamp }
 func (m *Mob) BlocksSpace() bool                  { return false }
 func (m *Mob) AttachPos(int) behavior.Vec3        { return m.Eyes() }
