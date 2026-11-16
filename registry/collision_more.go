@@ -232,15 +232,15 @@ func dripstoneShape(_ string, s map[string]any) []Box {
 	return []Box{{0.3125, 0, 0.3125, 0.6875, 1, 0.6875}}
 }
 
-// snowLayerShape is the shape players get: nothing under three layers'
-// worth, half a block from there, a full block when complete. BDS gives
-// items, falling blocks and some other entities other heights.
+// snowLayerShape is the shape mobs and players get in BDS 1.26.60: an eighth of a block per
+// height step, none at height 0, 0.875 at the top (TopSnowBlock's collision shape with the
+// block type's per-layer switch on, which it is in 1.26.60; checked with the component
+// oracle). The older rule (half a block from height 3, whole at 7) is what BDS does with the
+// switch off. Not ported: BDS gives items and projectiles one step more, rabbits and polar
+// bears the same, paintings none.
 func snowLayerShape(_ string, s map[string]any) []Box {
-	switch h := num(s, "height"); {
-	case h >= 7:
-		return []Box{{0, 0, 0, 1, 1, 1}}
-	case h >= 3:
-		return []Box{{0, 0, 0, 1, 0.5, 1}}
+	if h := num(s, "height"); h > 0 {
+		return []Box{{0, 0, 0, 1, float32(h) * 0.125, 1}}
 	}
 	return nil
 }
