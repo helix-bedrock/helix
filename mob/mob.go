@@ -68,7 +68,10 @@ type Runtime struct {
 	// Walk is the blocks the walk target scores look for (behavior.WalkTarget);
 	// BDS's by default. Set it before mobs tick.
 	Walk behavior.WalkBlocks
-	Log  *slog.Logger
+	// ItemRules answers the item components' item questions (items.go); nil gives mobs no
+	// item components. Set it before mobs tick.
+	ItemRules behavior.ItemRules
+	Log       *slog.Logger
 	// parser reads definitions; parsed definitions are cached by type.
 	parser *definition.Parser
 	defs   map[string]*definition.Definition
@@ -228,9 +231,17 @@ type Mob struct {
 	playerHitTime int32
 	// equip is what the mob holds and wears (equipment.go); charged and chargeAmount its
 	// crossbow's state.
-	equip        [EquipSlots]behavior.Item
-	charged      bool
-	chargeAmount int8
+	equip [EquipSlots]behavior.Item
+	// items are the item components (items.go): hasItems is set once they are built, inv is
+	// minecraft:inventory's slots, equipState minecraft:equip_item's waiting stack, and
+	// canPickUp the spawn roll pickup_based_on_chance reads.
+	items                   behavior.Items
+	hasItems                bool
+	inv                     inventory
+	equipState              behavior.EquipState
+	canPickUp, canPickUpSet bool
+	charged                 bool
+	chargeAmount            int8
 	// pushNear is scratch space for the actors pushActors finds.
 	pushNear []behavior.Actor
 	// standBoxes is scratch space for StandingOn.

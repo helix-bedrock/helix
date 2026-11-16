@@ -29,6 +29,7 @@ import (
 // setUpMobs reads every entity definition the mob runtime can run, at boot.
 func (s *Host) setUpMobs() {
 	s.mobs = mob.NewRuntime(mob.NewBlocks(s.reg.Blocks), s, s.log)
+	s.mobs.ItemRules = itemRules{s}
 	for _, t := range s.reg.EntityTypes.All() {
 		if t.Name == registry.Player || len(t.Definition) == 0 {
 			continue
@@ -637,6 +638,9 @@ func (s *Host) Actor(r *world.Region, id behavior.ID) behavior.Actor {
 	sc.list = r.AppendEntities(sc.list)
 	for _, e := range sc.list {
 		if behavior.ID(e.UniqueID()) == id {
+			if i, ok := e.Owner().(*ItemActor); ok && !i.taken {
+				return itemEntity{i}
+			}
 			return actorOf(e)
 		}
 	}

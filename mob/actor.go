@@ -229,7 +229,6 @@ func (m *Mob) CanAttack(a behavior.Actor) bool {
 	return true
 }
 
-func (m *Mob) Admiring() bool          { return false }
 func (m *Mob) PlayersTargetable() bool { return true }
 
 // --- Attacker ---

@@ -41,6 +41,7 @@ func (m *Mob) readStates(c component.Context, comps definition.Group) {
 	}
 	m.states = s
 	m.stateComps = maps.Clone(comps)
+	m.buildItems()
 	m.applySaved()
 }
 
@@ -50,6 +51,7 @@ func (m *Mob) stateTick() bool {
 	if m.despawned {
 		return true
 	}
+	m.rollPickUp()
 	if m.geneEvents && m.states != nil && m.states.Genetics != nil {
 		// GeneticsComponent's initialize: a new mob's random genes run their variants' birth
 		// events (a goat's born_default adds its milking interaction).

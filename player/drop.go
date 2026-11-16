@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/helix-bedrock/entity/behavior"
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -45,6 +46,7 @@ func vanillaDropItem(p *Player, s ItemStack, randomly bool) bool {
 	pos, rot := p.entity.Position(), p.entity.Rotation()
 	pos[1] -= dropHeightBelowEyes
 	i := p.s.newItem(s, p.dropVelocity(rot, randomly), dropPickupDelay, dropThrowTime)
+	i.thrower = behavior.ID(p.uniqueID)
 	if g := p.s.game; g.itemDropEv.Has() {
 		e := ItemDropEvent{Player: p, Item: i}
 		g.itemDropEv.fire(p.s.log, &e)

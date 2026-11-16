@@ -27,6 +27,9 @@ const (
 	opParticle
 	opSetMobTarget
 	opMobEvent
+	opSetSlot
+	opDropItem
+	opPickUp
 	opActorEvent
 	opHurt
 	opShoot
@@ -58,6 +61,8 @@ type op struct {
 	placed behavior.PlacedBlock
 	then   behavior.AttackResult
 	amount float32
+	// item is the stack of the item ops (items.go).
+	item behavior.Item
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -186,6 +191,8 @@ func (m *Mob) run(o op) {
 		env.SetDoorOpen(r, o.pos, o.n != 0)
 	case opDoorEvent:
 		env.LevelEventData(r, o.n, o.at, int32(o.amount))
+	case opSetSlot, opDropItem, opPickUp:
+		m.runItemOp(r, &o)
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r

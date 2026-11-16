@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/helix-bedrock/entity/behavior"
 	"maps"
 	"math"
 	"math/rand/v2"
@@ -88,6 +89,9 @@ type ItemActor struct {
 	view func(p *Player, v *ItemView)
 	// lifetime is the age this item vanishes at; 0 is the server's.
 	lifetime int32
+	// thrower is the player who dropped the item, NoID for none (not saved): admiring and
+	// bartering mobs read it.
+	thrower behavior.ID
 }
 
 // ItemLifetimeForever is a lifetime that never ends.
@@ -117,7 +121,7 @@ func (s *Host) newItem(stack ItemStack, vel mgl32.Vec3, pickupDelay, throwTime i
 	// A stack in the world has no slot, so no network ID the client names.
 	stack.netID = 0
 	s.offload(stack)
-	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime, health: itemHealth}
+	return &ItemActor{s: s, stack: stack, vel: vel, pickupDelay: pickupDelay, throwTime: throwTime, health: itemHealth, thrower: behavior.NoID}
 }
 
 // addTo puts the item in the dimension.

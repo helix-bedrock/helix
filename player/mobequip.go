@@ -139,7 +139,7 @@ func (m *Mob) setItem(slot int, it ItemStack) {
 	}
 	it = m.s.freshStack(it)
 	m.items.stacks[slot] = it
-	m.m.SetEquipment(slot, behavior.Item{Name: it.Name, Aux: it.Meta, Count: int32(it.Count)})
+	m.m.SetEquipment(slot, mobItem(it))
 }
 
 // handPacket and armourPacket are the mob's equipment as those who see it get it.

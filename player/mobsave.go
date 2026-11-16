@@ -91,6 +91,7 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	o.saveActor(e, data)
 	o.saveMobState(data)
 	o.saveEquipment(data)
+	o.saveMobItems(data)
 	data["Attributes"] = o.saveAttributes(prevAttrs)
 	o.saveBreeding(data)
 	o.saveTrades(data)
@@ -246,6 +247,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 		}
 	}
 	o.loadEquipment(saved.Data)
+	o.loadMobItems(saved.Data)
 	if o.stand != nil {
 		o.loadArmorStand(saved.Data)
 	}
@@ -345,3 +347,59 @@ func (o *Mob) loadBreeding(data map[string]any) {
 		o.m.SetLeashHolder(behavior.ID(id))
 	}
 }
+
+// The item component fields BDS saves: Actor's canPickupItems and hasSetCanPickupItems
+// (addAdditionalSaveData 0xB3990DD, 1.26.60), the spawn roll pickup_based_on_chance reads,
+// and the minecraft:inventory container as ChestItems, each stack with its Slot.
+const (
+	mobKeyCanPickUp    = "canPickupItems"
+	mobKeyCanPickUpSet = "hasSetCanPickupItems"
+	mobKeyChestItems   = "ChestItems"
+)
+
+// saveMobItems writes the pick-up roll and the inventory.
+func (o *Mob) saveMobItems(data map[string]any) {
+	can, set := o.m.PickUpLoot()
+	data[mobKeyCanPickUp] = boolByte(can)
+	data[mobKeyCanPickUpSet] = boolByte(set)
+	inv := o.m.Inventory()
+	if inv == nil {
+		return
+	}
+	list := make([]any, 0, len(inv))
+	for k, it := range inv {
+		if st := realStack(it); !st.Empty() {
+			list = append(list, st.nbt(k, true))
+		}
+	}
+	data[mobKeyChestItems] = list
+}
+
+// loadMobItems puts back the pick-up roll and the inventory.
+func (o *Mob) loadMobItems(data map[string]any) {
+	can, _ := data[mobKeyCanPickUp].(uint8)
+	set, _ := data[mobKeyCanPickUpSet].(uint8)
+	o.m.SetPickUpLoot(can != 0, set != 0)
+	list, _ := data[mobKeyChestItems].([]any)
+	if len(list) == 0 {
+		return
+	}
+	var slots []behavior.Item
+	for _, e := range list {
+		m, _ := e.(map[string]any)
+		slot, _ := m["Slot"].(uint8)
+		it := itemFromNBT(m)
+		if it.Empty() || int(slot) >= maxMobInventory {
+			continue
+		}
+		o.s.offload(it)
+		for len(slots) <= int(slot) {
+			slots = append(slots, behavior.Item{})
+		}
+		slots[slot] = mobItem(o.s.freshStack(it))
+	}
+	o.m.SetInventory(slots)
+}
+
+// maxMobInventory bounds the slot numbers a save may name.
+const maxMobInventory = 256
