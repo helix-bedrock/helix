@@ -56,6 +56,15 @@ func (n *navigator) PathTo(a behavior.Actor) (behavior.Pos, bool) {
 	return lastNode(m.nv.CreatePathToMob(&nm, pathfinder{m}, a.Pos()))
 }
 
+// PathToStatus is MeleeAttackBaseGoal::canUse's path test (1.26.60
+// 0x54325B0): any path made, and whether it reaches the entity.
+func (n *navigator) PathToStatus(a behavior.Actor) (ok, complete bool) {
+	m := n.m
+	nm := m.navMob()
+	p := m.nv.CreatePathToMob(&nm, pathfinder{m}, a.Pos())
+	return p != nil, p != nil && p.Status == path.StatusComplete
+}
+
 func (n *navigator) CanPathTo(p behavior.Vec3) bool {
 	_, ok := n.PathToPoint(p)
 	return ok

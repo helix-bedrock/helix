@@ -155,6 +155,9 @@ type Hooks interface {
 	Born(m *Mob, b state.Birth) behavior.Actor
 	// Experience drops experience orbs worth amount at the mob.
 	Experience(m *Mob, amount int32)
+	// Ignite sets the entity with the ID on fire for at least seconds: a melee hit's
+	// can_spread_on_fire. It runs in the mob's Apply.
+	Ignite(m *Mob, target behavior.ID, seconds int32)
 	// LeashDropped is the mob's leash coming off (Actor::dropLeash); dropLead drops a lead
 	// item at the mob.
 	LeashDropped(m *Mob, dropLead bool)
@@ -210,6 +213,7 @@ type Mob struct {
 	speed, underwaterSpeed, followRange float32
 	lavaSpeed                           float32
 	attackDamage                        float32
+	hasAttack                           bool
 
 	target, lastHurtBy, lastHurtMob behavior.ID
 	// lastHurtByPlayer is BDS's mLastHurtByPlayerId: the last player that
@@ -527,7 +531,9 @@ func (m *Mob) readAttributes(comps definition.Group) {
 		m.followRange = v
 	}
 	m.attackDamage = 0
-	if raw, ok := comps["minecraft:attack"]; ok {
+	raw, hasAttack := comps["minecraft:attack"]
+	m.hasAttack = hasAttack
+	if hasAttack {
 		var a struct {
 			Damage json.RawMessage `json:"damage"`
 		}

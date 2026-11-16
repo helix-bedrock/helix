@@ -399,6 +399,21 @@ func (m *Mob) attackMob(o *Mob) (hit, killed bool) {
 	return true, o.Dead()
 }
 
+// Ignite is a melee hit's can_spread_on_fire: the target, a player or a mob, burns for at
+// least seconds (Actor::setOnFire).
+func (m *Mob) Ignite(_ *mob.Mob, target behavior.ID, seconds int32) {
+	r := m.entity.Region()
+	if r == nil {
+		return
+	}
+	switch e := m.s.entityByID(r, target).(type) {
+	case *Mob:
+		e.SetOnFire(seconds)
+	case *Player:
+		e.SetOnFire(seconds)
+	}
+}
+
 // Swing is the attack goals' swing. BDS's melee goal swings and sends ActorEvent 4 (data
 // 0) only while the mob holds an item (MeleeAttackBaseGoal::_attemptAttackTarget,
 // 0x5431880 in 1.26.60); the hit itself sends one more (swingEvent).

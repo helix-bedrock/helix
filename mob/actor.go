@@ -235,6 +235,16 @@ func (m *Mob) PlayersTargetable() bool { return true }
 // --- Attacker ---
 
 // Swing swings the mob's arm.
+// HasAttack reports the minecraft:attack component, which melee goals need.
+func (m *Mob) HasAttack() bool { return m.hasAttack }
+
+// Ignite sets the target alight. Melee calls it from AttackResult, which runs in Apply.
+func (m *Mob) Ignite(id behavior.ID, seconds int32) {
+	if m.hooks != nil {
+		m.hooks.Ignite(m, id, seconds)
+	}
+}
+
 func (m *Mob) Swing() { m.do(op{kind: opSwing}) }
 
 // Attack hits a with the mob's attack, in Apply when the mob is thinking; then hears the
