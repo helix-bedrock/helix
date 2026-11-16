@@ -75,6 +75,12 @@ type Properties struct {
 	HalfSlab bool
 	// SolidMaterial is set when the block's material is solid.
 	SolidMaterial bool
+	// TypeFlags is BDS's BlockProperty bit set of the block type (cube shaped, leaves,
+	// prevents jumping...; helix-data's data.BlockProperty* constants).
+	TypeFlags uint64
+	// MaterialFlags is the flag byte of the block's Material (never buildable, liquid,
+	// blocks motion...; helix-data's data.Material* constants).
+	MaterialFlags uint8
 	// Suffocates is set when BDS's breathing check calls the block solid: a mob or player
 	// whose breathing point is inside its shape has no air. Not glass, ice, leaves, slabs.
 	Suffocates bool

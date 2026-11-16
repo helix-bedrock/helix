@@ -226,6 +226,10 @@ func vanillaBlocks(s *Setup) error {
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
 	}
+	typeFlags, err := data.AllBlockTypeFlags()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
 	suffocate, err := data.SuffocatingBlocks()
 	if err != nil {
 		return fmt.Errorf("registry: vanilla: %w", err)
@@ -294,6 +298,7 @@ func vanillaBlocks(s *Setup) error {
 			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name], HalfSlab: halfSlab(st.Name),
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
 			Precipitation: precip[st.Name], Suffocates: suffocating[st.Name],
+			TypeFlags: typeFlags[st.Name].Properties, MaterialFlags: typeFlags[st.Name].MaterialFlags,
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
 		if err != nil {

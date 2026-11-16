@@ -6,6 +6,7 @@ import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/path"
 	"github.com/helix-bedrock/entity/physics"
+	"github.com/helix-bedrock/helix-data/data"
 	"github.com/helix-bedrock/helix/registry"
 )
 
@@ -17,6 +18,8 @@ type Blocks struct {
 	path  []path.BlockInfo
 	phys  []physics.Block
 	goals []behavior.Block
+	// perch is the log groups random_fly and parrots perch on (with the leaves property).
+	perch map[string]bool
 	// full is set for states whose collision is one whole block.
 	full []bool
 	// wall is what a cell of a border column reads as: the barrier, a solid block of one
@@ -40,7 +43,10 @@ const (
 // does not have yet.
 func NewBlocks(reg *registry.Blocks) *Blocks {
 	n := reg.Count()
-	b := &Blocks{reg: reg, path: make([]path.BlockInfo, n), phys: make([]physics.Block, n), goals: make([]behavior.Block, n), full: make([]bool, n)}
+	b := &Blocks{reg: reg, perch: map[string]bool{}, path: make([]path.BlockInfo, n), phys: make([]physics.Block, n), goals: make([]behavior.Block, n), full: make([]bool, n)}
+	for _, name := range behavior.DefaultWalkBlocks().Perch {
+		b.perch[name] = true
+	}
 	for id := range n {
 		b.fill(uint32(id)) //nolint:gosec // n is a state count
 	}
@@ -78,10 +84,11 @@ func (b *Blocks) fill(id uint32) {
 
 	b.goals[id] = behavior.Block{
 		Name: b.reg.Name(id), Material: mat,
-		Ground: solid && !liquid,
+		Ground: groundOf(props),
 		Solid:  solid, Liquid: liquid,
 		HasCollision: len(props.Collision) > 0, BlocksMotion: solid,
-		Tree:       strings.HasSuffix(name, "_log") || strings.HasSuffix(name, "_leaves") || strings.HasSuffix(name, "_stem") || strings.HasSuffix(name, "_wood"),
+		Tree:        props.TypeFlags&data.BlockPropertyLeaves != 0 || b.perch[b.reg.Name(id)],
+		NoJumpStart: props.TypeFlags&data.BlockPropertyPreventsJumping != 0, NoJumpLanding: props.TypeFlags&propCausesDamage != 0,
 		BlockSolid: solid && full,
 		ShapeTop:   top, ShapeHeight: height,
 		Stairs: info.Props&path.PropStairs != 0, Slab: info.Props&path.PropSlab != 0, Trapdoor: info.Props&path.PropTrapdoor != 0,
@@ -93,6 +100,18 @@ func (b *Blocks) fill(id uint32) {
 	if inf, ok := hostInfested[name]; ok {
 		b.goals[id].Infested = "minecraft:" + inf
 	}
+}
+
+// propCausesDamage is BDS's BlockProperty CausesDamage (1<<22), which keeps jump_around_target
+// from landing in the block.
+const propCausesDamage = 1 << 22
+
+// groundOf is BDS's ground test of the random position search and strolling: the material
+// blocks motion and is not never-buildable, and the block type is cube shaped. Glass,
+// leaves, slabs, fences and walls are not ground.
+func groundOf(p registry.Properties) bool {
+	return p.MaterialFlags&(data.MaterialNeverBuildable|data.MaterialBlocksMotion) == data.MaterialBlocksMotion &&
+		p.TypeFlags&data.BlockPropertyCubeShaped != 0
 }
 
 // Path returns the pathfinder's facts for a state.
