@@ -210,6 +210,7 @@ type Snapshot struct {
 	headPitch     float32
 	headYaw       float32
 	bodyYaw       float32
+	yaw           float32
 	monster       bool
 	target        behavior.ID
 	lastHurtBy    behavior.ID
@@ -241,7 +242,7 @@ func (m *Mob) snapshot() {
 	s.pos, s.eyes, s.box = m.body.Pos, m.Eyes(), m.body.Box
 	s.alive = !m.Dead()
 	s.flags = m.flags
-	s.headPitch, s.headYaw, s.bodyYaw = m.pitch, m.headYaw, m.bodyYaw
+	s.headPitch, s.headYaw, s.bodyYaw, s.yaw = m.pitch, m.headYaw, m.bodyYaw, m.yaw
 	s.monster = m.Monster()
 	s.target, s.lastHurtBy, s.lastHurtMob, s.lastHurtStamp = m.target, m.lastHurtBy, m.lastHurtMob, m.lastHurtStamp
 	s.dimension = m.Dimension()
@@ -273,18 +274,22 @@ func (s *Snapshot) Team() int                          { return 0 }
 func (s *Snapshot) Dimension() int                     { return s.dimension }
 func (s *Snapshot) HeadRotation() (pitch, yaw float32) { return s.headPitch, s.headYaw }
 func (s *Snapshot) BodyYaw() float32                   { return s.bodyYaw }
-func (s *Snapshot) Invulnerable() bool                 { return false }
-func (s *Snapshot) HasHealth() bool                    { return true }
-func (s *Snapshot) Targetable() bool                   { return !s.flags.Has(behavior.FlagCannotTarget) }
-func (s *Snapshot) Monster() bool                      { return s.monster }
-func (s *Snapshot) ArmourCoverage() float32            { return 0 }
-func (s *Snapshot) WearsHeadOf(string) bool            { return false }
-func (s *Snapshot) Target() behavior.ID                { return s.target }
-func (s *Snapshot) HijacksMount() bool                 { return false }
-func (s *Snapshot) LastHurtByMob() behavior.ID         { return s.lastHurtBy }
-func (s *Snapshot) LastHurtMob() (behavior.ID, int32)  { return s.lastHurtMob, s.lastHurtStamp }
-func (s *Snapshot) BlocksSpace() bool                  { return false }
-func (s *Snapshot) AttachPos(int) behavior.Vec3        { return s.eyes }
+
+// Yaw is the mob's ActorRotationComponent yaw, as entity's goals read it
+// from other actors.
+func (s *Snapshot) Yaw() float32                      { return s.yaw }
+func (s *Snapshot) Invulnerable() bool                { return false }
+func (s *Snapshot) HasHealth() bool                   { return true }
+func (s *Snapshot) Targetable() bool                  { return !s.flags.Has(behavior.FlagCannotTarget) }
+func (s *Snapshot) Monster() bool                     { return s.monster }
+func (s *Snapshot) ArmourCoverage() float32           { return 0 }
+func (s *Snapshot) WearsHeadOf(string) bool           { return false }
+func (s *Snapshot) Target() behavior.ID               { return s.target }
+func (s *Snapshot) HijacksMount() bool                { return false }
+func (s *Snapshot) LastHurtByMob() behavior.ID        { return s.lastHurtBy }
+func (s *Snapshot) LastHurtMob() (behavior.ID, int32) { return s.lastHurtMob, s.lastHurtStamp }
+func (s *Snapshot) BlocksSpace() bool                 { return false }
+func (s *Snapshot) AttachPos(int) behavior.Vec3       { return s.eyes }
 
 // Families is the mob's type_family list.
 func (s *Snapshot) Families() []string { return s.families }
