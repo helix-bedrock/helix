@@ -129,12 +129,16 @@ func (m *Mob) InWater() bool                        { return m.body.WasInWater }
 func (m *Mob) UnderWater() bool                     { return m.body.HeadInWater }
 func (m *Mob) FloatJump()                           { m.jump.Jumping = true }
 func (m *Mob) DismountPassengers()                  {}
-func (m *Mob) HeardVibration() (uint64, bool)       { return 0, false }
-func (m *Mob) SetPersistent()                       { m.persistent = true }
-func (m *Mob) CanSit() bool                         { return false }
-func (m *Mob) OnGround() bool                       { return m.body.OnGround }
-func (m *Mob) OnFire() bool                         { return m.fireTicks > 0 }
-func (m *Mob) Velocity() behavior.Vec3              { return m.body.Vel }
+func (m *Mob) WeakenNextJump()                      { m.body.Jump.Pending = true }
+
+// ClientPredictedVehicle is false: no player rides a mob yet.
+func (m *Mob) ClientPredictedVehicle() bool   { return false }
+func (m *Mob) HeardVibration() (uint64, bool) { return 0, false }
+func (m *Mob) SetPersistent()                 { m.persistent = true }
+func (m *Mob) CanSit() bool                   { return false }
+func (m *Mob) OnGround() bool                 { return m.body.OnGround }
+func (m *Mob) OnFire() bool                   { return m.fireTicks > 0 }
+func (m *Mob) Velocity() behavior.Vec3        { return m.body.Vel }
 func (m *Mob) SetVelocity(v behavior.Vec3) {
 	m.traceVel("set", v)
 	m.body.Vel = v
