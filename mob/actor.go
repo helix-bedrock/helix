@@ -74,9 +74,11 @@ func (m *Mob) SetFlag(n int, on bool) {
 // SetPanicking implements behavior.Mob.
 func (m *Mob) SetPanicking(on bool) { m.panicking = on }
 
-// WalkTargetValue is PathfinderMob's: 0 everywhere in the minimal hookup (animals preferring
-// grass and monsters darkness is not ported yet).
-func (m *Mob) WalkTargetValue(behavior.Pos) float32 { return 0 }
+// WalkTargetValue is Mob::getWalkTargetValue for the mob's C++ class (behavior.WalkTarget):
+// how much random strolling, panic and the spawner like p. Runs: the mob's tick.
+func (m *Mob) WalkTargetValue(p behavior.Pos) float32 {
+	return behavior.WalkTarget(m.walk, &m.rt.Walk, goalWorld{&m.v}, p, m.FireImmune())
+}
 
 // LookAt points the look control at p unless a goal already did this tick.
 func (m *Mob) LookAt(p behavior.Vec3, yawMax, pitchMax float32) {

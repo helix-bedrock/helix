@@ -65,7 +65,10 @@ type Runtime struct {
 	Goals *component.Registry
 	// Villages is the village system dwellers belong to, nil for none (dweller.go).
 	Villages Villages
-	Log      *slog.Logger
+	// Walk is the blocks the walk target scores look for (behavior.WalkTarget);
+	// BDS's by default. Set it before mobs tick.
+	Walk behavior.WalkBlocks
+	Log  *slog.Logger
 	// parser reads definitions; parsed definitions are cached by type.
 	parser *definition.Parser
 	defs   map[string]*definition.Definition
@@ -75,7 +78,7 @@ type Runtime struct {
 
 // NewRuntime returns a runtime with vanilla's goals.
 func NewRuntime(b *Blocks, env Env, log *slog.Logger) *Runtime {
-	rt := &Runtime{Blocks: b, Env: env, Goals: component.Vanilla(), Log: log, parser: definition.NewParser(), defs: map[string]*definition.Definition{}, sounds: map[string]int{}}
+	rt := &Runtime{Blocks: b, Env: env, Goals: component.Vanilla(), Walk: behavior.DefaultWalkBlocks(), Log: log, parser: definition.NewParser(), defs: map[string]*definition.Definition{}, sounds: map[string]int{}}
 	for n, name := range soundEvents {
 		if name != "" {
 			rt.sounds[name] = n
@@ -163,8 +166,10 @@ type Mob struct {
 	rt    *Runtime
 	hooks Hooks
 	typ   string
-	id    behavior.ID
-	rid   uint64
+	// walk is the C++ class's walk target kind (behavior.WalkKindOf).
+	walk behavior.WalkKind
+	id   behavior.ID
+	rid  uint64
 
 	inst *definition.Instance
 	// geneEvents is set until a new (not loaded) mob's genetics have run their birth events.
@@ -297,7 +302,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 		return nil, fmt.Errorf("mob: no definition for %s", typ)
 	}
 	m := &Mob{
-		rt: rt, hooks: hooks, typ: typ, id: behavior.ID(uniqueID), rid: runtimeID,
+		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
 		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),

@@ -328,9 +328,28 @@ func (w goalWorld) Players(dst []behavior.Actor) []behavior.Actor { return w.env
 func (w goalWorld) DefaultGameMode() int                          { return w.env.DefaultGameMode() }
 func (w goalWorld) Peaceful() bool                                { return w.env.Difficulty() == 0 }
 
+// Brightness is BlockSource::getBrightness: the dimension's brightness ramp at the raw
+// brightness (0 below the world, the darkened sky above it).
 func (w goalWorld) Brightness(p behavior.Pos) float32 {
-	return float32(w.r.Brightness(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, uint8(min(max(w.env.SkyDarken(w.r), 0), 15)))) / 15 //nolint:gosec // clamped
+	darken := uint8(min(max(w.env.SkyDarken(w.r), 0), 15)) //nolint:gosec // clamped
+	ambient := float32(0)
+	if w.env.DimensionID(w.r.Dimension()) == netherID {
+		ambient = behavior.NetherAmbient
+	}
+	rg := w.r.Dimension().Range()
+	var raw uint8
+	switch {
+	case int(p.Y) < rg[0]:
+	case int(p.Y) > rg[1]:
+		raw = 15 - darken
+	default:
+		raw = w.r.Brightness(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, darken)
+	}
+	return behavior.BrightnessRamp(raw, ambient)
 }
+
+// netherID is the Nether's BDS dimension number.
+const netherID = 1
 
 func (w goalWorld) Block(p behavior.Pos) behavior.Block { return w.blocks.Goal(w.block(p, 0)) }
 func (w goalWorld) LiquidMaterial(p behavior.Pos) path.Material {
