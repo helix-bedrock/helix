@@ -153,6 +153,7 @@ func (m *Mob) Speed() float32                     { return m.speed }
 func (m *Mob) UnderwaterSpeed() float32           { return m.underwaterSpeed }
 func (m *Mob) FollowRange() float32               { return m.followRange }
 func (m *Mob) PrevRotation() (pitch, yaw float32) { return m.prevPitch, m.prevYaw }
+func (m *Mob) Yaw() float32                       { return m.yaw }
 func (m *Mob) SetYaw(yaw float32)                 { m.yaw = yaw }
 func (m *Mob) Breathable() bool                   { return true }
 func (m *Mob) AirSupply() int16                   { return 300 }
