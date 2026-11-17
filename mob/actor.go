@@ -30,8 +30,6 @@ func (m *Mob) IsPlayer() bool  { return false }
 func (m *Mob) Flag(n int) bool { return m.flags.Has(n) }
 func (m *Mob) GameMode() int   { return -1 }
 
-func (m *Mob) Riders() []behavior.ID              { return nil }
-func (m *Mob) Vehicle() behavior.ID               { return behavior.NoID }
 func (m *Mob) Owner() behavior.ID                 { return behavior.NoID }
 func (m *Mob) Team() int                          { return 0 }
 func (m *Mob) HeadRotation() (pitch, yaw float32) { return m.pitch, m.headYaw }
@@ -129,10 +127,10 @@ func (m *Mob) InLava() bool                         { return m.body.Travel() == 
 func (m *Mob) InWater() bool                        { return m.body.WasInWater }
 func (m *Mob) UnderWater() bool                     { return m.body.HeadInWater }
 func (m *Mob) FloatJump()                           { m.jump.Jumping = true }
-func (m *Mob) DismountPassengers()                  {}
 func (m *Mob) WeakenNextJump()                      { m.body.Jump.Pending = true }
 
-// ClientPredictedVehicle is false: no player rides a mob yet.
+// ClientPredictedVehicle is false: the engine takes a client-predicted horse's place
+// itself (player/mobride.go).
 func (m *Mob) ClientPredictedVehicle() bool   { return false }
 func (m *Mob) HeardVibration() (uint64, bool) { return 0, false }
 func (m *Mob) SetPersistent()                 { m.persistent = true }

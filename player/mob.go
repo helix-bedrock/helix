@@ -200,7 +200,7 @@ func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 			{Name: "minecraft:health", Value: m.m.HealthValue(), Max: m.m.MaxHealth()},
 			{Name: "minecraft:movement", Value: m.m.MovementSpeed(), Max: math.MaxFloat32},
 		},
-		EntityMetadata: m.metadata(),
+		EntityMetadata: m.metadata(), EntityLinks: m.rideLinks(e),
 	}})
 }
 
@@ -228,6 +228,9 @@ func (m *Mob) apply(e *world.Entity) {
 		return
 	}
 	m.m.Apply()
+	if m.m.Seats() != nil {
+		settleRiders(m)
+	}
 	if !m.m.Dead() && len(*m.m.Effects()) > 0 {
 		m.tickEffects()
 	}
@@ -289,6 +292,8 @@ func (m *Mob) sendTeleport(e *world.Entity) {
 
 func (m *Mob) remove(e *world.Entity) {
 	m.closeTrade()
+	m.m.Unlink()
+	letOffAll(m)
 	m.gone = true
 	e.Remove()
 }

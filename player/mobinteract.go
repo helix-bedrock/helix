@@ -89,8 +89,8 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	raw, ok := o.m.Interact(actorOf(p.entity))
 	if !ok {
 		// BDS's order after minecraft:interact: ageable, breedable, leashable.
-		if !p.feedMob(o) {
-			p.leashMob(o)
+		if !p.feedMob(o) && !p.leashMob(o) {
+			p.mountMob(o)
 		}
 		return
 	}

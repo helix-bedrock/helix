@@ -83,7 +83,7 @@ func letOff(v vehicle, p *Player) {
 	if p.entity != nil {
 		seat = p.seatPosition()
 	}
-	seats.Remove(p)
+	removeRider(v, p)
 	p.vehicle = nil
 	p.leftVehicle = e
 	p.move.forward = 0
@@ -133,7 +133,7 @@ func settleRiders(v vehicle) {
 		if !ok || p.entity != nil && !p.dead() && p.entity.Region() == e.Region() {
 			continue
 		}
-		seats.Remove(p)
+		removeRider(v, p)
 		p.vehicle, p.riding = nil, false
 		e.Send(&packet.SetActorLink{EntityLink: ride.Link(e.UniqueID(), p.uniqueID, protocol.EntityLinkRemove)})
 	}

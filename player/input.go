@@ -260,6 +260,14 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		}
 		b.drive(p, pk.Position, yaw, predicted)
 	}
+	if o, ok := p.vehicle.(*Mob); ok {
+		yaw := o.entity.Rotation().Yaw
+		if rot, has := pk.VehicleRotation.Value(); has {
+			yaw = rot[1]
+		}
+		id, has := pk.ClientPredictedVehicle.Value()
+		o.driveMob(p, pk.Position, yaw, has && id == o.entity.UniqueID())
+	}
 	if p.vehicle != nil {
 		pos = p.seatPosition()
 	}

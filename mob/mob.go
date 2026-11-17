@@ -209,7 +209,9 @@ type Mob struct {
 	squidPitch float32
 	lookSet    bool
 	body       physics.Body
-	flags      path.ActorFlags
+	// ride is the mob's riding (ride.go).
+	ride  riding
+	flags path.ActorFlags
 	// panicking is BDS's IsPanickingFlagComponent: set while the panic
 	// goal runs, read by the is_panicking filter, never sent.
 	panicking bool
@@ -370,7 +372,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
 		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID}, love: love{partner: behavior.NoID},
-		targetLeader: behavior.NoID, caravanHead: behavior.NoID, caravanTail: behavior.NoID,
+		targetLeader: behavior.NoID, caravanHead: behavior.NoID, caravanTail: behavior.NoID, ride: riding{vehicle: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, baseMaxHealth: defaultHealth, followRange: defaultFollowRange,
@@ -386,6 +388,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	m.flags.Set(FlagCanClimb, true)
 	m.inst = definition.New(def, m, method, initEvent)
 	m.geneEvents = method != definition.InitLoaded
+	m.ride.addRiders = method != definition.InitLoaded
 	m.setSize(0.6, 1.8)
 	m.markElder()
 	m.snapshot()
@@ -513,10 +516,15 @@ func (m *Mob) think() (remove bool) {
 		m.openDoorsTick(&nm)
 		m.traceWanted()
 	}
-	m.moveControl()
+	still := m.ridingStill()
+	if !still {
+		m.moveControl()
+	}
 	m.lookControl()
-	m.physicsTick()
-	m.squidStep()
+	if !still {
+		m.physicsTick()
+		m.squidStep()
+	}
 	m.bodyControl()
 	return false
 }
@@ -543,6 +551,7 @@ func (m *Mob) rebuild(comps definition.Group) {
 	if m.states != nil && m.states.Scale != nil {
 		m.scale = m.states.Scale.Value
 	}
+	m.readRideable()
 	m.readSensors(ctx, comps)
 	goals, warnings := m.rt.Goals.Build(ctx, order, comps)
 	for _, w := range warnings {

@@ -66,6 +66,10 @@ const (
 	opRemoveEffect
 	opClearEffects
 	opDrinkPotion
+	opStartRiding
+	opStopRiding
+	opEjectRiders
+	opAddRiders
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -126,6 +130,7 @@ func (m *Mob) Apply() {
 		m.ops[i] = op{}
 	}
 	m.ops = m.ops[:0]
+	m.tickRiders()
 	m.pushActors()
 	if m.flagsDirty {
 		m.flagsDirty = false
@@ -248,6 +253,8 @@ func (m *Mob) run(o op) {
 		m.runOtherOp(&o)
 	case opGiveEffect, opRemoveEffect, opClearEffects, opDrinkPotion:
 		m.runEffectOp(&o)
+	case opStartRiding, opStopRiding, opEjectRiders, opAddRiders:
+		m.runRideOp(&o)
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r
@@ -306,6 +313,14 @@ type Snapshot struct {
 	// mingle is MingleComponent, set when hasMingle is.
 	mingle    behavior.MingleState
 	hasMingle bool
+	// riders and vehicle are the mob's riding; rideable, seatCount, rideMaxWidth and
+	// rideFamilies its rideable rules, for find_mount.
+	riders       []behavior.ID
+	vehicle      behavior.ID
+	rideable     bool
+	seatCount    int
+	rideMaxWidth float32
+	rideFamilies []string
 }
 
 // Snapshot returns the mob as others see it this tick.
@@ -335,6 +350,10 @@ func (m *Mob) snapshot() {
 	s.breedReady = m.states != nil && m.states.Breedable != nil && m.states.Breedable.Cooldown() <= 0
 	s.trusted, s.hasTrust = m.trusted, m.hasTrust()
 	s.chasing, s.inCaravan, s.caravanHead, s.caravanTail = m.chasing, m.InCaravan(), m.caravanHead, m.caravanTail
+	s.riders, s.vehicle = append(s.riders[:0], m.ride.riders...), m.ride.vehicle
+	s.rideable = m.ride.seats != nil
+	s.seatCount, s.rideMaxWidth = m.ride.rules.SeatCount, m.ride.rules.MaxWidth
+	s.rideFamilies = append(s.rideFamilies[:0], m.ride.rules.Families...)
 }
 
 func (s *Snapshot) ID() behavior.ID                    { return s.id }
@@ -350,8 +369,8 @@ func (s *Snapshot) IsPlayer() bool                     { return false }
 func (s *Snapshot) Flag(n int) bool                    { return s.flags.Has(n) }
 func (s *Snapshot) Type() string                       { return s.typ }
 func (s *Snapshot) GameMode() int                      { return -1 }
-func (s *Snapshot) Riders() []behavior.ID              { return nil }
-func (s *Snapshot) Vehicle() behavior.ID               { return behavior.NoID }
+func (s *Snapshot) Riders() []behavior.ID              { return s.riders }
+func (s *Snapshot) Vehicle() behavior.ID               { return s.vehicle }
 func (s *Snapshot) Owner() behavior.ID                 { return behavior.NoID }
 func (s *Snapshot) Team() int                          { return 0 }
 func (s *Snapshot) Dimension() int                     { return s.dimension }
