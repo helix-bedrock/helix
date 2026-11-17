@@ -168,6 +168,9 @@ func (m *Mob) run(o op) {
 		if killed {
 			m.traceOp(&o, "killed target", true)
 		}
+		if _, melee := o.then.(*behavior.Melee); melee && !m.Dead() {
+			m.meleeEffect(o.id)
+		}
 		if o.then != nil {
 			o.then.AttackResult(o.id, hit, killed)
 		}

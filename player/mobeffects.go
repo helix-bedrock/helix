@@ -89,6 +89,26 @@ func (o *Mob) CanReceiveEffect(_ *mob.Mob, target, _ behavior.ID) bool {
 	return false
 }
 
+// MeleeEffect implements mob.EffectHooks: a mob or a player whose shield does not stop the
+// hit gets the effect.
+func (o *Mob) MeleeEffect(_ *mob.Mob, target behavior.ID, e effect.Instance) {
+	switch t := o.effectTarget(target).(type) {
+	case *Player:
+		if o.entity == nil || t.dead() {
+			return
+		}
+		at := o.entity.Position()
+		if t.blocksFrom(DamageEntityAttack, &at) {
+			return
+		}
+		t.GiveEffect(e)
+	case *Mob:
+		if t != o {
+			t.giveEffect(e)
+		}
+	}
+}
+
 // effectTarget is the player or mob with the unique ID in the mob's region.
 func (o *Mob) effectTarget(id behavior.ID) any {
 	if o.entity == nil {
@@ -288,6 +308,32 @@ func mobInstantHealth(o *Mob, amplifier int32, scale float32) {
 
 func mobInstantDamage(o *Mob, amplifier int32, scale float32) {
 	mobHarm(o, instantAmount(instantDamageBase, amplifier, scale))
+}
+
+// effectResist is the mob's effects' Resist hooks (Resistance) on damage of the cause, after
+// armour and protection, as a player's hit takes them.
+func (o *Mob) effectResist(v float32, c DamageCause) float32 {
+	if !resisted(c) {
+		return v
+	}
+	for _, e := range *o.m.Effects() {
+		if def, ok := o.effectDef(e.ID); ok && def.Resist != nil {
+			v = def.Resist(e.Amplifier, v)
+		}
+	}
+	return v
+}
+
+// meleeDamage is the mob's attack damage with its effects' Attack hooks (Strength,
+// Weakness), as they change a player's.
+func (o *Mob) meleeDamage() float32 {
+	v := o.m.MeleeDamage()
+	for _, e := range *o.m.Effects() {
+		if def, ok := o.effectDef(e.ID); ok && def.Attack != nil {
+			v = def.Attack(e.Amplifier, v)
+		}
+	}
+	return v
 }
 
 // --- mob.PotionHooks ---

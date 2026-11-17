@@ -1,7 +1,9 @@
 package mob
 
 import (
+	"encoding/json"
 	"math"
+	"strings"
 
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/effect"
@@ -30,6 +32,10 @@ type EffectHooks interface {
 	// CanReceiveEffect is Actor::canReceiveMobEffectsFromGameplay of the entity with the
 	// ID and its not being invulnerable to an attack by the entity by. Runs: m's think.
 	CanReceiveEffect(m *Mob, target, by behavior.ID) bool
+	// MeleeEffect gives the entity with the ID m's attack effect after a melee goal's hit,
+	// unless it is not a mob or player or it blocks the hit (Actor::isDamageBlocked: a
+	// raised shield). Runs: m's Apply.
+	MeleeEffect(m *Mob, target behavior.ID, e effect.Instance)
 }
 
 // Effects is the mob's effect list, for the engine. Runs: the region's goroutine, outside
@@ -205,4 +211,67 @@ func (m *Mob) SetEffectSpeed(id string, amount float32) {
 // mob.
 func (m *Mob) EffectImmune(name string) bool {
 	return m.states != nil && m.states.MobEffectImmunity != nil && m.states.MobEffectImmunity.Immune(name)
+}
+
+// attackEffect is the effect minecraft:attack gives (AttackDescription, parser 0x6FCAB10 in
+// BDS 1.26.60).
+type attackEffect struct {
+	name             string
+	ticks, amplifier int32
+}
+
+// attackEffectDefault is effect_duration's default, one second.
+const attackEffectDefault = 1
+
+// parseAttackEffect reads effect_name, effect_duration and effect_amplifier. The duration is
+// seconds, "infinite", or 0 when negative, turned into ticks as BDS's duration reader
+// (0x755FAE0: (int)(seconds * 20), at least 0).
+func parseAttackEffect(raw json.RawMessage) attackEffect {
+	var a struct {
+		Name      string          `json:"effect_name"`
+		Duration  json.RawMessage `json:"effect_duration"`
+		Amplifier int32           `json:"effect_amplifier"`
+	}
+	if json.Unmarshal(raw, &a) != nil || a.Name == "" {
+		return attackEffect{}
+	}
+	return attackEffect{name: a.Name, ticks: effectTicks(a.Duration), amplifier: a.Amplifier}
+}
+
+// effectTicks is an effect duration in seconds as ticks.
+func effectTicks(raw json.RawMessage) int32 {
+	if len(raw) == 0 {
+		return attackEffectDefault * ticksPerSecond
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		if strings.EqualFold(s, "infinite") {
+			return effect.Infinite
+		}
+		return 0
+	}
+	var secs float32
+	if json.Unmarshal(raw, &secs) != nil || secs < 0 {
+		return 0
+	}
+	return int32(secs * ticksPerSecond)
+}
+
+// meleeEffect is the attack effect of the melee goals' hit (MeleeAttackBaseGoal's
+// _attemptAttackTarget, 0x5431880 in BDS 1.26.60): after the attack, whether it landed or
+// not, a target that is a mob or player and does not block it gets the effect. Runs: Apply.
+func (m *Mob) meleeEffect(target behavior.ID) {
+	a := m.attackEffect
+	if a.name == "" {
+		return
+	}
+	h, ok := m.effectHooks()
+	if !ok {
+		return
+	}
+	id, ok := h.EffectID(a.name)
+	if !ok {
+		return
+	}
+	h.MeleeEffect(m, target, effect.Instance{ID: id, Amplifier: a.amplifier, Duration: a.ticks})
 }

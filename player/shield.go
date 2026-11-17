@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/direction"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -231,15 +232,25 @@ func (p *Player) lowerShield() {
 // it stops, and what caused the hit is in front of the player, by where it looks on
 // the flat. A cause with no actor behind it is always stopped.
 func (p *Player) blocks(src DamageSource) bool {
-	if !p.Blocking() || src.Cause < 0 || src.Cause >= causeBlockedLimit || causesBlocked>>src.Cause&1 == 0 {
+	if src.Attacker == nil || src.Attacker.entity == nil {
+		return p.blocksFrom(src.Cause, nil)
+	}
+	at := src.Attacker.entity.Position()
+	return p.blocksFrom(src.Cause, &at)
+}
+
+// blocksFrom is blocks for a hit of the cause from the position from, nil for a hit with no
+// actor behind it.
+func (p *Player) blocksFrom(cause DamageCause, from *mgl32.Vec3) bool {
+	if !p.Blocking() || cause < 0 || cause >= causeBlockedLimit || causesBlocked>>cause&1 == 0 {
 		return false
 	}
-	if src.Attacker == nil || src.Attacker.entity == nil || p.entity == nil {
+	if from == nil || p.entity == nil {
 		return true
 	}
 	rot := p.entity.Rotation()
 	yaw, flat := direction.Units(rot.Yaw), direction.Cos(direction.Units(rot.Pitch))
-	to := src.Attacker.entity.Position().Sub(p.entity.Position())
+	to := from.Sub(p.entity.Position())
 	return to[0]*-direction.Sin(yaw)*flat+to[2]*direction.Cos(yaw)*flat > 0
 }
 

@@ -229,6 +229,9 @@ type Mob struct {
 	lavaSpeed               float32
 	attackDamage, attackMin float32
 	hasAttack               bool
+	// attackEffect is minecraft:attack's effect_name, effect_duration (in ticks) and
+	// effect_amplifier, given by the melee goals' hit.
+	attackEffect attackEffect
 
 	target, lastHurtBy, lastHurtMob behavior.ID
 	// lastHurtByPlayer is BDS's mLastHurtByPlayerId: the last player that
@@ -601,6 +604,7 @@ func (m *Mob) readAttributes(comps definition.Group) {
 		m.followRange = v
 	}
 	m.attackMin, m.attackDamage = 0, 0
+	m.attackEffect = attackEffect{}
 	raw, hasAttack := comps["minecraft:attack"]
 	m.hasAttack = hasAttack
 	if hasAttack {
@@ -613,6 +617,7 @@ func (m *Mob) readAttributes(comps definition.Group) {
 				m.attackMin, m.attackDamage = rg.Min, rg.Max
 			}
 		}
+		m.attackEffect = parseAttackEffect(raw)
 	}
 	if raw, ok := comps["minecraft:collision_box"]; ok {
 		var b struct{ Width, Height float32 }

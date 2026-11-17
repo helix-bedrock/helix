@@ -24,7 +24,7 @@ func (m *Mob) AfterArmor(_ *mob.Mob, v float32, cause int) float32 {
 	if c != causeEnchantsSkip {
 		v = m.protectionShare(v, c)
 	}
-	return v
+	return m.effectResist(v, c)
 }
 
 // armourShare takes the helmet and the worn armour points off v.

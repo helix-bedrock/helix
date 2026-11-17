@@ -377,7 +377,7 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	if !ok || p.entity == nil || p.dead() {
 		return false, false
 	}
-	h := NewHit(p, m.m.MeleeDamage(), DamageSource{Cause: DamageEntityAttack})
+	h := NewHit(p, m.meleeDamage(), DamageSource{Cause: DamageEntityAttack})
 	if !p.s.game.sys.TakeHit(h) {
 		return false, false
 	}
@@ -400,7 +400,7 @@ func (m *Mob) attackMob(o *Mob) (hit, killed bool) {
 	if o == m || o.entity == nil || o.Dead() || o.stand != nil || r == nil {
 		return false, false
 	}
-	dealt := o.hurtBy(m.m.MeleeDamage(), behavior.ID(m.entity.UniqueID()), DamageEntityAttack)
+	dealt := o.hurtBy(m.meleeDamage(), behavior.ID(m.entity.UniqueID()), DamageEntityAttack)
 	if dealt <= 0 {
 		return false, false
 	}
