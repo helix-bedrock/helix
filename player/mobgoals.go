@@ -3,15 +3,19 @@ package player
 import (
 	"math"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/helix/daytime"
 	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
 
-// The engine side of guardian_attack (mob.GuardianHooks), raid_garden (mob.GardenEnv) and
-// follow_caravan's caravan-updated event (mob.ActorEventDataHooks).
+// The engine side of guardian_attack (mob.GuardianHooks), raid_garden (mob.GardenEnv),
+// follow_caravan's caravan-updated event (mob.ActorEventDataHooks), fire_at_target's shots
+// (mob.ProjectileHooks), the loot eat_mob, sneeze and drop_item_for drop (mob.LootHooks) and
+// drop_item_for's time of day (mob.ClockEnv).
 
 // ActorEventData sends the actor event with its data about the mob.
 func (m *Mob) ActorEventData(_ *mob.Mob, id, data int32) {
@@ -65,4 +69,56 @@ func (s *Host) RaidBlock(r *world.Region, p behavior.Pos, _ behavior.ID) {
 	if now, ok := f.RaidCrop(r, pos); ok {
 		levelEvent(r, pos, blockCenter(pos), packet.LevelEventParticlesCropEaten, int32(s.reg.Blocks.Hash(now))) //nolint:gosec // hashes are sent as int32
 	}
+}
+
+// ShootAlong spawns the projectile definition at from flying along dir at its own power, the
+// mob as its owner (fire_at_target).
+func (m *Mob) ShootAlong(_ *mob.Mob, def string, from, dir behavior.Vec3) {
+	r := m.entity.Region()
+	if r == nil || m.gone {
+		return
+	}
+	spec, ok := m.s.projectileSpec(def, "")
+	if !ok {
+		return
+	}
+	d := mglVec(dir)
+	if d.Len() < 1e-7 {
+		return
+	}
+	if pr := m.s.SpawnProjectile(r.Dimension(), spec, mglVec(from), d.Normalize(), spec.Power, nil); pr != nil {
+		pr.shooter, pr.separated = m, false
+	}
+}
+
+// DropLoot rolls the loot table for the mob, killed naming the entity_killed type, and drops
+// each item at at; a pickupDelay below 0 takes a death drop's. Nothing drops without
+// doMobLoot.
+func (m *Mob) DropLoot(_ *mob.Mob, table string, at behavior.Vec3, killed behavior.ID, pickupDelay int32) {
+	r := m.entity.Region()
+	if r == nil || m.gone || table == "" || m.s.entityLoot == nil || !m.s.mobLoot() {
+		return
+	}
+	c := m.lootContext(r)
+	if a := m.s.Actor(r, killed); a != nil {
+		c.Killed = a.Type()
+	}
+	pos := mglVec(at)
+	for _, d := range m.s.entityLoot.Roll(table, c, nil) {
+		for _, it := range m.s.lootStacks(d) {
+			if pickupDelay < 0 {
+				m.s.spawnMobDrop(r, it, pos)
+				continue
+			}
+			m.s.spawnItem(r.Dimension(), m.s.freshStack(it), pos, mgl32.Vec3{dropDrift(), dropUp, dropDrift()}, world.Rotation{}, pickupDelay, 0)
+		}
+	}
+}
+
+// TimeOfDay is BDS's Dimension::getTimeOfDay: the sun angle of the overworld clock.
+func (s *Host) TimeOfDay() float32 {
+	if s.clock == nil {
+		return 0
+	}
+	return daytime.SunAngle(s.clock.Time(), s.clock.Cycle())
 }

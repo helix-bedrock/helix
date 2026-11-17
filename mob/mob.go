@@ -275,6 +275,13 @@ type Mob struct {
 	// and follow_caravan's state (pack.go).
 	chasing                                bool
 	targetLeader, caravanHead, caravanTail behavior.ID
+	// hurtThisTick and wasHurt are Actor +784 and +785 (wasHurt is +785, copied from +784 by
+	// Actor::baseTick, 1.26.60); pushedBy is PushedByComponent; rollCount is the panda's
+	// RollCounterComponent (flyer.go, golem.go, panda.go).
+	hurtThisTick, wasHurt bool
+	pushedBy              behavior.ID
+	hasPushedBy           bool
+	rollCount             int32
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
 	// saved is the age and breeding state a save holds, put back once the components are
@@ -448,6 +455,7 @@ func (m *Mob) think() (remove bool) {
 	if m.hurtTime > 0 {
 		m.hurtTime--
 	}
+	m.wasHurt, m.hurtThisTick = m.hurtThisTick, false
 	if m.playerHitTime > 0 {
 		m.playerHitTime--
 	}
@@ -456,6 +464,7 @@ func (m *Mob) think() (remove bool) {
 		return m.deathTime >= deathTicks
 	}
 	m.creeperTick()
+	m.rollTick()
 	if m.stateTick() {
 		return true
 	}
@@ -468,6 +477,7 @@ func (m *Mob) think() (remove bool) {
 	noAI := m.flags.Has(FlagNoAI)
 	m.squidPreStep()
 	m.sel.Tick(noAI)
+	m.hasPushedBy = false
 	if m.nv != nil {
 		nm := m.navMob()
 		if nav.ShouldTick(false, noAI, m.health) {
@@ -900,6 +910,7 @@ func (m *Mob) hurt(amount float32, by behavior.ID, cause int, tick uint64, ignor
 	} else {
 		m.hurtTime = hurtTicks
 	}
+	m.hurtThisTick = true
 	m.lastHurtAmount = amount
 	if h, ok := m.hooks.(ArmorHooks); ok {
 		dealt = h.AfterArmor(m, dealt, cause)
