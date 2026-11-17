@@ -51,12 +51,11 @@ const (
 	materialPortal = 16
 )
 
-// NewBlocks builds the tables for every state in reg. Kinds and property bits come from the
-// block names, the way BDS gives them to its block classes (stairs, slabs, doors...).
-//
-// Not compared with BDS state by state: Solid and SolidBlocking come from the registry's
-// solid material flag and a full collision box, not from BDS's Material table, which helix-data
-// does not have yet.
+// NewBlocks builds the tables for every state in reg from BDS 1.26.60's own block facts, as the
+// registry carries them from helix-data: the BlockProperty bits of the block type (BlockType
+// +264; the pathfinder's Props are the same bits), the Material's flag byte (never buildable,
+// liquid, blocks motion, solid) and the Block solid flag (Block::isSolid). Only Kind, the blocks
+// BDS tells apart by type, still comes from the name.
 func NewBlocks(reg *registry.Blocks) *Blocks {
 	n := reg.Count()
 	b := &Blocks{reg: reg, perch: map[string]bool{}, path: make([]path.BlockInfo, n), phys: make([]physics.Block, n), goals: make([]behavior.Block, n), full: make([]bool, n)}
@@ -77,13 +76,14 @@ func (b *Blocks) fill(id uint32) {
 	full := fullBox(props.Collision)
 	b.full[id] = full
 	mat := path.Material(props.Material)
-	liquid := props.Material == materialWater || props.Material == materialLava
-	solid := props.SolidMaterial && !liquid
+	liquid := props.MaterialFlags&data.MaterialLiquid != 0
+	solid := props.MaterialFlags&data.MaterialSolid != 0
+	blocksMotion := props.MaterialFlags&data.MaterialBlocksMotion != 0
 	top, height := shapeTop(props.Collision)
 
 	info := path.BlockInfo{
-		Kind: kindOf(name), Props: propsOf(name, props), Material: mat,
-		Solid: solid && full, SolidBlocking: solid && full,
+		Kind: kindOf(name), Props: path.Props(props.TypeFlags), Material: mat,
+		Solid: props.BlockSolid, SolidBlocking: solidBlocking(props.MaterialFlags),
 		Open:         stateTrue(states, "open_bit"),
 		Extinguished: stateTrue(states, "extinguished"),
 		Flowing:      name == "flowing_water",
@@ -102,10 +102,10 @@ func (b *Blocks) fill(id uint32) {
 		Name: b.reg.Name(id), Material: mat,
 		Ground: groundOf(props),
 		Solid:  solid, Liquid: liquid,
-		HasCollision: len(props.Collision) > 0, BlocksMotion: solid,
+		HasCollision: len(props.Collision) > 0, BlocksMotion: blocksMotion,
 		Tree:        props.TypeFlags&data.BlockPropertyLeaves != 0 || b.perch[b.reg.Name(id)],
 		NoJumpStart: props.TypeFlags&data.BlockPropertyPreventsJumping != 0, NoJumpLanding: props.TypeFlags&propCausesDamage != 0,
-		BlockSolid: solid && full,
+		BlockSolid: props.BlockSolid,
 		ShapeTop:   top, ShapeHeight: height,
 		Stairs: info.Props&path.PropStairs != 0, Slab: info.Props&path.PropSlab != 0, Trapdoor: info.Props&path.PropTrapdoor != 0,
 		Fence: info.Props&path.PropFence != 0 && !strings.HasSuffix(name, "_wall"),
@@ -122,11 +122,17 @@ func (b *Blocks) fill(id uint32) {
 // from landing in the block.
 const propCausesDamage = 1 << 22
 
+// solidBlocking is Material::isSolidBlocking: the material blocks motion and is not never
+// buildable, the same bits as the ground test below.
+func solidBlocking(flags uint8) bool {
+	return flags&(data.MaterialNeverBuildable|data.MaterialBlocksMotion) == data.MaterialBlocksMotion
+}
+
 // groundOf is BDS's ground test of the random position search and strolling: the material
 // blocks motion and is not never-buildable, and the block type is cube shaped. Glass,
 // leaves, slabs, fences and walls are not ground.
 func groundOf(p registry.Properties) bool {
-	return p.MaterialFlags&(data.MaterialNeverBuildable|data.MaterialBlocksMotion) == data.MaterialBlocksMotion &&
+	return solidBlocking(p.MaterialFlags) &&
 		p.TypeFlags&data.BlockPropertyCubeShaped != 0
 }
 
@@ -235,54 +241,6 @@ func kindOf(name string) path.Kind {
 		return path.KindShelf
 	}
 	return path.KindOther
-}
-
-// propsOf sets the BDS block class bits the pathfinder reads.
-func propsOf(name string, p registry.Properties) path.Props {
-	var out path.Props
-	has := func(suffix string) bool { return strings.HasSuffix(name, suffix) }
-	switch {
-	case has("_stairs"):
-		out |= path.PropStairs
-	case has("_slab") && !has("double_slab"):
-		out |= path.PropSlab
-	case name == "hopper":
-		out |= path.PropHopper
-	case name == "snow_layer":
-		out |= path.PropTopSnow
-	case has("fence_gate"):
-		out |= path.PropFenceGate
-	case has("_leaves") || has("leaves2") || name == "leaves":
-		out |= path.PropLeaves
-	case has("_fence") || has("_wall") && !has("_sign") && !has("_banner") && !has("_torch") && !has("_fan"):
-		out |= path.PropFence
-	case has("carpet"):
-		out |= path.PropCarpet | path.PropSmallSolid
-	case has("_button"):
-		out |= path.PropButton
-	case has("_door") && !has("trapdoor"):
-		out |= path.PropDoor
-	case has("trapdoor"):
-		out |= path.PropTrapdoor
-	case has("_sign") || name == "standing_sign" || name == "wall_sign":
-		out |= path.PropSign
-	case has("shulker_box") || name == "ender_chest":
-		out |= path.PropSmallSolid
-	case has("pressure_plate"):
-		out |= path.PropPressurePlate
-	}
-	switch name {
-	case "fire", "soul_fire", "campfire", "soul_campfire", "magma", "sweet_berry_bush", "cactus", "wither_rose", "lava", "flowing_lava":
-		out |= path.PropHurts
-	}
-	if name == "cactus" || name == "sweet_berry_bush" {
-		out |= path.PropHurtsOnContact
-	}
-	if name == "cauldron" || name == "composter" {
-		out |= path.PropInnerFloor
-	}
-	_ = p
-	return out
 }
 
 // Silverfish blocks: the block an infested block hides and the reverse.

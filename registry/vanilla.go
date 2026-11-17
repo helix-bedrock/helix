@@ -238,6 +238,14 @@ func vanillaBlocks(s *Setup) error {
 	for _, n := range suffocate {
 		suffocating[n] = true
 	}
+	solidNames, err := data.SolidBlocks()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	blockSolid := make(map[string]bool, len(solidNames))
+	for _, n := range solidNames {
+		blockSolid[n] = true
+	}
 	liq, err := vanillaLiquids()
 	if err != nil {
 		return err
@@ -297,7 +305,7 @@ func vanillaBlocks(s *Setup) error {
 			ExplosionResistance: p.ExplosionResistance.At(i), Friction: p.Friction.At(i), DestroyTime: p.DestroyTime.At(i),
 			Climbable: climbable[st.Name], Material: materials[st.Name], PushesOut: pushes[st.Name], Stairs: stairs[st.Name], HalfSlab: halfSlab(st.Name),
 			SolidMaterial: liq.solid[st.Name], LiquidReaction: liq.reaction[st.Name], CanContainLiquid: liq.contain[st.Name], LavaBlocking: liq.lavaBlocking[st.Name],
-			Precipitation: precip[st.Name], Suffocates: suffocating[st.Name],
+			Precipitation: precip[st.Name], Suffocates: suffocating[st.Name], BlockSolid: blockSolid[st.Name],
 			TypeFlags: typeFlags[st.Name].Properties, MaterialFlags: typeFlags[st.Name].MaterialFlags,
 		}})
 		boxes, computed, err := collisionOf(coll, st.Name, st.Properties)
