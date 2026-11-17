@@ -61,6 +61,9 @@ type riding struct {
 	// addRiders is set until minecraft:addrider's riders were spawned; a loaded mob does
 	// not spawn them again.
 	addRiders bool
+	// loaded are the riders of the mob's save still to get on: each does once it is in
+	// the region.
+	loaded []behavior.ID
 }
 
 // Seats is the mob's vehicle, nil when it has no minecraft:rideable. Runs: the region's
@@ -372,9 +375,36 @@ func (m *Mob) Unlink() {
 	m.ejectRiders()
 }
 
-// tickRiders is the vehicle's part of Apply: a dead vehicle lets everyone off, and mob
-// riders that are gone leave their seats; the others sit where their seats are now.
+// SavedRiders are the riders the mob's save lists, in seat order, as Actor::saveWithoutId
+// writes its LinksTag (BDS 1.26.60 0xB3B6C10). Runs: the region's goroutine, outside the
+// think phase.
+func (m *Mob) SavedRiders() []behavior.ID { return m.ride.riders }
+
+// LoadRiders keeps the riders of the mob's save (Actor::loadLinks, 0xB3C1550): each gets on
+// once it is in the region, in the order saved. Runs: before the mob first ticks.
+func (m *Mob) LoadRiders(ids []behavior.ID) { m.ride.loaded = append(m.ride.loaded[:0], ids...) }
+
+// seatLoaded seats the saved riders that are in the region now.
+func (m *Mob) seatLoaded() {
+	if len(m.ride.loaded) == 0 || m.v.r == nil || m.Dead() {
+		return
+	}
+	left := m.ride.loaded[:0]
+	for _, id := range m.ride.loaded {
+		if r := m.rt.Env.Mob(m.v.r, id); r != nil {
+			r.startRiding(m)
+			continue
+		}
+		left = append(left, id)
+	}
+	m.ride.loaded = left
+}
+
+// tickRiders is the vehicle's part of Apply: saved riders that came in get on, a dead
+// vehicle lets everyone off, and mob riders that are gone leave their seats; the others sit
+// where their seats are now.
 func (m *Mob) tickRiders() {
+	m.seatLoaded()
 	if m.ride.seats == nil || len(m.ride.seats.Riders()) == 0 {
 		return
 	}

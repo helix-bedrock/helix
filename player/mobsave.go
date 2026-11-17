@@ -91,6 +91,7 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 		data[k] = v
 	}
 	o.saveActor(e, data)
+	o.saveLinks(data)
 	o.saveMobState(data)
 	o.saveEquipment(data)
 	o.saveMobItems(data)
@@ -126,6 +127,45 @@ func (o *Mob) saveActor(e *world.Entity, data map[string]any) {
 	if r := e.Region(); r != nil {
 		data["LastDimensionId"] = int32(o.s.dimensionID(r.Dimension()))
 	}
+}
+
+// The rider links BDS saves on a vehicle (Actor::saveWithoutId 0xB3B6C10, read back by
+// Actor::loadLinks 0xB3C1550): LinksTag, one compound per rider in seat order, with the
+// rider's unique ID and its seat index (0 is the driver); none when nobody rides.
+const (
+	mobKeyLinks    = "LinksTag"
+	mobKeyLinkID   = "entityID"
+	mobKeyLinkSeat = "linkID"
+)
+
+// saveLinks writes the mob's riders.
+func (o *Mob) saveLinks(data map[string]any) {
+	riders := o.m.SavedRiders()
+	if len(riders) == 0 {
+		delete(data, mobKeyLinks)
+		return
+	}
+	links := make([]any, 0, len(riders))
+	for i, id := range riders {
+		links = append(links, map[string]any{mobKeyLinkID: int64(id), mobKeyLinkSeat: int32(i)}) //nolint:gosec // few seats
+	}
+	data[mobKeyLinks] = links
+}
+
+// loadLinks gives the mob back the riders it was saved with.
+func (o *Mob) loadLinks(data map[string]any) {
+	links, _ := data[mobKeyLinks].([]any)
+	if len(links) == 0 {
+		return
+	}
+	ids := make([]behavior.ID, 0, len(links))
+	for _, l := range links {
+		c, _ := l.(map[string]any)
+		if id, ok := c[mobKeyLinkID].(int64); ok {
+			ids = append(ids, behavior.ID(id))
+		}
+	}
+	o.m.LoadRiders(ids)
 }
 
 // saveMobState writes the mob's flag bytes, actor data values, persistence, fire, air,
@@ -253,6 +293,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 			o.m.SetFlag(k.flag, true)
 		}
 	}
+	o.loadLinks(saved.Data)
 	o.loadEquipment(saved.Data)
 	o.loadMobItems(saved.Data)
 	o.loadEffects(saved.Data)

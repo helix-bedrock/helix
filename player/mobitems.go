@@ -271,10 +271,27 @@ func (r itemRules) Matches(d string, it behavior.Item) bool {
 func (r itemRules) nameMatches(d string, it behavior.Item) bool {
 	if i := strings.LastIndexByte(d, ':'); i > 0 && strings.Count(d, ":") == 2 {
 		if aux, err := strconv.ParseInt(d[i+1:], 10, 16); err == nil {
-			return int16(aux) == it.Aux && ns(d[:i]) == it.Name
+			return int16(aux) == it.Aux && itemName(d[:i]) == it.Name
 		}
 	}
-	return ns(d) == it.Name
+	return itemName(d) == it.Name
+}
+
+// itemAliases are BDS's names for renamed items that entity files still use, as its item
+// registry's alias table (BDS 1.26.60 0xC66BA90) maps them; BDS looks names up in lower
+// case.
+var itemAliases = map[string]string{
+	"minecraft:carrotonastick": "minecraft:carrot_on_a_stick",
+}
+
+// itemName is the item a descriptor's name means: namespaced, lower case and through
+// BDS's aliases.
+func itemName(d string) string {
+	n := ns(d)
+	if a, ok := itemAliases[strings.ToLower(n)]; ok {
+		return a
+	}
+	return n
 }
 
 // tagsMatch runs a q.all_tags('a', 'b') or q.any_tag(...) call on the item's tags.

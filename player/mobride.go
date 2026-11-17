@@ -181,3 +181,25 @@ func (m *Mob) EjectPlayer(v *mob.Mob, rider behavior.ID) {
 		}
 	}
 }
+
+// boostMount is a boost item used by a player riding a mob with minecraft:boostable (BDS
+// 1.26.60 0x736ACB0): the mob boosts, the used stack takes the boost item's damage
+// (hurtAndBreak, 0x736B0B0) and, if that broke it, becomes the boost item's replace_item.
+func (p *Player) boostMount(held ItemStack) bool {
+	o, ok := p.vehicle.(*Mob)
+	if !ok {
+		return false
+	}
+	bi, ok := o.m.Boost(mobItem(held))
+	if !ok {
+		return false
+	}
+	inv := &p.inventory
+	p.hurtHeld(bi.Damage)
+	if inv.main[inv.held].Empty() && bi.ReplaceItem != "" {
+		inv.main[inv.held] = p.s.freshStack(ItemStack{Name: itemName(bi.ReplaceItem), Count: 1})
+		p.sendHeld()
+		p.flush()
+	}
+	return true
+}

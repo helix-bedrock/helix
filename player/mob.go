@@ -834,7 +834,6 @@ func (a playerActor) Flag(int) bool         { return false }
 func (a playerActor) Type() string          { return registry.Player }
 func (a playerActor) GameMode() int         { return int(a.p.gameMode) }
 func (a playerActor) Riders() []behavior.ID { return nil }
-func (a playerActor) Vehicle() behavior.ID  { return behavior.NoID }
 func (a playerActor) Owner() behavior.ID    { return behavior.NoID }
 func (a playerActor) Team() int             { return 0 }
 func (a playerActor) Dimension() int        { return int(a.p.s.dimensionID(a.p.dim)) }
@@ -842,7 +841,19 @@ func (a playerActor) HeadRotation() (pitch, yaw float32) {
 	r := a.p.entity.Rotation()
 	return r.Pitch, r.HeadYaw
 }
-func (a playerActor) BodyYaw() float32                  { return a.p.entity.Rotation().Yaw }
+func (a playerActor) BodyYaw() float32 { return a.p.entity.Rotation().Yaw }
+
+// Yaw is the player's ActorRotationComponent yaw, which controlled_by_player turns a
+// ridden mob towards.
+func (a playerActor) Yaw() float32 { return a.p.entity.Rotation().Yaw }
+
+// Vehicle is the mob the player rides, NoID for none or another vehicle.
+func (a playerActor) Vehicle() behavior.ID {
+	if o, ok := a.p.vehicle.(*Mob); ok {
+		return o.m.ID()
+	}
+	return behavior.NoID
+}
 func (a playerActor) Invulnerable() bool                { return a.p.invulnerable() }
 func (a playerActor) HasHealth() bool                   { return true }
 func (a playerActor) Targetable() bool                  { return true }

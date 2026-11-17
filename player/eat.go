@@ -258,6 +258,9 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 	if g.sys.EquipArmor(p, held) {
 		return true
 	}
+	if p.boostMount(held) {
+		return true
+	}
 	if p.throwItem(held) {
 		return true
 	}

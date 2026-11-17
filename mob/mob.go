@@ -210,7 +210,9 @@ type Mob struct {
 	lookSet    bool
 	body       physics.Body
 	// ride is the mob's riding (ride.go).
-	ride  riding
+	ride riding
+	// boost is minecraft:boostable's state.
+	boost boosting
 	flags path.ActorFlags
 	// panicking is BDS's IsPanickingFlagComponent: set while the panic
 	// goal runs, read by the is_panicking filter, never sent.
@@ -498,6 +500,7 @@ func (m *Mob) think() (remove bool) {
 	if m.stateTick() {
 		return true
 	}
+	m.boostTick()
 	m.sensorTick()
 	m.dwellerTick()
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw
