@@ -39,11 +39,20 @@ func (t packetTrace) traced(pk packet.Packet) bool {
 	return t[strings.ToLower(ty.Name())]
 }
 
-// traceIn logs a traced packet the player sent. Runs: the player's read loop.
+// traceIn logs a traced packet the player sent. PlayerAuthInput, sent every client tick,
+// is logged only when its input flags change. Runs: the player's read loop.
 func (p *Player) traceIn(pk packet.Packet) {
-	if p.s.trace.traced(pk) {
-		p.s.log.Info("packet in", "name", p.name, "packet", fmt.Sprintf("%+v", pk))
+	if !p.s.trace.traced(pk) {
+		return
 	}
+	if in, ok := pk.(*packet.PlayerAuthInput); ok {
+		flags := fmt.Sprintf("%v", in.InputData)
+		if flags == p.traceFlags {
+			return
+		}
+		p.traceFlags = flags
+	}
+	p.s.log.Info("packet in", "name", p.name, "packet", fmt.Sprintf("%+v", pk))
 }
 
 // traceOut logs a traced packet sent to the player. Runs: anywhere.

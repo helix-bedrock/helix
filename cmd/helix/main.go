@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec // served only with -pprof, on the address given
@@ -24,6 +25,7 @@ func main() {
 	settings := flag.String("config", "server.properties", "the server settings file, in BDS's server.properties format; written with the defaults if missing")
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
 	trace := flag.String("trace", "", "log these packets whole, both ways, comma-separated, such as Interact,ItemStackRequest,ItemStackResponse")
+	logFile := flag.String("log-file", "", "also write the log to this file, so nothing scrolls away")
 	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
 	publicIP := flag.String("public-ip", "", "BDS's server-public-ip: this network's public IP, so players outside it can join; forward TCP 19132 and the UDP ports on the router")
 	udpPort := flag.Uint("udp-port", 0, "carry every connection over this one UDP port, so one forwarded port is enough; not something BDS can do")
@@ -42,7 +44,17 @@ func main() {
 	if *debug {
 		level = slog.LevelDebug
 	}
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	var out io.Writer = os.Stderr
+	if *logFile != "" {
+		f, err := os.Create(*logFile)
+		if err != nil {
+			slog.Error("cannot open the log file", "err", err)
+			return
+		}
+		defer f.Close()
+		out = io.MultiWriter(os.Stderr, f)
+	}
+	log := slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{Level: level}))
 	if *cpuProfile != "" {
 		stopProfile, err := startProfile(*cpuProfile)
 		if err != nil {

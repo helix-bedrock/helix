@@ -357,7 +357,7 @@ sibling library folders, so unreleased library changes are used.
   same bytes; the others get the packet. PlayerAuthInput structs are reused: the
   connection reads into released ones, and the region tick releases each packet after
   its handler (`Player.releasePacket`), so a handler must not keep a packet.
-- `cmd/helix`: the server program. `-tick-distance` sets `Config.TickDistance`. `-trace Interact,ItemStackRequest` logs only those packets, whole, both ways, at info level (`Config.TracePackets`, `player/trace.go`), for in-game testing without `-debug`'s noise. `-testcmds` adds a stand-in /gamemode
+- `cmd/helix`: the server program. `-tick-distance` sets `Config.TickDistance`. `-trace Interact,ItemStackRequest` logs only those packets, whole, both ways, at info level (`Config.TracePackets`, `player/trace.go`), for in-game testing without `-debug`'s noise; PlayerAuthInput only when its input flags change. `-log-file` also writes the log to a file. `-testcmds` adds a stand-in /gamemode
   (and /gm), listed to the client with an AvailableCommands packet on its
   first input, for in-game testing until commands are designed, a countdown
   name tag over dropped items through an item view, and /itemtest to try the

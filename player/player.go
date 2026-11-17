@@ -50,6 +50,8 @@ type Player struct {
 	// traceSends counts down the packets logged at debug level after a
 	// dimension change, to see what the client gets around it. Runs: anywhere.
 	traceSends atomic.Int32
+	// traceFlags is the last PlayerAuthInput input flags the packet trace logged.
+	traceFlags string
 
 	// Session: fixed once the player joined. Runs: anywhere.
 	uuid uuid.UUID
