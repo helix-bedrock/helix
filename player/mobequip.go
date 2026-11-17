@@ -105,7 +105,7 @@ func (m *Mob) equipFromTable(r *world.Region) {
 	}
 	for _, d := range m.s.entityLoot.Roll(cfg.Table, m.lootContext(r), nil) {
 		for _, it := range m.s.lootStacks(d) {
-			m.setItem(m.s.equipSlotFor(it.Name), it)
+			m.setItem(m.s.equipSlotFor(it), it)
 		}
 	}
 	for _, c := range cfg.SlotDropChance {
@@ -116,15 +116,22 @@ func (m *Mob) equipFromTable(r *world.Region) {
 	m.sendEquipment()
 }
 
-// equipSlotFor is where Actor::equip puts an item: a wearable in its armour slot, an item
-// the offhand takes in the offhand, anything else in the main hand. A banner goes on the
-// head, as a raid captain wears it (BDS's item test for that was not read).
-func (s *Host) equipSlotFor(name string) int {
-	t, ok := s.reg.Items.ByName(name)
+// equipSlotFor is where Actor::equip (0xB3C8A40) puts an item: a wearable in its armour
+// slot; the illager banner in the chest slot, as a captain wears it (0xC8ECCD0 gives slot 1
+// for a banner whose Type is 1); an item the offhand takes in the offhand; anything else in
+// the main hand. Other banners stay on the head, as before (that test, Item vt+384, was not
+// read).
+func (s *Host) equipSlotFor(it ItemStack) int {
+	t, ok := s.reg.Items.ByName(it.Name)
 	switch {
 	case ok && t.Wearable:
 		return mob.EquipHead + int(t.ArmorSlot)
-	case strings.HasSuffix(name, "banner"):
+	case it.Name == bannerItem:
+		if typ, _ := tagInt(it.Tag, bannerTypeTag); typ == BannerOminous {
+			return mob.EquipChest
+		}
+		return mob.EquipHead
+	case strings.HasSuffix(it.Name, "banner"):
 		return mob.EquipHead
 	case ok && t.Offhand:
 		return mob.EquipOffhand

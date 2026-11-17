@@ -163,16 +163,11 @@ func (m *Mob) Crossbow() (held, charged bool) {
 // UnchargeCrossbow empties the crossbow.
 func (m *Mob) UnchargeCrossbow() { m.charged = false }
 
-// ChargeAmount and SetChargeAmount are the charge actor data. A charge that reaches the
-// goal's charged trigger leaves the crossbow charged. Not sent to clients yet.
+// ChargeAmount and SetChargeAmount are the charge actor data (item 22). The crossbow is
+// loaded by charge_held_item's LoadCharge, not by the amount. Not sent to clients yet.
 func (m *Mob) ChargeAmount() int8 { return m.chargeAmount }
 
-func (m *Mob) SetChargeAmount(v int8) {
-	if v == 0 && m.chargeAmount > 0 && m.equip[EquipMainhand].Name == itemCrossbow {
-		m.charged = true
-	}
-	m.chargeAmount = v
-}
+func (m *Mob) SetChargeAmount(v int8) { m.chargeAmount = v }
 
 // Shoot is ShooterComponent::onShoot: the projectile its minecraft:shooter picks for the
 // target, fired at Apply by the engine. Nothing without the component or a target.

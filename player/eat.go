@@ -57,8 +57,8 @@ type usingState struct {
 	left   int32
 	// bow is a bow being drawn, which ends when the player lets go.
 	bow bool
-	// milk is a milk bucket being drunk, and potion a potion.
-	milk, potion bool
+	// milk is a milk bucket being drunk, potion a potion and ominous an ominous bottle.
+	milk, potion, ominous bool
 	// crossbow is a crossbow being loaded: it loads when the draw is done or let go after.
 	crossbow bool
 }
@@ -301,6 +301,10 @@ func vanillaUseItem(p *Player, held ItemStack) bool {
 		p.startPotion(held)
 		return true
 	}
+	if held.Name == nameOminousBottle {
+		p.startOminousBottle(held)
+		return true
+	}
 	food, ok := g.sys.FoodOf(p, held)
 	if !ok || !p.mayEat(food) || food.CooldownType != "" && p.Cooldown(food.CooldownType) > 0 {
 		return false
@@ -412,8 +416,12 @@ func (p *Player) tickUsing() {
 		}
 		return
 	}
-	food, milk, potion := u.food, u.milk, u.potion
+	food, milk, potion, ominous := u.food, u.milk, u.potion, u.ominous
 	p.stopUsing()
+	if ominous {
+		p.drinkOminousBottle(held)
+		return
+	}
 	if milk {
 		p.drinkMilk()
 		return

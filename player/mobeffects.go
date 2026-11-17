@@ -520,11 +520,16 @@ func (o *Mob) meleeDamage() float32 {
 
 // --- mob.PotionHooks ---
 
-// UseDuration implements mob.PotionHooks: a potion takes potionUseTicks to drink. Other
-// items' use durations are not known to mobs yet.
+// UseDuration implements mob.PotionHooks: a potion takes potionUseTicks to drink and a
+// crossbow loads in 25 ticks less 5 per Quick Charge level (CrossbowItem::getMaxUseDuration).
+// Other items' use durations are not known to mobs yet.
 func (o *Mob) UseDuration(_ *mob.Mob, it behavior.Item) int32 {
-	if it.Name == namePotion {
+	switch it.Name {
+	case namePotion:
 		return potionUseTicks
+	case nameCrossbow:
+		st, _ := it.Data.(ItemStack)
+		return crossbowLoadTime(st)
 	}
 	return 0
 }
