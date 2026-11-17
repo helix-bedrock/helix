@@ -230,6 +230,10 @@ type Mob struct {
 	// modifier on it.
 	baseMaxHealth, healthBoost          float32
 	speed, underwaterSpeed, followRange float32
+	// jumpStrength is minecraft:horse.jump_strength, which the client of a rider steering
+	// the horse jumps by; hasJumpStrength is false without the component.
+	jumpStrength, jumpStrengthMax float32
+	hasJumpStrength               bool
 	// speedBase is the movement attribute before its modifiers, speedMods those (sprint.go).
 	speedBase               float32
 	speedMods               []attrModifier
@@ -447,6 +451,12 @@ func (m *Mob) SetHealth(h float32) { m.health = min(max(h, 0), m.maxHealth) }
 
 // AttackDamage is the attack component's damage.
 
+// JumpStrength is the horse.jump_strength attribute's value and maximum; ok is false
+// without it.
+func (m *Mob) JumpStrength() (v, mx float32, ok bool) {
+	return m.jumpStrength, m.jumpStrengthMax, m.hasJumpStrength
+}
+
 // MovementSpeed is the movement attribute.
 func (m *Mob) MovementSpeed() float32 { return m.speed }
 
@@ -632,6 +642,7 @@ func (m *Mob) readAttributes(comps definition.Group) {
 	if v, _, ok := attribute(comps["minecraft:follow_range"]); ok {
 		m.followRange = v
 	}
+	m.jumpStrength, m.jumpStrengthMax, m.hasJumpStrength = attribute(comps["minecraft:horse.jump_strength"])
 	m.attackMin, m.attackDamage = 0, 0
 	m.attackEffect = attackEffect{}
 	raw, hasAttack := comps["minecraft:attack"]

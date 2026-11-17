@@ -192,15 +192,19 @@ func targetData(id behavior.ID) int64 {
 // spawnPackets show the mob. Not yet compared with what BDS sends.
 func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 	pitch, yaw, head, body := m.m.Rotation()
+	attrs := []protocol.AttributeValue{
+		{Name: "minecraft:health", Value: m.m.HealthValue(), Max: m.m.MaxHealth()},
+		{Name: "minecraft:movement", Value: m.m.MovementSpeed(), Max: math.MaxFloat32},
+	}
+	// A rider's client jumps a horse it steers by the horse's jump strength.
+	if v, mx, ok := m.m.JumpStrength(); ok {
+		attrs = append(attrs, protocol.AttributeValue{Name: "minecraft:horse.jump_strength", Value: v, Max: max(mx, v)})
+	}
 	return m.spawnEquipment([]packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: m.m.Type(),
 		Position: e.Position(), Velocity: mglVec(m.m.Body().Vel),
 		Pitch: pitch, Yaw: yaw, HeadYaw: head, BodyYaw: body,
-		Attributes: []protocol.AttributeValue{
-			{Name: "minecraft:health", Value: m.m.HealthValue(), Max: m.m.MaxHealth()},
-			{Name: "minecraft:movement", Value: m.m.MovementSpeed(), Max: math.MaxFloat32},
-		},
-		EntityMetadata: m.metadata(), EntityLinks: m.rideLinks(e),
+		Attributes: attrs, EntityMetadata: m.metadata(), EntityLinks: m.rideLinks(e),
 	}})
 }
 
