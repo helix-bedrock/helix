@@ -31,7 +31,7 @@ func (m *Mob) currentAttrs() mobAttrs {
 // once its equip slots are read). Runs: the mob's apply, each tick; it allocates only when
 // something changed.
 func (m *Mob) syncAttrs() {
-	if b := m.bodyItem(); b.Name != m.sentBody.Name || b.Meta != m.sentBody.Meta {
+	if b := m.bodyItem(); b.Name != m.sentBody.Name || b.Meta != m.sentBody.Meta || b.Damage() != m.sentBody.Damage() {
 		m.sentBody = b
 		m.entity.Send(m.armourPacket())
 	}

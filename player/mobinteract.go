@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -22,7 +23,8 @@ import (
 // as a bucket fills (takeFilled); how BDS's interaction hands it over was not read.
 //
 // Done of the item work: hurt_item, use_item, transform_to_item, spawn_items, play_sounds,
-// swing, equip_item_slot and drop_item_slot (the inventory domain). Not done: add_items,
+// swing, equip_item_slot and drop_item_slot (an inventory slot number or an equipment
+// slot such as "slot.armor.body", where wolf armour goes) and repair_entity_item. Not done: add_items,
 // health_amount, particles, vibration (game events) and interact_text.
 //
 // Spawned items are BDS 1.26.60's (the interact runtime 0x71FABF0): each item of the table
@@ -44,7 +46,12 @@ type interaction struct {
 	EquipItemSlot   string   `json:"equip_item_slot"`
 	DropItemSlot    string   `json:"drop_item_slot"`
 	DropItemYOffset *float32 `json:"drop_item_y_offset"`
-	SpawnItems      *struct {
+	// RepairEntityItem takes Amount damage off what the mob wears in Slot.
+	RepairEntityItem *struct {
+		Slot   string `json:"slot"`
+		Amount int32  `json:"amount"`
+	} `json:"repair_entity_item"`
+	SpawnItems *struct {
 		Table   string   `json:"table"`
 		YOffset *float32 `json:"y_offset"`
 	} `json:"spawn_items"`
@@ -114,6 +121,7 @@ func (p *Player) runInteraction(r *world.Region, o *Mob, it interaction) {
 	at := o.entity.Position()
 	p.spawnInteractItems(r, o, it)
 	p.dropInteractSlot(r, o, it)
+	p.repairInteractSlot(o, it)
 	for _, name := range it.sounds() {
 		playSound(r, feetBlock(at), soundEvent{name: name, pos: at, extra: -1, entity: o.m.Type(), actor: o.entity.UniqueID()}, nil)
 	}
@@ -194,29 +202,64 @@ func (p *Player) nameMob(o *Mob) bool {
 // slot, which runs the equip slot's on_equip (a saddle saddles a horse). The held item is
 // used up as use_item does; whether BDS keeps it in creative was not read.
 func (p *Player) equipInteractSlot(o *Mob, it interaction) bool {
-	k, err := strconv.Atoi(it.EquipItemSlot)
 	held := p.inventory.Held()
-	if it.EquipItemSlot == "" || err != nil || held.Empty() || k < 0 || k >= len(o.m.Inventory()) {
+	if it.EquipItemSlot == "" || held.Empty() {
 		return false
 	}
 	one := held
 	one.Count = 1
+	if slot, ok := mob.EquipSlotByName(it.EquipItemSlot); ok {
+		// An equipment slot (wolf armour on the body); the armour is shown by syncAttrs.
+		o.setItem(slot, one)
+		p.useUpHeld()
+		return true
+	}
+	k, err := strconv.Atoi(it.EquipItemSlot)
+	if err != nil || k < 0 || k >= len(o.m.Inventory()) {
+		return false
+	}
 	o.setInventorySlot(k, mobItem(p.s.freshStack(one)))
 	p.useUpHeld()
 	return true
+}
+
+// repairInteractSlot is repair_entity_item: the worn item in the named slot loses amount
+// damage (armadillo scutes on wolf armour).
+func (p *Player) repairInteractSlot(o *Mob, it interaction) {
+	rep := it.RepairEntityItem
+	if rep == nil {
+		return
+	}
+	slot, ok := mob.EquipSlotByName(rep.Slot)
+	if !ok || o.items.stacks[slot].Empty() {
+		return
+	}
+	st := o.items.stacks[slot]
+	o.setItem(slot, withDamage(st, max(st.Damage()-rep.Amount, 0)))
 }
 
 // dropInteractSlot is drop_item_slot: what the mob's inventory slot holds drops
 // drop_item_y_offset above its feet (BDS 1.26.60's interact runtime 0x71FABF0 through the
 // container's slot drop 0x737FEE0), and the emptied slot runs on_unequip.
 func (p *Player) dropInteractSlot(r *world.Region, o *Mob, it interaction) {
-	k, err := strconv.Atoi(it.DropItemSlot)
-	inv := o.m.Inventory()
-	if it.DropItemSlot == "" || err != nil || k < 0 || k >= len(inv) || inv[k].Empty() {
+	if it.DropItemSlot == "" {
 		return
 	}
-	st := realStack(inv[k])
-	o.setInventorySlot(k, behavior.Item{})
+	var st ItemStack
+	if slot, ok := mob.EquipSlotByName(it.DropItemSlot); ok {
+		if st = o.items.stacks[slot]; st.Empty() {
+			return
+		}
+		o.setItem(slot, ItemStack{})
+	} else {
+		k, err := strconv.Atoi(it.DropItemSlot)
+		inv := o.m.Inventory()
+		if err != nil || k < 0 || k >= len(inv) || inv[k].Empty() {
+			return
+		}
+		st = realStack(inv[k])
+		o.setInventorySlot(k, behavior.Item{})
+	}
 	y := float32(0)
 	if it.DropItemYOffset != nil {
 		y = *it.DropItemYOffset
