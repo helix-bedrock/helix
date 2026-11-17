@@ -1,8 +1,9 @@
 package player
 
 import (
-	"slices"
 	"strings"
+
+	"github.com/helix-bedrock/helix/effect"
 
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -10,44 +11,18 @@ import (
 
 // EffectInfinite is the duration of an effect that never runs out, as BDS's /effect
 // infinite gives.
-const EffectInfinite int32 = -1
+const EffectInfinite = effect.Infinite
 
 // ActiveEffect is an effect a player has; Duration is the ticks left (EffectInfinite for
 // an endless one).
-type ActiveEffect struct {
-	ID        int32
-	Amplifier int32
-	Duration  int32
-	// Ambient marks an effect from a beacon or conduit (fainter particles); Hidden hides
-	// its particles.
-	Ambient, Hidden bool
-	// age is the ticks an endless effect has had, which its Tick is given.
-	age int32
-	// stored are the same effect at other levels that outlast this one, in the order they
-	// were kept, each counting down too; the first comes back when this one runs out
-	// (BDS's StoredEffects).
-	stored []ActiveEffect
-}
+type ActiveEffect = effect.Instance
 
 // Effect returns the amplifier of the player's effect id, false if it does
 // not have it. Runs: the player's region.
-func (p *Player) Effect(id int32) (int32, bool) {
-	for _, e := range p.effects {
-		if e.ID == id {
-			return e.Amplifier, true
-		}
-	}
-	return 0, false
-}
+func (p *Player) Effect(id int32) (int32, bool) { return p.effects.Amplifier(id) }
 
 // Effects returns the player's effects. Runs: the player's region.
-func (p *Player) Effects() []ActiveEffect {
-	out := slices.Clone(p.effects)
-	for i := range out {
-		out[i].stored = slices.Clone(out[i].stored)
-	}
-	return out
-}
+func (p *Player) Effects() []ActiveEffect { return p.effects.Clone() }
 
 // AddEffect gives the player effect id at amplifier (0 is level I), for
 // duration ticks, with particles. Runs: the player's region.
@@ -69,75 +44,16 @@ func (p *Player) GiveEffect(e ActiveEffect) {
 		p.flush()
 		return
 	}
-	e.age, e.stored = 0, nil
 	if ok && def.NoParticles {
 		e.Hidden = true
 	}
-	i, found := slices.BinarySearchFunc(p.effects, e.ID, func(o ActiveEffect, id int32) int { return int(o.ID - id) })
-	if !found {
-		p.effects = slices.Insert(p.effects, i, e)
-		p.effectChanged(e, packet.MobEffectAdd, def, ok)
-		return
+	now, added := p.effects.Give(e)
+	op := byte(packet.MobEffectModify)
+	if added {
+		op = packet.MobEffectAdd
 	}
-	mergeEffect(&p.effects[i], e)
-	p.effectChanged(p.effects[i], packet.MobEffectModify, def, ok)
+	p.effectChanged(now, op, def, ok)
 }
-
-// mergeEffect is BDS's MobEffectInstance update of old with e:
-//   - stronger: old is kept for later if e runs out sooner, e takes over, and kept effects
-//     that do not outlast e are dropped (all are kept if e is endless);
-//   - weaker: kept for later if it does not run out sooner than old;
-//   - same level: the longer duration wins (an endless old stays).
-//
-// Ambient and the particles come from e unless it is weaker.
-func mergeEffect(old *ActiveEffect, e ActiveEffect) {
-	switch {
-	case e.Amplifier > old.Amplifier:
-		if shorter(e.Duration, old.Duration) {
-			old.keep(ActiveEffect{ID: old.ID, Amplifier: old.Amplifier, Duration: old.Duration, Ambient: old.Ambient, Hidden: old.Hidden})
-		}
-		old.Amplifier, old.Duration, old.Ambient, old.Hidden, old.age = e.Amplifier, e.Duration, e.Ambient, e.Hidden, 0
-		if e.Duration != EffectInfinite {
-			old.stored = slices.DeleteFunc(old.stored, func(k ActiveEffect) bool { return !longer(k.Duration, e.Duration) })
-		}
-	case e.Amplifier < old.Amplifier:
-		if !shorter(e.Duration, old.Duration) {
-			old.keep(e)
-		}
-	default:
-		if longer(e.Duration, old.Duration) {
-			old.Duration = e.Duration
-		}
-		old.Ambient, old.Hidden = e.Ambient, e.Hidden
-	}
-}
-
-// keep stores k behind e: a kept effect at the same level takes k's duration if k
-// outlasts it, else k is kept after the others.
-func (e *ActiveEffect) keep(k ActiveEffect) {
-	k.stored, k.age = nil, 0
-	for i := range e.stored {
-		if e.stored[i].Amplifier == k.Amplifier {
-			if longer(k.Duration, e.stored[i].Duration) {
-				e.stored[i].Duration = k.Duration
-			}
-			return
-		}
-	}
-	e.stored = append(e.stored, k)
-}
-
-// longer reports whether duration a outlasts b; an endless one outlasts all but another
-// endless one.
-func longer(a, b int32) bool {
-	if a == b || b == EffectInfinite {
-		return false
-	}
-	return a == EffectInfinite || a > b
-}
-
-// shorter reports whether duration a runs out before b.
-func shorter(a, b int32) bool { return longer(b, a) }
 
 // effectChanged tells the player and those who see it about an effect given or changed,
 // runs its Added hook and puts its modifiers on.
@@ -170,9 +86,7 @@ func (p *Player) ApplyInstantEffect(id, amplifier int32, scale float32) bool {
 // RemoveEffect takes effect id away from the player, with any weaker one stored behind
 // it. Runs: the player's region.
 func (p *Player) RemoveEffect(id int32) {
-	n := len(p.effects)
-	p.effects = slices.DeleteFunc(p.effects, func(e ActiveEffect) bool { return e.ID == id })
-	if len(p.effects) == n {
+	if !p.effects.Remove(id) {
 		return
 	}
 	p.effectGone(id)
@@ -204,48 +118,22 @@ func (p *Player) effectGone(id int32) {
 // (0x76B5550). Runs: the player's region, once per tick.
 func (p *Player) tickEffects() {
 	for i := 0; i < len(p.effects); {
-		e := &p.effects[i]
-		id := e.ID
-		left := e.Duration
-		if left == EffectInfinite {
-			left = -e.age
-			e.age++
-		}
+		id := p.effects[i].ID
+		left := p.effects[i].Left()
 		if def, ok := p.s.game.effects[id]; ok && def.Tick != nil {
-			def.Tick(p, e.Amplifier, left)
+			def.Tick(p, p.effects[i].Amplifier, left)
 		}
 		// A Tick may have killed the player and cleared its effects.
 		if i >= len(p.effects) || p.effects[i].ID != id {
 			continue
 		}
-		e = &p.effects[i]
-		e.stored = slices.DeleteFunc(e.stored, func(k ActiveEffect) bool {
-			return k.Duration != EffectInfinite && k.Duration <= 1
-		})
-		for k := range e.stored {
-			if e.stored[k].Duration != EffectInfinite {
-				e.stored[k].Duration--
-			}
-		}
-		if e.Duration == EffectInfinite {
-			i++
-			continue
-		}
-		e.Duration--
-		if e.Duration > 0 {
-			i++
-			continue
-		}
-		if len(e.stored) == 0 {
+		switch p.effects[i].Countdown() {
+		case effect.Gone:
 			p.RemoveEffect(id)
 			continue
-		}
-		next, amp := e.stored[0], e.Amplifier
-		e.Amplifier, e.Duration, e.Ambient, e.Hidden, e.age = next.Amplifier, next.Duration, next.Ambient, next.Hidden, 0
-		e.stored = slices.Delete(e.stored, 0, 1)
-		if e.Amplifier != amp {
+		case effect.Restored:
 			def, ok := p.s.game.effects[id]
-			p.effectChanged(*e, packet.MobEffectModify, def, ok)
+			p.effectChanged(p.effects[i], packet.MobEffectModify, def, ok)
 		}
 		i++
 	}
@@ -385,28 +273,10 @@ func (p *Player) applyValueModifier(i int, m *modifierSums) bool {
 	return p.attributes.set(i, v)
 }
 
-// visibleEffectsMax is how many effects the visible effects actor data holds.
-const visibleEffectsMax = 8
-
 // visibleEffects is the actor data those who see the player draw its effects' particles
 // from: up to eight effects with particles, seven bits each (the ID and the ambient
 // bit).
-func (p *Player) visibleEffects() int64 {
-	var v int64
-	n := 0
-	for _, e := range p.effects {
-		if e.Hidden || n == visibleEffectsMax {
-			continue
-		}
-		bit := int64(0)
-		if e.Ambient {
-			bit = 1
-		}
-		v = v<<7 | int64(e.ID&0x3F)<<1 | bit
-		n++
-	}
-	return v
-}
+func (p *Player) visibleEffects() int64 { return p.effects.Visible() }
 
 // sendVisibleEffects shows the player and those who see it its effects' particles. The
 // player gets it too: its own client draws the particles around it from this data.
@@ -421,95 +291,14 @@ func (p *Player) sendVisibleEffects() {
 	}
 }
 
-// Keys of an effect in a saved player's ActiveEffects, as BDS 1.26.60 writes them
-// (MobEffectInstance save 0xCAB8B90, load 0xCAB9E10).
-const (
-	effectsTag         = "ActiveEffects"
-	effectTagID        = "Id"
-	effectTagAmplifier = "Amplifier"
-	effectTagDuration  = "Duration"
-	effectTagEasy      = "DurationEasy"
-	effectTagNormal    = "DurationNormal"
-	effectTagHard      = "DurationHard"
-	effectTagAmbient   = "Ambient"
-	effectTagParticles = "ShowParticles"
-	effectTagAnimation = "DisplayOnScreenTextureAnimation"
-	effectTagStored    = "StoredEffects"
-)
-
 // saveEffects writes the player's effects as BDS saves them; no effects, no key.
-func (p *Player) saveEffects(data map[string]any) {
-	if len(p.effects) == 0 {
-		delete(data, effectsTag)
-		return
-	}
-	list := make([]any, 0, len(p.effects))
-	for i := range p.effects {
-		list = append(list, effectNBT(&p.effects[i]))
-	}
-	data[effectsTag] = list
-}
-
-// effectNBT is one effect as BDS saves it. BDS keeps a duration per difficulty; Helix has
-// one, written to all three.
-func effectNBT(e *ActiveEffect) map[string]any {
-	m := map[string]any{
-		effectTagID: uint8(e.ID), effectTagAmplifier: uint8(min(max(e.Amplifier, 0), 255)), //nolint:gosec // clamped, BDS saves bytes
-		effectTagDuration: e.Duration, effectTagEasy: e.Duration, effectTagNormal: e.Duration, effectTagHard: e.Duration,
-		effectTagAmbient: boolByte(e.Ambient), effectTagParticles: boolByte(!e.Hidden), effectTagAnimation: uint8(0),
-	}
-	if len(e.stored) > 0 {
-		list := make([]any, 0, len(e.stored))
-		for i := range e.stored {
-			list = append(list, effectNBT(&e.stored[i]))
-		}
-		m[effectTagStored] = list
-	}
-	return m
-}
+func (p *Player) saveEffects(data map[string]any) { p.effects.Save(data) }
 
 // loadEffects reads the effects BDS saved. They are put back without their Added hooks,
 // since what those set (Absorption's extra health) was saved with the attributes.
 func (p *Player) loadEffects(data map[string]any) {
-	list, ok := data[effectsTag].([]any)
-	if !ok {
-		return
-	}
-	for _, v := range list {
-		m, ok := v.(map[string]any)
-		if !ok {
-			continue
-		}
-		if e, ok := effectFromNBT(m); ok {
-			p.effects = append(p.effects, e)
-		}
-	}
-	slices.SortStableFunc(p.effects, func(a, b ActiveEffect) int { return int(a.ID - b.ID) })
+	p.effects = effect.Load(data)
 	p.applyEffectModifiers()
-}
-
-// effectFromNBT reads one saved effect; false without an ID or duration.
-func effectFromNBT(m map[string]any) (ActiveEffect, bool) {
-	id, ok := m[effectTagID].(uint8)
-	dur, okd := m[effectTagDuration].(int32)
-	if !ok || !okd || id == 0 {
-		return ActiveEffect{}, false
-	}
-	amp, _ := m[effectTagAmplifier].(uint8)
-	ambient, _ := m[effectTagAmbient].(uint8)
-	particles, okp := m[effectTagParticles].(uint8)
-	e := ActiveEffect{ID: int32(id), Amplifier: int32(amp), Duration: dur, Ambient: ambient != 0, Hidden: okp && particles == 0}
-	if stored, ok := m[effectTagStored].([]any); ok {
-		for _, v := range stored {
-			if sm, ok := v.(map[string]any); ok {
-				if s, ok := effectFromNBT(sm); ok {
-					s.stored = nil
-					e.stored = append(e.stored, s)
-				}
-			}
-		}
-	}
-	return e, true
 }
 
 // sendEffects tells a joining player the effects it was saved with.

@@ -58,18 +58,6 @@ func (a stateActions) Hurt(target behavior.Actor, _ behavior.ID, cause int, amou
 	}
 }
 
-// CanReceiveEffect is false: mobs have no effects yet.
-func (stateActions) CanReceiveEffect(behavior.Actor, behavior.ID) bool { return false }
-
-// GiveEffect does nothing yet.
-func (stateActions) GiveEffect(behavior.Actor, string, int32, int32, bool) {}
-
-// EffectTicks is 0: mobs have no effects yet.
-func (stateActions) EffectTicks(behavior.Actor, string) int32 { return 0 }
-
-// RemoveEffect does nothing yet.
-func (stateActions) RemoveEffect(behavior.Actor, string) {}
-
 // Teleport is refused: TeleportComponent's search is not built.
 func (stateActions) Teleport(behavior.Vec3) bool { return false }
 

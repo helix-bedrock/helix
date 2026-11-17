@@ -165,7 +165,8 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyWidth:    w, protocol.EntityDataKeyHeight: h,
 		protocol.EntityDataKeyScale:     m.m.Scale(),
 		protocol.EntityDataKeyAirSupply: air, protocol.EntityDataKeyAirSupplyMax: maxAir,
-		protocol.EntityDataKeyTarget: targetData(m.m.Target()),
+		protocol.EntityDataKeyTarget:            targetData(m.m.Target()),
+		protocol.EntityDataKeyVisibleMobEffects: m.visibleEffects(),
 	}
 	for _, d := range m.m.ActorData() {
 		md[uint32(d.Key)] = d.Value //nolint:gosec // actor data keys are small
@@ -224,6 +225,9 @@ func (m *Mob) apply(e *world.Entity) {
 		return
 	}
 	m.m.Apply()
+	if !m.m.Dead() && len(*m.m.Effects()) > 0 {
+		m.tickEffects()
+	}
 	if m.m.Dead() && m.m.LeashHolder() != behavior.NoID {
 		m.dropLeashOnDeath(e.Region())
 	}

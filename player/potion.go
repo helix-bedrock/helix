@@ -248,7 +248,7 @@ func (t *Projectile) splashShow(r *world.Region, at mgl32.Vec3, colour uint32, c
 // splash is BDS's thrown_potion_effect: the potion's effects on every player within its
 // splash range of where it hit, measured to the player's box, at full strength on the one it
 // hit and less the further off. Harmful effects from a player's potion pass other players by
-// while pvp is off. Mobs take no effects in Helix yet.
+// while pvp is off. Mobs take them too.
 func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit) {
 	pot, _ := t.s.Potion(int32(t.potion))
 	t.splashShow(r, hit.pos, t.s.potionColour(pot.Effects), true)
@@ -263,8 +263,8 @@ func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit)
 	grow := mgl32.Vec3{reach, reach, reach}
 	t.found = r.AppendEntitiesIn(t.found[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range t.found {
-		target, ok := o.Owner().(*Player)
-		if !ok || target.dead() || target.gameMode == GameModeSpectator {
+		target, ok := effectTakerOf(o)
+		if !ok {
 			continue
 		}
 		boxLo, boxHi, has := target.BlastBox()
@@ -287,18 +287,18 @@ func (t *Projectile) splash(r *world.Region, e *world.Entity, hit projectileHit)
 // splashOn gives target the splash's effects at scale: instant ones scaled, the others for
 // a scaled share of their time, dropped when too short. Harmful effects from a player's
 // potion pass players by while pvp is off.
-func (t *Projectile) splashOn(target *Player, effects []ActiveEffect, scale float32) {
+func (t *Projectile) splashOn(target effectTaker, effects []ActiveEffect, scale float32) {
 	g := t.s.game
 	for _, eff := range effects {
 		def, known := g.effects[eff.ID]
 		if !known {
 			continue
 		}
-		if def.Harmful && t.owner != nil && !t.s.level.PVP {
+		if _, player := target.(*Player); player && def.Harmful && t.owner != nil && !t.s.level.PVP {
 			continue
 		}
 		if def.Instant {
-			target.ApplyInstantEffect(eff.ID, eff.Amplifier, scale)
+			target.takeInstant(eff.ID, eff.Amplifier, scale)
 			continue
 		}
 		ticks := eff.Duration
@@ -309,7 +309,7 @@ func (t *Projectile) splashOn(target *Player, effects []ActiveEffect, scale floa
 				continue
 			}
 		}
-		target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
+		target.takeEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
 	}
 }
 

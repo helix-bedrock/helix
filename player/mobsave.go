@@ -146,6 +146,7 @@ func (o *Mob) saveMobState(data map[string]any) {
 	data[mobKeySurface] = boolByte(o.surface)
 	data[mobKeyNaturalSpawn] = boolByte(o.naturalSpawn)
 	data["TargetID"] = int64(o.m.Target())
+	o.saveEffects(data)
 }
 
 // saveEquipment writes the mob's hands and armour in BDS's lists.
@@ -250,6 +251,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 	}
 	o.loadEquipment(saved.Data)
 	o.loadMobItems(saved.Data)
+	o.loadEffects(saved.Data)
 	if o.stand != nil {
 		o.loadArmorStand(saved.Data)
 	}

@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/effect"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -223,8 +224,8 @@ func (c *AreaEffectCloud) touch(r *world.Region, e *world.Entity, age int64) {
 	hi := mgl32.Vec3{pos[0] + radius, pos[1] + radius/2, pos[2] + radius}
 	c.found = r.AppendEntitiesIn(c.found[:0], lo[0], lo[2], hi[0], hi[2])
 	for _, o := range c.found {
-		target, ok := o.Owner().(*Player)
-		if !ok || target.dead() || target.gameMode == GameModeSpectator {
+		target, ok := effectTakerOf(o)
+		if !ok {
 			continue
 		}
 		boxLo, boxHi, has := target.BlastBox()
@@ -251,7 +252,7 @@ func (c *AreaEffectCloud) touch(r *world.Region, e *world.Entity, age int64) {
 
 // affect gives target the cloud's effects: instant ones at the cloud's scale, the others
 // for a share of their time.
-func (c *AreaEffectCloud) affect(target *Player) {
+func (c *AreaEffectCloud) affect(target effectTaker) {
 	g := c.s.game
 	for _, eff := range c.effects {
 		def, known := g.effects[eff.ID]
@@ -259,14 +260,14 @@ func (c *AreaEffectCloud) affect(target *Player) {
 			continue
 		}
 		if def.Instant {
-			target.ApplyInstantEffect(eff.ID, eff.Amplifier, cloudInstantScale)
+			target.takeInstant(eff.ID, eff.Amplifier, cloudInstantScale)
 			continue
 		}
 		ticks := eff.Duration
 		if ticks != EffectInfinite {
 			ticks = max(int32(float32(ticks)*cloudDurationScale), 0)
 		}
-		target.GiveEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
+		target.takeEffect(ActiveEffect{ID: eff.ID, Amplifier: eff.Amplifier, Duration: ticks})
 	}
 }
 
@@ -326,7 +327,7 @@ func (c *AreaEffectCloud) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	data[cloudTagParticle] = c.particle
 	list := make([]any, 0, len(c.effects))
 	for i := range c.effects {
-		list = append(list, effectNBT(&c.effects[i]))
+		list = append(list, c.effects[i].NBT())
 	}
 	data[cloudTagEffects] = list
 	data[cloudTagColour] = int32(c.colour) //nolint:gosec // ARGB, as BDS saves it
@@ -362,7 +363,7 @@ func (s *Host) loadCloud(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) 
 	if list, isList := d[cloudTagEffects].([]any); isList {
 		for _, v := range list {
 			if m, isMap := v.(map[string]any); isMap {
-				if eff, valid := effectFromNBT(m); valid {
+				if eff, valid := effect.FromNBT(m); valid {
 					c.effects = append(c.effects, eff)
 				}
 			}

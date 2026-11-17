@@ -144,7 +144,6 @@ func (m *Mob) SetVelocity(v behavior.Vec3) {
 	m.traceVel("set", v)
 	m.body.Vel = v
 }
-func (m *Mob) HasEffect(int) bool                 { return false }
 func (m *Mob) SetHijackable(bool)                 {}
 func (m *Mob) NoActionTime() int32                { return m.noActionTime }
 func (m *Mob) ResetFlock()                        {}

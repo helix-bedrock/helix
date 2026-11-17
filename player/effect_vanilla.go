@@ -57,6 +57,9 @@ type Effect struct {
 	// it is hurt (slot 6).
 	Died func(p *Player, amplifier int32)
 	Hurt func(p *Player, amplifier int32, src DamageSource)
+	// MobTick and MobApply are Tick and Apply on a mob (player/mobeffects.go).
+	MobTick  func(m *Mob, amplifier, left int32)
+	MobApply func(m *Mob, amplifier int32, scale float32)
 }
 
 // EffectModifier is one attribute change of an effect, BDS's AttributeModifier.
@@ -207,12 +210,12 @@ func vanillaEffects() []Effect {
 		{ID: EffectHaste, Name: "haste", Description: "potion.digSpeed", Color: 0xD9C043, BreakSpeed: hasteSpeed(EffectHaste), BreakRate: hasteRate(EffectHaste)},
 		{ID: EffectMiningFatigue, Name: "mining_fatigue", Description: "potion.digSlowDown", Harmful: true, Color: 0x4A4217, BreakSpeed: fatigueSpeed, BreakRate: fatigueRate},
 		{ID: EffectStrength, Name: "strength", Description: "potion.damageBoost", Color: 0xFFC700, Attack: strengthAttack},
-		{ID: EffectInstantHealth, Name: "instant_health", Description: "potion.heal", Color: 0xF82423, Instant: true, Apply: instantHealth},
-		{ID: EffectInstantDamage, Name: "instant_damage", Description: "potion.harm", Harmful: true, Color: 0xA9656A, Instant: true, Apply: instantDamage},
+		{ID: EffectInstantHealth, Name: "instant_health", Description: "potion.heal", Color: 0xF82423, Instant: true, Apply: instantHealth, MobApply: mobInstantHealth},
+		{ID: EffectInstantDamage, Name: "instant_damage", Description: "potion.harm", Harmful: true, Color: 0xA9656A, Instant: true, Apply: instantDamage, MobApply: mobInstantDamage},
 		// Jump Boost and Levitation move the player on its own client; the fall reads Jump Boost.
 		{ID: EffectJumpBoost, Name: "jump_boost", Description: "potion.jump", Color: 0xFDFF84},
 		{ID: EffectNausea, Name: "nausea", Description: "potion.confusion", Harmful: true, Color: 0x551D4A},
-		{ID: EffectRegeneration, Name: "regeneration", Description: "potion.regeneration", Color: 0xCD5CAB, Tick: regenerationTick},
+		{ID: EffectRegeneration, Name: "regeneration", Description: "potion.regeneration", Color: 0xCD5CAB, Tick: regenerationTick, MobTick: mobRegenerationTick},
 		{ID: EffectResistance, Name: "resistance", Description: "potion.resistance", Color: 0x9146F0, Resist: resistanceDamage},
 		{ID: EffectFireResistance, Name: "fire_resistance", Description: "potion.fireResistance", Color: 0xFF9900},
 		{ID: EffectWaterBreathing, Name: "water_breathing", Description: "potion.waterBreathing", Color: 0x98DAC0},
@@ -221,13 +224,13 @@ func vanillaEffects() []Effect {
 		{ID: EffectNightVision, Name: "night_vision", Description: "potion.nightVision", Color: 0xC2FF66},
 		{ID: EffectHunger, Name: "hunger", Description: "potion.hunger", Harmful: true, Color: 0x587653, Tick: hungerTick},
 		{ID: EffectWeakness, Name: "weakness", Description: "potion.weakness", Harmful: true, Color: 0x484D48, Attack: weaknessAttack},
-		{ID: EffectPoison, Name: "poison", Description: "potion.poison", Harmful: true, Color: 0x87A363, Tick: poisonTick(false)},
-		{ID: EffectWither, Name: "wither", Description: "potion.wither", Harmful: true, Color: 0x736156, Tick: witherTick},
+		{ID: EffectPoison, Name: "poison", Description: "potion.poison", Harmful: true, Color: 0x87A363, Tick: poisonTick(false), MobTick: mobPoisonTick(false)},
+		{ID: EffectWither, Name: "wither", Description: "potion.wither", Harmful: true, Color: 0x736156, Tick: witherTick, MobTick: mobWitherTick},
 		{ID: EffectHealthBoost, Name: "health_boost", Description: "potion.healthBoost", Color: 0xF87D23, Modifiers: boost},
 		{ID: EffectAbsorption, Name: "absorption", Description: "potion.absorption", Color: 0x2552A5, Added: absorptionAdded, Removed: absorptionRemoved},
 		{ID: EffectSaturation, Name: "saturation", Description: "potion.saturation", Color: 0xF82423, Instant: true, Apply: saturationApply},
 		{ID: EffectLevitation, Name: "levitation", Description: "potion.levitation", Harmful: true, Color: 0xCEFFFF},
-		{ID: EffectFatalPoison, Name: "fatal_poison", Description: "potion.poison", Harmful: true, Color: 0x4E9331, Tick: poisonTick(true)},
+		{ID: EffectFatalPoison, Name: "fatal_poison", Description: "potion.poison", Harmful: true, Color: 0x4E9331, Tick: poisonTick(true), MobTick: mobPoisonTick(true)},
 		{ID: EffectConduitPower, Name: "conduit_power", Description: "potion.conduitPower", Color: 0x1DC2D1, BreakSpeed: hasteSpeed(EffectConduitPower), BreakRate: hasteRate(EffectConduitPower)},
 		{ID: EffectSlowFalling, Name: "slow_falling", Description: "potion.slowFalling", Color: 0xF3CFB9},
 		// The omens and Hero of the Village wait for raids, trial spawners and trading.

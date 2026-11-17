@@ -24,6 +24,7 @@ import (
 	"github.com/helix-bedrock/entity/sensor"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/entity/trace"
+	"github.com/helix-bedrock/helix/effect"
 	"github.com/helix-bedrock/helix/liquid"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/world/cube"
@@ -290,6 +291,8 @@ type Mob struct {
 	hurtAt                         uint64
 	mingle                         behavior.MingleState
 	hasMingle                      bool
+	// effects are the mob's effects (effects.go).
+	effects effect.List
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
 	// saved is the age and breeding state a save holds, put back once the components are

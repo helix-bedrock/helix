@@ -243,7 +243,6 @@ func (s stateMob) SetAirSupply(air, maxAir int16) {
 
 func (stateMob) SetOwner(behavior.ID)                         {}
 func (stateMob) DropItem(string) bool                         { return false }
-func (stateMob) AddEffect(string, int32, int32)               {}
 func (stateMob) Particles(int, int)                           {}
 func (stateMob) MakeMad()                                     {}
 func (stateMob) SlotEmpty(string) bool                        { return true }

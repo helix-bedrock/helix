@@ -4,6 +4,7 @@ import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/path"
+	"github.com/helix-bedrock/helix/effect"
 )
 
 // A mob's tick has two halves (world.EntityConfig Think and Input). Tick is the thinking
@@ -61,6 +62,10 @@ const (
 	opLevelEventData
 	opSetMingle
 	opDropHorn
+	opGiveEffect
+	opRemoveEffect
+	opClearEffects
+	opDrinkPotion
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -89,6 +94,8 @@ type op struct {
 	dir behavior.Vec3
 	// mingle is the MingleComponent of opSetMingle.
 	mingle behavior.MingleState
+	// effect is the effect of opGiveEffect, its ID in n or by its name.
+	effect effect.Instance
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -236,6 +243,8 @@ func (m *Mob) run(o op) {
 	case opSpawnProjectile, opDropLoot, opSetVelocityOf, opRemoveActor, opMakeJump, opLevelEventData,
 		opSetMingle, opDropHorn:
 		m.runOtherOp(&o)
+	case opGiveEffect, opRemoveEffect, opClearEffects, opDrinkPotion:
+		m.runEffectOp(&o)
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r

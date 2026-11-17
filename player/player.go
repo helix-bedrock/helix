@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 
 	"github.com/google/uuid"
+	"github.com/helix-bedrock/helix/effect"
 	"github.com/helix-bedrock/helix/network"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -107,7 +108,7 @@ type Player struct {
 	inventory  playerItems
 	invs       playerInventories
 	requests   requestState
-	effects    []ActiveEffect
+	effects    effect.List
 	// effectValued and effectMaxed mark the attributes whose value and maximum effect
 	// modifiers changed, so they go back when the effects go.
 	effectValued, effectMaxed uint32

@@ -27,9 +27,6 @@ func (m *Mob) SetBox(b behavior.Box) {
 	m.customBox = absf(w-m.body.Width) > boxSlack || absf(h-m.body.Height) > boxSlack
 }
 
-// EffectAmplifier implements behavior.Jumper: Helix's mobs have no effects yet.
-func (m *Mob) EffectAmplifier(int) (int32, bool) { return 0, false }
-
 // LastHurtTime implements behavior.Jumper: Actor::getLastHurtTimestamp, the tick of the last
 // hurt that landed.
 func (m *Mob) LastHurtTime() uint64 { return m.hurtAt }
