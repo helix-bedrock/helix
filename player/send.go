@@ -64,7 +64,8 @@ func (p *Player) addViewer(d *world.Dimension) *world.Viewer {
 // sendRaw writes a packet already encoded in the latest version, false if the client
 // needs it as a packet instead (another version, a packet-out hook).
 func (p *Player) sendRaw(b []byte) bool {
-	if p.conn == nil || !p.conn.RawOK() {
+	// A packet trace needs the packets themselves (trace.go).
+	if p.conn == nil || !p.conn.RawOK() || len(p.s.trace) > 0 {
 		return false
 	}
 	if err := p.conn.WriteRaw(b); err != nil {
