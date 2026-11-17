@@ -349,6 +349,9 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 	if dealt <= 0 {
 		return 0
 	}
+	if by != nil {
+		by.hurtMob(m.m.ID())
+	}
 	if by != nil && by.entity != nil {
 		away := m.entity.Position().Sub(by.feet())
 		v := by.knockbackStep(mglVec(m.m.Body().Vel), away[0], away[2], by.Tuning(TuneKnockbackPush), by.Tuning(TuneKnockbackLift))
@@ -427,6 +430,7 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	if !p.s.game.sys.TakeHit(h) {
 		return false, false
 	}
+	p.hurtByMob(m.m.ID())
 	if !p.dead() {
 		away := p.feet().Sub(m.entity.Position())
 		resist := max(1-p.attributes.get(attrKnockbackResistance), 0) * p.Tuning(TuneKnockbackTakenScale)
@@ -891,8 +895,8 @@ func (a playerActor) ArmourCoverage() float32           { return 0 }
 func (a playerActor) WearsHeadOf(string) bool           { return false }
 func (a playerActor) Target() behavior.ID               { return behavior.NoID }
 func (a playerActor) HijacksMount() bool                { return false }
-func (a playerActor) LastHurtByMob() behavior.ID        { return behavior.NoID }
-func (a playerActor) LastHurtMob() (behavior.ID, int32) { return behavior.NoID, 0 }
+func (a playerActor) LastHurtByMob() behavior.ID        { return a.p.hurts.by }
+func (a playerActor) LastHurtMob() (behavior.ID, int32) { return a.p.hurts.mob, a.p.hurts.stamp }
 func (a playerActor) BlocksSpace() bool                 { return false }
 func (a playerActor) AttachPos(int) behavior.Vec3       { return a.Eyes() }
 

@@ -52,6 +52,8 @@ type Player struct {
 	traceSends atomic.Int32
 	// traceFlags is the last PlayerAuthInput input flags the packet trace logged.
 	traceFlags string
+	// hurts are the mob the player last hurt and the one that last hurt it (hurtby.go).
+	hurts hurtRecord
 
 	// Session: fixed once the player joined. Runs: anywhere.
 	uuid uuid.UUID
