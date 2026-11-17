@@ -3,10 +3,12 @@ package player
 import (
 	"maps"
 	"math"
+	"strconv"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
+	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/mob"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
@@ -329,6 +331,8 @@ func (o *Mob) saveBreeding(data map[string]any) {
 		delete(data, mobKeyBreedCool)
 	}
 	data[mobKeyLeasher] = int64(o.m.LeashHolder())
+	saveAnger(data, st)
+	o.saveTrust(data)
 }
 
 func (o *Mob) loadBreeding(data map[string]any) {
@@ -342,7 +346,9 @@ func (o *Mob) loadBreeding(data map[string]any) {
 	if !st.HasBreed {
 		st.LoveCause = int64(behavior.NoID)
 	}
+	st.Nuisances, st.HasAnger = loadAnger(data)
 	o.m.RestoreState(st)
+	o.loadTrust(data)
 	if id, ok := data[mobKeyLeasher].(int64); ok && behavior.ID(id) != behavior.NoID {
 		o.m.SetLeashHolder(behavior.ID(id))
 	}
@@ -403,3 +409,99 @@ func (o *Mob) loadMobItems(data map[string]any) {
 
 // maxMobInventory bounds the slot numbers a save may name.
 const maxMobInventory = 256
+
+// The anger_level and trust keys BDS 1.26.60 saves: AngerLevelComponent's "Nuisances", a
+// list of ActorId, Anger and Priority (save 0x735D5D0, load 0x7384410), and TrustComponent's
+// TrustedPlayersAmount and TrustedPlayer<n> (save 0x7405E20, load 0x74061A0).
+const (
+	mobKeyNuisances     = "Nuisances"
+	mobKeyNuisanceID    = "ActorId"
+	mobKeyNuisanceAnger = "Anger"
+	mobKeyNuisancePrio  = "Priority"
+	mobKeyTrustedAmount = "TrustedPlayersAmount"
+	mobKeyTrustedPrefix = "TrustedPlayer"
+)
+
+// saveAnger writes the suspects while the mob has anger_level.
+func saveAnger(data map[string]any, st mob.SavedState) {
+	if !st.HasAnger {
+		delete(data, mobKeyNuisances)
+		return
+	}
+	list := make([]any, 0, len(st.Nuisances))
+	for _, n := range st.Nuisances {
+		prio := uint8(0)
+		if n.Priority {
+			prio = 1
+		}
+		list = append(list, map[string]any{mobKeyNuisanceID: int64(n.ID), mobKeyNuisanceAnger: n.Anger, mobKeyNuisancePrio: prio})
+	}
+	data[mobKeyNuisances] = list
+}
+
+// loadAnger reads the suspects; an entry needs ActorId and Anger, as BDS's load.
+func loadAnger(data map[string]any) ([]state.Nuisance, bool) {
+	raw, ok := data[mobKeyNuisances]
+	if !ok {
+		return nil, false
+	}
+	var out []state.Nuisance
+	for _, e := range compoundList(raw) {
+		id, okID := e[mobKeyNuisanceID].(int64)
+		anger, okAnger := e[mobKeyNuisanceAnger].(int32)
+		if !okID || !okAnger {
+			continue
+		}
+		prio, _ := e[mobKeyNuisancePrio].(uint8)
+		out = append(out, state.Nuisance{ID: behavior.ID(id), Anger: anger, Priority: prio != 0})
+	}
+	return out, true
+}
+
+// compoundList is an NBT list of compounds as the decoder gives it.
+func compoundList(raw any) []map[string]any {
+	switch l := raw.(type) {
+	case []map[string]any:
+		return l
+	case []any:
+		out := make([]map[string]any, 0, len(l))
+		for _, e := range l {
+			if c, ok := e.(map[string]any); ok {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+// saveTrust writes the trusted players while the mob has minecraft:trust.
+func (o *Mob) saveTrust(data map[string]any) {
+	if n, ok := data[mobKeyTrustedAmount].(int32); ok {
+		for i := range n {
+			delete(data, mobKeyTrustedPrefix+strconv.Itoa(int(i)))
+		}
+	}
+	delete(data, mobKeyTrustedAmount)
+	ids, ok := o.m.SavedTrust()
+	if !ok {
+		return
+	}
+	data[mobKeyTrustedAmount] = int32(len(ids)) //nolint:gosec // a trusted set is small
+	for i, id := range ids {
+		data[mobKeyTrustedPrefix+strconv.Itoa(i)] = int64(id)
+	}
+}
+
+// loadTrust reads the trusted players; entries missing are skipped, as BDS's load.
+func (o *Mob) loadTrust(data map[string]any) {
+	n, ok := data[mobKeyTrustedAmount].(int32)
+	if !ok {
+		return
+	}
+	for i := range n {
+		if id, ok := data[mobKeyTrustedPrefix+strconv.Itoa(int(i))].(int64); ok {
+			o.m.Trust(behavior.ID(id))
+		}
+	}
+}

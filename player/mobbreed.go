@@ -35,6 +35,9 @@ func (m *Mob) Born(_ *mob.Mob, b state.Birth) behavior.Actor {
 	if b.Tame {
 		baby.m.SetFlag(flagTamed, true)
 	}
+	// createBornActor (0xBFF2400) adds the parents' player love causes to the baby's
+	// trust set after its born event.
+	baby.m.Trust(b.Trusted[0], b.Trusted[1])
 	baby.add(r.Dimension())
 	return baby.m.Snapshot()
 }

@@ -19,7 +19,7 @@ func (m *Mob) Pos() behavior.Vec3  { return m.body.Pos }
 func (m *Mob) Box() behavior.Box   { return m.body.Box }
 func (m *Mob) Eyes() behavior.Vec3 { p := m.body.Pos; p.Y += m.eyeHeight(); return p }
 func (m *Mob) Alive() bool         { return !m.Dead() }
-func (m *Mob) Removed() bool       { return false }
+func (m *Mob) Removed() bool       { return m.despawned }
 func (m *Mob) Pickable() bool      { return !m.Dead() }
 
 // Interacts is Actor::canInteractWithOtherEntitiesInGame, true for every

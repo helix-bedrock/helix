@@ -261,6 +261,13 @@ type Mob struct {
 	persistent bool
 	// nameTag is the mob's name (BDS's setNameTag), "" for none.
 	nameTag string
+	// suspect is the suspect_tracking location; sonicCooldown the warden's sonic boom
+	// cooldown, set when hasSonicCooldown is (warden.go).
+	suspect          suspicion
+	sonicCooldown    uint64
+	hasSonicCooldown bool
+	// trusted are the IDs the trust component holds (trust.go).
+	trusted []behavior.ID
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
 	// saved is the age and breeding state a save holds, put back once the components are

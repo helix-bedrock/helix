@@ -98,11 +98,13 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		ranged := slices.ContainsFunc(hand, func(n string) bool { return n == itemBow || n == itemCrossbow })
 		return definition.CompareBool(op, ranged, rawBool(test.Value, true)), true
 	case "is_riding_self", "is_vehicle_family", "is_controlling_passenger_family", "in_caravan", "is_leashed_to",
-		"has_nametag", "has_mob_effect", "is_avoiding_mobs", "is_owner", "trusts",
+		"has_nametag", "has_mob_effect", "is_avoiding_mobs", "is_owner",
 		"has_damaged_equipment", "has_same_equipment_in_slot_as", "has_trade_supply", "has_container_open":
 		// Nothing a mob or player can have yet: riding, leashes, owners, effects, name tags,
 		// and trades are not hooked up.
 		return definition.CompareBool(op, false, rawBool(test.Value, true)), true
+	case "trusts":
+		return definition.CompareBool(op, trusts(t.self, a.ID()), rawBool(test.Value, true)), true
 	case "is_variant", "is_mark_variant", "is_skin_id", "is_color":
 		v, ok := intComponent(comps(m, s), variantComponents[test.Name])
 		return ok && definition.Compare(op, v, rawInt(test.Value)), true

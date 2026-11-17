@@ -46,6 +46,9 @@ const (
 	opWilling
 	opUseBreedFood
 	opSpawnBaby
+	opSonicHit
+	opKnockback
+	opLevelEventXYZ
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -68,6 +71,8 @@ type op struct {
 	amount float32
 	// item is the stack of the item ops (items.go).
 	item behavior.Item
+	// knock is the push of opKnockback.
+	knock behavior.Knockback
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -200,6 +205,8 @@ func (m *Mob) run(o op) {
 		env.LevelEventData(r, o.n, o.at, int32(o.amount))
 	case opSetSlot, opDropItem, opPickUp:
 		m.runItemOp(r, &o)
+	case opSonicHit, opKnockback, opLevelEventXYZ:
+		m.runWardenOp(&o)
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r
@@ -241,6 +248,9 @@ type Snapshot struct {
 	// breedReady is minecraft:breedable present and not cooling down, for other mobs'
 	// CanMate.
 	breedReady bool
+	// trusted and hasTrust are the trust component's set (trust.go).
+	trusted  []behavior.ID
+	hasTrust bool
 	// equip is the equipment, for other mobs' has_equipment tests.
 	equip [EquipSlots]behavior.Item
 	// lovePartner, loveLeader, willing and breedFood are the make_love state (love.go).
@@ -271,6 +281,7 @@ func (m *Mob) snapshot() {
 	s.lovePartner, s.loveLeader, s.willing = m.love.partner, m.love.leader, m.love.willing
 	s.breedFood = m.breedFoodSlot() >= 0
 	s.breedReady = m.states != nil && m.states.Breedable != nil && m.states.Breedable.Cooldown() <= 0
+	s.trusted, s.hasTrust = m.trusted, m.hasTrust()
 }
 
 func (s *Snapshot) ID() behavior.ID                    { return s.id }

@@ -35,6 +35,10 @@ type SavedState struct {
 	InLove       int32
 	Cooldown     int32
 	LoveCause    int64
+	// HasAnger is set when anger_level was there; Nuisances are its suspects as BDS saves
+	// them (AngerLevelComponent "Nuisances", save 0x735D5D0, load 0x7384410).
+	HasAnger  bool
+	Nuisances []state.Nuisance
 }
 
 // SaveState is what the mob's age and breeding components hold now.
@@ -51,6 +55,9 @@ func (m *Mob) SaveState() SavedState {
 	}
 	if b := m.states.Breedable; b != nil {
 		s.HasBreed, s.InLove, s.Cooldown, s.LoveCause = true, b.Love(), b.Cooldown(), int64(b.LoveCause())
+	}
+	if a := m.states.AngerLevel; a != nil {
+		s.HasAnger, s.Nuisances = true, a.Nuisances()
 	}
 	return s
 }
@@ -72,6 +79,9 @@ func (m *Mob) applySaved() {
 	}
 	if b := m.states.Breedable; b != nil && s.HasBreed {
 		b.SetState(s.InLove, s.Cooldown, behavior.ID(s.LoveCause))
+	}
+	if a := m.states.AngerLevel; a != nil && s.HasAnger {
+		a.Load(s.Nuisances)
 	}
 }
 
