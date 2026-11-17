@@ -196,7 +196,6 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 	if m.stand != nil {
 		md[protocol.EntityDataKeyPoseIndex] = m.stand.pose
 	}
-	showNameTag(md, m.m.NameTag())
 	return md
 }
 
