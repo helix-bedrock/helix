@@ -18,7 +18,8 @@ import (
 // A player's use on the mob opens it when nothing else applies (Actor::getInteraction
 // 0xB3D1540's open-container interaction, checked by 0x737E1B0: alive, the player may open
 // containers, and a private inventory only for its owner); so does a rider asking for its
-// inventory.
+// inventory, whose client opens the screen itself: a packet capture of BDS 1.26.60 shows
+// a rider's Interact OpenInventory answered with UpdateEquip and InventoryContent only.
 
 // ContainerHorse is a horse's, donkey's, mule's, llama's or camel's inventory.
 const ContainerHorse = ContainerBeacon + 1
@@ -59,8 +60,10 @@ func (h *horseHolder) inventoryChanged(slot int) {
 	}
 }
 
-// openHorse opens the mob's inventory window, if the player may.
-func (p *Player) openHorse(o *Mob) bool {
+// openHorse opens the mob's inventory window, if the player may. rider is true when the
+// mob's rider asked for it (Interact OpenInventory), whose client has the screen open
+// already: BDS then sends UpdateEquip and the slots with no ContainerOpen.
+func (p *Player) openHorse(o *Mob, rider bool) bool {
 	r := p.entity.Region()
 	if r == nil || p.window.open || o.gone || o.m.Dead() || !o.m.HorseInventory() || !p.abilities.Flag(AbilityOpenContainers) {
 		return false
@@ -71,7 +74,7 @@ func (p *Player) openHorse(o *Mob) bool {
 	o.syncHorseInv()
 	ow := windowOpening{
 		kind: ContainerHorse, window: byte(protocol.ContainerTypeHorse), pos: floorPos(o.entity.Position()),
-		entity: o.entity.UniqueID(), inv: o.horseInv,
+		entity: o.entity.UniqueID(), inv: o.horseInv, screenOpen: rider,
 	}
 	if !p.mayOpen(r, &ow) {
 		return false
@@ -84,7 +87,7 @@ func (p *Player) openHorse(o *Mob) bool {
 
 // mayOpenMob is the open-container interaction's test for a use on the mob.
 func (p *Player) mayOpenMob(o *Mob) bool {
-	return !o.m.Flag(flagContainerPrivate) && o.m.HorseInventory() && p.openHorse(o)
+	return !o.m.Flag(flagContainerPrivate) && o.m.HorseInventory() && p.openHorse(o, false)
 }
 
 // syncHorseInv copies the mob's slots into its window inventory, resized to them.

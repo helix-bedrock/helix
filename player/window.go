@@ -104,6 +104,10 @@ type windowOpening struct {
 	cart    *Minecart
 	boat    *Boat
 	blocked bool
+	// screenOpen is true when the client opened the screen itself, so no ContainerOpen
+	// is sent: a horse's rider asking for its inventory (BDS 1.26.60 answers with
+	// UpdateEquip and the slots only, seen in a packet capture of BDS).
+	screenOpen bool
 }
 
 // mayOpen runs ContainerOpenEvent on a window about to open; false keeps it shut.
@@ -130,10 +134,12 @@ func (p *Player) showWindowThen(r *world.Region, o *windowOpening, after func())
 	if r != nil {
 		w.dim = r.Dimension()
 	}
-	p.send(&packet.ContainerOpen{
-		WindowID: w.id, ContainerType: o.window,
-		ContainerPosition: blockPos(o.pos), ContainerEntityUniqueID: o.entity,
-	})
+	if !o.screenOpen {
+		p.send(&packet.ContainerOpen{
+			WindowID: w.id, ContainerType: o.window,
+			ContainerPosition: blockPos(o.pos), ContainerEntityUniqueID: o.entity,
+		})
+	}
 	if after != nil {
 		after()
 	}
@@ -215,7 +221,7 @@ func handleInteract(p *Player, pk *packet.Interact) {
 		return
 	}
 	// A rider of a mount with a horse inventory opens that.
-	if o, ok := p.vehicle.(*Mob); ok && pk.TargetEntityRuntimeID == o.entity.RuntimeID() && p.openHorse(o) {
+	if o, ok := p.vehicle.(*Mob); ok && pk.TargetEntityRuntimeID == o.entity.RuntimeID() && p.openHorse(o, true) {
 		return
 	}
 	// A rider names what it sits on: a vehicle with no slots of its own opens the
