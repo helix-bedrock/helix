@@ -61,13 +61,19 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 	env, r := t.m.rt.Env, t.m.v.r
 	switch test.Name {
 	case "has_equipment":
+		if m != nil && domainOr(test, "any") == domainInventory {
+			return definition.CompareBool(op, m.inventoryHas(rawString(test.Value), false), true), true
+		}
 		if eq := mobEquip(m, s); eq != nil {
 			has := slices.Contains(equipmentNames(eq, domainOr(test, "any"), nil), ns(rawString(test.Value)))
 			return definition.CompareBool(op, has, true), true
 		}
 		return definition.CompareBool(op, t.equipped(p, test, false), true), true
 	case "has_equipment_tag":
-		// Item tags of a mob's equipment are not looked up yet: only players answer.
+		if m != nil && domainOr(test, "any") == domainInventory {
+			return definition.CompareBool(op, m.inventoryHas(rawString(test.Value), true), true), true
+		}
+		// Item tags of a mob's worn equipment are not looked up yet: only players answer.
 		return definition.CompareBool(op, t.equipped(p, test, true), true), true
 	case "all_slots_empty":
 		var empty bool
@@ -327,4 +333,25 @@ func rawInt(raw []byte) int32 {
 		}
 	}
 	return int32(f)
+}
+
+// domainInventory is the has_equipment domain of the mob's minecraft:inventory slots.
+const domainInventory = "inventory"
+
+// inventoryHas reports an item in the mob's inventory slots: the one a name means, or with
+// tag, one carrying that item tag.
+func (m *Mob) inventoryHas(want string, tag bool) bool {
+	if m.items.Inventory == nil || m.rt.ItemRules == nil {
+		return false
+	}
+	d := want
+	if tag {
+		d = `{"tags":"q.any_tag('` + want + `')"}`
+	}
+	for _, it := range m.inv.slots {
+		if !it.Empty() && (m.rt.ItemRules.Matches(d, it) || !tag && HeldItem{Name: it.Name}.Matches(want)) {
+			return true
+		}
+	}
+	return false
 }

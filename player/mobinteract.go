@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"math"
 	"math/rand/v2"
+	"strconv"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -20,8 +22,8 @@ import (
 // as a bucket fills (takeFilled); how BDS's interaction hands it over was not read.
 //
 // Done of the item work: hurt_item, use_item, transform_to_item, spawn_items, play_sounds,
-// swing. Not done: add_items, equip_item_slot, drop_item_slot, health_amount, particles,
-// vibration (game events) and interact_text.
+// swing, equip_item_slot and drop_item_slot (the inventory domain). Not done: add_items,
+// health_amount, particles, vibration (game events) and interact_text.
 //
 // Spawned items are BDS 1.26.60's (the interact runtime 0x71FABF0): each item of the table
 // appears y_offset above the mob's feet, with the item's own spawn speed (ItemActor's
@@ -37,6 +39,11 @@ type interaction struct {
 	HurtItem        int32           `json:"hurt_item"`
 	Swing           bool            `json:"swing"`
 	PlaySounds      json.RawMessage `json:"play_sounds"`
+	// EquipItemSlot puts the held item in that inventory slot; DropItemSlot drops what the
+	// slot holds DropItemYOffset above the mob's feet.
+	EquipItemSlot   string   `json:"equip_item_slot"`
+	DropItemSlot    string   `json:"drop_item_slot"`
+	DropItemYOffset *float32 `json:"drop_item_y_offset"`
 	SpawnItems      *struct {
 		Table   string   `json:"table"`
 		YOffset *float32 `json:"y_offset"`
@@ -97,7 +104,8 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 // trading. The first that applies wins.
 func (p *Player) mobInteractions(r *world.Region, o *Mob) {
 	_ = p.bucketMob(r, o) || p.tameMob(o) || p.trustMob(o) || p.feedMob(o) || p.leashMob(o) ||
-		p.nameMob(o) || p.feedMount(o) || p.mountMob(o) || p.sitMob(o) || p.openTrade(r, o)
+		p.nameMob(o) || p.feedMount(o) || p.mountMob(o) || p.sitMob(o) || p.openTrade(r, o) ||
+		p.mayOpenMob(o)
 }
 
 // runInteraction does the item work of a minecraft:interact that applied: spawn_items,
@@ -105,6 +113,7 @@ func (p *Player) mobInteractions(r *world.Region, o *Mob) {
 func (p *Player) runInteraction(r *world.Region, o *Mob, it interaction) {
 	at := o.entity.Position()
 	p.spawnInteractItems(r, o, it)
+	p.dropInteractSlot(r, o, it)
 	for _, name := range it.sounds() {
 		playSound(r, feetBlock(at), soundEvent{name: name, pos: at, extra: -1, entity: o.m.Type()}, nil)
 	}
@@ -112,6 +121,7 @@ func (p *Player) runInteraction(r *world.Region, o *Mob, it interaction) {
 		p.hurtHeld(it.HurtItem)
 	}
 	switch name, ok := itemByAux(it.TransformToItem); {
+	case p.equipInteractSlot(o, it):
 	case it.TransformToItem != "" && ok:
 		p.takeFilled(ItemStack{Name: name, Count: 1, netID: p.s.stackIDs.Add(1)})
 	case it.UseItem:
@@ -178,4 +188,38 @@ func (p *Player) nameMob(o *Mob) bool {
 	p.useUpHeld()
 	p.flush()
 	return true
+}
+
+// equipInteractSlot is equip_item_slot: one of the held item goes into the mob's inventory
+// slot, which runs the equip slot's on_equip (a saddle saddles a horse). The held item is
+// used up as use_item does; whether BDS keeps it in creative was not read.
+func (p *Player) equipInteractSlot(o *Mob, it interaction) bool {
+	k, err := strconv.Atoi(it.EquipItemSlot)
+	held := p.inventory.Held()
+	if it.EquipItemSlot == "" || err != nil || held.Empty() || k < 0 || k >= len(o.m.Inventory()) {
+		return false
+	}
+	one := held
+	one.Count = 1
+	o.m.SetInventorySlot(k, mobItem(p.s.freshStack(one)))
+	p.useUpHeld()
+	return true
+}
+
+// dropInteractSlot is drop_item_slot: what the mob's inventory slot holds drops
+// drop_item_y_offset above its feet (BDS 1.26.60's interact runtime 0x71FABF0 through the
+// container's slot drop 0x737FEE0), and the emptied slot runs on_unequip.
+func (p *Player) dropInteractSlot(r *world.Region, o *Mob, it interaction) {
+	k, err := strconv.Atoi(it.DropItemSlot)
+	inv := o.m.Inventory()
+	if it.DropItemSlot == "" || err != nil || k < 0 || k >= len(inv) || inv[k].Empty() {
+		return
+	}
+	st := realStack(inv[k])
+	o.m.SetInventorySlot(k, behavior.Item{})
+	y := float32(0)
+	if it.DropItemYOffset != nil {
+		y = *it.DropItemYOffset
+	}
+	p.s.spawnMobDrop(r, st, o.entity.Position().Add(mgl32.Vec3{0, y, 0}))
 }

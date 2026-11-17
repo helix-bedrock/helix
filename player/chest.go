@@ -1112,7 +1112,7 @@ func (p *Player) loadChestWork() []ItemStack {
 		return nil
 	}
 	r := p.entity.Region()
-	if r == nil || p.windowChest(r) == nil {
+	if r == nil || p.windowChest(r) == nil && !p.horseLive(r) {
 		return nil
 	}
 	inv := p.window.inv
@@ -1129,7 +1129,7 @@ func (p *Player) commitChestWork() {
 		return
 	}
 	r := p.entity.Region()
-	if r == nil || p.windowChest(r) == nil {
+	if r == nil || p.windowChest(r) == nil && !p.horseLive(r) {
 		return
 	}
 	inv := p.window.inv

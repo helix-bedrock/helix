@@ -67,8 +67,9 @@ func (m *Mob) buildItems() {
 	}
 	m.items = behavior.Items{Body: m, World: goalWorld{&m.v}, Rules: m.rt.ItemRules, Shareables: s.Shareables}
 	if s.Inventory != nil {
-		m.inv.resize(int(max(s.Inventory.Size, 0)), m.rt.ItemRules)
+		m.inv.resize(m.containerSize(), m.rt.ItemRules)
 		m.items.Inventory = &m.inv
+		m.showContainer()
 	}
 	if s.EquipItem != nil {
 		m.items.Equip = &m.equipState

@@ -281,7 +281,11 @@ func (r itemRules) nameMatches(d string, it behavior.Item) bool {
 // registry's alias table (BDS 1.26.60 0xC66BA90) maps them; BDS looks names up in lower
 // case.
 var itemAliases = map[string]string{
-	"minecraft:carrotonastick": "minecraft:carrot_on_a_stick",
+	"minecraft:carrotonastick":    "minecraft:carrot_on_a_stick",
+	"minecraft:horsearmorleather": "minecraft:leather_horse_armor",
+	"minecraft:horsearmoriron":    "minecraft:iron_horse_armor",
+	"minecraft:horsearmorgold":    "minecraft:golden_horse_armor",
+	"minecraft:horsearmordiamond": "minecraft:diamond_horse_armor",
 }
 
 // itemName is the item a descriptor's name means: namespaced, lower case and through

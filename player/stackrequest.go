@@ -178,7 +178,7 @@ func (p *Player) checkRequest() uint8 {
 	if !p.beaconPaid() {
 		return protocol.ItemStackResponseStatusError
 	}
-	if !p.commitStorage() || p.shulkerInShulker() || p.shulkerTooFull() || !p.fireChestItems() {
+	if !p.commitStorage() || p.shulkerInShulker() || p.shulkerTooFull() || !p.fireChestItems() || !p.horseSlotsTake() {
 		return protocol.ItemStackResponseStatusCannotPlaceItem
 	}
 	return protocol.ItemStackResponseStatusOK
@@ -286,6 +286,9 @@ func (p *Player) inventoryOf(r slotRef) (*Inventory, int) {
 		return invs.armour, int(r.slot)
 	case containerOffhand:
 		return invs.offhand, 0
+	case protocol.ContainerHorseEquip:
+		k, _ := p.horseSlot(r.kind, r.slot)
+		return p.window.inv, k
 	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox,
 		protocol.ContainerFurnaceIngredient, protocol.ContainerBlastFurnaceIngredient, protocol.ContainerSmokerIngredient,
 		protocol.ContainerFurnaceFuel, protocol.ContainerFurnaceResult:
@@ -421,7 +424,20 @@ func (p *Player) slot(inv *playerItems, container, slot byte) (slotRef, bool) {
 			return r, false
 		}
 		r.stack = &inv.ui[slot]
+	case protocol.ContainerHorseEquip:
+		k, ok := p.horseSlot(container, slot)
+		if !ok || k >= len(inv.open) {
+			return r, false
+		}
+		r.stack = &inv.open[k]
 	case containerLevelEntity, protocol.ContainerCrafterLevelEntity, protocol.ContainerShulkerBox:
+		if k, ok := p.horseSlot(container, slot); ok {
+			if k >= len(inv.open) {
+				return r, false
+			}
+			r.stack = &inv.open[k]
+			break
+		}
 		if int(slot) >= len(inv.open) {
 			return r, false
 		}

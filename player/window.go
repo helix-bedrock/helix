@@ -32,8 +32,10 @@ type windowState struct {
 	// cart is the minecart whose slots are open, if a cart's are; boat the chest boat's.
 	cart *Minecart
 	boat *Boat
-	// trader is the villager whose trade window is open.
+	// trader is the villager whose trade window is open; horse the mob whose horse
+	// window is.
 	trader *Mob
+	horse  *Mob
 }
 
 // nextID moves to the next window ID.
@@ -117,6 +119,11 @@ func (p *Player) mayOpen(r *world.Region, o *windowOpening) bool {
 // showWindow opens the window as BDS's openContainer does: the next window ID,
 // ContainerOpen, then the slots. It fires no event.
 func (p *Player) showWindow(r *world.Region, o *windowOpening) {
+	p.showWindowThen(r, o, nil)
+}
+
+// showWindowThen is showWindow with more packets sent between ContainerOpen and the slots.
+func (p *Player) showWindowThen(r *world.Region, o *windowOpening, after func()) {
 	w := &p.window
 	w.nextID()
 	w.open, w.kind, w.inv, w.pos, w.cart, w.boat = true, o.kind, o.inv, o.pos, o.cart, o.boat
@@ -127,6 +134,9 @@ func (p *Player) showWindow(r *world.Region, o *windowOpening) {
 		WindowID: w.id, ContainerType: o.window,
 		ContainerPosition: blockPos(o.pos), ContainerEntityUniqueID: o.entity,
 	})
+	if after != nil {
+		after()
+	}
 	if o.inv != nil {
 		o.inv.sendAll(p, false)
 	}
@@ -138,7 +148,8 @@ func (p *Player) showWindow(r *world.Region, o *windowOpening) {
 func (p *Player) closeWindow(r *world.Region, serverSide bool) {
 	w := &p.window
 	was := *w
-	w.open, w.kind, w.inv, w.cart, w.boat, w.trader = false, ContainerNone, nil, nil, nil, nil
+	was.horse.leaveHorse(p)
+	w.open, w.kind, w.inv, w.cart, w.boat, w.trader, w.horse = false, ContainerNone, nil, nil, nil, nil, nil
 	if was.trader != nil && was.trader.trades != nil && was.trader.trades.player == p {
 		was.trader.endTrade()
 	}
@@ -201,6 +212,10 @@ func handleInteract(p *Player, pk *packet.Interact) {
 	// So does a chest boat's rider, and one looking at it.
 	if b := p.boatInReach(pk.TargetEntityRuntimeID); b != nil && b.chest != nil {
 		p.openBoat(b)
+		return
+	}
+	// A rider of a mount with a horse inventory opens that.
+	if o, ok := p.vehicle.(*Mob); ok && pk.TargetEntityRuntimeID == o.entity.RuntimeID() && p.openHorse(o) {
 		return
 	}
 	// A rider names what it sits on: a vehicle with no slots of its own opens the

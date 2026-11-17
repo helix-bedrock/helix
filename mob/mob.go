@@ -313,6 +313,8 @@ type Mob struct {
 	// counts the ticks of a refused horse's rear-up (tame.go).
 	owner   behavior.ID
 	madTime int32
+	// strength and strengthMax are minecraft:strength's (horse.go).
+	strength, strengthMax int32
 	// saved is the age and breeding state a save holds, put back once the components are
 	// built; births is scratch space for a mating's babies.
 	saved  *SavedState
@@ -559,6 +561,7 @@ func (m *Mob) refresh() {
 func (m *Mob) rebuild(comps definition.Group) {
 	order := m.inst.Order()
 	m.readAttributes(comps)
+	m.readStrength(comps)
 	m.readNavigation(order, comps)
 	m.readMovement(order, comps)
 	m.readJump(comps)

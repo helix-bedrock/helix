@@ -83,6 +83,10 @@ type Mob struct {
 	absorption, absorbed float32
 	// trades are a villager's offers (trade.go), nil without a trade table.
 	trades *villagerTrades
+	// horseInv and horseView are the window slots of a horse container and who has them
+	// open (mobhorse.go).
+	horseInv  *Inventory
+	horseView *horseHolder
 }
 
 // Entity returns the mob's entity.
@@ -240,6 +244,9 @@ func (m *Mob) apply(e *world.Entity) {
 	}
 	if m.m.Dead() && m.m.LeashHolder() != behavior.NoID {
 		m.dropLeashOnDeath(e.Region())
+	}
+	if m.m.Dead() {
+		m.dropInventoryOnDeath(e.Region())
 	}
 	if m.ended {
 		// A despawned mob (a creeper that blew up) leaves no experience, as BDS's

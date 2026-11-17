@@ -245,6 +245,12 @@ var oldItemNames = map[string]string{
 	"fish":           "minecraft:cod",
 	"clownfish":      "minecraft:tropical_fish",
 	"cooked_fish":    "minecraft:cooked_cod",
+	// The horse armour, by BDS 1.26.60's item alias table (0xC66BA90).
+	"horsearmorleather": "minecraft:leather_horse_armor",
+	"horsearmoriron":    "minecraft:iron_horse_armor",
+	"horsearmorgold":    "minecraft:golden_horse_armor",
+	"horsearmordiamond": "minecraft:diamond_horse_armor",
+	"carrotonastick":    "minecraft:carrot_on_a_stick",
 }
 
 // --- leashes ---
