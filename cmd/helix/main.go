@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -22,6 +23,7 @@ import (
 func main() {
 	settings := flag.String("config", "server.properties", "the server settings file, in BDS's server.properties format; written with the defaults if missing")
 	debug := flag.Bool("debug", false, "log every packet players send, and other details")
+	trace := flag.String("trace", "", "log these packets whole, both ways, comma-separated, such as Interact,ItemStackRequest,ItemStackResponse")
 	testcmds := flag.Bool("testcmds", false, "let anyone use /gamemode and /itemtest and show a countdown over dropped items, for in-game testing")
 	publicIP := flag.String("public-ip", "", "BDS's server-public-ip: this network's public IP, so players outside it can join; forward TCP 19132 and the UDP ports on the router")
 	udpPort := flag.Uint("udp-port", 0, "carry every connection over this one UDP port, so one forwarded port is enough; not something BDS can do")
@@ -63,6 +65,9 @@ func main() {
 
 	conf := helix.DefaultConfig()
 	conf.Log = log
+	if *trace != "" {
+		conf.TracePackets = strings.Split(*trace, ",")
+	}
 	if err := conf.LoadProperties(*settings); err != nil {
 		log.Error("cannot start", "err", err)
 		return

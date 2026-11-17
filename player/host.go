@@ -106,6 +106,9 @@ type HostConfig struct {
 	// Items stores big contents of items (shulker boxes of books) on their own, so items
 	// keep only a reference (helditems.go). Nil keeps them in the items.
 	Items ItemContents
+	// TracePackets names packet types logged whole, both ways, at info level, such as
+	// "Interact" (player/trace.go). Empty logs none.
+	TracePackets []string
 }
 
 // Host runs the players of one server: it admits them, owns the player
@@ -137,6 +140,8 @@ type Host struct {
 	redstone *circuit.Settings
 
 	handlers handlers
+	// trace is the packet types logged whole (HostConfig.TracePackets).
+	trace packetTrace
 	// commands are the server's commands, shared with the Setup they were registered on.
 	commands *command.Manager
 	game     *gameplay
@@ -218,6 +223,7 @@ func NewHost(conf HostConfig, setup *Setup) (*Host, error) {
 	}
 	h := &Host{
 		log:          conf.Log,
+		trace:        newPacketTrace(conf.TracePackets),
 		onPanic:      conf.OnPanic,
 		reg:          conf.Registry,
 		overworld:    conf.Overworld,

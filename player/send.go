@@ -18,6 +18,7 @@ func (p *Player) send(pks ...packet.Packet) bool {
 		return true // a player with no client to tell, as in tests
 	}
 	for _, pk := range pks {
+		p.traceOut(pk)
 		if p.traceSends.Load() > 0 && p.traceSends.Add(-1) >= 0 {
 			p.s.log.Debug("packet to player", "name", p.name, "packet", describePacket(pk))
 		}

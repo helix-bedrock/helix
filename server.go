@@ -50,6 +50,9 @@ type Config struct {
 	LevelName string
 	// WorldsDir is the folder worlds are kept in, as BDS's worlds folder.
 	WorldsDir string
+	// TracePackets names packet types logged whole, both ways, at info level (such as
+	// "Interact", "ItemStackRequest"), for in-game testing. Empty logs none.
+	TracePackets []string
 	// Storage replaces where the world and players are kept.
 	Storage StorageConfig
 	// WorldType names how chunks the world has not saved are made: a name in
@@ -401,6 +404,7 @@ func (s *Server) newHost() (*player.Host, error) {
 		Fire:         s.fire,
 		OnPanic:      s.panicked,
 		Items:        s.itemContents(),
+		TracePackets: s.conf.TracePackets,
 	}, s.setup)
 	if err != nil {
 		return nil, err

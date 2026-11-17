@@ -246,6 +246,7 @@ func (p *Player) readLoop(done <-chan struct{}) {
 		if pk.ID() == packet.IDPlayerAuthInput {
 			p.clientTicks.add(time.Now())
 		}
+		p.traceIn(pk)
 		if s.handlers.handler(pk.ID()) != nil {
 			if !p.input.push(pk) {
 				s.log.Debug("input queue full, packet dropped", "name", p.name, "packet", fmt.Sprintf("%T", pk))
