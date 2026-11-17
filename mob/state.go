@@ -196,9 +196,16 @@ func (s stateMob) CanSeeDaylight() bool {
 	return s.v.r != nil && s.rt.Env.SkyDarken(s.v.r) < 4 && s.canSeeSky(s.Eyes())
 }
 
-// InWaterOrRain is in water, or in the rain under the open sky.
+// InWaterOrRain is BDS's Actor::isInWaterOrRain (sub_B39B650): in water, or rain falling on
+// the block at the top of the mob's box (Weather::isRainingAt, which wants the biome's
+// precipitation warm enough to be rain).
 func (s stateMob) InWaterOrRain() bool {
-	return s.InWater() || s.v.r != nil && s.rt.Env.Rain(s.v.r) > 0 && s.canSeeSky(s.Eyes())
+	if s.InWater() {
+		return true
+	}
+	top := s.body.Pos
+	top.Y += s.body.Height
+	return s.RainingAt(blockOf(top))
 }
 
 // InPowderSnow reports powder snow at the mob's feet.

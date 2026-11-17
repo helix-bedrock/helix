@@ -179,8 +179,12 @@ func (t tester) Test(test *definition.Test) (pass, resolved bool) {
 		}
 		_, has := comps[ns(rawString(test.Value))]
 		return definition.CompareBool(test.Operator, has, rawBool(test.Value, true)), true
-	case "in_water", "in_water_or_rain":
+	case "in_water":
 		v := m != nil && m.InWater() || s != nil && s.inWater
+		return definition.CompareBool(test.Operator, v, rawBool(test.Value, true)), true
+	case "in_water_or_rain":
+		// ActorInWaterOrRainTest::evaluate (0xCA58B50).
+		v := m != nil && m.Wet() || s != nil && s.inWater
 		return definition.CompareBool(test.Operator, v, rawBool(test.Value, true)), true
 	case "is_underwater":
 		v := m != nil && m.UnderWater() || s != nil && s.underWater

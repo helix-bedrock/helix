@@ -138,7 +138,9 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		missing := m != nil && m.health < m.maxHealth
 		return definition.CompareBool(op, missing, rawBool(test.Value, true)), true
 	case "in_contact_with_water":
-		wet := m != nil && m.InWater() || s != nil && s.inWater
+		// ActorInContactWithWater::evaluate (0xCA58BB0): isInWaterOrRain, or a water bottle's
+		// splash (not tracked yet). Another mob's snapshot knows only water.
+		wet := m != nil && m.Wet() || s != nil && s.inWater
 		return definition.CompareBool(op, wet, rawBool(test.Value, true)), true
 	case "in_nether":
 		return definition.CompareBool(op, a.Dimension() == 1, rawBool(test.Value, true)), true

@@ -346,6 +346,8 @@ type Mob struct {
 	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
 	// (actions.go). Neither is read by Helix yet.
 	hijackable, persistSit bool
+	// aggroedByPlayer is EnderMan's mAggroedByPlayer: a player's hit made it angry.
+	aggroedByPlayer bool
 	// data is the actor data the components wrote (data.go).
 	data []DataValue
 	// scale is minecraft:scale's value, the size the client draws the mob at (a rabbit 0.6,
@@ -516,6 +518,7 @@ func (m *Mob) think() (remove bool) {
 		return m.deathTime >= deathTicks
 	}
 	m.creeperTick()
+	m.endermanTick()
 	m.rollTick()
 	if m.stateTick() {
 		return true
@@ -975,6 +978,7 @@ func (m *Mob) hurt(amount float32, by behavior.ID, cause int, tick uint64, ignor
 		m.traceHurt("hurt stopped by damage sensor", amount, cause)
 		return 0
 	}
+	m.endermanHurt(amount, attacker)
 	dealt := amount
 	if m.hurtTime > 0 && !ignoreCooldown {
 		if amount <= m.lastHurtAmount {
@@ -992,6 +996,7 @@ func (m *Mob) hurt(amount float32, by behavior.ID, cause int, tick uint64, ignor
 	}
 	m.traceHurt("hurt", dealt, cause)
 	m.health = max(m.health-dealt, 0)
+	m.endermanHurtEffects(dealt)
 	m.lastCause = cause
 	if by != behavior.NoID {
 		m.lastHurtBy, m.lastHurtTick = by, tick

@@ -961,6 +961,10 @@ func (s *Host) clipBlocks(r *world.Region, from, to mgl32.Vec3) (float64, cube.P
 
 // apply is what a hit does, BDS's on hit subcomponents as far as built.
 func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, kind projectileHitKind) {
+	if kind == projectileHitEntity && hit.mob != nil && hit.mob.m.DodgeProjectile() {
+		// An enderman teleported away: BDS's onHit stops before any of the hit's effects.
+		return
+	}
 	t.hitSound(r, hit.pos)
 	if kind == projectileHitEntity {
 		switch {
