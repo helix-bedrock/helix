@@ -71,6 +71,8 @@ type Mob struct {
 	// surface is set for a mob the natural spawner put on the surface; the spawner counts
 	// surface and underground mobs apart.
 	surface bool
+	// sentAttrs are the attributes viewers were last sent (mobattrs.go).
+	sentAttrs mobAttrs
 	// died is set once the death event went out.
 	died bool
 	gone bool
@@ -207,13 +209,15 @@ func targetData(id behavior.ID) int64 {
 // spawnPackets show the mob. Not yet compared with what BDS sends.
 func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 	pitch, yaw, head, body := m.m.Rotation()
+	a := m.currentAttrs()
+	m.sentAttrs = a
 	attrs := []protocol.AttributeValue{
-		{Name: "minecraft:health", Value: m.m.HealthValue(), Max: m.m.MaxHealth()},
-		{Name: "minecraft:movement", Value: m.m.MovementSpeed(), Max: math.MaxFloat32},
+		{Name: "minecraft:health", Value: m.m.HealthValue(), Max: a.maxHealth},
+		{Name: attrMovementName, Value: a.speed, Max: math.MaxFloat32},
 	}
 	// A rider's client jumps a horse it steers by the horse's jump strength.
-	if v, mx, ok := m.m.JumpStrength(); ok {
-		attrs = append(attrs, protocol.AttributeValue{Name: "minecraft:horse.jump_strength", Value: v, Max: max(mx, v)})
+	if a.hasJump {
+		attrs = append(attrs, protocol.AttributeValue{Name: attrJumpStrengthName, Value: a.jump, Max: max(a.jumpMax, a.jump)})
 	}
 	return m.spawnEquipment([]packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: m.m.Type(),
@@ -247,6 +251,7 @@ func (m *Mob) apply(e *world.Entity) {
 		return
 	}
 	m.m.Apply()
+	m.syncAttrs()
 	if m.m.Seats() != nil {
 		settleRiders(m)
 	}
