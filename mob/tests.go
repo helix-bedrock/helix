@@ -103,9 +103,15 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		}
 		ranged := slices.ContainsFunc(hand, func(n string) bool { return n == itemBow || n == itemCrossbow })
 		return definition.CompareBool(op, ranged, rawBool(test.Value, true)), true
+	case "is_owner":
+		// The subject owns the mob running the filter.
+		owns := t.self != nil && a.ID() != behavior.NoID && t.self.Owner() == a.ID()
+		return definition.CompareBool(op, owns, rawBool(test.Value, true)), true
+	case "has_damaged_equipment":
+		return definition.CompareBool(op, t.damagedEquipment(test, mobEquip(m, s)), true), true
 	case "is_riding_self", "is_vehicle_family", "is_controlling_passenger_family", "in_caravan", "is_leashed_to",
-		"has_nametag", "has_mob_effect", "is_avoiding_mobs", "is_owner",
-		"has_damaged_equipment", "has_same_equipment_in_slot_as", "has_trade_supply", "has_container_open":
+		"has_nametag", "has_mob_effect", "is_avoiding_mobs",
+		"has_same_equipment_in_slot_as", "has_trade_supply", "has_container_open":
 		// Nothing a mob or player can have yet: riding, leashes, owners, effects, name tags,
 		// and trades are not hooked up.
 		return definition.CompareBool(op, false, rawBool(test.Value, true)), true
@@ -352,6 +358,23 @@ func (m *Mob) inventoryHas(want string, tag bool) bool {
 	}
 	for _, it := range m.inv.slots {
 		if !it.Empty() && (m.rt.ItemRules.Matches(d, it) || !tag && HeldItem{Name: it.Name}.Matches(want)) {
+			return true
+		}
+	}
+	return false
+}
+
+// damagedEquipment is has_damaged_equipment: the item named in a slot of the domain, with
+// damage taken. Only a mob's worn equipment answers; the engine says what is damaged.
+func (t tester) damagedEquipment(test *definition.Test, eq *[EquipSlots]behavior.Item) bool {
+	h, ok := t.m.hooks.(DamageHooks)
+	if eq == nil || !ok {
+		return false
+	}
+	want := ns(rawString(test.Value))
+	var buf [EquipSlots]int
+	for _, k := range equipmentSlots(domainOr(test, "any"), buf[:0]) {
+		if it := eq[k]; !it.Empty() && it.Name == want && h.ItemDamaged(it) {
 			return true
 		}
 	}

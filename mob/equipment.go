@@ -83,35 +83,41 @@ func (m *Mob) equipmentCount() int32 {
 // equipmentNames appends the names of the items in the slots a filter domain names
 // (has_equipment, all_slots_empty).
 func equipmentNames(equip *[EquipSlots]behavior.Item, domain string, dst []string) []string {
-	add := func(slots ...int) {
-		for _, s := range slots {
-			if it := equip[s]; !it.Empty() {
-				dst = append(dst, it.Name)
-			}
+	var buf [EquipSlots]int
+	for _, k := range equipmentSlots(domain, buf[:0]) {
+		if it := equip[k]; !it.Empty() {
+			dst = append(dst, it.Name)
 		}
 	}
+	return dst
+}
+
+// equipmentSlots are the equipment slots a filter domain names.
+func equipmentSlots(domain string, dst []int) []int {
 	switch domain {
 	case "hand", "main_hand":
-		add(EquipMainhand)
+		return append(dst, EquipMainhand)
 	case "offhand":
-		add(EquipOffhand)
+		return append(dst, EquipOffhand)
 	case "head":
-		add(EquipHead)
+		return append(dst, EquipHead)
 	case "torso":
-		add(EquipChest)
+		return append(dst, EquipChest)
 	case "leg":
-		add(EquipLegs)
+		return append(dst, EquipLegs)
 	case "feet":
-		add(EquipFeet)
+		return append(dst, EquipFeet)
 	case "body":
-		add(EquipBody)
-	case "armor":
-		add(EquipHead, EquipChest, EquipLegs, EquipFeet)
+		return append(dst, EquipBody)
 	case "inventory":
-	default:
-		add(EquipMainhand, EquipOffhand, EquipHead, EquipChest, EquipLegs, EquipFeet, EquipBody)
+		// The minecraft:inventory slots, which callers read on their own.
+		return dst
+	case "armor":
+		// The body slot counts as armour: wolf.json's interactions test wolf armour with
+		// the armor domain.
+		return append(dst, EquipHead, EquipChest, EquipLegs, EquipFeet, EquipBody)
 	}
-	return dst
+	return append(dst, EquipMainhand, EquipOffhand, EquipHead, EquipChest, EquipLegs, EquipFeet, EquipBody)
 }
 
 // EquipmentTable is the definition's minecraft:equipment, for the engine to roll when the

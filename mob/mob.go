@@ -134,6 +134,12 @@ type ArmorHooks interface {
 	AfterArmor(m *Mob, amount float32, cause int) float32
 }
 
+// DamageHooks answer whether an item has taken damage: the engine keeps item damage in the
+// stack's Data, which the mob never reads. has_damaged_equipment asks it.
+type DamageHooks interface {
+	ItemDamaged(it behavior.Item) bool
+}
+
 // Hooks are what the engine does for one mob: its packets and its effects on others. They
 // run on the region's goroutine, never while mobs think.
 type Hooks interface {
