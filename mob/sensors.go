@@ -63,6 +63,11 @@ func (m *Mob) damageSensed(amount float32, cause int, other behavior.Actor) (flo
 
 // SetTarget changes the mob's target and fires on_target_acquired or on_target_escape.
 func (m *Mob) SetTarget(id behavior.ID) {
+	if id == behavior.NoID {
+		// Mob::setTarget (BDS 1.26.60 0xBFEE2A0) forgets who hurt the mob when it drops its
+		// target, so a mob that calmed down does not take its attacker back.
+		m.lastHurtBy, m.lastHurtByTime = behavior.NoID, 0
+	}
 	if id == m.target {
 		return
 	}

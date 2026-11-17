@@ -249,9 +249,12 @@ type Mob struct {
 	// hurt the mob.
 	lastHurtByPlayer behavior.ID
 	lastHurtTick     uint64
-	lastHurtStamp    int32
-	lastHurtAmount   float32
-	hurtTime         int32
+	// lastHurtByTime is BDS's mLastHurtByMobTime: the ticks lastHurtBy is still kept
+	// (forget.go).
+	lastHurtByTime int32
+	lastHurtStamp  int32
+	lastHurtAmount float32
+	hurtTime       int32
 	// playerHitTime counts down from playerHitTicks after a player hurt the mob: Molang's
 	// query.last_hit_by_player.
 	playerHitTime int32
@@ -518,6 +521,7 @@ func (m *Mob) think() (remove bool) {
 	if m.hurtTime > 0 {
 		m.hurtTime--
 	}
+	m.forgetHurtBy()
 	m.wasHurt, m.hurtThisTick = m.hurtThisTick, false
 	if m.playerHitTime > 0 {
 		m.playerHitTime--
@@ -1019,6 +1023,7 @@ func (m *Mob) hurt(amount float32, by behavior.ID, cause int, tick uint64, ignor
 	m.lastCause = cause
 	if by != behavior.NoID {
 		m.lastHurtBy, m.lastHurtTick = by, tick
+		m.lastHurtByTime = lastHurtByTicks
 	}
 	m.noActionTime = 0
 	m.fire(onHurt, attacker)
