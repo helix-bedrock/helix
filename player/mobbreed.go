@@ -2,10 +2,10 @@ package player
 
 import (
 	"github.com/helix-bedrock/entity/behavior"
-	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/mob"
+	"github.com/helix-bedrock/helix/world"
 )
 
 // Breeding, feeding and leashes on the engine side: the mob package decides (breed.go),
@@ -70,13 +70,18 @@ func (p *Player) feedMob(o *Mob) bool {
 	if !ok {
 		return false
 	}
+	p.useFed(result)
+	return true
+}
+
+// useFed uses up the held item a mob took, or swaps it for what it turns into.
+func (p *Player) useFed(result string) {
 	if name, isItem := itemByAux(result); result != "" && isItem {
 		p.takeFilled(ItemStack{Name: name, Count: 1, netID: p.s.stackIDs.Add(1)})
 	} else {
 		p.useUpHeld()
 	}
 	p.flush()
-	return true
 }
 
 // leashMob is the leashable part of a player's use on a mob: a lead ties an unleashed (or

@@ -160,6 +160,9 @@ func (m *Mob) Feed(player behavior.Actor, h state.Hand) (result string, ok bool)
 			return orResult(a.Config().FeedItems[i].Result, a.Config().TransformToItem), true
 		}
 	}
+	if m.Heal(h) {
+		return "", true
+	}
 	if b := m.states.Breedable; b != nil {
 		if i := b.Feed(&m.stateEnv, player, h, m.environmentMet(b.Config().Environment)); i >= 0 {
 			return orResult(b.Config().BreedItems[i].Result, b.Config().TransformToItem), true

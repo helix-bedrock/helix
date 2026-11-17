@@ -1,0 +1,156 @@
+package mob
+
+import (
+	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/entity/state"
+)
+
+// Taming, trusting, healing and sitting: the interactions a player's use on a mob runs, as
+// BDS 1.26.60's PlayerInteractionSystem (its list, built in
+// VanillaGameModuleServer::configureLevel 0x4A3B490, is tried in order by
+// Actor::getInteraction 0xB3D1540, and the first component that offers an interaction
+// wins). The engine calls these in that order and does the item work.
+
+// dataOwner is actor data 5, the owner's unique ID (Actor::setOwner 0xB39B090).
+const dataOwner = 5
+
+// Owner is the entity that tamed the mob, behavior.NoID for none.
+func (m *Mob) Owner() behavior.ID { return m.owner }
+
+// SetOwner makes an entity the mob's owner and shows it to those who see the mob, as
+// Actor::setOwner. Loading a saved owner calls it too.
+func (m *Mob) SetOwner(id behavior.ID) {
+	m.owner = id
+	m.setData(dataOwner, int64(id))
+}
+
+// Tame is a player trying to tame the mob with the item in hand, as BDS 1.26.60's
+// TameableComponent (getInteraction 0x7170480, its callback 0x72346B0): a mob that is not
+// tame yet takes one of tame_items, then tames with the probability or sends the failed
+// event. It returns the item the used one turns into ("" to use it up). Runs: the mob's
+// region.
+func (m *Mob) Tame(player behavior.Actor, h state.Hand) (result string, ok bool) {
+	if m.states == nil || m.states.Tameable == nil || m.stateEnv.Self == nil || player == nil || m.Dead() {
+		return "", false
+	}
+	t := m.states.Tameable
+	i := t.Feed(&m.stateEnv, player, h)
+	if i < 0 {
+		return "", false
+	}
+	return t.Config().TameItems[i].Result, true
+}
+
+// FeedTrust is a player feeding a mob with minecraft:trusting, as BDS 1.26.60's
+// TrustingComponent (getInteraction 0x74069D0, its callback 0x740A160): a mob that does not
+// trust yet takes one of trust_items and trusts with the probability. The engine shows the
+// eating first (Actor::feed) and uses up the item. Runs: the mob's region.
+func (m *Mob) FeedTrust(h state.Hand) bool {
+	if m.states == nil || m.states.Trusting == nil || m.stateEnv.Self == nil || m.Dead() {
+		return false
+	}
+	c := m.states.Trusting
+	if state.TrustingInteraction(stateMob{m}, c, h) == "" {
+		return false
+	}
+	state.TryTrust(&m.stateEnv, c)
+	return true
+}
+
+// Heal is a player feeding a mob with minecraft:healable one of its items: it heals and may
+// get the item's effects. The engine uses up the item. Runs: the mob's region.
+func (m *Mob) Heal(h state.Hand) bool {
+	if m.states == nil || m.states.Healable == nil || m.stateEnv.Self == nil || m.Dead() {
+		return false
+	}
+	return m.states.Healable.Feed(&m.stateEnv, h) >= 0
+}
+
+// FeedMount is a player using an item on an unridden mob with minecraft:tamemount: a feed
+// item raises its temper (the engine uses it up), an auto-reject item is refused.
+func (m *Mob) FeedMount(h state.Hand) (state.MountResult, bool) {
+	if m.states == nil || m.states.Tamemount == nil || m.stateEnv.Self == nil || m.Dead() {
+		return state.InteractNone, false
+	}
+	r, _ := m.states.Tamemount.Feed(&m.stateEnv, h)
+	return r, r != state.InteractNone
+}
+
+// ToggleSit is a player's use on a mob with minecraft:sittable: its owner makes it sit or
+// stand (state.Sit). Runs: the mob's region.
+func (m *Mob) ToggleSit(player behavior.Actor) bool {
+	if m.states == nil || m.states.Sittable == nil || m.stateEnv.Self == nil || m.Dead() {
+		return false
+	}
+	return state.Sit(&m.stateEnv, m.states.Sittable, player)
+}
+
+// The horse's refusal, as BDS 1.26.60's Horse::makeMad (0xBEB41A0): it stands up
+// (Horse::setStanding 0xBEB4050, actor flag 39, which BDS's server never clears), raises
+// horse flag 128 for 30 ticks (0xBEB25E0, counted down in the horse's tick 0xBEB3950) and
+// plays the mad sound (LevelSoundEvent 19) at its head.
+const (
+	flagStanding   = 39
+	dataHorseFlags = 16
+	horseFlagMad   = 128
+	madTicks       = 30
+	soundMad       = 19
+)
+
+// MakeMad is the mount throwing its rider (state.Mob).
+func (s stateMob) MakeMad() {
+	if !horseClass[s.typ] {
+		return
+	}
+	s.SetFlag(flagStanding, true)
+	s.madTime = 1
+	s.setHorseFlags(horseFlagMad, true)
+	s.do(op{kind: opSound, n: soundMad, at: s.Eyes()})
+}
+
+// madTick counts the rear-up down. Runs: think.
+func (m *Mob) madTick() {
+	if m.madTime <= 0 {
+		return
+	}
+	t := m.madTime
+	m.madTime++
+	if t >= madTicks {
+		m.madTime = 0
+		m.setHorseFlags(horseFlagMad, false)
+	}
+}
+
+// setHorseFlags sets or clears bits of actor data 16, the horse flags.
+func (m *Mob) setHorseFlags(bits int32, on bool) {
+	var cur int32
+	for _, d := range m.data {
+		if v, ok := d.Value.(int32); ok && d.Key == dataHorseFlags {
+			cur = v
+		}
+	}
+	if on {
+		cur |= bits
+	} else {
+		cur &^= bits
+	}
+	m.setData(dataHorseFlags, cur)
+}
+
+// horseClass are the mobs BDS writes as its Horse class, whose makeMad rears them up; other
+// mounts with minecraft:tamemount (camels, llamas) do not.
+var horseClass = map[string]bool{
+	"minecraft:horse": true, "minecraft:donkey": true, "minecraft:mule": true,
+	"minecraft:skeleton_horse": true, "minecraft:zombie_horse": true,
+}
+
+// DropItem spawns one of the item a descriptor names at the mob (Actor::spawnAtLocation),
+// at Apply.
+func (s stateMob) DropItem(item string) bool {
+	name := ns(item)
+	if name == "" {
+		return false
+	}
+	s.Mob.DropItem(behavior.Item{Name: name, Count: 1})
+	return true
+}

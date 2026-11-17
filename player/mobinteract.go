@@ -77,21 +77,9 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	if r == nil || p.entity.Position().Sub(o.entity.Position()).Len() > attackRangeCreative {
 		return
 	}
-	if p.nameMob(o) {
-		return
-	}
-	if p.bucketMob(r, o) {
-		return
-	}
-	if p.openTrade(r, o) {
-		return
-	}
 	raw, ok := o.m.Interact(actorOf(p.entity))
 	if !ok {
-		// BDS's order after minecraft:interact: ageable, breedable, leashable.
-		if !p.feedMob(o) && !p.leashMob(o) {
-			p.mountMob(o)
-		}
+		p.mobInteractions(r, o)
 		return
 	}
 	var it interaction
@@ -101,6 +89,15 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 	}
 	p.runInteraction(r, o, it)
 	p.flush()
+}
+
+// mobInteractions are the components' interactions after minecraft:interact, in BDS
+// 1.26.60's PlayerInteractionSystem order (mob/tame.go): bucketable, tameable, trusting,
+// ageable, healable and breedable, leashable, nameable, tamemount, rideable, sittable, then
+// trading. The first that applies wins.
+func (p *Player) mobInteractions(r *world.Region, o *Mob) {
+	_ = p.bucketMob(r, o) || p.tameMob(o) || p.trustMob(o) || p.feedMob(o) || p.leashMob(o) ||
+		p.nameMob(o) || p.feedMount(o) || p.mountMob(o) || p.sitMob(o) || p.openTrade(r, o)
 }
 
 // runInteraction does the item work of a minecraft:interact that applied: spawn_items,

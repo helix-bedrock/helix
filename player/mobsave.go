@@ -48,6 +48,8 @@ const (
 	mobKeySurface           = "Surface"
 	mobKeyNaturalSpawn      = "NaturalSpawn"
 	mobKeyDead              = "Dead"
+	// mobKeyOwner is the owner's unique ID, -1 for none (BDS's invalid ID, as NoID).
+	mobKeyOwner = "OwnerNew"
 )
 
 // mobFlagKeys are the saved bytes Actor::saveWithoutId writes from actor flags.
@@ -186,6 +188,7 @@ func (o *Mob) saveMobState(data map[string]any) {
 	data[mobKeySurface] = boolByte(o.surface)
 	data[mobKeyNaturalSpawn] = boolByte(o.naturalSpawn)
 	data["TargetID"] = int64(o.m.Target())
+	data[mobKeyOwner] = int64(o.m.Owner())
 	o.saveEffects(data)
 }
 
@@ -292,6 +295,9 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 		if b, _ := saved.Data[k.key].(uint8); b != 0 {
 			o.m.SetFlag(k.flag, true)
 		}
+	}
+	if id, has := saved.Data[mobKeyOwner].(int64); has && behavior.ID(id) != behavior.NoID {
+		o.m.SetOwner(behavior.ID(id))
 	}
 	o.loadLinks(saved.Data)
 	o.loadEquipment(saved.Data)

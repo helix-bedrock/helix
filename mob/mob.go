@@ -309,6 +309,10 @@ type Mob struct {
 	effects effect.List
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
+	// owner is the entity that tamed the mob (Actor::setOwner), NoID for none; madTime
+	// counts the ticks of a refused horse's rear-up (tame.go).
+	owner   behavior.ID
+	madTime int32
 	// saved is the age and breeding state a save holds, put back once the components are
 	// built; births is scratch space for a mating's babies.
 	saved  *SavedState
@@ -377,7 +381,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	}
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
-		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID}, love: love{partner: behavior.NoID},
+		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, owner: behavior.NoID, dw: dweller{trading: behavior.NoID}, love: love{partner: behavior.NoID},
 		targetLeader: behavior.NoID, caravanHead: behavior.NoID, caravanTail: behavior.NoID, ride: riding{vehicle: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
@@ -511,6 +515,7 @@ func (m *Mob) think() (remove bool) {
 		return true
 	}
 	m.boostTick()
+	m.madTick()
 	m.sensorTick()
 	m.dwellerTick()
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw

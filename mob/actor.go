@@ -30,7 +30,6 @@ func (m *Mob) IsPlayer() bool  { return false }
 func (m *Mob) Flag(n int) bool { return m.flags.Has(n) }
 func (m *Mob) GameMode() int   { return -1 }
 
-func (m *Mob) Owner() behavior.ID                 { return behavior.NoID }
 func (m *Mob) Team() int                          { return 0 }
 func (m *Mob) HeadRotation() (pitch, yaw float32) { return m.pitch, m.headYaw }
 func (m *Mob) BodyYaw() float32                   { return m.bodyYaw }

@@ -241,10 +241,7 @@ func (s stateMob) SetAirSupply(air, maxAir int16) {
 	s.flagsChanged()
 }
 
-func (stateMob) SetOwner(behavior.ID)                         {}
-func (stateMob) DropItem(string) bool                         { return false }
 func (stateMob) Particles(int, int)                           {}
-func (stateMob) MakeMad()                                     {}
 func (stateMob) SlotEmpty(string) bool                        { return true }
 func (stateMob) Respiration() int32                           { return 0 }
 func (stateMob) StopRiding()                                  {}
