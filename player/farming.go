@@ -116,12 +116,7 @@ func (p *Player) pickBerries(r *world.Region, u *BlockUse) bool {
 		return false
 	}
 	return f.PickBerries(r, u.Pos, func(block uint32) {
-		items, _ := p.s.game.sys.Drops(p.s, block, &loot.Context{})
-		for _, it := range items {
-			d := NewBlockDrop(u.Pos, it)
-			p.s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
-		}
-		playSound(r, u.Pos, soundEvent{name: packet.SoundEventSweetBerryBushPick, pos: blockCenter(u.Pos), extra: -1}, nil)
+		p.s.dropPicked(r, u.Pos, block, packet.SoundEventSweetBerryBushPick)
 	})
 }
 
@@ -134,13 +129,19 @@ func (p *Player) pickGlowBerries(r *world.Region, u *BlockUse) bool {
 		return false
 	}
 	return f.PickGlowBerries(r, u.Pos, func(block uint32) {
-		items, _ := p.s.game.sys.Drops(p.s, block, &loot.Context{})
-		for _, it := range items {
-			d := NewBlockDrop(u.Pos, it)
-			p.s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
-		}
-		playSound(r, u.Pos, soundEvent{name: packet.SoundEventCaveVinesPickBerries, pos: blockCenter(u.Pos), extra: -1}, nil)
+		p.s.dropPicked(r, u.Pos, block, packet.SoundEventCaveVinesPickBerries)
 	})
+}
+
+// dropPicked drops a picked plant's drops (its berries, by the block as it was) at pos and
+// plays the pick sound: the shared part of picking by hand and of raid_garden.
+func (s *Host) dropPicked(r *world.Region, pos cube.Pos, block uint32, sound string) {
+	items, _ := s.game.sys.Drops(s, block, &loot.Context{})
+	for _, it := range items {
+		d := NewBlockDrop(pos, it)
+		s.spawnItem(r.Dimension(), d.Stack, d.Pos, d.Velocity, world.Rotation{}, d.PickupDelay, 0)
+	}
+	playSound(r, pos, soundEvent{name: sound, pos: blockCenter(pos), extra: -1}, nil)
 }
 
 // shearPlantTip is shears on the tip of weeping, twisting or cave vines: it stops growing and

@@ -333,6 +333,7 @@ func (o *Mob) saveBreeding(data map[string]any) {
 	data[mobKeyLeasher] = int64(o.m.LeashHolder())
 	saveAnger(data, st)
 	o.saveTrust(data)
+	o.saveCaptainAndElder(data)
 }
 
 func (o *Mob) loadBreeding(data map[string]any) {
@@ -349,6 +350,7 @@ func (o *Mob) loadBreeding(data map[string]any) {
 	st.Nuisances, st.HasAnger = loadAnger(data)
 	o.m.RestoreState(st)
 	o.loadTrust(data)
+	o.loadCaptainAndElder(data)
 	if id, ok := data[mobKeyLeasher].(int64); ok && behavior.ID(id) != behavior.NoID {
 		o.m.SetLeashHolder(behavior.ID(id))
 	}
@@ -420,7 +422,43 @@ const (
 	mobKeyNuisancePrio  = "Priority"
 	mobKeyTrustedAmount = "TrustedPlayersAmount"
 	mobKeyTrustedPrefix = "TrustedPlayer"
+	// mobKeyCaptain is Mob::mTargetCaptainId, written only when set (Mob::addAdditionalSaveData,
+	// 1.26.60); mobKeyElder is a guardian's elder flag (Guardian save 0xBD400D0).
+	mobKeyCaptain = "TargetCaptainID"
+	mobKeyElder   = "Elder"
 )
+
+// The types BDS makes Guardian actors, whose save writes Elder.
+const (
+	typeGuardian      = "minecraft:guardian"
+	typeElderGuardian = "minecraft:elder_guardian"
+)
+
+// saveCaptainAndElder writes the follow_target_captain leader and a guardian's elder flag.
+func (o *Mob) saveCaptainAndElder(data map[string]any) {
+	if id := o.m.TargetLeader(); id != behavior.NoID {
+		data[mobKeyCaptain] = int64(id)
+	} else {
+		delete(data, mobKeyCaptain)
+	}
+	if t := o.m.Type(); t == typeGuardian || t == typeElderGuardian {
+		var elder uint8
+		if o.m.Flag(behavior.FlagElder) {
+			elder = 1
+		}
+		data[mobKeyElder] = elder
+	}
+}
+
+// loadCaptainAndElder reads them back.
+func (o *Mob) loadCaptainAndElder(data map[string]any) {
+	if id, ok := data[mobKeyCaptain].(int64); ok {
+		o.m.SetTargetLeader(behavior.ID(id))
+	}
+	if elder, ok := data[mobKeyElder].(uint8); ok && elder != 0 {
+		o.m.SetFlag(behavior.FlagElder, true)
+	}
+}
 
 // saveAnger writes the suspects while the mob has anger_level.
 func saveAnger(data map[string]any, st mob.SavedState) {

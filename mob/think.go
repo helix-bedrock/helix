@@ -49,6 +49,10 @@ const (
 	opSonicHit
 	opKnockback
 	opLevelEventXYZ
+	opJoinCaravan
+	opLeaveCaravan
+	opHurtBy
+	opRaidBlock
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -207,6 +211,16 @@ func (m *Mob) run(o op) {
 		m.runItemOp(r, &o)
 	case opSonicHit, opKnockback, opLevelEventXYZ:
 		m.runWardenOp(&o)
+	case opJoinCaravan, opLeaveCaravan:
+		m.runCaravanOp(&o)
+	case opHurtBy:
+		if h, ok := m.hooks.(GuardianHooks); ok && !m.Dead() {
+			h.HurtBy(m, o.id, int(o.n), o.amount, o.other != 0)
+		}
+	case opRaidBlock:
+		if e, ok := env.(GardenEnv); ok {
+			e.RaidBlock(r, o.pos, m.id)
+		}
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r
@@ -251,6 +265,10 @@ type Snapshot struct {
 	// trusted and hasTrust are the trust component's set (trust.go).
 	trusted  []behavior.ID
 	hasTrust bool
+	// chasing and the caravan fields are pack.go's.
+	chasing                  bool
+	inCaravan                bool
+	caravanHead, caravanTail behavior.ID
 	// equip is the equipment, for other mobs' has_equipment tests.
 	equip [EquipSlots]behavior.Item
 	// lovePartner, loveLeader, willing and breedFood are the make_love state (love.go).
@@ -282,6 +300,7 @@ func (m *Mob) snapshot() {
 	s.breedFood = m.breedFoodSlot() >= 0
 	s.breedReady = m.states != nil && m.states.Breedable != nil && m.states.Breedable.Cooldown() <= 0
 	s.trusted, s.hasTrust = m.trusted, m.hasTrust()
+	s.chasing, s.inCaravan, s.caravanHead, s.caravanTail = m.chasing, m.InCaravan(), m.caravanHead, m.caravanTail
 }
 
 func (s *Snapshot) ID() behavior.ID                    { return s.id }

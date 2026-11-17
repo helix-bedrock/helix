@@ -295,3 +295,21 @@ func (t *Ticker) Fertilizable(block uint32) bool {
 	}
 	return t.isPickle(block)
 }
+
+// RaidCrop is a crop's minecraft:on_raided (BDS 1.26.60 0xCB3BBF0): its growth goes down one
+// stage, not below 0. It returns the block now at pos; ok is false when pos held no crop or
+// the crop became another block. Runs: owner of the region.
+func (t *Ticker) RaidCrop(r *world.Region, pos cube.Pos) (now uint32, ok bool) {
+	b, found := r.Block(pos, 0)
+	if !found {
+		return 0, false
+	}
+	s := t.state(b)
+	if s.kind != kindCrop {
+		return 0, false
+	}
+	t.setCrop(r, pos, s.crop, max(int(s.age), 1)-1)
+	now, found = r.Block(pos, 0)
+	after := t.state(now)
+	return now, found && after.kind == kindCrop && after.crop == s.crop
+}

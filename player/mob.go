@@ -320,11 +320,22 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 // hurtBy hurts the mob by the entity with ID by (behavior.NoID for none) and shows the
 // hurt, or the death and its drops. It reports the damage taken.
 func (m *Mob) hurtBy(amount float32, by behavior.ID, cause DamageCause) float32 {
+	return m.hurtWith(amount, by, cause, false)
+}
+
+// hurtWith is hurtBy, with the mob's hurt time skipped when ignoreCooldown is set.
+func (m *Mob) hurtWith(amount float32, by behavior.ID, cause DamageCause, ignoreCooldown bool) float32 {
 	r := m.entity.Region()
 	if r == nil || m.gone {
 		return 0
 	}
-	dealt := m.m.Hurt(amount, by, int(cause), uint64(max(r.CurrentTick(), 0))) //nolint:gosec // clamped
+	tick := uint64(max(r.CurrentTick(), 0)) //nolint:gosec // clamped
+	var dealt float32
+	if ignoreCooldown {
+		dealt = m.m.HurtIgnoringCooldown(amount, by, int(cause), tick)
+	} else {
+		dealt = m.m.Hurt(amount, by, int(cause), tick)
+	}
 	if dealt <= 0 {
 		return 0
 	}
@@ -362,7 +373,7 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 	if !ok || p.entity == nil || p.dead() {
 		return false, false
 	}
-	h := NewHit(p, m.m.AttackDamage(), DamageSource{Cause: DamageEntityAttack})
+	h := NewHit(p, m.m.MeleeDamage(), DamageSource{Cause: DamageEntityAttack})
 	if !p.s.game.sys.TakeHit(h) {
 		return false, false
 	}
@@ -385,7 +396,7 @@ func (m *Mob) attackMob(o *Mob) (hit, killed bool) {
 	if o == m || o.entity == nil || o.Dead() || o.stand != nil || r == nil {
 		return false, false
 	}
-	dealt := o.hurtBy(m.m.AttackDamage(), behavior.ID(m.entity.UniqueID()), DamageEntityAttack)
+	dealt := o.hurtBy(m.m.MeleeDamage(), behavior.ID(m.entity.UniqueID()), DamageEntityAttack)
 	if dealt <= 0 {
 		return false, false
 	}

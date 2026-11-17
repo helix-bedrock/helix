@@ -371,7 +371,9 @@ func vanillaHitParts(h *Hit) {
 		}
 	}
 	if cause != DamageNone && cause != DamageSelfDestruct {
-		h.Reductions = append(h.Reductions, part(PartHurtTime, 0))
+		t := part(PartHurtTime, 0)
+		t.Off = h.Source.IgnoreHurtTime
+		h.Reductions = append(h.Reductions, t)
 	}
 	if cause != DamageSelfDestruct {
 		h.Reductions = append(h.Reductions, part(PartAbsorption, 0))

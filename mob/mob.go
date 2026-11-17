@@ -222,9 +222,12 @@ type Mob struct {
 
 	health, maxHealth                   float32
 	speed, underwaterSpeed, followRange float32
-	lavaSpeed                           float32
-	attackDamage                        float32
-	hasAttack                           bool
+	// speedBase is the movement attribute before its modifiers, speedMods those (sprint.go).
+	speedBase               float32
+	speedMods               []attrModifier
+	lavaSpeed               float32
+	attackDamage, attackMin float32
+	hasAttack               bool
 
 	target, lastHurtBy, lastHurtMob behavior.ID
 	// lastHurtByPlayer is BDS's mLastHurtByPlayerId: the last player that
@@ -268,6 +271,10 @@ type Mob struct {
 	hasSonicCooldown bool
 	// trusted are the IDs the trust component holds (trust.go).
 	trusted []behavior.ID
+	// chasing, targetLeader, caravanHead and caravanTail are play's, follow_target_captain's
+	// and follow_caravan's state (pack.go).
+	chasing                                bool
+	targetLeader, caravanHead, caravanTail behavior.ID
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
 	// saved is the age and breeding state a save holds, put back once the components are
@@ -339,6 +346,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
 		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID}, love: love{partner: behavior.NoID},
+		targetLeader: behavior.NoID, caravanHead: behavior.NoID, caravanTail: behavior.NoID,
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,
@@ -355,6 +363,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	m.inst = definition.New(def, m, method, initEvent)
 	m.geneEvents = method != definition.InitLoaded
 	m.setSize(0.6, 1.8)
+	m.markElder()
 	m.snapshot()
 	return m, nil
 }
@@ -399,7 +408,6 @@ func (m *Mob) HealthValue() float32 { return m.health }
 func (m *Mob) SetHealth(h float32) { m.health = min(max(h, 0), m.maxHealth) }
 
 // AttackDamage is the attack component's damage.
-func (m *Mob) AttackDamage() float32 { return m.attackDamage }
 
 // MovementSpeed is the movement attribute.
 func (m *Mob) MovementSpeed() float32 { return m.speed }
@@ -558,7 +566,8 @@ func (m *Mob) readAttributes(comps definition.Group) {
 		m.savedHealth = 0
 	}
 	if v, _, ok := attribute(comps["minecraft:movement"]); ok {
-		m.speed = v
+		m.speedBase = v
+		m.applySpeed()
 	}
 	if v, _, ok := attribute(comps["minecraft:underwater_movement"]); ok {
 		m.underwaterSpeed = v
@@ -569,7 +578,7 @@ func (m *Mob) readAttributes(comps definition.Group) {
 	if v, _, ok := attribute(comps["minecraft:follow_range"]); ok {
 		m.followRange = v
 	}
-	m.attackDamage = 0
+	m.attackMin, m.attackDamage = 0, 0
 	raw, hasAttack := comps["minecraft:attack"]
 	m.hasAttack = hasAttack
 	if hasAttack {
@@ -579,7 +588,7 @@ func (m *Mob) readAttributes(comps definition.Group) {
 		if json.Unmarshal(raw, &a) == nil {
 			var rg behavior.Range[float32]
 			if rg.UnmarshalJSON(a.Damage) == nil {
-				m.attackDamage = rg.Max
+				m.attackMin, m.attackDamage = rg.Min, rg.Max
 			}
 		}
 	}
@@ -861,6 +870,17 @@ func clampAround(v, centre, limit float32) float32 {
 // Hurt takes damage from the attacker (NoID for none) with a cause. It applies BDS's hurt
 // time: within it only damage above the last hurt counts. It reports the damage dealt.
 func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float32 {
+	return m.hurt(amount, by, cause, tick, false)
+}
+
+// HurtIgnoringCooldown is Hurt with the hurt time skipped, as BDS's hurt cooldown bypass
+// (Actor +849) does for the guardian's magic hit: the damage counts in full and a new hurt
+// time starts.
+func (m *Mob) HurtIgnoringCooldown(amount float32, by behavior.ID, cause int, tick uint64) float32 {
+	return m.hurt(amount, by, cause, tick, true)
+}
+
+func (m *Mob) hurt(amount float32, by behavior.ID, cause int, tick uint64, ignoreCooldown bool) float32 {
 	if m.Dead() || amount <= 0 {
 		return 0
 	}
@@ -871,7 +891,7 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 		return 0
 	}
 	dealt := amount
-	if m.hurtTime > 0 {
+	if m.hurtTime > 0 && !ignoreCooldown {
 		if amount <= m.lastHurtAmount {
 			m.traceHurt("hurt ignored in hurt time", amount, cause)
 			return 0

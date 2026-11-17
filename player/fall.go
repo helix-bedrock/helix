@@ -32,6 +32,9 @@ type DamageSource struct {
 	Extra     float32
 	// Block is the name of the block that hurt, for contact damage.
 	Block string
+	// IgnoreHurtTime turns the hit's hurt time part off, as BDS's hurt cooldown bypass
+	// (Actor +849) does for a guardian's magic hit.
+	IgnoreHurtTime bool
 }
 
 // fallBigDamage is the damage from which BDS plays the big fall sound; fallFree is
