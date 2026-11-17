@@ -59,6 +59,8 @@ const (
 	opRemoveActor
 	opMakeJump
 	opLevelEventData
+	opSetMingle
+	opDropHorn
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -85,6 +87,8 @@ type op struct {
 	knock behavior.Knockback
 	// dir is the aim of opSpawnProjectile.
 	dir behavior.Vec3
+	// mingle is the MingleComponent of opSetMingle.
+	mingle behavior.MingleState
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -229,7 +233,8 @@ func (m *Mob) run(o op) {
 		if e, ok := env.(GardenEnv); ok {
 			e.RaidBlock(r, o.pos, m.id)
 		}
-	case opSpawnProjectile, opDropLoot, opSetVelocityOf, opRemoveActor, opMakeJump, opLevelEventData:
+	case opSpawnProjectile, opDropLoot, opSetVelocityOf, opRemoveActor, opMakeJump, opLevelEventData,
+		opSetMingle, opDropHorn:
 		m.runOtherOp(&o)
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
@@ -284,6 +289,11 @@ type Snapshot struct {
 	// lovePartner, loveLeader, willing and breedFood are the make_love state (love.go).
 	lovePartner                    behavior.ID
 	loveLeader, willing, breedFood bool
+	// vel and prevPos are StateVectorComponent's posDelta and posPrev (mingle.go).
+	vel, prevPos behavior.Vec3
+	// mingle is MingleComponent, set when hasMingle is.
+	mingle    behavior.MingleState
+	hasMingle bool
 }
 
 // Snapshot returns the mob as others see it this tick.
@@ -295,6 +305,8 @@ func (m *Mob) snapshot() {
 	s.mob = m
 	s.id, s.typ = m.id, m.typ
 	s.pos, s.eyes, s.box = m.body.Pos, m.Eyes(), m.body.Box
+	s.vel, s.prevPos = m.body.Vel, m.body.PrevPos
+	s.mingle, s.hasMingle = m.mingle, m.hasMingle
 	s.alive = !m.Dead()
 	s.flags = m.flags
 	s.headPitch, s.headYaw, s.bodyYaw, s.yaw = m.pitch, m.headYaw, m.bodyYaw, m.yaw

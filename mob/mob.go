@@ -282,6 +282,14 @@ type Mob struct {
 	pushedBy              behavior.ID
 	hasPushedBy           bool
 	rollCount             int32
+	// customBox is set while a goal's Actor::setAABB box stands in for the mob's size;
+	// hurtAt is the tick of the last hurt that landed (Actor::getLastHurtTimestamp);
+	// fallImmune is CurrentlyImmuneToFallDamageComponent; ramHorn is the ram's horn dropper
+	// flag; mingle is MingleComponent, set when hasMingle is (jumper.go, ram.go, mingle.go).
+	customBox, fallImmune, ramHorn bool
+	hurtAt                         uint64
+	mingle                         behavior.MingleState
+	hasMingle                      bool
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
 	// saved is the age and breeding state a save holds, put back once the components are
@@ -425,6 +433,7 @@ func (m *Mob) Dead() bool { return m.health <= 0 }
 func (m *Mob) setSize(w, h float32) {
 	m.body.Width, m.body.Height = w, h
 	m.body.Box = boxAt(m.body.Pos, w, h)
+	m.customBox = false
 }
 
 func boxAt(p path.Vec3, w, h float32) path.Box {
@@ -783,7 +792,9 @@ func (m *Mob) physicsTick() {
 	}
 	m.liquidPush()
 	m.body.Tick(physWorld{&m.v})
-	m.body.Box = boxAt(m.body.Pos, m.body.Width, m.body.Height)
+	if !m.customBox {
+		m.body.Box = boxAt(m.body.Pos, m.body.Width, m.body.Height)
+	}
 	m.body.UpdateLiquid(physWorld{&m.v}, m.ridingBoat())
 	m.body.HeadInWater = m.headInWater()
 	m.traceBlocks()
@@ -910,7 +921,7 @@ func (m *Mob) hurt(amount float32, by behavior.ID, cause int, tick uint64, ignor
 	} else {
 		m.hurtTime = hurtTicks
 	}
-	m.hurtThisTick = true
+	m.hurtThisTick, m.hurtAt = true, tick
 	m.lastHurtAmount = amount
 	if h, ok := m.hooks.(ArmorHooks); ok {
 		dealt = h.AfterArmor(m, dealt, cause)
@@ -945,6 +956,7 @@ func (m *Mob) Knock(v behavior.Vec3) {
 func (m *Mob) SetPos(p behavior.Vec3) {
 	m.body.Pos, m.body.PrevPos = p, p
 	m.body.Box = boxAt(p, m.body.Width, m.body.Height)
+	m.customBox = false
 	if !m.thinking {
 		m.snapshot()
 	}

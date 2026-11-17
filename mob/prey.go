@@ -65,6 +65,11 @@ func (m *Mob) runOtherOp(o *op) {
 	case opLevelEventData:
 		env.LevelEventData(r, o.n, o.at, int32(o.other)) //nolint:gosec // carried from an int32
 		return
+	case opDropHorn:
+		if h, ok := m.hooks.(HornHooks); ok {
+			h.DropHorn(m, o.at)
+		}
+		return
 	}
 	t := env.Mob(r, o.id)
 	if t == nil {
@@ -77,6 +82,8 @@ func (m *Mob) runOtherOp(o *op) {
 		t.despawned = true
 	case opMakeJump:
 		t.Jump()
+	case opSetMingle:
+		t.mingle, t.hasMingle = o.mingle, true
 	}
 	t.snapshot()
 }

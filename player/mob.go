@@ -835,8 +835,16 @@ func (a playerActor) LastHurtMob() (behavior.ID, int32) { return behavior.NoID, 
 func (a playerActor) BlocksSpace() bool                 { return false }
 func (a playerActor) AttachPos(int) behavior.Vec3       { return a.Eyes() }
 
+// PosDelta implements mob.MovingActor: the player's last movement, as BDS sets posDelta from
+// the client's input.
+func (a playerActor) PosDelta() behavior.Vec3 { return vec(a.p.move.velocity) }
+
+// PrevPos implements mob.MovingActor: where the player's feet were before its last movement.
+func (a playerActor) PrevPos() behavior.Vec3 { return vec(a.p.feet().Sub(a.p.move.moved)) }
+
 var (
-	_ mob.Env        = (*Host)(nil)
-	_ mob.Hooks      = (*Mob)(nil)
-	_ behavior.Actor = playerActor{}
+	_ mob.Env         = (*Host)(nil)
+	_ mob.Hooks       = (*Mob)(nil)
+	_ mob.MovingActor = playerActor{}
+	_ behavior.Actor  = playerActor{}
 )
