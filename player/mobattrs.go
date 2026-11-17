@@ -26,9 +26,15 @@ func (m *Mob) currentAttrs() mobAttrs {
 	return a
 }
 
-// syncAttrs sends viewers the attributes that changed since they were last sent. Runs: the
-// mob's apply, each tick; it allocates only when something changed.
+// syncAttrs sends viewers the attributes that changed since they were last sent, and the
+// body armour when what the mob shows there changed (a loaded horse's armour is found only
+// once its equip slots are read). Runs: the mob's apply, each tick; it allocates only when
+// something changed.
 func (m *Mob) syncAttrs() {
+	if b := m.bodyItem(); b.Name != m.sentBody.Name || b.Meta != m.sentBody.Meta {
+		m.sentBody = b
+		m.entity.Send(m.armourPacket())
+	}
 	a := m.currentAttrs()
 	was := m.sentAttrs
 	if a == was {

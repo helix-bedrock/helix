@@ -190,6 +190,7 @@ func (m *Mob) bodyItem() ItemStack {
 func (m *Mob) setInventorySlot(k int, it behavior.Item) {
 	m.m.SetInventorySlot(k, it)
 	if k < len(m.m.EquipSlots()) && m.entity != nil && m.entity.Region() != nil {
+		m.sentBody = m.bodyItem()
 		m.entity.Send(m.armourPacket())
 	}
 }

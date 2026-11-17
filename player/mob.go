@@ -73,6 +73,8 @@ type Mob struct {
 	surface bool
 	// sentAttrs are the attributes viewers were last sent (mobattrs.go).
 	sentAttrs mobAttrs
+	// sentBody is the body armour viewers were last sent (mobattrs.go).
+	sentBody ItemStack
 	// died is set once the death event went out.
 	died bool
 	gone bool
@@ -210,7 +212,7 @@ func targetData(id behavior.ID) int64 {
 func (m *Mob) spawnPackets(e *world.Entity) []packet.Packet {
 	pitch, yaw, head, body := m.m.Rotation()
 	a := m.currentAttrs()
-	m.sentAttrs = a
+	m.sentAttrs, m.sentBody = a, m.bodyItem()
 	attrs := []protocol.AttributeValue{
 		{Name: "minecraft:health", Value: m.m.HealthValue(), Max: a.maxHealth},
 		{Name: attrMovementName, Value: a.speed, Max: math.MaxFloat32},
