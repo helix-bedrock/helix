@@ -126,9 +126,7 @@ func (c *Cushion) spawnPackets(e *world.Entity) []packet.Packet {
 		protocol.EntityDataKeyWidth:   float32(cushionWidth), protocol.EntityDataKeyHeight: float32(cushionHeight),
 		protocol.EntityDataKeyScale: float32(1),
 	}
-	if c.name != "" {
-		meta[protocol.EntityDataKeyName] = c.name
-	}
+	showNameTag(meta, c.name)
 	rot := e.Rotation()
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: cushionID,

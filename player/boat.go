@@ -232,9 +232,7 @@ func (b *Boat) spawnPackets(e *world.Entity) []packet.Packet {
 		meta[protocol.EntityDataKeyContainerType] = b.chest.machine.window
 		meta[protocol.EntityDataKeyContainerSize] = int32(b.chest.machine.size) //nolint:gosec // small
 	}
-	if b.name != "" {
-		meta[protocol.EntityDataKeyName] = b.name
-	}
+	showNameTag(meta, b.name)
 	rot := e.Rotation()
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: b.id(),
