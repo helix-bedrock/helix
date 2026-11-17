@@ -78,6 +78,9 @@ type Mob struct {
 	naturalSpawn bool
 	// stand is an armour stand's own state, nil for any other mob (armorstand.go).
 	stand *armorStand
+	// absorption is the mob's absorption attribute (Absorption's extra health); absorbed is
+	// what the hurt being run took off it (mobeffects.go).
+	absorption, absorbed float32
 	// trades are a villager's offers (trade.go), nil without a trade table.
 	trades *villagerTrades
 }
@@ -322,7 +325,7 @@ func (m *Mob) hurt(amount float32, by *Player, cause DamageCause) float32 {
 }
 
 // hurtBy hurts the mob by the entity with ID by (behavior.NoID for none) and shows the
-// hurt, or the death and its drops. It reports the damage taken.
+// hurt, or the death and its drops. It reports the damage taken, absorption's share too.
 func (m *Mob) hurtBy(amount float32, by behavior.ID, cause DamageCause) float32 {
 	return m.hurtWith(amount, by, cause, false)
 }
@@ -335,17 +338,26 @@ func (m *Mob) hurtWith(amount float32, by behavior.ID, cause DamageCause, ignore
 	}
 	tick := uint64(max(r.CurrentTick(), 0)) //nolint:gosec // clamped
 	var dealt float32
+	m.absorbed = 0
 	if ignoreCooldown {
 		dealt = m.m.HurtIgnoringCooldown(amount, by, int(cause), tick)
 	} else {
 		dealt = m.m.Hurt(amount, by, int(cause), tick)
 	}
+	// A hurt that absorption took whole still landed.
+	dealt += m.absorbed
 	if dealt <= 0 {
 		return 0
 	}
+	// Mob::_hurt (0xBFDC98F in BDS 1.26.60) takes Absorption away once its health is used up.
+	if m.absorption <= 0 {
+		m.removeEffect(EffectAbsorption)
+	}
 	m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventHurt))
+	m.effectsHurt(cause)
 	if m.m.Dead() && !m.died {
 		m.died = true
+		m.effectsDied()
 		m.entity.Send(actorEvent(m.entity.RuntimeID(), packet.ActorEventDeath))
 		m.dropOnDeath(r)
 	}

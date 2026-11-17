@@ -183,8 +183,8 @@ func (o *Mob) dataValue(key uint32, asByte bool) any {
 	return n
 }
 
-// saveAttributes writes health and movement over the saved attribute list, keeping the
-// others it holds.
+// saveAttributes writes health, movement and absorption over the saved attribute list,
+// keeping the others it holds.
 func (o *Mob) saveAttributes(prev any) []any {
 	health := map[string]any{
 		"Name": attrHealthName, "Base": o.m.MaxHealth(), "Current": o.m.HealthValue(), "Max": o.m.MaxHealth(),
@@ -195,10 +195,14 @@ func (o *Mob) saveAttributes(prev any) []any {
 		"Name": "minecraft:movement", "Base": speed, "Current": speed, "Max": float32(math.MaxFloat32),
 		"Min": float32(0), "DefaultMax": float32(math.MaxFloat32), "DefaultMin": float32(0),
 	}
-	out := []any{health, movement}
+	absorption := map[string]any{
+		"Name": attrAbsorptionName, "Base": float32(0), "Current": o.absorption, "Max": float32(mobAbsorptionMax),
+		"Min": float32(0), "DefaultMax": float32(mobAbsorptionMax), "DefaultMin": float32(0),
+	}
+	out := []any{health, movement, absorption}
 	if l, ok := prev.([]any); ok {
 		for _, a := range l {
-			if m, ok := a.(map[string]any); ok && m["Name"] != attrHealthName && m["Name"] != "minecraft:movement" {
+			if m, ok := a.(map[string]any); ok && m["Name"] != attrHealthName && m["Name"] != "minecraft:movement" && m["Name"] != attrAbsorptionName {
 				out = append(out, a)
 			}
 		}
@@ -252,6 +256,7 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 	o.loadEquipment(saved.Data)
 	o.loadMobItems(saved.Data)
 	o.loadEffects(saved.Data)
+	o.absorption = savedAbsorption(saved.Data["Attributes"])
 	if o.stand != nil {
 		o.loadArmorStand(saved.Data)
 	}
@@ -544,4 +549,19 @@ func (o *Mob) loadTrust(data map[string]any) {
 			o.m.Trust(behavior.ID(id))
 		}
 	}
+}
+
+// attrAbsorptionName is the absorption attribute's saved name.
+const attrAbsorptionName = "minecraft:absorption"
+
+// savedAbsorption is the current absorption in a saved attribute list, 0 for none.
+func savedAbsorption(list any) float32 {
+	l, _ := list.([]any)
+	for _, a := range l {
+		if m, ok := a.(map[string]any); ok && m["Name"] == attrAbsorptionName {
+			v, _ := m["Current"].(float32)
+			return min(max(v, 0), mobAbsorptionMax)
+		}
+	}
+	return 0
 }

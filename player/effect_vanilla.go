@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
 )
@@ -57,9 +58,14 @@ type Effect struct {
 	// it is hurt (slot 6).
 	Died func(p *Player, amplifier int32)
 	Hurt func(p *Player, amplifier int32, src DamageSource)
-	// MobTick and MobApply are Tick and Apply on a mob (player/mobeffects.go).
-	MobTick  func(m *Mob, amplifier, left int32)
-	MobApply func(m *Mob, amplifier int32, scale float32)
+	// MobTick, MobApply, MobAdded, MobRemoved, MobDied and MobHurt are those hooks on a mob
+	// (player/mobeffects.go).
+	MobTick    func(m *Mob, amplifier, left int32)
+	MobApply   func(m *Mob, amplifier int32, scale float32)
+	MobAdded   func(m *Mob, amplifier int32)
+	MobRemoved func(m *Mob)
+	MobDied    func(m *Mob, amplifier int32)
+	MobHurt    func(m *Mob, amplifier int32, cause DamageCause)
 }
 
 // EffectModifier is one attribute change of an effect, BDS's AttributeModifier.
@@ -227,7 +233,7 @@ func vanillaEffects() []Effect {
 		{ID: EffectPoison, Name: "poison", Description: "potion.poison", Harmful: true, Color: 0x87A363, Tick: poisonTick(false), MobTick: mobPoisonTick(false)},
 		{ID: EffectWither, Name: "wither", Description: "potion.wither", Harmful: true, Color: 0x736156, Tick: witherTick, MobTick: mobWitherTick},
 		{ID: EffectHealthBoost, Name: "health_boost", Description: "potion.healthBoost", Color: 0xF87D23, Modifiers: boost},
-		{ID: EffectAbsorption, Name: "absorption", Description: "potion.absorption", Color: 0x2552A5, Added: absorptionAdded, Removed: absorptionRemoved},
+		{ID: EffectAbsorption, Name: "absorption", Description: "potion.absorption", Color: 0x2552A5, Added: absorptionAdded, Removed: absorptionRemoved, MobAdded: mobAbsorptionAdded, MobRemoved: mobAbsorptionRemoved},
 		{ID: EffectSaturation, Name: "saturation", Description: "potion.saturation", Color: 0xF82423, Instant: true, Apply: saturationApply},
 		{ID: EffectLevitation, Name: "levitation", Description: "potion.levitation", Harmful: true, Color: 0xCEFFFF},
 		{ID: EffectFatalPoison, Name: "fatal_poison", Description: "potion.poison", Harmful: true, Color: 0x4E9331, Tick: poisonTick(true), MobTick: mobPoisonTick(true)},
@@ -238,10 +244,10 @@ func vanillaEffects() []Effect {
 		{ID: EffectVillageHero, Name: "village_hero", Description: "effect.villageHero", Color: 0x44FF44},
 		{ID: EffectDarkness, Name: "darkness", Description: "effect.darkness", Harmful: true, Color: 0x44FF44, NoParticles: true},
 		{ID: EffectTrialOmen, Name: "trial_omen", Description: "effect.trial_omen", Color: 0x16A6A6},
-		{ID: EffectWindCharged, Name: "wind_charged", Description: "effect.wind_charged", Harmful: true, Color: 0xBDC9FF, Died: windChargedDied},
-		{ID: EffectWeaving, Name: "weaving", Description: "effect.weaving", Harmful: true, Color: 0x78695A, Died: weavingDied},
-		{ID: EffectOozing, Name: "oozing", Description: "effect.oozing", Harmful: true, Color: 0x99FFA3, Died: oozingDied},
-		{ID: EffectInfested, Name: "infested", Description: "effect.infested", Harmful: true, Color: 0x8C9B8C, Hurt: infestedHurt},
+		{ID: EffectWindCharged, Name: "wind_charged", Description: "effect.wind_charged", Harmful: true, Color: 0xBDC9FF, Died: windChargedDied, MobDied: mobDied(effectSite.windBurst)},
+		{ID: EffectWeaving, Name: "weaving", Description: "effect.weaving", Harmful: true, Color: 0x78695A, Died: weavingDied, MobDied: mobDied(effectSite.weave)},
+		{ID: EffectOozing, Name: "oozing", Description: "effect.oozing", Harmful: true, Color: 0x99FFA3, Died: oozingDied, MobDied: mobDied(effectSite.ooze)},
+		{ID: EffectInfested, Name: "infested", Description: "effect.infested", Harmful: true, Color: 0x8C9B8C, Hurt: infestedHurt, MobHurt: mobInfestedHurt},
 		{ID: EffectRaidOmen, Name: "raid_omen", Description: "effect.raid_omen", Color: 0xDE4058},
 		{ID: EffectBreathOfTheNautilus, Name: "breath_of_the_nautilus", Description: "effect.customNautilus", Color: 0x00FFEE},
 		// Freezing makes freezing hurt more (player/freeze.go).
@@ -325,17 +331,45 @@ func absorptionRemoved(p *Player) { p.setAttributes(attrAbsorption, float32(0)) 
 func flagsChanged(p *Player, _ int32) { p.sendActorFlags() }
 func flagsGone(p *Player)             { p.sendActorFlags() }
 
+// effectSite is where a dying or hurt player or mob is, for the effects that act then:
+// BDS runs them on any actor (MobEffect slots 5 and 6), from its position, height and view.
+type effectSite struct {
+	s      *Host
+	r      *world.Region
+	feet   mgl32.Vec3
+	height float32
+	view   mgl32.Vec3
+	rng    effectRand
+	source *world.Entity
+}
+
+// effectRand is the random a death or hurt effect rolls with.
+type effectRand interface {
+	Float32() float32
+	IntN(n int) int
+}
+
+// siteOf is the player's effectSite, false when it is in no region.
+func (p *Player) siteOf() (effectSite, bool) {
+	if p.entity == nil || p.entity.Region() == nil {
+		return effectSite{}, false
+	}
+	return effectSite{s: p.s, r: p.entity.Region(), feet: p.feet(), height: playerHeight, view: p.viewVector(), rng: p.rng, source: p.entity}, true
+}
+
 // windChargedDied is BDS's Wind Charged: a wind burst halfway up the dead, of power 3 to
 // 5, that hurts nothing, toggles blocks and takes away fall damage.
 func windChargedDied(p *Player, _ int32) {
-	r := p.entity.Region()
-	if r == nil {
-		return
+	if at, ok := p.siteOf(); ok {
+		at.windBurst()
 	}
-	at := p.feet().Add(mgl32.Vec3{0, playerHeight / 2, 0})
-	p.s.Explode(r, &Explosion{
-		Pos: at, Radius: windChargedRadius + p.rng.Float32()*windChargedSpread, Kind: ExplosionWindCharge,
-		Source: p.entity, AllowUnderwater: true, MaxResistance: noResistance, KnockbackScale: windChargedKnockback,
+}
+
+// windBurst is Wind Charged's burst at the site.
+func (at effectSite) windBurst() {
+	at.s.Explode(at.r, &Explosion{
+		Pos: at.feet.Add(mgl32.Vec3{0, at.height / 2, 0}), Radius: windChargedRadius + at.rng.Float32()*windChargedSpread, Kind: ExplosionWindCharge,
+		Source: at.source, AllowUnderwater: true, MaxResistance: noResistance, KnockbackScale: windChargedKnockback,
 		Cause: DamageEntityExplosion, Particle: packet.LevelEventParticlesWindExplosion, Sound: packet.SoundEventWindChargeBurst,
 		ToggleBlocks: true, NegatesFallDamage: true,
 	})
@@ -345,25 +379,32 @@ func windChargedDied(p *Player, _ int32) {
 // the dead, each in a block that can be built over, above a block whose top holds things,
 // each with the cobweb animation.
 func weavingDied(p *Player, _ int32) {
-	r := p.entity.Region()
-	web, ok := p.s.reg.Blocks.Block(nameCobweb)
-	if r == nil || !ok || !p.s.level.MobGriefing {
+	if at, ok := p.siteOf(); ok {
+		at.weave()
+	}
+}
+
+// weave is Weaving's cobwebs around the site.
+func (at effectSite) weave() {
+	s, r := at.s, at.r
+	web, ok := s.reg.Blocks.Block(nameCobweb)
+	if !ok || !s.level.MobGriefing {
 		return
 	}
-	base := floorPos(p.feet())
-	want := weavingMin + p.rng.IntN(weavingExtra)
+	base := floorPos(at.feet)
+	want := weavingMin + at.rng.IntN(weavingExtra)
 	placed := 0
 	for range weavingTries {
 		if placed >= want {
 			break
 		}
-		pos := base.Add(cube.Pos{p.rng.IntN(3) - 1, p.rng.IntN(3) - 1, p.rng.IntN(3) - 1})
+		pos := base.Add(cube.Pos{at.rng.IntN(3) - 1, at.rng.IntN(3) - 1, at.rng.IntN(3) - 1})
 		b, ok := r.Block(pos, 0)
 		if !ok || b == web {
 			continue
 		}
 		below, ok := r.Block(pos.Side(cube.FaceDown), 0)
-		if !ok || !p.s.attach.Supports(below, cube.FaceUp) || !p.s.game.replaceable(p, r, pos, b, web) {
+		if !ok || !s.attach.Supports(below, cube.FaceUp) || !s.game.replaceableIn(s, r, pos, b, web) {
 			continue
 		}
 		if r.SetBlock(pos, 0, web) {
@@ -376,13 +417,16 @@ func weavingDied(p *Player, _ int32) {
 // oozingDied is BDS's Oozing: two medium slimes half a block above the dead, each facing
 // a random way.
 func oozingDied(p *Player, _ int32) {
-	d := p.dim
-	if d == nil {
-		return
+	if at, ok := p.siteOf(); ok {
+		at.ooze()
 	}
-	at := p.feet().Add(mgl32.Vec3{0, oozingLift, 0})
+}
+
+// ooze is Oozing's slimes at the site.
+func (at effectSite) ooze() {
+	from := at.feet.Add(mgl32.Vec3{0, oozingLift, 0})
 	for range oozingSlimes {
-		if m, ok := p.s.SpawnMob(d, nameSlime, at, p.rng.Float32()*360); ok {
+		if m, ok := at.s.SpawnMob(at.r.Dimension(), nameSlime, from, at.rng.Float32()*360); ok {
 			m.m.RunEvent(oozingEvent)
 		}
 	}
@@ -391,29 +435,39 @@ func oozingDied(p *Player, _ int32) {
 // infestedHurt is BDS's Infested: one hurt in ten lets out one or two silverfish halfway
 // up the player, thrown out in front of it.
 func infestedHurt(p *Player, _ int32, _ DamageSource) {
-	d := p.dim
-	if d == nil || p.rng.Float32() > infestedChance {
+	if at, ok := p.siteOf(); ok {
+		at.infest()
+	}
+}
+
+// infest is Infested's roll and silverfish at the site.
+func (at effectSite) infest() {
+	if at.rng.Float32() > infestedChance {
 		return
 	}
-	n := 1 + p.rng.IntN(infestedExtra)
-	at := p.feet().Add(mgl32.Vec3{0, playerHeight / 2, 0})
+	n := 1 + at.rng.IntN(infestedExtra)
+	from := at.feet.Add(mgl32.Vec3{0, at.height / 2, 0})
 	for range n {
-		yaw := p.rng.Float32() * 360
-		turn := float64(p.rng.Float32())*math.Pi - math.Pi/2
-		view := p.viewVector()
-		m, ok := p.s.SpawnMob(d, nameSilverfish, at, yaw)
+		yaw := at.rng.Float32() * 360
+		turn := float64(at.rng.Float32())*math.Pi - math.Pi/2
+		m, ok := at.s.SpawnMob(at.r.Dimension(), nameSilverfish, from, yaw)
 		if !ok {
 			continue
 		}
 		cos, sin := float32(math.Cos(turn)), float32(math.Sin(turn))
-		x, z := view[0]*infestedSpeed, view[2]*infestedSpeed
-		m.SetVelocity(mgl32.Vec3{x*cos + z*sin, view[1] * infestedSpeed * infestedLift, z*cos - x*sin})
+		x, z := at.view[0]*infestedSpeed, at.view[2]*infestedSpeed
+		m.SetVelocity(mgl32.Vec3{x*cos + z*sin, at.view[1] * infestedSpeed * infestedLift, z*cos - x*sin})
 	}
 }
 
 // viewVector is the way the player looks, BDS's getViewVector.
 func (p *Player) viewVector() mgl32.Vec3 {
 	rot := p.entity.Rotation()
-	yaw, pitch := float64(mgl32.DegToRad(rot.Yaw)), float64(mgl32.DegToRad(rot.Pitch))
+	return viewOf(rot.Pitch, rot.Yaw)
+}
+
+// viewOf is the unit vector of a pitch and yaw in degrees.
+func viewOf(pitchDeg, yawDeg float32) mgl32.Vec3 {
+	yaw, pitch := float64(mgl32.DegToRad(yawDeg)), float64(mgl32.DegToRad(pitchDeg))
 	return mgl32.Vec3{float32(-math.Sin(yaw) * math.Cos(pitch)), float32(-math.Sin(pitch)), float32(math.Cos(yaw) * math.Cos(pitch))}
 }

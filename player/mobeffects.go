@@ -1,6 +1,9 @@
 package player
 
 import (
+	"math/rand/v2"
+	"slices"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/helix/effect"
@@ -15,11 +18,6 @@ import (
 // (onEffectUpdated 0xB3CC950 sends it only when the actor's category has the player bit);
 // those who see a mob learn its effects from the visible effects actor data (131), and
 // Invisibility sets its invisible flag (0xCABBC70).
-
-// familyUndead is the family whose heal and harm swap. BDS asks the actor type's undead
-// bit (0xB3CBBA0); Helix's mobs know only their families, which vanilla gives every undead
-// type.
-const familyUndead = "undead"
 
 // effectDef is the registered effect with the ID.
 func (o *Mob) effectDef(id int32) (*Effect, bool) {
@@ -130,10 +128,10 @@ func (o *Mob) giveEffect(e effect.Instance) {
 	if o.m.Dead() {
 		return
 	}
-	def, ok := o.effectDef(e.ID)
-	if ok && o.m.EffectImmune(def.Name) {
+	if !o.canBeAffected(e.ID) {
 		return
 	}
+	def, ok := o.effectDef(e.ID)
 	if ok && def.Instant {
 		if def.MobApply != nil {
 			def.MobApply(o, e.Amplifier, 1)
@@ -143,15 +141,28 @@ func (o *Mob) giveEffect(e effect.Instance) {
 	if ok && def.NoParticles {
 		e.Hidden = true
 	}
-	o.m.Effects().Give(e)
+	now, _ := o.m.Effects().Give(e)
+	o.effectAdded(now, def, ok)
+}
+
+// effectAdded runs the effect's MobAdded hook, as BDS's onEffectUpdated runs applyEffects on
+// every add, merge and comeback, and shows the change.
+func (o *Mob) effectAdded(e effect.Instance, def *Effect, known bool) {
+	if known && def.MobAdded != nil {
+		def.MobAdded(o, e.Amplifier)
+	}
 	o.effectsChanged()
 }
 
 // removeEffect takes effect id away from the mob.
 func (o *Mob) removeEffect(id int32) {
-	if o.m.Effects().Remove(id) {
-		o.effectsChanged()
+	if !o.m.Effects().Remove(id) {
+		return
 	}
+	if def, ok := o.effectDef(id); ok && def.MobRemoved != nil {
+		def.MobRemoved(o)
+	}
+	o.effectsChanged()
 }
 
 // tickEffects runs each of the mob's effects' MobTick and counts it down, as the player's
@@ -174,7 +185,8 @@ func (o *Mob) tickEffects() {
 			o.removeEffect(id)
 			continue
 		case effect.Restored:
-			o.effectsChanged()
+			def, ok := o.effectDef(id)
+			o.effectAdded((*l)[i], def, ok)
 		}
 		i++
 	}
@@ -190,9 +202,28 @@ func (o *Mob) effectsChanged() {
 			o.m.SetEffectSpeed(def.Name, amount)
 		}
 	}
+	o.m.SetHealthBoost(mobHealthBoost(o.s.game.effects, l))
 	_, invisible := l.Get(EffectInvisibility)
 	o.m.SetFlag(protocol.EntityDataFlagInvisible, invisible)
 	o.FlagsChanged(o.m)
+}
+
+// mobHealthBoost is the additions the effects in l make to the health maximum (Health
+// Boost), each by its amount times the level, as BDS's modifier value.
+func mobHealthBoost(effects map[int32]*Effect, l effect.List) float32 {
+	var v float32
+	for _, e := range l {
+		def, ok := effects[e.ID]
+		if !ok {
+			continue
+		}
+		for _, mod := range def.Modifiers {
+			if mod.Attribute == attrHealthName && mod.OnMax && mod.Operation == ModifierAdd {
+				v += mod.Amount * float32(e.Amplifier+1)
+			}
+		}
+	}
+	return v
 }
 
 // hasSpeedModifier reports whether the effect changes movement.
@@ -234,6 +265,7 @@ func (o *Mob) loadEffects(data map[string]any) {
 			o.m.SetEffectSpeed(def.Name, amount)
 		}
 	}
+	o.m.SetHealthBoost(mobHealthBoost(o.s.game.effects, l))
 	if _, ok := l.Get(EffectInvisibility); ok {
 		o.m.SetFlag(protocol.EntityDataFlagInvisible, true)
 	}
@@ -266,14 +298,164 @@ func mobHarm(o *Mob, amount float32) {
 	o.hurtBy(amount, behavior.NoID, DamageMagic)
 }
 
-// undead reports whether heal and harm swap on the mob.
-func (o *Mob) undead() bool {
-	for _, f := range o.m.Families() {
-		if f == familyUndead {
-			return true
+// Actor types whose class overrides Actor::canBeAffected, by runtime ID (the ActorType's low
+// byte), from BDS 1.26.60's actor factory (0xBC5B490).
+const (
+	typeSpider     = 35
+	typeCaveSpider = 40
+	typeNpc        = 51
+	typeWither     = 52
+	typeDragon     = 53
+	typeAgent      = 56
+	// skeletonWitherVariant is the variant whose Skeleton is kept from Wither.
+	skeletonWitherVariant = 1
+)
+
+// canBeAffected is BDS's Actor::canBeAffected (0xB3CD280), which Actor::addEffect asks
+// first, with its class overrides: the wither takes only Instant Health and Instant Damage
+// (0xBD4F950), the ender dragon, NPCs and agents nothing, spiders no Poison (0xBD19160) and
+// a Skeleton of variant 1 no Wither (0xBD168A0). Otherwise the mob must be alive, of a type
+// with the Mob bit, not undead by family for Regeneration and Poison, and not immune by
+// minecraft:mob_effect_immunity.
+func (o *Mob) canBeAffected(id int32) bool {
+	t, known := o.s.reg.EntityTypes.ByName(o.m.Type())
+	switch t.RuntimeID {
+	case typeWither:
+		return id == EffectInstantHealth || id == EffectInstantDamage
+	case typeDragon, typeNpc, typeAgent:
+		return false
+	case typeSpider, typeCaveSpider:
+		if id == EffectPoison {
+			return false
+		}
+	case 34, 46, 48, 144, 151: // the Skeleton class: skeleton, stray, wither skeleton, bogged, parched
+		if id == EffectWither && o.m.Variant() == skeletonWitherVariant {
+			return false
 		}
 	}
+	if o.m.Dead() || known && !mobActorType(t.RuntimeID) {
+		return false
+	}
+	if (id == EffectRegeneration || id == EffectPoison) && slices.Contains(o.m.Families(), familyUndead) {
+		return false
+	}
+	def, ok := o.effectDef(id)
+	return !ok || !o.m.EffectImmune(def.Name)
+}
+
+// familyUndead is the family Actor::canBeAffected keeps from Regeneration and Poison.
+const familyUndead = "undead"
+
+// mobActorType reports whether the actor type with the runtime ID has BDS 1.26.60's Mob bit
+// (0x100): every type but these.
+func mobActorType(id int32) bool {
+	switch id {
+	case 1, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
+		90, 91, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 106, 107, 117, 119, 141, 143, 145, 154, 156, 218:
+		return false
+	}
+	return true
+}
+
+// undead reports whether heal and harm swap on the mob: BDS asks its actor type for the Mob
+// and UndeadMob bits (0x10100, 0xB3CBBA0), not its families.
+func (o *Mob) undead() bool {
+	t, ok := o.s.reg.EntityTypes.ByName(o.m.Type())
+	return ok && undeadType(t.RuntimeID)
+}
+
+// undeadType reports whether the actor type with the runtime ID (the ActorType's low byte)
+// has the undead bits in BDS 1.26.60's ActorType enum.
+func undeadType(id int32) bool {
+	switch id {
+	case 26, 27, // skeleton and zombie horse
+		32, 34, 36, // zombie, skeleton, zombie pigman
+		44, 46, 47, 48, // zombie villager, stray, husk, wither skeleton
+		52, 58, // wither, phantom
+		110, 116, 126, // drowned, zombie villager v2, zoglin
+		144, 150, 151, 152, 155: // bogged, zombie nautilus, parched, camel husk, frostbite
+		return true
+	}
 	return false
+}
+
+// mobAbsorptionMax is the absorption attribute's maximum BDS gives every mob (0xBFEF1F0).
+const mobAbsorptionMax = 16
+
+// mobAbsorptionAdded is Absorption on a mob (AbsorptionMobEffect::applyEffects 0xCAB1160):
+// the absorption starts over at 0, then a living mob gets the effect's amount, up to the
+// attribute's maximum.
+func mobAbsorptionAdded(o *Mob, amplifier int32) {
+	o.absorption = 0
+	if !o.m.Dead() {
+		o.absorption = min(float32(amplifier+1)*absorptionPerLevel, mobAbsorptionMax)
+	}
+}
+
+// mobAbsorptionRemoved takes what is left of Absorption away (0xCAB0FC0).
+func mobAbsorptionRemoved(o *Mob) { o.absorption = 0 }
+
+// absorb takes damage of the cause off the mob's absorption first, as BDS's health delegate
+// (0xBC45336) does after Resistance; self-destruct damage goes past it. It returns the
+// damage left and adds what was taken to absorbed.
+func (o *Mob) absorb(v float32, c DamageCause) float32 {
+	if v <= 0 || o.absorption <= 0 || c == DamageSelfDestruct {
+		return v
+	}
+	used := min(o.absorption, v)
+	o.absorption -= used
+	o.absorbed += used
+	return v - used
+}
+
+// effectsHurt runs the Hurt hooks of the mob's effects after a hurt landed (MobEffect slot 6).
+func (o *Mob) effectsHurt(c DamageCause) {
+	for _, e := range *o.m.Effects() {
+		if def, ok := o.effectDef(e.ID); ok && def.MobHurt != nil {
+			def.MobHurt(o, e.Amplifier, c)
+		}
+	}
+}
+
+// effectsDied runs the Died hooks of the effects a dying mob has (MobEffect slot 5).
+func (o *Mob) effectsDied() {
+	for _, e := range *o.m.Effects() {
+		if def, ok := o.effectDef(e.ID); ok && def.MobDied != nil {
+			def.MobDied(o, e.Amplifier)
+		}
+	}
+}
+
+// mobRand is the random a mob's death and hurt effects roll with.
+type mobRand struct{}
+
+func (mobRand) Float32() float32 { return rand.Float32() } //nolint:gosec // gameplay randomness
+func (mobRand) IntN(n int) int   { return rand.IntN(n) }   //nolint:gosec // gameplay randomness
+
+// siteOf is the mob's effectSite: its feet, its height and the way its body faces.
+func (o *Mob) siteOf() (effectSite, bool) {
+	if o.entity == nil || o.entity.Region() == nil {
+		return effectSite{}, false
+	}
+	_, h := o.m.Size()
+	pitch, yaw, _, _ := o.m.Rotation()
+	return effectSite{s: o.s, r: o.entity.Region(), feet: o.entity.Position(), height: h, view: viewOf(pitch, yaw), rng: mobRand{}, source: o.entity}, true
+}
+
+// mobDied runs a death effect's work at a dying mob.
+func mobDied(work func(effectSite)) func(o *Mob, amplifier int32) {
+	return func(o *Mob, _ int32) {
+		if at, ok := o.siteOf(); ok {
+			work(at)
+		}
+	}
+}
+
+// mobInfestedHurt is Infested on a hurt mob.
+func mobInfestedHurt(o *Mob, _ int32, _ DamageCause) {
+	if at, ok := o.siteOf(); ok {
+		at.infest()
+	}
 }
 
 // mobRegenerationTick is Regeneration on a mob.
@@ -384,7 +566,7 @@ func (p *Player) takeInstant(id, amplifier int32, scale float32) {
 func (o *Mob) canTakeEffects() bool      { return !o.m.Dead() && o.stand == nil && !o.gone }
 func (o *Mob) takeEffect(e ActiveEffect) { o.giveEffect(e) }
 func (o *Mob) takeInstant(id, amplifier int32, scale float32) {
-	if def, ok := o.effectDef(id); ok && def.Instant && def.MobApply != nil && !o.m.EffectImmune(def.Name) {
+	if def, ok := o.effectDef(id); ok && def.Instant && def.MobApply != nil && o.canBeAffected(id) {
 		def.MobApply(o, amplifier, scale)
 	}
 }

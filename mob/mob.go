@@ -128,8 +128,8 @@ func (rt *Runtime) Parse(typ string, raw json.RawMessage) error {
 func (rt *Runtime) Has(typ string) bool { _, ok := rt.defs[typ]; return ok }
 
 // ArmorHooks is what an engine that knows the mob's armour implements on its Hooks: what
-// the armour leaves of damage amount of cause, as BDS's Mob hurt (armour, then protection
-// enchantments), after the hurt time has taken its part.
+// the armour leaves of damage amount of cause, as BDS's Mob hurt (armour, protection
+// enchantments, Resistance, then absorption), after the hurt time has taken its part.
 type ArmorHooks interface {
 	AfterArmor(m *Mob, amount float32, cause int) float32
 }
@@ -221,7 +221,10 @@ type Mob struct {
 	pitch, yaw, headYaw, bodyYaw float32
 	prevPitch, prevYaw           float32
 
-	health, maxHealth                   float32
+	health, maxHealth float32
+	// baseMaxHealth is the health attribute's maximum before healthBoost, Health Boost's
+	// modifier on it.
+	baseMaxHealth, healthBoost          float32
 	speed, underwaterSpeed, followRange float32
 	// speedBase is the movement attribute before its modifiers, speedMods those (sprint.go).
 	speedBase               float32
@@ -370,7 +373,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 		targetLeader: behavior.NoID, caravanHead: behavior.NoID, caravanTail: behavior.NoID,
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
-		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,
+		health: defaultHealth, maxHealth: defaultHealth, baseMaxHealth: defaultHealth, followRange: defaultFollowRange,
 		underwaterSpeed: defaultLiquidSpeed, lavaSpeed: defaultLiquidSpeed,
 	}
 	m.rnd = NewRandom(uint64(uniqueID)) //nolint:gosec // the bits of the ID seed the random
@@ -419,6 +422,15 @@ func (m *Mob) Size() (w, h float32) { return m.body.Width, m.body.Height }
 
 // MaxHealth is the health attribute's maximum.
 func (m *Mob) MaxHealth() float32 { return m.maxHealth }
+
+// SetHealthBoost puts Health Boost's modifier (an addition) on the health maximum, 0 to take
+// it off. As BDS's attribute instance does when its maximum drops, health above the new
+// maximum is cut to it; a rising maximum leaves health as it is.
+func (m *Mob) SetHealthBoost(v float32) {
+	m.healthBoost = v
+	m.maxHealth = m.baseMaxHealth + v
+	m.health = min(m.health, m.maxHealth)
+}
 
 // HealthValue is the mob's health.
 func (m *Mob) HealthValue() float32 { return m.health }
@@ -580,10 +592,11 @@ func (m *Mob) readJump(comps definition.Group) {
 // readAttributes reads the attribute components the minimal hookup uses.
 func (m *Mob) readAttributes(comps definition.Group) {
 	if v, mx, ok := attribute(comps["minecraft:health"]); ok {
-		if m.maxHealth != mx || m.inst.Components() == nil {
+		if m.baseMaxHealth != mx || m.inst.Components() == nil {
 			m.health = v
 		}
-		m.maxHealth = mx
+		m.baseMaxHealth = mx
+		m.maxHealth = mx + m.healthBoost
 	}
 	if m.savedHealth > 0 {
 		// A save's health replaces the definition's once its components are read.

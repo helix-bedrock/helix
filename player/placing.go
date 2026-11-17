@@ -301,7 +301,12 @@ func (h *Host) itemBlock(s ItemStack) (uint32, bool) {
 // except where BDS's own rule refuses the block placed (light blocks are
 // not replaced by light blocks, full snow layers are not built over).
 func (g *gameplay) replaceable(p *Player, r *world.Region, pos cube.Pos, b, block uint32) bool {
-	blocks := p.s.reg.Blocks
+	return g.replaceableIn(p.s, r, pos, b, block)
+}
+
+// replaceableIn is replaceable with no player behind the placing (a mob's death effect).
+func (g *gameplay) replaceableIn(s *Host, r *world.Region, pos cube.Pos, b, block uint32) bool {
+	blocks := s.reg.Blocks
 	name := blocks.Name(b)
 	if rb, ok := g.blocks[name].(Replaceable); ok {
 		return rb.Replaceable(b)
@@ -319,7 +324,7 @@ func (g *gameplay) replaceable(p *Player, r *world.Region, pos cube.Pos, b, bloc
 		return false
 	}
 	if name == nameSnowLayer {
-		return g.snowReplaceable(p, r, pos, b, block)
+		return g.snowReplaceable(s, r, pos, b, block)
 	}
 	return true
 }
@@ -335,11 +340,11 @@ const (
 // snowReplaceable is BDS 1.26.60's TopSnowBlock::canBeBuiltOver (sub_D4EB2B0): unless a snow
 // layer is placed, a block in the snow's second layer (a plant it covers) decides; otherwise
 // only snow below its full height (8 layers, which looks like a snow block) is built over.
-func (g *gameplay) snowReplaceable(p *Player, r *world.Region, pos cube.Pos, b, block uint32) bool {
-	blocks := p.s.reg.Blocks
+func (g *gameplay) snowReplaceable(s *Host, r *world.Region, pos cube.Pos, b, block uint32) bool {
+	blocks := s.reg.Blocks
 	if blocks.Name(block) != nameSnowLayer && r != nil {
 		if covered, ok := r.Block(pos, 1); ok && blocks.Name(covered) != nameAir {
-			return g.replaceable(p, r, pos, covered, block)
+			return g.replaceableIn(s, r, pos, covered, block)
 		}
 	}
 	h, _ := blocks.States(b)[stateSnowHeight].(int32)

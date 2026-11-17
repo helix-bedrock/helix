@@ -14,6 +14,8 @@ var mobArmourSlots = [...]int{mob.EquipHead, mob.EquipChest, mob.EquipLegs, mob.
 // armour share (Mob::getDamageAfterArmorReduction, 0xBFE8020) from the worn pieces'
 // protection and toughness, then the protection enchantments (0xC4A2AA0). The worn pieces
 // wear by the damage before armour, as the health change's Mob::hurtArmor (0xBFE91C0) does.
+// Resistance and the absorption attribute come last, as the health delegate (0xBC45336)
+// takes them.
 func (m *Mob) AfterArmor(_ *mob.Mob, v float32, cause int) float32 {
 	c := DamageCause(cause)
 	if !armorBypassed(c) {
@@ -24,7 +26,7 @@ func (m *Mob) AfterArmor(_ *mob.Mob, v float32, cause int) float32 {
 	if c != causeEnchantsSkip {
 		v = m.protectionShare(v, c)
 	}
-	return m.effectResist(v, c)
+	return m.absorb(m.effectResist(v, c), c)
 }
 
 // armourShare takes the helmet and the worn armour points off v.

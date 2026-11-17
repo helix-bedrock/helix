@@ -473,6 +473,10 @@ func vanillaTakeHit(h *Hit) bool {
 	}
 	abs := h.Part(PartAbsorption, 0)
 	p.takeHealth(damage, src, abs != nil && !abs.Off)
+	// Mob::_hurt (0xBFDC98F in BDS 1.26.60) takes Absorption away once its health is used up.
+	if p.attributes.get(attrAbsorption) <= 0 {
+		p.RemoveEffect(EffectAbsorption)
+	}
 	if p.hurt.ticks > 0 {
 		p.hurt.last += damage
 	} else {
