@@ -243,9 +243,11 @@ type Mob struct {
 	// items are the item components (items.go): hasItems is set once they are built, inv is
 	// minecraft:inventory's slots, equipState minecraft:equip_item's waiting stack, and
 	// canPickUp the spawn roll pickup_based_on_chance reads.
-	items                   behavior.Items
-	hasItems                bool
-	inv                     inventory
+	items    behavior.Items
+	hasItems bool
+	inv      inventory
+	// love is the make_love state (love.go).
+	love                    love
 	equipState              behavior.EquipState
 	canPickUp, canPickUpSet bool
 	charged                 bool
@@ -329,7 +331,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 	}
 	m := &Mob{
 		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
-		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID},
+		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, dw: dweller{trading: behavior.NoID}, love: love{partner: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,
 		finder: path.NewFinder(),
 		health: defaultHealth, maxHealth: defaultHealth, followRange: defaultFollowRange,

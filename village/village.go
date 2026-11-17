@@ -144,6 +144,8 @@ type Village struct {
 type snapshot struct {
 	box  behavior.Box
 	free [kinds][]behavior.POI
+	// beds and inhabitants are what WantsBabies compares.
+	beds, inhabitants int
 }
 
 // Bounds is the box around the village's POIs. Safe from any goroutine.
@@ -174,6 +176,18 @@ func (v *Village) FreePOI(kind Kind, p behavior.Pos) (behavior.POI, bool) {
 	return s.free[kind][best], true
 }
 
+// WantsBabies is Village's room test for make_love (1.26.60 0xBEE5760): the beds, at least
+// one, outnumber the inhabitants. BDS counts its unclaimed beds plus the claimed ones whose
+// bed still exists, which is every bed here. Its no-breed timer (set by nothing Helix runs)
+// is not kept. Safe from any goroutine.
+func (v *Village) WantsBabies() bool {
+	s := v.snap.Load()
+	if s == nil {
+		return false
+	}
+	return max(s.beds, 1) > s.inhabitants
+}
+
 // centre is the middle of the village's POI box.
 func (v *Village) centre() behavior.Vec3 {
 	return behavior.Vec3{X: float32(v.min[0]+v.max[0]+1) / 2, Y: float32(v.min[1]+v.max[1]+1) / 2, Z: float32(v.min[2]+v.max[2]+1) / 2}
@@ -201,6 +215,12 @@ func (v *Village) publish() {
 			if !p.full() {
 				s.free[k] = append(s.free[k], p.view())
 			}
+		}
+	}
+	s.beds = len(v.pois[Bed])
+	for _, m := range v.members {
+		if m.role == roleInhabitant {
+			s.inhabitants++
 		}
 	}
 	v.snap.Store(s)
@@ -478,6 +498,7 @@ func (m *Manager) DwellerTick(r *world.Region, d Dweller, findPOI, migrate bool)
 		if v != nil {
 			if v.member(d.ID()) == nil {
 				v.members = append(v.members, &member{id: d.ID(), seen: now, role: roleIndex(d.Role())})
+				v.publish()
 			}
 			m.byDweller[d.ID()] = v
 		}

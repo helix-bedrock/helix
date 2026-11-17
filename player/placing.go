@@ -278,8 +278,11 @@ var plantedBlocks = map[string]string{
 
 // itemBlock returns the block a block item places: its saved block state, else
 // the default state of the block it plants or of the block with its name.
-func (p *Player) itemBlock(s ItemStack) (uint32, bool) {
-	blocks := p.s.reg.Blocks
+func (p *Player) itemBlock(s ItemStack) (uint32, bool) { return p.s.itemBlock(s) }
+
+// itemBlock is Player.itemBlock for any holder of the stack.
+func (h *Host) itemBlock(s ItemStack) (uint32, bool) {
+	blocks := h.reg.Blocks
 	if s.Block != nil {
 		name, _ := s.Block["name"].(string)
 		states, _ := s.Block["states"].(map[string]any)

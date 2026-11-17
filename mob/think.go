@@ -41,6 +41,11 @@ const (
 	opCarried
 	opExplode
 	opTransform
+	opLovePartner
+	opLoveLeader
+	opWilling
+	opUseBreedFood
+	opSpawnBaby
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -166,6 +171,8 @@ func (m *Mob) run(o op) {
 		}
 	case opBreed:
 		m.mate(o.id)
+	case opLovePartner, opLoveLeader, opWilling, opUseBreedFood, opSpawnBaby:
+		m.runLoveOp(&o)
 	case opDropLeash:
 		if m.hooks != nil {
 			m.hooks.LeashDropped(m, o.n != 0)
@@ -236,6 +243,9 @@ type Snapshot struct {
 	breedReady bool
 	// equip is the equipment, for other mobs' has_equipment tests.
 	equip [EquipSlots]behavior.Item
+	// lovePartner, loveLeader, willing and breedFood are the make_love state (love.go).
+	lovePartner                    behavior.ID
+	loveLeader, willing, breedFood bool
 }
 
 // Snapshot returns the mob as others see it this tick.
@@ -258,6 +268,8 @@ func (m *Mob) snapshot() {
 	s.health = m.health
 	s.inWater, s.underWater, s.inLava, s.onGround = m.InWater(), m.UnderWater(), m.InLava(), m.OnGround()
 	s.equip = m.equip
+	s.lovePartner, s.loveLeader, s.willing = m.love.partner, m.love.leader, m.love.willing
+	s.breedFood = m.breedFoodSlot() >= 0
 	s.breedReady = m.states != nil && m.states.Breedable != nil && m.states.Breedable.Cooldown() <= 0
 }
 
