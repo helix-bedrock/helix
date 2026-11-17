@@ -313,6 +313,9 @@ type Mob struct {
 	// counts the ticks of a refused horse's rear-up (tame.go).
 	owner   behavior.ID
 	madTime int32
+	// standTime is the horse's HorseStandCounterComponent: 1 when it rears up, counted
+	// on until the stand ends.
+	standTime int32
 	// strength and strengthMax are minecraft:strength's (horse.go).
 	strength, strengthMax int32
 	// saved is the age and breeding state a save holds, put back once the components are
@@ -529,6 +532,7 @@ func (m *Mob) think() (remove bool) {
 	}
 	m.boostTick()
 	m.madTick()
+	m.standTick()
 	m.sensorTick()
 	m.dwellerTick()
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw

@@ -86,7 +86,8 @@ func (m *Mob) ToggleSit(player behavior.Actor) bool {
 }
 
 // The horse's refusal, as BDS 1.26.60's Horse::makeMad (0xBEB41A0): it stands up
-// (Horse::setStanding 0xBEB4050, actor flag 39, which BDS's server never clears), raises
+// (Horse::setStanding 0xBEB4050: actor flag 39, and on the server HorseStandCounterComponent
+// set to 1, which HorsePostTravelSystem counts down and clears, see standTick), raises
 // horse flag 128 for 30 ticks (0xBEB25E0, counted down in the horse's tick 0xBEB3950) and
 // plays the mad sound (LevelSoundEvent 19) at its head.
 const (
@@ -103,6 +104,7 @@ func (s stateMob) MakeMad() {
 		return
 	}
 	s.SetFlag(flagStanding, true)
+	s.standTime = 1
 	s.madTime = 1
 	s.setHorseFlags(horseFlagMad, true)
 	s.do(op{kind: opSound, n: soundMad, at: s.Eyes()})
@@ -118,6 +120,30 @@ func (m *Mob) madTick() {
 	if t >= madTicks {
 		m.madTime = 0
 		m.setHorseFlags(horseFlagMad, false)
+	}
+}
+
+// standTicks is how long a horse stands: HorsePostTravelSystem ends the stand on the tick
+// its counter was already 20.
+const standTicks = 20
+
+// standTick is HorsePostTravelSystem's stand step (BDS 1.26.60 0x7881CC0): a standing
+// horse's counter goes up each tick, and once it was 20 the counter goes back to 0 and
+// actor flag 39 is cleared, so the horse comes down. BDS also ends the stand when
+// HorseLandedOnGroundFlagComponent is set (a jump landing); horse jumps are not built, so
+// that never happens here. Runs: think.
+func (m *Mob) standTick() {
+	if m.standTime <= 0 {
+		return
+	}
+	t := m.standTime
+	m.standTime++
+	if t < standTicks {
+		return
+	}
+	m.standTime = 0
+	if m.Flag(flagStanding) {
+		m.SetFlag(flagStanding, false)
 	}
 }
 
