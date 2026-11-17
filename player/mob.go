@@ -191,7 +191,7 @@ func (m *Mob) metadata() protocol.EntityMetadata {
 		protocol.EntityDataKeyVisibleMobEffects: m.visibleEffects(),
 	}
 	for _, d := range m.m.ActorData() {
-		md[uint32(d.Key)] = d.Value //nolint:gosec // actor data keys are small
+		md[uint32(d.Key)] = dataWireValue(uint32(d.Key), d.Value) //nolint:gosec // actor data keys are small
 	}
 	if m.stand != nil {
 		md[protocol.EntityDataKeyPoseIndex] = m.stand.pose
@@ -913,3 +913,13 @@ var (
 	_ mob.MovingActor = playerActor{}
 	_ behavior.Actor  = playerActor{}
 )
+
+// dataWireValue is an actor data value as the client reads its key: the colours are bytes
+// (BDS's Color and Color2), which a client given an int drops, so a tamed wolf showed no
+// collar.
+func dataWireValue(key uint32, v any) any {
+	if n, ok := v.(int32); ok && (key == protocol.EntityDataKeyColorIndex || key == protocol.EntityDataKeyColorTwoIndex) {
+		return uint8(n) //nolint:gosec // colours are 0 to 15
+	}
+	return v
+}
