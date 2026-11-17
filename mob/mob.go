@@ -613,6 +613,10 @@ func (m *Mob) readAttributes(comps definition.Group) {
 	if v, _, ok := attribute(comps["minecraft:lava_movement"]); ok {
 		m.lavaSpeed = v
 	}
+	m.body.AirSpeed = defaultAirSpeed
+	if v, _, ok := attribute(comps["minecraft:flying_speed"]); ok {
+		m.body.AirSpeed = v
+	}
 	if v, _, ok := attribute(comps["minecraft:follow_range"]); ok {
 		m.followRange = v
 	}
@@ -811,6 +815,9 @@ func (m *Mob) physicsTick() {
 	} else {
 		m.body.HasTarget = false
 	}
+	m.blockClimb()
+	m.beforeMove()
+	m.applyBody()
 	m.liquidPush()
 	m.body.Tick(physWorld{&m.v})
 	if !m.customBox {
@@ -818,6 +825,7 @@ func (m *Mob) physicsTick() {
 	}
 	m.body.UpdateLiquid(physWorld{&m.v}, m.ridingBoat())
 	m.body.HeadInWater = m.headInWater()
+	m.blockSlowdown()
 	m.traceBlocks()
 }
 
