@@ -122,7 +122,9 @@ func (p *Player) sendWorldState(worldSpawn protocol.BlockPos) {
 // broadcast, so the player gets its abilities twice, as from BDS.
 func (p *Player) sendSessionData() {
 	s := p.s
-	adventure := &packet.UpdateAdventureSettings{AutoJump: true}
+	// BDS's level adventure settings start with name tags shown; without it the client
+	// shows a name only while it is looked at.
+	adventure := &packet.UpdateAdventureSettings{AutoJump: true, ShowNameTags: true}
 	abilities := &packet.UpdateAbilities{AbilityData: p.abilities.Data(p.uniqueID)}
 	p.broadcast(adventure, abilities)
 	p.send(adventure, abilities, &packet.GameRulesChanged{GameRules: s.level.GameRules}, s.global.listPacket(), abilities,

@@ -28,9 +28,11 @@ func (p *Player) spawnPackets(e *world.Entity) []packet.Packet {
 		protocol.EntityDataKeyFlagsTwo:    p.actorFlagsTwo(),
 		protocol.EntityDataKeyName:        p.name,
 		protocol.EntityDataKeyPlayerIndex: p.index,
-		protocol.EntityDataKeyWidth:       float32(0.6),
-		protocol.EntityDataKeyHeight:      float32(1.8),
-		protocol.EntityDataKeyScale:       float32(1),
+		// A player's always show name tag data is 1, as in BDS's own data for it (join).
+		protocol.EntityDataKeyAlwaysShowNameTag: uint8(1),
+		protocol.EntityDataKeyWidth:             float32(0.6),
+		protocol.EntityDataKeyHeight:            float32(1.8),
+		protocol.EntityDataKeyScale:             float32(1),
 
 		protocol.EntityDataKeyVisibleMobEffects: p.visibleEffects(),
 	}
