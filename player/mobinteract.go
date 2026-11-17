@@ -115,7 +115,7 @@ func (p *Player) runInteraction(r *world.Region, o *Mob, it interaction) {
 	p.spawnInteractItems(r, o, it)
 	p.dropInteractSlot(r, o, it)
 	for _, name := range it.sounds() {
-		playSound(r, feetBlock(at), soundEvent{name: name, pos: at, extra: -1, entity: o.m.Type()}, nil)
+		playSound(r, feetBlock(at), soundEvent{name: name, pos: at, extra: -1, entity: o.m.Type(), actor: o.entity.UniqueID()}, nil)
 	}
 	if it.HurtItem > 0 && !p.creative() {
 		p.hurtHeld(it.HurtItem)

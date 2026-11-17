@@ -17,11 +17,15 @@ type soundEvent struct {
 	extra int32
 	// entity is the type of the entity making it, "" for none.
 	entity string
+	// actor is the unique ID of the entity making it, 0 for none. BDS 1.26.60 sets it on
+	// every mob sound (packet capture), and the client needs it to play a mob's own sound,
+	// such as a horse's mad sound.
+	actor int64
 }
 
 // packet is the sound as the client gets it.
 func (s soundEvent) packet() *packet.LevelSoundEvent {
-	return &packet.LevelSoundEvent{SoundType: s.name, Position: s.pos, ExtraData: s.extra, EntityType: s.entity}
+	return &packet.LevelSoundEvent{SoundType: s.name, Position: s.pos, ExtraData: s.extra, EntityType: s.entity, EntityUniqueID: s.actor}
 }
 
 // handleLevelSoundEvent is a sound the client says it made, such as a sweet berry bush

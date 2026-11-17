@@ -100,7 +100,7 @@ func (m *Mob) wearArmour(damage float32, c DamageCause) {
 	}
 	if r := m.entity.Region(); r != nil {
 		at := m.entity.Position()
-		playSound(r, feetBlock(at), soundEvent{name: packet.SoundEventBreak, pos: at, extra: -1, entity: m.m.Type()}, nil)
+		playSound(r, feetBlock(at), soundEvent{name: packet.SoundEventBreak, pos: at, extra: -1, entity: m.m.Type(), actor: m.entity.UniqueID()}, nil)
 	}
 	m.entity.Send(m.armourPacket())
 }

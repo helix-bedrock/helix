@@ -493,7 +493,7 @@ func (m *Mob) Sound(_ *mob.Mob, n int, at behavior.Vec3) {
 	if name == "" || m.entity == nil || m.entity.Region() == nil {
 		return
 	}
-	m.entity.Send(soundEvent{name: name, pos: mglVec(at), extra: -1, entity: m.m.Type()}.packet())
+	m.entity.Send(soundEvent{name: name, pos: mglVec(at), extra: -1, entity: m.m.Type(), actor: m.entity.UniqueID()}.packet())
 }
 
 // ActorEvent sends an actor event about the mob to those who see it.
