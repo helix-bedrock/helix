@@ -220,8 +220,10 @@ func handleInteract(p *Player, pk *packet.Interact) {
 		p.openBoat(b)
 		return
 	}
-	// A rider of a mount with a horse inventory opens that.
-	if o, ok := p.vehicle.(*Mob); ok && pk.TargetEntityRuntimeID == o.entity.RuntimeID() && p.openHorse(o, true) {
+	// A rider of a mount with a horse inventory opens that, whether the client names the
+	// mount or the player: BDS 1.26.60 answered every rider's request in a packet capture
+	// with the mount's UpdateEquip.
+	if o, ok := p.vehicle.(*Mob); ok && (pk.TargetEntityRuntimeID == o.entity.RuntimeID() || pk.TargetEntityRuntimeID == p.runtimeID) && p.openHorse(o, true) {
 		return
 	}
 	// A rider names what it sits on: a vehicle with no slots of its own opens the
