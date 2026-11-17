@@ -53,6 +53,8 @@ type riding struct {
 	riders []behavior.ID
 	// vehicle is what the mob rides, NoID for nothing.
 	vehicle behavior.ID
+	// ridersQueued is minecraft:addrider waiting for the mob's first think.
+	ridersQueued bool
 	// mountPath is find_mount's path to its mount.
 	mountPath *path.Path
 	// driven is set while a player's client moves the mob (a ridden horse); the mob then
@@ -100,6 +102,12 @@ func (m *Mob) readRideable() {
 	m.ride.seats.SetScale(m.scale)
 	if m.ride.addRiders && m.states.AddRider != nil {
 		m.ride.addRiders = false
+		// A mob read before it is in the world (a spawner's, a spawn egg's) gets its riders
+		// at its first think, when the engine can place them.
+		if !m.thinking {
+			m.ride.ridersQueued = true
+			return
+		}
 		m.do(op{kind: opAddRiders})
 	}
 }

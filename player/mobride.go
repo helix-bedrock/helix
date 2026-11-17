@@ -142,6 +142,9 @@ func (m *Mob) Landed(v, rider *mob.Mob) {
 // SpawnRider implements mob.RideHooks: minecraft:addrider's rider, spawned where the vehicle
 // is and facing its way.
 func (m *Mob) SpawnRider(v *mob.Mob, typ, event string) *mob.Mob {
+	if m.entity == nil {
+		return nil
+	}
 	r := m.entity.Region()
 	if r == nil {
 		return nil
@@ -155,6 +158,9 @@ func (m *Mob) SpawnRider(v *mob.Mob, typ, event string) *mob.Mob {
 	if !ok {
 		return nil
 	}
+	// Its components are read now, as the spawner's mobs are, so the vehicle's seats can
+	// test its families when it gets on.
+	o.m.Ready(r)
 	o.add(d)
 	return o.m
 }

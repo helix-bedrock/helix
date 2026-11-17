@@ -506,6 +506,10 @@ func (m *Mob) think() (remove bool) {
 	if m.inst.Changed() || m.inst.Components() == nil {
 		m.refresh()
 	}
+	if m.ride.ridersQueued {
+		m.ride.ridersQueued = false
+		m.do(op{kind: opAddRiders})
+	}
 	if m.hurtTime > 0 {
 		m.hurtTime--
 	}
