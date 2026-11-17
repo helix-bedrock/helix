@@ -32,11 +32,16 @@ func (t packetTrace) traced(pk packet.Packet) bool {
 	if len(t) == 0 || pk == nil {
 		return false
 	}
+	return t[strings.ToLower(packetName(pk))]
+}
+
+// packetName is the name of pk's type, such as "SetActorData".
+func packetName(pk packet.Packet) string {
 	ty := reflect.TypeOf(pk)
 	if ty.Kind() == reflect.Pointer {
 		ty = ty.Elem()
 	}
-	return t[strings.ToLower(ty.Name())]
+	return ty.Name()
 }
 
 // traceIn logs a traced packet the player sent. PlayerAuthInput, sent every client tick,
@@ -52,12 +57,12 @@ func (p *Player) traceIn(pk packet.Packet) {
 		}
 		p.traceFlags = flags
 	}
-	p.s.log.Info("packet in", "name", p.name, "packet", fmt.Sprintf("%+v", pk))
+	p.s.log.Info("packet in", "name", p.name, "type", packetName(pk), "packet", fmt.Sprintf("%+v", pk))
 }
 
 // traceOut logs a traced packet sent to the player. Runs: anywhere.
 func (p *Player) traceOut(pk packet.Packet) {
 	if p.s.trace.traced(pk) {
-		p.s.log.Info("packet out", "name", p.name, "packet", fmt.Sprintf("%+v", pk))
+		p.s.log.Info("packet out", "name", p.name, "type", packetName(pk), "packet", fmt.Sprintf("%+v", pk))
 	}
 }
