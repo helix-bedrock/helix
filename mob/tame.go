@@ -73,6 +73,11 @@ func (m *Mob) FeedMount(h state.Hand) (state.MountResult, bool) {
 		return state.InteractNone, false
 	}
 	r, _ := m.states.Tamemount.Feed(&m.stateEnv, h)
+	if r == state.InteractReject {
+		// A packet capture of BDS 1.26.60 shows each use of an auto_reject_items item
+		// (a saddle on a wild horse) running Horse::makeMad.
+		stateMob{m}.MakeMad()
+	}
 	return r, r != state.InteractNone
 }
 

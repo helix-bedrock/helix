@@ -74,7 +74,9 @@ func (p *Player) showFeed(o *Mob, held ItemStack) {
 }
 
 // feedMount is minecraft:tamemount's feeding: a feed item raises the mount's temper and is
-// used up; an auto-reject item does nothing more (BDS's reject action was not read).
+// used up; an auto-reject item (a saddle on a wild horse) makes the mount rear up and is
+// kept, and the player's arm swings, sent to the player too (a packet capture of BDS 1.26.60:
+// Animate with the interact swing source, then the horse's mad sound and flags).
 func (p *Player) feedMount(o *Mob) bool {
 	held := p.inventory.Held()
 	if held.Empty() {
@@ -84,9 +86,16 @@ func (p *Player) feedMount(o *Mob) bool {
 	if !ok {
 		return false
 	}
-	if r == state.InteractFeed {
+	switch r {
+	case state.InteractFeed:
 		p.useUpHeld()
 		p.flush()
+	case state.InteractReject:
+		if reg := p.entity.Region(); reg != nil {
+			reg.Broadcast(p.blockPos(), &packet.Animate{
+				ActionType: packet.AnimateActionSwingArm, EntityRuntimeID: p.runtimeID, SwingSource: packet.AnimateSwingSourceInteract,
+			}, nil)
+		}
 	}
 	return true
 }
