@@ -201,7 +201,7 @@ func (p *Player) equipInteractSlot(o *Mob, it interaction) bool {
 	}
 	one := held
 	one.Count = 1
-	o.m.SetInventorySlot(k, mobItem(p.s.freshStack(one)))
+	o.setInventorySlot(k, mobItem(p.s.freshStack(one)))
 	p.useUpHeld()
 	return true
 }
@@ -216,7 +216,7 @@ func (p *Player) dropInteractSlot(r *world.Region, o *Mob, it interaction) {
 		return
 	}
 	st := realStack(inv[k])
-	o.m.SetInventorySlot(k, behavior.Item{})
+	o.setInventorySlot(k, behavior.Item{})
 	y := float32(0)
 	if it.DropItemYOffset != nil {
 		y = *it.DropItemYOffset

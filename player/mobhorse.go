@@ -56,7 +56,7 @@ func (h *horseHolder) inventoryChanged(slot int) {
 		return
 	}
 	if st := inv.at(slot); st != nil {
-		h.o.m.SetInventorySlot(slot, mobItem(*st))
+		h.o.setInventorySlot(slot, mobItem(*st))
 	}
 }
 
@@ -204,6 +204,6 @@ func (o *Mob) dropInventoryOnDeath(r *world.Region) {
 			continue
 		}
 		o.s.spawnMobDrop(r, realStack(it), at)
-		o.m.SetInventorySlot(k, behavior.Item{})
+		o.setInventorySlot(k, behavior.Item{})
 	}
 }

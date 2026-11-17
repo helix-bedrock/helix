@@ -162,7 +162,35 @@ func (m *Mob) armourPacket() *packet.MobArmourEquipment {
 	a, reg := &m.items.stacks, m.s.reg
 	return &packet.MobArmourEquipment{
 		EntityRuntimeID: m.m.RuntimeID(), Helmet: a[mob.EquipHead].networkShown(reg), Chestplate: a[mob.EquipChest].networkShown(reg),
-		Leggings: a[mob.EquipLegs].networkShown(reg), Boots: a[mob.EquipFeet].networkShown(reg), Body: a[mob.EquipBody].networkShown(reg),
+		Leggings: a[mob.EquipLegs].networkShown(reg), Boots: a[mob.EquipFeet].networkShown(reg), Body: m.bodyItem().networkShown(reg),
+	}
+}
+
+// bodyItem is what the mob shows in its body slot: its body equipment, else the first body
+// armour (registry BodyArmor) in its equip slots, as horse armour put in a horse's
+// inventory is drawn on the horse (BDS 1.26.60 MobArmorEquipment's Body, packet capture).
+func (m *Mob) bodyItem() ItemStack {
+	if st := m.items.stacks[mob.EquipBody]; !st.Empty() {
+		return st
+	}
+	inv := m.m.Inventory()
+	for k := range min(len(m.m.EquipSlots()), len(inv)) {
+		if inv[k].Empty() {
+			continue
+		}
+		if t, ok := m.s.reg.Items.ByName(inv[k].Name); ok && t.BodyArmor {
+			return realStack(inv[k])
+		}
+	}
+	return ItemStack{}
+}
+
+// setInventorySlot puts a stack in the mob's inventory slot, running its equip events, and
+// shows its body armour again when an equip slot changed.
+func (m *Mob) setInventorySlot(k int, it behavior.Item) {
+	m.m.SetInventorySlot(k, it)
+	if k < len(m.m.EquipSlots()) && m.entity != nil && m.entity.Region() != nil {
+		m.entity.Send(m.armourPacket())
 	}
 }
 
@@ -182,7 +210,7 @@ func (m *Mob) sendEquipment() {
 func (m *Mob) spawnEquipment(dst []packet.Packet) []packet.Packet {
 	a := &m.items.stacks
 	for _, slot := range []int{mob.EquipHead, mob.EquipChest, mob.EquipLegs, mob.EquipFeet, mob.EquipBody} {
-		if !a[slot].Empty() {
+		if !a[slot].Empty() || slot == mob.EquipBody && !m.bodyItem().Empty() {
 			dst = append(dst, m.armourPacket())
 			break
 		}

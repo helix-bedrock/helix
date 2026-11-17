@@ -151,6 +151,14 @@ func vanillaItems(s *Setup) error {
 	for _, name := range offhandList {
 		offhand[name] = true
 	}
+	bodyList, err := data.BodyArmor()
+	if err != nil {
+		return fmt.Errorf("registry: vanilla: %w", err)
+	}
+	body := make(map[string]bool, len(bodyList))
+	for _, name := range bodyList {
+		body[name] = true
+	}
 	info := make(map[string]int, len(list))
 	for i, it := range list {
 		info[it.Name] = i
@@ -166,6 +174,7 @@ func vanillaItems(s *Setup) error {
 		}
 		t.ArmorSlot, t.Wearable = armorSlots[e.Name]
 		t.Offhand = offhand[e.Name]
+		t.BodyArmor = body[e.Name]
 		if st, ok := storage[e.Name]; ok {
 			t.Storage, t.StorageWeight = st.rules, st.weight
 		}
