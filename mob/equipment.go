@@ -213,8 +213,28 @@ func (m *Mob) Variant() int32 {
 }
 
 func (m *Mob) Color() int32 {
+	// A dyed colour lives in the actor data, as BDS keeps it.
+	for _, d := range m.data {
+		if v, ok := d.Value.(int32); ok && d.Key == state.DataColor {
+			return v
+		}
+	}
 	v, _ := intComponent(m.inst.Components(), "minecraft:color")
 	return v
+}
+
+// Dyeable reports that the mob has minecraft:is_dyeable.
+func (m *Mob) Dyeable() bool { return m.states != nil && m.states.Dyeable != nil }
+
+// SetColor sets the mob's colour (actor data 3), as a dye does. Runs: the mob's region,
+// outside its think.
+func (m *Mob) SetColor(c int32) { m.setData(state.DataColor, c) }
+
+// RestoreColor is the colour a save holds: it wins over minecraft:color's value when the
+// loaded mob's components are first read, as BDS loads the saved actor data.
+func (m *Mob) RestoreColor(c int32) {
+	m.savedColor, m.hasSavedColor = c, true
+	m.setData(state.DataColor, c)
 }
 
 // BoolProperty is a bool property's value; ok is false without the property.

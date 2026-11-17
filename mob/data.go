@@ -31,7 +31,13 @@ func (m *Mob) setData(key int, v any) {
 }
 
 // SetIntData, SetFloatData and SetStringData are state.DataMob: the components' actor data.
-func (s stateMob) SetIntData(key int, v int32)     { s.setData(key, v) }
+func (s stateMob) SetIntData(key int, v int32) {
+	if key == state.DataColor && s.hasSavedColor {
+		// A loaded mob's saved colour (a dyed collar) wins over minecraft:color once.
+		v, s.hasSavedColor = s.savedColor, false
+	}
+	s.setData(key, v)
+}
 func (s stateMob) SetFloatData(key int, v float32) { s.setData(key, v) }
 func (s stateMob) SetStringData(key int, v string) { s.setData(key, v) }
 

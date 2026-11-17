@@ -296,6 +296,9 @@ func (s *Host) loadMob(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity, ty
 			o.m.SetFlag(k.flag, true)
 		}
 	}
+	if c, has := saved.Data["Color"].(uint8); has {
+		o.m.RestoreColor(int32(c))
+	}
 	if id, has := saved.Data[mobKeyOwner].(int64); has && behavior.ID(id) != behavior.NoID {
 		o.m.SetOwner(behavior.ID(id))
 	}

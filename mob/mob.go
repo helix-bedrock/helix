@@ -325,6 +325,10 @@ type Mob struct {
 	// standTime is the horse's HorseStandCounterComponent: 1 when it rears up, counted
 	// on until the stand ends.
 	standTime int32
+	// savedColor is a loaded mob's saved colour, used once when its minecraft:color is
+	// first applied (RestoreColor).
+	savedColor    int32
+	hasSavedColor bool
 	// wolf is a wolf's wet and shake state (wolf.go).
 	wolf wolfShake
 	// strength and strengthMax are minecraft:strength's (horse.go).
@@ -581,6 +585,8 @@ func (m *Mob) think() (remove bool) {
 // navigation, movement, attributes and size.
 func (m *Mob) refresh() {
 	m.inst.Refresh(m.tester(nil), m.rebuild)
+	// A saved colour counts only for the components the mob loaded with.
+	m.hasSavedColor = false
 	m.flagsChanged()
 }
 
