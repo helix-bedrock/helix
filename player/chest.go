@@ -1085,11 +1085,18 @@ func (p *Player) tickChest() {
 	}
 	// Checked first, since only then may the cart be read: BDS measures to the middle of the
 	// block a cart is in (0xBC30280).
+	// A horse window has no chest behind it: the mob holds its slots.
 	gone := p.windowChest(r) == nil
+	if p.window.horse != nil {
+		gone = !p.horseLive(r)
+	}
 	if !gone {
 		at := p.window.pos
 		if m := p.window.cart; m != nil {
 			at = floorPos(m.entity.Position())
+		}
+		if o := p.window.horse; o != nil {
+			at = floorPos(o.entity.Position())
 		}
 		if b := p.window.boat; b != nil {
 			at = floorPos(b.entity.Position())
