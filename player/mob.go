@@ -26,9 +26,20 @@ import (
 // in naturalspawn.go, monster spawners in spawner.go, despawning in mob/despawn.go. Mobs are
 // still hurt outside the Hit pipeline (no armour, no HitEvent).
 
+// topSupport is canProvideSupport on a block's top face, which a teleporting mob stands
+// on: the attach table's answer, or blocking motion before it is loaded.
+func (s *Host) topSupport(id uint32) bool {
+	if s.attach == nil {
+		return s.reg.Blocks.Properties(id).SolidMaterial
+	}
+	return s.attach.Supports(id, cube.FaceUp)
+}
+
 // setUpMobs reads every entity definition the mob runtime can run, at boot.
 func (s *Host) setUpMobs() {
-	s.mobs = mob.NewRuntime(mob.NewBlocks(s.reg.Blocks), s, s.log)
+	blocks := mob.NewBlocks(s.reg.Blocks)
+	blocks.SetTopSupport(s.topSupport)
+	s.mobs = mob.NewRuntime(blocks, s, s.log)
 	s.mobs.ItemRules = itemRules{s}
 	for _, t := range s.reg.EntityTypes.All() {
 		if t.Name == registry.Player || len(t.Definition) == 0 {

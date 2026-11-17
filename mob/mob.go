@@ -342,6 +342,10 @@ type Mob struct {
 	transforming bool
 	blast        state.Explosion
 	noActionTime int32
+	// hijackable is CanBeHijackedByPassengerComponent, which mount_pathing adds while it
+	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
+	// (actions.go). Neither is read by Helix yet.
+	hijackable, persistSit bool
 	// data is the actor data the components wrote (data.go).
 	data []DataValue
 	// scale is minecraft:scale's value, the size the client draws the mob at (a rabbit 0.6,

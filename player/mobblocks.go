@@ -26,6 +26,10 @@ func (s *Host) MayPlace(r *world.Region, p behavior.Pos, block string) bool {
 		return false
 	}
 	pos := cube.Pos{int(p.X), int(p.Y), int(p.Z)}
+	if s.reg.Blocks.Name(id) == nameSnowLayer && s.falling != nil && !s.falling.SnowSurvives(r, pos) {
+		// TopSnowBlock's mayPlace is its survive check (the snow golem's trail).
+		return false
+	}
 	if !s.attach.MayPlace(r, pos, id, cube.FaceUp) {
 		return false
 	}

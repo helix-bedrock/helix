@@ -47,8 +47,8 @@ func (m *Mob) creeperTick() {
 }
 
 // stateActions are the state components' hands (state.Actions). What they do to anything
-// but the mob is queued for Apply. Only explosions reach the engine so far: hurting others,
-// effects, teleports, placed blocks and spawned entities are refused or dropped.
+// but the mob is queued for Apply. Teleports, trail blocks and spawn_entity are in
+// actions.go; hurting others is not built yet.
 type stateActions struct{ m *Mob }
 
 // Hurt hurts the mob itself; other targets are not hurt yet.
@@ -58,20 +58,11 @@ func (a stateActions) Hurt(target behavior.Actor, _ behavior.ID, cause int, amou
 	}
 }
 
-// Teleport is refused: TeleportComponent's search is not built.
-func (stateActions) Teleport(behavior.Vec3) bool { return false }
-
-// PlaceBlock is refused: trails are not built.
-func (stateActions) PlaceBlock(behavior.Pos, string) bool { return false }
-
 // Explode queues the explosion for Apply. A mob explodes at most once (it despawns).
 func (a stateActions) Explode(at behavior.Vec3, e state.Explosion) {
 	a.m.blast = e
 	a.m.do(op{kind: opExplode, at: at})
 }
-
-// Spawn does nothing yet: spawn_entity is not built.
-func (stateActions) Spawn(state.SpawnEntry) {}
 
 // TNTExplodes is the tntexplodes game rule.
 func (a stateActions) TNTExplodes() bool { return a.m.rt.Env.TNTExplodes() }

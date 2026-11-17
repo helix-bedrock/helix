@@ -241,11 +241,37 @@ func (s stateMob) SetAirSupply(air, maxAir int16) {
 	s.flagsChanged()
 }
 
-func (stateMob) Particles(int, int)                           {}
-func (stateMob) SlotEmpty(string) bool                        { return true }
-func (stateMob) Respiration() int32                           { return 0 }
-func (stateMob) StopRiding()                                  {}
-func (stateMob) GameEvent(string, behavior.ID, behavior.Vec3) {}
+// Particles is ActorParticles::spawnParticlesInArea, which the server never sends: BDS
+// 1.26.60's taming (0x716FF50) and love only broadcast their actor events (7, 21) and the
+// client draws the hearts from those.
+func (stateMob) Particles(int, int) {}
+
+// SlotEmpty reports nothing in the equipment slot with the name ("slot.armor.head"); an
+// unknown name reads as empty.
+func (s stateMob) SlotEmpty(slot string) bool {
+	i, ok := EquipSlotByName(slot)
+	return !ok || s.Equipment(i).Empty()
+}
+
+// Respiration is the highest Respiration level of the worn armour, from the engine that
+// keeps the enchantments.
+func (s stateMob) Respiration() int32 {
+	if h, ok := s.hooks.(ArmorEnchantHooks); ok {
+		return h.Respiration(s.Mob)
+	}
+	return 0
+}
+
+// StopRiding takes the mob off its vehicle at Apply.
+func (s stateMob) StopRiding() { s.GiveUpRiding() }
+
+// GameEvent posts the game event with the BDS name at p, at Apply. The source is always the
+// mob itself here.
+func (s stateMob) GameEvent(name string, _ behavior.ID, p behavior.Vec3) {
+	if name != "" {
+		s.postGameEvent(name, p)
+	}
+}
 
 // blockOf is the block a position is in.
 func blockOf(v behavior.Vec3) behavior.Pos {

@@ -64,7 +64,3 @@ func (m *Mob) SetSpellColor(argb int32) { m.setData(dataSpellColor, argb) }
 func (m *Mob) RoarHurt(a behavior.Actor, damage float32) {
 	m.do(op{kind: opHurtBy, id: a.ID(), n: damageRoar, amount: damage})
 }
-
-// RoarGameEvent implements behavior.Roarer. Helix's game events come from players only, so
-// none is posted.
-func (m *Mob) RoarGameEvent(behavior.Vec3) {}

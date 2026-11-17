@@ -4,6 +4,7 @@ import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/definition"
 	"github.com/helix-bedrock/entity/path"
+	"github.com/helix-bedrock/entity/state"
 	"github.com/helix-bedrock/helix/effect"
 )
 
@@ -70,6 +71,10 @@ const (
 	opStopRiding
 	opEjectRiders
 	opAddRiders
+	opTeleport
+	opSpawnEntry
+	opGameEvent
+	opPlaceBlock
 )
 
 // ShowHooks is what an engine that shows a mob's hand item for trade_interest implements on
@@ -100,6 +105,8 @@ type op struct {
 	mingle behavior.MingleState
 	// effect is the effect of opGiveEffect, its ID in n or by its name.
 	effect effect.Instance
+	// spawn is the minecraft:spawn_entity entry of opSpawnEntry.
+	spawn *state.SpawnEntry
 }
 
 // do runs o now, or queues it for Apply while the mob thinks.
@@ -255,6 +262,8 @@ func (m *Mob) run(o op) {
 		m.runEffectOp(&o)
 	case opStartRiding, opStopRiding, opEjectRiders, opAddRiders:
 		m.runRideOp(&o)
+	case opTeleport, opSpawnEntry, opGameEvent, opPlaceBlock:
+		m.runActionOp(&o)
 	case opMobEvent:
 		if t := env.Mob(r, o.id); t != nil {
 			t.v.r = r

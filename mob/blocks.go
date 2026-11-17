@@ -25,6 +25,22 @@ type Blocks struct {
 	// wall is what a cell of a border column reads as: the barrier, a solid block of one
 	// whole box. BDS walls the column off for actors without IgnoresBorderCollisions.
 	wall uint32
+	// topSupport is BlockLegacy::canProvideSupport(block, up, Any) as the engine answers it
+	// (SetTopSupport); nil falls back to blocking motion.
+	topSupport func(id uint32) bool
+}
+
+// SetTopSupport gives the engine's answer to whether a block holds things on its top face
+// (BDS's canProvideSupport, face up, support type Any), which a teleport stands on. Set it
+// before any mob ticks; it is read from any region.
+func (b *Blocks) SetTopSupport(fn func(id uint32) bool) { b.topSupport = fn }
+
+// TopSupport reports that the block holds things on its top face.
+func (b *Blocks) TopSupport(id uint32) bool {
+	if b.topSupport != nil {
+		return b.topSupport(id)
+	}
+	return b.Goal(id).BlocksMotion
 }
 
 // The BDS material types the tables test (MaterialType numbers, as the registry keeps them).

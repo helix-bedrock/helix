@@ -133,7 +133,6 @@ func (m *Mob) WeakenNextJump()                      { m.body.Jump.Pending = true
 func (m *Mob) ClientPredictedVehicle() bool   { return false }
 func (m *Mob) HeardVibration() (uint64, bool) { return 0, false }
 func (m *Mob) SetPersistent()                 { m.persistent = true }
-func (m *Mob) CanSit() bool                   { return false }
 func (m *Mob) OnGround() bool                 { return m.body.OnGround }
 func (m *Mob) OnFire() bool                   { return m.fireTicks > 0 }
 func (m *Mob) Velocity() behavior.Vec3        { return m.body.Vel }
@@ -141,10 +140,7 @@ func (m *Mob) SetVelocity(v behavior.Vec3) {
 	m.traceVel("set", v)
 	m.body.Vel = v
 }
-func (m *Mob) SetHijackable(bool)                 {}
 func (m *Mob) NoActionTime() int32                { return m.noActionTime }
-func (m *Mob) ResetFlock()                        {}
-func (m *Mob) SetPersistSit(bool)                 {}
 func (m *Mob) HelmetEmpty() bool                  { return true }
 func (m *Mob) Speed() float32                     { return m.speed }
 func (m *Mob) UnderwaterSpeed() float32           { return m.underwaterSpeed }
@@ -252,9 +248,6 @@ func (m *Mob) Attack(a behavior.Actor, then behavior.AttackResult) {
 
 // ActorEvent sends an actor event about the mob; the eat goal's head-down animation.
 func (m *Mob) ActorEvent(id, _ int32) { m.do(op{kind: opActorEvent, n: id}) }
-
-// EatGameEvent would post the eat game event; game events (vibrations) are not built.
-func (m *Mob) EatGameEvent(behavior.Vec3) {}
 
 // standProbe is how far under its box BDS looks for what a mob stands on.
 const standProbe = 0.2
