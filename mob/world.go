@@ -150,7 +150,7 @@ func cells(b path.Box, fn func(p path.Pos) bool) {
 type pathWorld struct{ *view }
 
 func (w pathWorld) Block(p path.Pos) path.Block  { return path.Block(w.block(p, 0)) }
-func (w pathWorld) Liquid(p path.Pos) path.Block { return path.Block(w.block(p, 1)) }
+func (w pathWorld) Liquid(p path.Pos) path.Block { return path.Block(w.liquid(p)) }
 func (w pathWorld) Info(b path.Block) *path.BlockInfo {
 	return w.blocks.Path(uint32(b))
 }
@@ -356,7 +356,7 @@ const netherID = 1
 
 func (w goalWorld) Block(p behavior.Pos) behavior.Block { return w.blocks.Goal(w.block(p, 0)) }
 func (w goalWorld) LiquidMaterial(p behavior.Pos) path.Material {
-	return w.blocks.Path(w.block(p, 1)).Material
+	return w.blocks.Path(w.liquid(p)).Material
 }
 func (w goalWorld) ClearLine(a, b behavior.Vec3) bool { _, hit := w.clip(a, b); return !hit }
 func (w goalWorld) Clip(a, b behavior.Vec3) (behavior.Vec3, bool) {

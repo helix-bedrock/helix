@@ -802,26 +802,34 @@ func (m *Mob) moveControl() {
 	m.flags = b.Flags
 }
 
-// lookControl turns the head toward what a goal looks at, else back to the body.
+// lookControl is LookControl::tick (BDS 1.26.60 0xBFBF1E0): the head turns toward what a
+// goal looks at, or to the rotation a control asked for; with neither, the pitch goes back
+// to level and the head to the body, 10 degrees a tick. The head then stays within 75
+// degrees of the body.
 func (m *Mob) lookControl() {
-	if m.look.Has {
+	switch {
+	case m.look.Has:
 		d := path.Vec3{X: m.look.Pos.X - m.body.Pos.X, Y: m.look.Pos.Y - (m.body.Pos.Y + m.eyeHeight()), Z: m.look.Pos.Z - m.body.Pos.Z}
 		yaw := float32(math.Atan2(float64(d.Z), float64(d.X)))*180/math.Pi - 90
 		h := float32(math.Sqrt(float64(d.X*d.X + d.Z*d.Z)))
 		pitch := -float32(math.Atan2(float64(d.Y), float64(h))) * 180 / math.Pi
-		m.headYaw = approach(m.headYaw, yaw, m.look.YawSpeed)
 		m.pitch = approach(m.pitch, pitch, m.look.PitchSpeed)
+		m.headYaw = approach(m.headYaw, yaw, m.look.YawSpeed)
 		m.look.Has = false
-		return
-	}
-	if m.look.HasYaw {
-		m.headYaw = approach(m.headYaw, m.look.Yaw, m.look.YawSpeed)
+	case m.look.HasYaw:
 		m.pitch = approach(m.pitch, m.look.Pitch, m.look.PitchSpeed)
+		m.headYaw = approach(m.headYaw, m.look.Yaw, m.look.YawSpeed)
 		m.look.HasYaw = false
-		return
+	default:
+		m.pitch = approach(m.pitch, 0, lookReset)
+		m.headYaw = approach(m.headYaw, m.bodyYaw, lookReset)
 	}
-	m.headYaw = approach(m.headYaw, m.bodyYaw, 10)
+	m.headYaw = clampAround(m.headYaw, m.bodyYaw, bodyMaxTurn)
 }
+
+// lookReset is how far, in degrees a tick, the look control turns the head back when
+// nothing is looked at.
+const lookReset = 10
 
 // bodyControl turns the body: with the movement while it moves, else within reach of the
 // head.
