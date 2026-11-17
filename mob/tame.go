@@ -154,3 +154,37 @@ func (s stateMob) DropItem(item string) bool {
 	s.Mob.DropItem(behavior.Item{Name: name, Count: 1})
 	return true
 }
+
+// Bribe is a player bribing a mob with minecraft:bribeable one of its bribe_items, as BDS
+// 1.26.60's BribeableComponent (getInteraction 0x7375240, callback 0x7404580): offered while
+// the bribe time and the cooldown are over; a mob not yet bribed gets the bribe time and
+// the treasure flag. The engine shows the eating (Actor::feed) and uses up the item. Runs:
+// the mob's region.
+func (m *Mob) Bribe(h state.Hand) bool {
+	if m.states == nil || m.states.Bribeable == nil || m.stateEnv.Self == nil || m.Dead() {
+		return false
+	}
+	b := m.states.Bribeable
+	if !b.Takes(h) {
+		return false
+	}
+	b.Bribe(stateMob{m})
+	return true
+}
+
+// Give is a player giving a mob with minecraft:giveable the item in hand, as BDS 1.26.60's
+// GiveableComponent (getInteraction 0x7265080, callback 0x734AF40): the first trigger not
+// cooling down that takes the item, when the inventory has room; one of the item (no aux,
+// no user data) goes into the inventory and on_give fires. The engine uses up the item.
+// BDS adds the item before on_give; here on_give runs first. Runs: the mob's region.
+func (m *Mob) Give(player behavior.Actor, name string) bool {
+	if m.states == nil || m.states.Giveable == nil || m.stateEnv.Self == nil || m.Dead() || m.items.Inventory == nil {
+		return false
+	}
+	it := behavior.Item{Name: name, Count: 1}
+	if m.states.Giveable.Give(&m.stateEnv, player, HeldItem{Name: name}, m.inv.CanAdd(it)) < 0 {
+		return false
+	}
+	m.inv.Add(it)
+	return true
+}

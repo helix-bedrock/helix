@@ -100,12 +100,12 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 
 // mobInteractions are the components' interactions after minecraft:interact, in BDS
 // 1.26.60's PlayerInteractionSystem order (mob/tame.go): bucketable, tameable, trusting,
-// ageable, healable and breedable, leashable, nameable, tamemount, rideable, sittable, then
-// trading. The first that applies wins.
+// ageable, healable and breedable, bribeable, leashable, nameable, tamemount, rideable,
+// sittable, trading, giveable, then the open inventory. The first that applies wins.
 func (p *Player) mobInteractions(r *world.Region, o *Mob) {
-	_ = p.bucketMob(r, o) || p.tameMob(o) || p.trustMob(o) || p.feedMob(o) || p.leashMob(o) ||
-		p.nameMob(o) || p.feedMount(o) || p.mountMob(o) || p.sitMob(o) || p.openTrade(r, o) ||
-		p.mayOpenMob(o)
+	_ = p.bucketMob(r, o) || p.tameMob(o) || p.trustMob(o) || p.feedMob(o) || p.bribeMob(o) ||
+		p.leashMob(o) || p.nameMob(o) || p.feedMount(o) || p.mountMob(o) || p.sitMob(o) ||
+		p.openTrade(r, o) || p.giveMob(o) || p.mayOpenMob(o)
 }
 
 // runInteraction does the item work of a minecraft:interact that applied: spawn_items,
