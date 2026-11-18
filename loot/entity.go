@@ -69,6 +69,10 @@ type Drop struct {
 	// enchant_with_levels), Treasure letting treasure enchantments in; 0 for none.
 	EnchantLevel int32
 	Treasure     bool
+	// EnchantDraw enchants the item even at EnchantLevel 0 (enchant_randomly, whose level
+	// can be 0), and EnchantBonus is added to the item's enchantability for the draw.
+	EnchantDraw  bool
+	EnchantBonus int32
 	// Enchants are specific enchantments by name and level.
 	Enchants []Enchant
 	// Smelt is set when furnace_smelt applied: the engine smelts the item.
@@ -438,6 +442,9 @@ func (k *condition) difficultyChance(d int32) float32 {
 	return pick(k.Hard)
 }
 
+// enchantRandomlyLevels is how many levels enchant_randomly draws its level from, BDS's value.
+const enchantRandomlyLevels = 30
+
 // function is one loot function.
 type function struct {
 	Function   string          `json:"function"`
@@ -494,6 +501,15 @@ func (f *function) apply(d *Drop, c *EntityContext) {
 	case "enchant_with_levels":
 		d.EnchantLevel = randomFloatInt(f.Levels, c.Random)
 		d.Treasure = f.Treasure
+	case "enchant_randomly":
+		// BDS: a draw at a random level under 30. Its treasure flag never lets treasure
+		// enchantments in: BDS passes it as 1 extra enchantability.
+		d.EnchantDraw = true
+		d.EnchantLevel = c.Random.Intn(enchantRandomlyLevels)
+		d.EnchantBonus = 0
+		if f.Treasure {
+			d.EnchantBonus = 1
+		}
 	case "specific_enchants":
 		for _, e := range f.Enchants {
 			d.Enchants = append(d.Enchants, Enchant{ID: e.ID, Level: randomFloatInt(e.Level, c.Random)})

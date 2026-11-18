@@ -256,8 +256,8 @@ func (s *Host) lootStacks(d loot.Drop) []ItemStack {
 			it = withDamage(it, int32(math.Floor(float64((1-d.Damage)*float32(most)))))
 		}
 	}
-	if d.EnchantLevel > 0 {
-		it = s.EnchantItem(it, d.EnchantLevel, 0, d.Treasure)
+	if d.EnchantLevel > 0 || d.EnchantDraw {
+		it = s.EnchantItem(it, d.EnchantLevel, d.EnchantBonus, d.Treasure)
 	}
 	for _, e := range d.Enchants {
 		if id, ok := s.enchantByName(e.ID); ok {
