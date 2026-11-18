@@ -38,6 +38,7 @@ type Vanilla struct {
 
 var (
 	_ world.ColumnGenerator = (*Vanilla)(nil)
+	_ world.SpawnFinder     = (*Vanilla)(nil)
 	_ world.Spawner         = (*Vanilla)(nil)
 	_ world.MobGenerator    = (*Vanilla)(nil)
 )
@@ -203,3 +204,7 @@ func (v *Vanilla) SpawnHeight(x, z int32) int32 {
 func (v *Vanilla) Temperature(biome uint32, x, y, z int32) float32 {
 	return v.gen.Temperature(biome, x, y, z)
 }
+
+// FindSpawn is the column a new world spawns at, found from the climate as BDS's
+// overworld finds it: inland, away from rivers, near 0, 0.
+func (v *Vanilla) FindSpawn() (x, z int32) { return v.gen.SpawnPosition() }

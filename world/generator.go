@@ -84,6 +84,13 @@ type Spawner interface {
 	SpawnHeight(x, z int32) int32
 }
 
+// SpawnFinder is a Generator that picks a new world's spawn column, as BDS's
+// generators do when a world is made. Worlds made with a generator that is not
+// one spawn at 0, 0.
+type SpawnFinder interface {
+	FindSpawn() (x, z int32)
+}
+
 // Empty generates nothing: every chunk stays air. It is BDS's void world.
 type Empty struct{}
 

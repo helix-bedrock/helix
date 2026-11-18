@@ -78,7 +78,7 @@ func (s *Server) openWorld() error {
 	s.ticker.SetPanicHandler(s.panicked)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
 	s.clock = daytime.NewClock(s.ticker.CurrentTick, int32(min(ldat.Time, math.MaxInt32)), ldat.DoDayLightCycle) //nolint:gosec // capped
-	if err := s.openOverworld(worldType, gt, ldat.RandomSeed, ldat.FlatWorldLayers, ldat.RandomTickSpeed, ldat.DoFireTick); err != nil {
+	if err := s.openOverworld(worldType, gt, ldat.RandomSeed, ldat.FlatWorldLayers, ldat.RandomTickSpeed, ldat.DoFireTick, isNew); err != nil {
 		s.ticker.Close()
 		_ = db.Close()
 		return fmt.Errorf("helix: open world %q: %w", dir, err)
@@ -89,7 +89,7 @@ func (s *Server) openWorld() error {
 	if s.farm != nil {
 		s.farm.SetClock(s.clock)
 	}
-	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew, "type", worldType, "seed", ldat.RandomSeed)
+	s.log.Info("World opened", "dir", dir, "name", s.level.Name, "new", isNew, "type", worldType, "seed", ldat.RandomSeed, "spawn", [2]int32{ldat.SpawnX, ldat.SpawnZ})
 	return nil
 }
 
@@ -173,7 +173,7 @@ func (s *Server) worldType(level int32, isNew bool) (string, generator.Type, err
 }
 
 // openOverworld starts the overworld with the world type's generator.
-func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, flatLayers string, randomTickSpeed int32, doFireTick bool) error {
+func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, flatLayers string, randomTickSpeed int32, doFireTick, isNew bool) error {
 	conf := world.DefaultConfig()
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
@@ -205,6 +205,9 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 			return fmt.Errorf("world type %s: %w", typeName, err)
 		}
 		conf.Generator = g
+	}
+	if isNew {
+		s.findSpawn(conf.Generator)
 	}
 	s.findSurface(conf.Generator, r)
 	if s.farm != nil {
@@ -268,6 +271,19 @@ func (s *Server) vanillaTicker(doFireTick bool) (*circuit.Ticker, error) {
 	s.farm.SetPower(circuits.Powered)
 	s.circuits = circuits
 	return circuits, nil
+}
+
+// findSpawn puts a new world's spawn on the column its generator picks, kept in
+// level.dat; the height stays "find the surface", as BDS leaves it.
+func (s *Server) findSpawn(gen world.Generator) {
+	f, ok := gen.(world.SpawnFinder)
+	if !ok {
+		return
+	}
+	x, z := f.FindSpawn()
+	ldat := s.db.LevelDat()
+	ldat.SpawnX, ldat.SpawnZ = x, z
+	s.level.Spawn[0], s.level.Spawn[2] = x, z
 }
 
 // findSurface sets the level's surface, where players stand while the spawn has no
