@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/player"
@@ -23,6 +24,15 @@ const (
 	rocketTicks = 30
 	// regenerationPotion is the potion ID of Regeneration, the clouds' potion.
 	regenerationPotion = 28
+	// cloudBombSize is the cloudbomb scenario's loaded square: 32 blocks, four chunks, so
+	// every cloud shares its chunks with thousands of others, as /cloudbomb drops them.
+	cloudBombSize = 32
+	// cloudBombCows is how many cows wander among the clouds, so every cloud has players or
+	// mobs to look for and touch.
+	cloudBombCows = 50
+	// cloudBombTicks is how long the bomb's clouds last: past any warmup and measure, so
+	// none runs out while measured.
+	cloudBombTicks = 20 * 60 * 20
 )
 
 // itemKinds are the items the item scenario drops, taken in turn so neighbours differ and
@@ -49,6 +59,7 @@ func loadScenarios() []Scenario {
 		{Name: "fireworks", About: "firework rockets launched all the time, about n in the air", Unit: "rockets", Tick: tickFireworks},
 		{Name: "mobs", About: "cows wandering the area", Unit: "cows", Start: startMobs},
 		{Name: "clouds", About: "lingering Regeneration clouds (no players to touch, so only their own tick)", Unit: "clouds", Start: startClouds},
+		{Name: "cloudbomb", About: "lingering clouds packed into four chunks with 50 cows among them, as /cloudbomb drops them; the clouds never shrink or run out", Unit: "clouds", Size: cloudBombSize, Start: startCloudBomb},
 		{Name: "redstone", About: "observer clocks (two observers facing each other) each driving a line of redstone dust", Unit: "clocks", Size: redstoneSize, Start: startClocks},
 		{Name: "chests", About: "sticky pistons pushing and pulling chests full of items with 2 KB of lore each", Unit: "chests", Size: redstoneSize, Start: startChests, Tick: tickChests},
 	}
@@ -143,6 +154,32 @@ func startClouds(_ context.Context, w *World, n int) error {
 	}
 	for range n {
 		w.Host.SpawnCloud(w.Dim, w.RandomSpot(0), regenerationPotion, *spec.Cloud, nil)
+	}
+	return nil
+}
+
+// startCloudBomb fills the area with n lingering Regeneration clouds on an even grid, as
+// /cloudbomb does, and lets cloudBombCows cows loose among them. The clouds keep their size
+// and last cloudBombTicks, the worst case of a lingering cloud: every cow they touch takes
+// nothing from them, so the load stays the same from start to end.
+func startCloudBomb(_ context.Context, w *World, n int) error {
+	spec, ok := w.Host.ProjectileSpec("minecraft:lingering_potion")
+	if !ok || spec.Cloud == nil {
+		return fmt.Errorf("sim: lingering potions leave no cloud")
+	}
+	cloud := *spec.Cloud
+	cloud.Duration, cloud.RadiusOnUse = cloudBombTicks, 0
+	x0, z0, _, _ := w.Area()
+	side := int(math.Ceil(math.Sqrt(float64(max(n, 1)))))
+	step := float32(w.size) / float32(side)
+	for i := range n {
+		pos := mgl32.Vec3{float32(x0) + (float32(i%side)+0.5)*step, w.Surface(), float32(z0) + (float32(i/side)+0.5)*step}
+		w.Host.SpawnCloud(w.Dim, pos, regenerationPotion, cloud, nil)
+	}
+	for range cloudBombCows {
+		if _, ok := w.Host.SpawnMob(w.Dim, "minecraft:cow", w.RandomSpot(0), w.Rand.Float32()*360); !ok {
+			return errors.New("sim: cows cannot be spawned")
+		}
 	}
 	return nil
 }

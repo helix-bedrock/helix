@@ -38,6 +38,7 @@ type options struct {
 	scenario, counts, jsonPath string
 	list                       bool
 	logLevel, memProfile       string
+	cpuProfile                 string
 	size                       int
 	conf                       sim.Config
 }
@@ -55,6 +56,7 @@ func parseFlags() options {
 	flag.DurationVar(&o.conf.Warmup, "warmup", sim.DefaultWarmup, "how long the load runs before measuring")
 	flag.DurationVar(&o.conf.Measure, "measure", sim.DefaultMeasure, "how long the load is measured")
 	flag.StringVar(&o.logLevel, "log", "error", "server log level: debug, info, warn or error")
+	flag.StringVar(&o.cpuProfile, "cpuprofile", "", "write a CPU profile of the whole run (every count, server start included) to this path")
 	flag.StringVar(&o.memProfile, "memprofile", "", "write a heap profile at the end of each run to this path, with scenario and n added")
 	flag.Parse()
 	if o.memProfile != "" {
@@ -82,6 +84,13 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if o.cpuProfile != "" {
+		end, err := startCPUProfile(o.cpuProfile)
+		if err != nil {
+			return err
+		}
+		defer end()
+	}
 	var all []sim.Report
 	for _, sc := range scenarios {
 		fmt.Fprintf(os.Stderr, "running %s for n=%s...\n", sc.Name, o.counts)
@@ -92,6 +101,22 @@ func run() error {
 		}
 	}
 	return writeResults(all, o.jsonPath)
+}
+
+// startCPUProfile starts a CPU profile into path; the func it returns ends it.
+func startCPUProfile(path string) (func(), error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return func() {
+		pprof.StopCPUProfile()
+		_ = f.Close()
+	}, nil
 }
 
 // heapProfile writes a heap profile per run to path with the scenario and count added.
