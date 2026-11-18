@@ -2,6 +2,7 @@ package player
 
 import (
 	"maps"
+	"math"
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -117,7 +118,14 @@ func (t *Projectile) spawnCloud(r *world.Region, at mgl32.Vec3) {
 		t.splashShow(r, at, waterColour, false)
 		return
 	}
-	c := t.s.SpawnCloud(r.Dimension(), at, t.potion, *t.spec.Cloud, t.owner)
+	// BDS spawns the cloud at the centre of the block the potion hit in (captured from BDS
+	// 1.26.60: a splash at (-55.94, 118.0, -255.1) left its cloud at (-55.5, 118.5, -255.5)).
+	centre := mgl32.Vec3{
+		float32(math.Floor(float64(at[0]))) + 0.5,
+		float32(math.Floor(float64(at[1]))) + 0.5,
+		float32(math.Floor(float64(at[2]))) + 0.5,
+	}
+	c := t.s.SpawnCloud(r.Dimension(), centre, t.potion, *t.spec.Cloud, t.owner)
 	t.splashShow(r, at, c.colour, false)
 }
 
