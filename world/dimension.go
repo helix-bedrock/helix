@@ -109,7 +109,8 @@ type Config struct {
 	// before a crowded region spreads it over idle cores; 0 means DefaultParallelMin.
 	ParallelMin int
 	// ParallelHelpers is how many goroutines at most help one region's phase besides its
-	// own; 0 means DefaultParallelHelpers and below 0 keeps every region on one core.
+	// own; 0 means one per core besides the region's (DefaultParallelHelpers) and below 0
+	// keeps every region on one core.
 	ParallelHelpers int
 }
 
@@ -295,7 +296,7 @@ func New(conf Config) (*Dimension, error) {
 		pmin = DefaultParallelMin
 	}
 	if helpers == 0 {
-		helpers = DefaultParallelHelpers
+		helpers = defaultParallelHelpers()
 	}
 	d.SetParallel(pmin, helpers)
 	d.idle = sync.NewCond(&d.mu)

@@ -388,6 +388,8 @@ type Mob struct {
 	flagsDirty bool
 	ops        []op
 	snap       Snapshot
+	// onBox is told the snapshot's box each time it is taken (SetBoxListener).
+	onBox func(behavior.Box)
 
 	v view
 }

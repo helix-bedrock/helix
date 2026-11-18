@@ -332,6 +332,16 @@ type Snapshot struct {
 	rideFamilies []string
 }
 
+// SetBoxListener has fn told the mob's box each time its snapshot is taken, and once now, so
+// the engine can keep a copy for its area searches. Nil stops it. Runs: owner, not while the
+// mob thinks.
+func (m *Mob) SetBoxListener(fn func(behavior.Box)) {
+	m.onBox = fn
+	if fn != nil {
+		fn(m.snap.box)
+	}
+}
+
 // Snapshot returns the mob as others see it this tick.
 func (m *Mob) Snapshot() *Snapshot { return &m.snap }
 
@@ -341,6 +351,9 @@ func (m *Mob) snapshot() {
 	s.mob = m
 	s.id, s.typ = m.id, m.typ
 	s.pos, s.eyes, s.box = m.body.Pos, m.Eyes(), m.body.Box
+	if m.onBox != nil {
+		m.onBox(s.box)
+	}
 	s.vel, s.prevPos = m.body.Vel, m.body.PrevPos
 	s.mingle, s.hasMingle = m.mingle, m.hasMingle
 	s.alive = !m.Dead()

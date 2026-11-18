@@ -39,6 +39,12 @@ type Entity struct {
 	chunk    mcdb.ChunkPos
 	moved    bool
 	gone     bool
+	// box is the actor's box as its owner last set it (SetActorBox). actors is the chunk
+	// list it is in and slot its place there, where a copy of box is kept with the others'
+	// for AppendActorsTouching; nil while it is in none.
+	box    actorBox
+	actors *actorList
+	slot   int
 	// frozen is set for this tick when the entity's chunk is not ticking: it neither thinks
 	// nor takes input (tickEntities).
 	frozen bool
@@ -309,6 +315,16 @@ func (e *Entity) Position() mgl32.Vec3 { return e.pos }
 // Chunk returns the chunk the entity is kept and saved in. Runs: owner.
 func (e *Entity) Chunk() mcdb.ChunkPos { return e.chunk }
 
+// SetActorBox sets the box the entity's owner gives for it as an actor, min and max corners,
+// for AppendActorsTouching. The owner must set it again each time that box changes, or the
+// search misses the entity. Runs: owner, not in a Parallel phase.
+func (e *Entity) SetActorBox(minimum, maximum mgl32.Vec3) {
+	e.box = actorBox{lo: minimum, hi: maximum, set: true}
+	if e.actors != nil {
+		e.actors.boxes[e.slot] = e.box
+	}
+}
+
 // Rotation returns the entity's rotation. Runs: owner.
 func (e *Entity) Rotation() Rotation { return e.rot }
 
@@ -430,7 +446,58 @@ func byRuntimeID(a, b *Entity) int { return cmp.Compare(a.conf.RuntimeID, b.conf
 func (r *Region) unindex(e *Entity) {
 	dropFrom(r.byChunk, e.chunk, e)
 	if e.conf.Actor {
-		dropFrom(r.actorsByChunk, e.chunk, e)
+		r.dropActor(e)
+	}
+}
+
+// actorList is a chunk's actors in order, with each one's box (SetActorBox) kept beside it
+// in one flat slice, so a search reads boxes without visiting the entities.
+type actorList struct {
+	ents  []*Entity
+	boxes []actorBox
+}
+
+// actorBox is an actor's box as its owner set it; set is false until it has.
+type actorBox struct {
+	lo, hi mgl32.Vec3
+	set    bool
+}
+
+// misses reports that b is set and does not overlap minimum to maximum, edges touching
+// not counted.
+func (b *actorBox) misses(minimum, maximum mgl32.Vec3) bool {
+	return b.set && (b.lo[0] >= maximum[0] || b.hi[0] <= minimum[0] || b.lo[1] >= maximum[1] || b.hi[1] <= minimum[1] ||
+		b.lo[2] >= maximum[2] || b.hi[2] <= minimum[2])
+}
+
+// addActor puts e at the end of its chunk's actor list.
+func (r *Region) addActor(e *Entity) {
+	l := r.actorsByChunk[e.chunk]
+	if l == nil {
+		l = &actorList{}
+		r.actorsByChunk[e.chunk] = l
+	}
+	e.actors, e.slot = l, len(l.ents)
+	l.ents = append(l.ents, e)
+	l.boxes = append(l.boxes, e.box)
+}
+
+// dropActor takes e out of its chunk's actor list, keeping the others' order, and deletes
+// the list once empty.
+func (r *Region) dropActor(e *Entity) {
+	l := e.actors
+	if l == nil {
+		return
+	}
+	i := e.slot
+	l.ents = slices.Delete(l.ents, i, i+1)
+	l.boxes = slices.Delete(l.boxes, i, i+1)
+	for j := i; j < len(l.ents); j++ {
+		l.ents[j].slot = j
+	}
+	e.actors = nil
+	if len(l.ents) == 0 && r.actorsByChunk[e.chunk] == l {
+		delete(r.actorsByChunk, e.chunk)
 	}
 }
 
@@ -438,7 +505,7 @@ func (r *Region) unindex(e *Entity) {
 func (r *Region) indexChunk(e *Entity) {
 	r.byChunk[e.chunk] = append(r.byChunk[e.chunk], e)
 	if e.conf.Actor {
-		r.actorsByChunk[e.chunk] = append(r.actorsByChunk[e.chunk], e)
+		r.addActor(e)
 	}
 }
 
@@ -783,6 +850,30 @@ func (r *Region) AppendEntitiesIn(dst []*Entity, minX, minZ, maxX, maxZ float32)
 	return dst
 }
 
+// AppendActorsTouching is AppendActorsIn for the chunks under minimum to maximum widened by
+// grow on x and z, leaving out the actors whose box (SetActorBox) misses minimum to maximum,
+// in the same order. An actor with no box set is always kept. Searches in crowds (mobs
+// pushing each other) then never ask the owners of the many actors far off. Runs: owner,
+// or a phase that runs entities in parallel.
+func (r *Region) AppendActorsTouching(dst []*Entity, minimum, maximum mgl32.Vec3, grow float32) []*Entity {
+	lo := chunkOf(mgl32.Vec3{minimum[0] - grow, 0, minimum[2] - grow})
+	hi := chunkOf(mgl32.Vec3{maximum[0] + grow, 0, maximum[2] + grow})
+	for x := lo[0]; x <= hi[0]; x++ {
+		for z := lo[1]; z <= hi[1]; z++ {
+			l := r.actorsByChunk[mcdb.ChunkPos{x, z}]
+			if l == nil {
+				continue
+			}
+			for i := range l.boxes {
+				if !l.boxes[i].misses(minimum, maximum) {
+					dst = append(dst, l.ents[i])
+				}
+			}
+		}
+	}
+	return dst
+}
+
 // AppendActorsIn is AppendEntitiesIn for the entities added with EntityConfig.Actor alone,
 // in the same order, so a search for living things near thousands of items or clouds
 // walks only the living. Runs: owner, or a phase that runs entities in parallel.
@@ -790,7 +881,9 @@ func (r *Region) AppendActorsIn(dst []*Entity, minX, minZ, maxX, maxZ float32) [
 	lo, hi := chunkOf(mgl32.Vec3{minX, 0, minZ}), chunkOf(mgl32.Vec3{maxX, 0, maxZ})
 	for x := lo[0]; x <= hi[0]; x++ {
 		for z := lo[1]; z <= hi[1]; z++ {
-			dst = append(dst, r.actorsByChunk[mcdb.ChunkPos{x, z}]...)
+			if l := r.actorsByChunk[mcdb.ChunkPos{x, z}]; l != nil {
+				dst = append(dst, l.ents...)
+			}
 		}
 	}
 	return dst

@@ -2,6 +2,7 @@ package world
 
 import (
 	"log/slog"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -17,13 +18,19 @@ const (
 	// DefaultParallelMin is how many items a phase needs before it spreads over more cores.
 	// Below it, handing work to other goroutines costs more than it saves.
 	DefaultParallelMin = 32
-	// DefaultParallelHelpers is how many goroutines at most help one region's phase,
-	// besides the region's own: the "two or three idle cores" a crowded region may take.
-	DefaultParallelHelpers = 3
+	// DefaultParallelHelpers is how many goroutines at most help one region's phase besides
+	// its own, when the config gives none: every other core (defaultParallelHelpers). A
+	// helper only joins while idle, so a crowded region takes the cores other regions leave,
+	// and a phase takes one helper per DefaultParallelMin items, so small phases stay cheap.
+	DefaultParallelHelpers = 0
 	// parallelSlices is how many slices each goroutine's share is cut into, so a goroutine
 	// that drew cheap items takes more while another is busy with a slow one.
 	parallelSlices = 8
 )
+
+// defaultParallelHelpers is the helpers a phase may take when the config gives none: one per
+// core besides the region's own.
+func defaultParallelHelpers() int { return max(runtime.GOMAXPROCS(0)-1, 0) }
 
 // parallelJob is one phase being spread over goroutines. Each region keeps one and reuses it,
 // so a phase allocates nothing.
@@ -100,8 +107,10 @@ func (d *Dimension) SetParallel(min, helpers int) {
 // Then the results are the same on one core and many. Runs: owner.
 func (r *Region) Parallel(n int, fn func(i int)) {
 	helpers := 0
-	if int64(n) >= r.d.parallelMin.Load() {
-		helpers = int(min(r.d.parallelHelpers.Load(), int64(n-1)))
+	if pmin := r.d.parallelMin.Load(); int64(n) >= pmin {
+		// One helper per pmin items: handing a few items to many goroutines costs more than
+		// it saves.
+		helpers = int(min(r.d.parallelHelpers.Load(), int64(n)/pmin, int64(n-1)))
 	}
 	if helpers <= 0 {
 		for i := range n {

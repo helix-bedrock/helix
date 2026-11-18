@@ -123,7 +123,9 @@ type Region struct {
 	byChunk map[mcdb.ChunkPos][]*Entity
 	// actorsByChunk are the entities of byChunk added with EntityConfig.Actor, in the same
 	// order.
-	actorsByChunk map[mcdb.ChunkPos][]*Entity
+	actorsByChunk map[mcdb.ChunkPos]*actorList
+	// blockWrites counts the blocks set in the region (BlockWrites).
+	blockWrites uint64
 	// leaving are the entities that moved out of the region's sections this
 	// tick, handed off at its end.
 	leaving []*Entity
@@ -284,8 +286,14 @@ func (r *Region) set(c *Chunk, pos cube.Pos, layer uint8, block uint32) {
 	r.updateBlock(pos, layer, block)
 	c.dirty, c.net = true, nil
 	c.version++
+	r.blockWrites++
 	r.d.cache.drop(c.pos)
 }
+
+// BlockWrites counts every block set in the region so far: when it has not moved, every
+// block read before reads the same now, so work done on them in a Parallel phase still holds
+// in the apply after it. Runs: owner, or a Parallel phase.
+func (r *Region) BlockWrites() uint64 { return r.blockWrites }
 
 // UpdateNeighbours tells the six neighbours of pos that it changed, as
 // BDS's updateNeighborsAt: for each, in BDS's order, the Ticker's

@@ -68,6 +68,8 @@ type Mob struct {
 	entity *world.Entity
 	m      *mob.Mob
 	moves  actorMoves
+	// hazards are the hazard blocks its box touched when it thought (thinkHazards).
+	hazards thoughtHazards
 	// surface is set for a mob the natural spawner put on the surface; the spawner counts
 	// surface and underground mobs apart.
 	surface bool
@@ -161,6 +163,8 @@ func (o *Mob) add(d *world.Dimension) {
 	o.moves.start(pos, rot, actorMoveDropped, actorMoveFar)
 	o.moves.head = true
 	o.entity = d.AddEntity(o.config(pos, rot))
+	e := o.entity
+	o.m.SetBoxListener(func(b behavior.Box) { e.SetActorBox(mglVec(b.Min), mglVec(b.Max)) })
 }
 
 // config is the mob's entity, saved with its chunk.
@@ -243,6 +247,7 @@ func (m *Mob) think(e *world.Entity) {
 		return
 	}
 	m.ended = m.m.Tick(r)
+	m.thinkHazards(r)
 }
 
 // apply does what the mob decided this tick, in the region's runtime ID order: its queued
@@ -717,7 +722,8 @@ func (s *Host) Entities(r *world.Region, dst []behavior.Actor, self behavior.ID,
 	sc := s.scratch()
 	defer sc.done()
 	// Look a little wider than b: entity positions are their feet or eyes, not their box.
-	sc.list = r.AppendActorsIn(sc.list, b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
+	// Mobs whose box misses b are left out by the world from the box their snapshot set.
+	sc.list = r.AppendActorsTouching(sc.list, mglVec(b.Min), mglVec(b.Max), 2)
 	for _, e := range sc.list {
 		a := actorOf(e)
 		if a == nil || a.ID() == self {

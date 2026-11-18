@@ -225,13 +225,42 @@ func (m *Mob) tickHazards(r *world.Region) {
 	b := m.m.Body()
 	box := m.m.Box()
 	moved := mglVec(b.Pos).Sub(mglVec(b.PrevPos))
-	m.s.tickHazards(r, m, mglVec(box.Min), mglVec(box.Max), moved)
+	lo, hi := mglVec(box.Min), mglVec(box.Max)
+	if h := &m.hazards; h.ok && h.r == r && h.lo == lo && h.hi == hi && h.writes == r.BlockWrites() {
+		m.s.tickHazardsFrom(r, m, lo, hi, moved, h.c)
+	} else {
+		m.s.tickHazards(r, m, lo, hi, moved)
+	}
+	m.hazards = thoughtHazards{}
 	if b.OnGround && !m.Dead() {
 		m.s.standOnDripleaf(r, mglVec(b.Pos))
 	}
 	if b.Landed && !m.Dead() {
 		m.s.landed(r, m, mglVec(b.Pos), b.LandedFall, m.m.Type())
 	}
+}
+
+// thoughtHazards are the hazard blocks a mob's box touched in its think, and what they were
+// read for: the region, the box and the region's block writes then. tickHazards uses them
+// only when all three are still the same, so the blocks it would read are the ones read.
+type thoughtHazards struct {
+	ok     bool
+	r      *world.Region
+	lo, hi mgl32.Vec3
+	writes uint64
+	c      burnContact
+}
+
+// thinkHazards reads the hazard blocks the mob's box touches, in the parallel think, so the
+// apply after it only hurts. Runs: think.
+func (m *Mob) thinkHazards(r *world.Region) {
+	if m.ended || m.m.Dead() {
+		m.hazards = thoughtHazards{}
+		return
+	}
+	box := m.m.Box()
+	lo, hi := mglVec(box.Min), mglVec(box.Max)
+	m.hazards = thoughtHazards{ok: true, r: r, lo: lo, hi: hi, writes: r.BlockWrites(), c: m.s.touching(r, lo, hi)}
 }
 
 // hasFamily reports the mob in the type family.
