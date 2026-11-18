@@ -203,11 +203,11 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return ""
 		}},
-		{tpsCommand, "Shows the server's, your region's and your client's ticks per second.", nil, func(p *player.Player, _ []string) string {
+		{tpsCommand, "Shows the server's, your region's and your client's ticks per second: [live] keeps them on screen.", nil, func(p *player.Player, args []string) string {
 			if !registry() {
 				return ""
 			}
-			return tpsRun(srv.Load(), p)
+			return tpsRun(srv.Load(), p, args)
 		}},
 		{chestBombCommand, "Builds chests full of shulker boxes full of 50-page books: [count] [pistons].", nil, func(p *player.Player, args []string) string {
 			if !registry() {
@@ -215,7 +215,13 @@ func registerTestCommands(setup *player.Setup, srv *atomic.Pointer[helix.Server]
 			}
 			return chestBomb(srv.Load(), p, args)
 		}},
-		{timeCommand,"Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
+		{cloudBombCommand, "Drops lingering potion clouds around you: [count] [potion id].", nil, func(p *player.Player, args []string) string {
+			if !registry() {
+				return ""
+			}
+			return cloudBomb(p, args)
+		}},
+		{timeCommand, "Changes or shows the time: set day, set 6000, add 1000, query.", timeTestArg(""), func(_ *player.Player, args []string) string {
 			if !registry() {
 				return ""
 			}

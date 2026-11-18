@@ -272,6 +272,7 @@ type projectileComponent struct {
 			RadiusOnUse *float32 `json:"radius_on_use"`
 			Reapply     int32    `json:"reapplication_delay"`
 			AffectOwner *bool    `json:"affect_owner"`
+			Particle    string   `json:"particle"`
 		} `json:"spawn_aoe_cloud"`
 		WindBurst *struct{}       `json:"wind_burst_on_hit"`
 		GrantXP   json.RawMessage `json:"grant_xp"`
@@ -359,7 +360,7 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 	if a := c.OnHit.Cloud; a != nil {
 		cs := &CloudSpec{
 			Duration: max(a.Duration, 0) * cloudTicksPerSecond, Radius: a.Radius, RadiusOnUse: cloudRadiusOnUse,
-			ReapplicationDelay: a.Reapply, Particle: cloudParticleMobSpellAmbient, AffectOwner: true,
+			ReapplicationDelay: a.Reapply, Particle: cloudParticle(a.Particle), AffectOwner: true,
 		}
 		if a.RadiusOnUse != nil {
 			cs.RadiusOnUse = *a.RadiusOnUse
