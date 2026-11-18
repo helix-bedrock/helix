@@ -12,6 +12,7 @@
 [![License](https://img.shields.io/badge/license-noncommercial-orange)](LICENSE)
 [![Status](https://img.shields.io/badge/status-in_development-orange)](https://helixbedrock.com/progress/)
 [![Website](https://img.shields.io/badge/website-helixbedrock.com-2ea44f)](https://helixbedrock.com)
+[![Discord](https://img.shields.io/discord/1568071670097518763?label=discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/Fbmc69Gqr7)
 
 </div>
 
