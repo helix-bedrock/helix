@@ -325,8 +325,12 @@ func (p *Player) beaconPaid() bool {
 func (p *Player) commitBeacon() {
 	pay := p.requests.beacon
 	p.requests.beacon = beaconPayment{}
+	// A player without an entity (joining, between dimensions) has no beacon open.
+	if !pay.pending || p.entity == nil {
+		return
+	}
 	r := p.entity.Region()
-	if !pay.pending || r == nil {
+	if r == nil {
 		return
 	}
 	be, ok := r.BlockEntity(p.window.pos)

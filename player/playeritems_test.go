@@ -22,7 +22,7 @@ func testPlayer(t *testing.T) *Player {
 		t.Fatal(err)
 	}
 	s := &Host{redstone: circuit.NewSettings(circuit.DefaultConfig()), reg: reg, log: slog.New(slog.DiscardHandler), level: Level{GameMode: GameModeCreative}}
-	p := &Player{s: s, gameMode: GameModeSurvival}
+	p := &Player{s: s, gameMode: GameModeSurvival, abilities: DefaultAbilities()}
 	p.inventory.load(map[string]any{"Inventory": []any{
 		map[string]any{"Name": "minecraft:netherite_sword", "Count": uint8(1), "Damage": int16(0), "Slot": uint8(0), "WasPickedUp": uint8(0)},
 		map[string]any{"Name": "minecraft:emerald", "Count": uint8(64), "Damage": int16(0), "Slot": uint8(2), "WasPickedUp": uint8(0)},
