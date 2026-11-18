@@ -5,12 +5,12 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Pointed dripstone losing its hold, as BDS 1.26.60 does it: neighborChanged (0xD4FE130) looks
-// at a change right above or below, and when the dripstone cannot stay (canSurvive
-// 0xD4FDB20) asks for a tick in 1, for a stalactite on each of its pieces from the tip up. The
-// tick (0xD4FC920) breaks a stalagmite that cannot stay, with its drops, and makes a
-// stalactite fall (startFalling 0xD4FF1D0). A falling tip hurts what it lands on by the
-// falling block's fall damage (0xBD5DD80): its height in blocks counts once for each
+// Pointed dripstone losing its hold, as BDS 1.26.60 does it: neighborChanged looks
+// at a change right above or below, and when the dripstone cannot stay (canSurvive)
+// asks for a tick in 1, for a stalactite on each of its pieces from the tip up. The
+// tick breaks a stalagmite that cannot stay, with its drops, and makes a
+// stalactite fall (startFalling). A falling tip hurts what it lands on by the
+// falling block's fall damage: its height in blocks counts once for each
 // dripstone stacked on the tip when it fell, up to 6. Pieces that are not the tip hurt
 // nothing.
 const (
@@ -77,7 +77,7 @@ func (t *Ticker) askFall(r *world.Region, pos cube.Pos, block uint32, k kind) {
 	}
 }
 
-// fallTip follows a stalactite down from pos to its tip (0xD4FE8C0), within fallReach.
+// fallTip follows a stalactite down from pos to its tip, within fallReach.
 func (t *Ticker) fallTip(r *world.Region, pos cube.Pos) (cube.Pos, bool) {
 	return t.lowestHanging(r, pos, fallReach)
 }

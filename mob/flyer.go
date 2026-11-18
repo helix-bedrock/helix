@@ -4,9 +4,9 @@ import "github.com/helix-bedrock/entity/behavior"
 
 // The flying and shooting goals' hooks: circle_around_anchor (behavior.Circler) and
 // swoop_attack (behavior.Swooper) of the phantom, fire_at_target (behavior.Firer) of the
-// breeze. BDS 1.26.60's SwoopAttackGoal::canContinueToUse (0x5699380) reads
-// Mob::mWasHurtLastTick (Actor +785), which Actor::baseTick sets from the hurt-this-tick
-// byte (+784) and clears that byte.
+// breeze. BDS 1.26.60's BDS's code reads
+// BDS's code, which BDS's code sets from the hurt-this-tick
+// byte and clears that byte.
 
 // ProjectileHooks is what an engine that spawns a mob's aimed projectiles implements on
 // its Hooks.

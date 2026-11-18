@@ -13,9 +13,9 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// End crystals as BDS 1.26.60 runs them: the item's use on a block (EndCrystalItem::_useOn,
-// 0x4AE5AA0), the EnderCrystal actor (vtable 0xFAC6D88: normal tick 0xBD341C0, hurt
-// 0xBD34A90, load 0xBD34740, save 0xBD34470) and its behaviour pack definition (health 1,
+// End crystals as BDS 1.26.60 runs them: the item's use on a block (BDS's code,),
+// the EnderCrystal actor (normal tick, hurt,
+// load, save) and its behaviour pack definition (health 1,
 // on_hurt -> explode power 6, no fire, breaking blocks only with mobGriefing, fuse 0).
 // The research note is private.
 const (
@@ -219,7 +219,7 @@ func (p *Player) useOnEndCrystal(d *protocol.UseItemOnEntityTransactionData) boo
 	return true
 }
 
-// placeEndCrystal is BDS's EndCrystalItem::_useOn: on obsidian or bedrock with two air blocks
+// placeEndCrystal is BDS's code: on obsidian or bedrock with two air blocks
 // above and no entity in the two blocks from the clicked block's floor, a crystal on top of
 // the block, the entity_place game event, and one used up outside creative.
 func (p *Player) placeEndCrystal(r *world.Region, clicked cube.Pos) bool {

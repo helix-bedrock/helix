@@ -13,7 +13,7 @@ import (
 // when the first viewer opens it and back with the close sound when the last one leaves; hoppers
 // and comparators see it as any container.
 //
-// Not checked against BDS 1.26.60's BarrelBlockActor (vtable 0xFBFBF70): the open_bit and the
+// Not checked against BDS 1.26.60's BarrelBlockActor: the open_bit and the
 // sounds follow what the game is known to do; the sound position and whether BDS also sends a
 // BlockEvent were not read.
 

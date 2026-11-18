@@ -6,8 +6,8 @@ import (
 )
 
 // The hooks of jump_around_target (behavior.Jumper, the breeze) and jump_to_block
-// (behavior.BlockJumper, the frog and goat). BDS 1.26.60's JumpAroundTargetGoal::tick
-// (0x5A06810) writes the AABBShapeComponent box directly: the movement then moves that box and
+// (behavior.BlockJumper, the frog and goat). BDS 1.26.60's BDS's code
+// writes the AABBShapeComponent box directly: the movement then moves that box and
 // takes the position from it, so a shrunk box lasts until the goal puts the old size back.
 // Helix rebuilds the box from the mob's size after each move unless a goal set its own.
 
@@ -20,14 +20,14 @@ func (m *Mob) DiscardFriction() bool { return m.body.DiscardFriction }
 // SetDiscardFriction implements behavior.Jumper.
 func (m *Mob) SetDiscardFriction(on bool) { m.body.DiscardFriction = on }
 
-// SetBox implements behavior.Jumper: Actor::setAABB. The position follows at the next move.
+// SetBox implements behavior.Jumper: BDS's code. The position follows at the next move.
 func (m *Mob) SetBox(b behavior.Box) {
 	m.body.Box = b
 	w, h := b.Max.X-b.Min.X, b.Max.Y-b.Min.Y
 	m.customBox = absf(w-m.body.Width) > boxSlack || absf(h-m.body.Height) > boxSlack
 }
 
-// LastHurtTime implements behavior.Jumper: Actor::getLastHurtTimestamp, the tick of the last
+// LastHurtTime implements behavior.Jumper: BDS's code, the tick of the last
 // hurt that landed.
 func (m *Mob) LastHurtTime() uint64 { return m.hurtAt }
 

@@ -11,15 +11,15 @@ import (
 
 // Dispensers putting armour on, as BDS 1.26.60 does it.
 //
-// Humanoid armour (HumanoidArmorItem::dispense 0xC919140, through the equip helper
-// 0xC9835F0) goes on the first mob in the block in front whose armour slot for it is
-// empty and that may wear it (the filter 0xC9833F0): a mob whose class has both the
+// Humanoid armour (BDS's code, through the equip helper)
+// goes on the first mob in the block in front whose armour slot for it is
+// empty and that may wear it (the filter): a mob whose class has both the
 // Monster and Humanoid categories, an armour stand, or a player who is not spectating.
 // One item goes on, it leaves the dispenser, and the click plays at the front block's
 // corner. No mob there takes it, and the item is thrown out as usual.
 //
-// Horse armour (HorseArmorItem::dispense 0xC917520) goes into the first equip slot of a
-// mob in front whose accepted_items take it (0xB3D26D0), when that inventory slot is
+// Horse armour goes into the first equip slot of a
+// mob in front whose accepted_items take it, when that inventory slot is
 // empty; armor.equip_generic and the click play at the dispense point. BDS does not
 // check that the horse is tamed.
 //
@@ -34,11 +34,11 @@ const typeArmorStand = 61
 const humanoidArmourSlots = 4
 
 // humanoidMonsterType reports the actor types whose BDS class sets both the Monster and
-// Humanoid categories (0xC in Actor::mCategories): the Zombie class (zombie, husk, drowned,
+// Humanoid categories (0xC): the Zombie class (zombie, husk, drowned,
 // frostbite) and its subclasses PigZombie and ZombieVillager (both villager versions), the
 // Skeleton class (skeleton, stray, wither skeleton, bogged, parched), witches,
 // vindicators, evokers, pillagers and the Piglin class (piglin, piglin brute). Read from
-// the class constructors and the actor factory 0xBC5B490.
+// the class constructors and the actor factory.
 func humanoidMonsterType(id int32) bool {
 	switch id {
 	case 32, 47, 110, 155, // Zombie
@@ -125,7 +125,7 @@ func (s *Host) equipDispensed(e *world.Entity, lo, hi mgl32.Vec3, armour int, on
 	return false
 }
 
-// wearsDispensedArmour is the filter 0xC9833F0 for a mob: a humanoid monster or an armour
+// wearsDispensedArmour is the filter for a mob: a humanoid monster or an armour
 // stand.
 func (s *Host) wearsDispensedArmour(o *Mob) bool {
 	t, ok := s.reg.EntityTypes.ByName(o.m.Type())
@@ -142,7 +142,7 @@ func (m *Mob) mobBox() (lo, hi mgl32.Vec3, ok bool) {
 }
 
 // wearDispensed puts a dispensed armour piece on the player when the player is not
-// spectating (Player::canInteractWithOtherEntitiesInGame), its box touches the block in
+// spectating, its box touches the block in
 // front and the armour slot is empty. Runs: the player's region.
 func (p *Player) wearDispensed(lo, hi mgl32.Vec3, armour int, one ItemStack) bool {
 	if p.entity == nil || p.mode() == GameModeSpectator {
@@ -191,7 +191,7 @@ func (s *Host) dispenseHorseArmour(d dispense, it ItemStack) bool {
 }
 
 // horseArmourSlot is the first of the mob's equip slots whose accepted_items take the
-// item, and that its inventory has (0xB3D26D0).
+// item, and that its inventory has.
 func horseArmourSlot(o *Mob, name string) (int, bool) {
 	n := min(len(o.m.EquipSlots()), len(o.m.Inventory()))
 	for k := range n {

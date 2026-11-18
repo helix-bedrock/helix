@@ -260,7 +260,7 @@ func (l *Liquids) blocking(r *world.Region, pos, from cube.Pos) bool {
 	return l.blocks.Properties(b).LiquidReaction == registry.LiquidBlocking
 }
 
-// spreadTo is BDS's trySpreadTo (0xD55BDE0): liquid k of depth flows into
+// spreadTo is BDS's trySpreadTo: liquid k of depth flows into
 // pos unless liquid of its kind or lava is there or the block stops it.
 // Lava makes a block it flows into fizz; water pops a block whose reaction
 // is popped (its drops thrown out, with no sound or particles, as BDS's

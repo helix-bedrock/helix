@@ -10,12 +10,12 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Potions, from BDS 1.26.60. The table is the one Potion's static setup (0xC8C1380) builds and
-// registers in ID order (0xC6DDD70, Potion::addPotion 0xC6DD230): a potion item's meta is its
-// ID. Drinking is PotionItem (vtable 0xFB51820): 32 ticks of use, then the finish 0xC90ABD0.
-// Splash and lingering potions are thrown as snowballs are (0xC8E58C0, 0xC8F9B90) and do
-// their work in their projectile's on hit subcomponents: thrown_potion_effect (0x7153490),
-// spawn_aoe_cloud (0x714EA60) and douse_fire (0x7151E10).
+// Potions, from BDS 1.26.60. The table is the one Potion's static setup builds and
+// registers in ID order: a potion item's meta is its
+// ID. Drinking is PotionItem: 32 ticks of use, then the finish.
+// Splash and lingering potions are thrown as snowballs are and do
+// their work in their projectile's on hit subcomponents: thrown_potion_effect,
+// spawn_aoe_cloud and douse_fire.
 
 const (
 	namePotion          = "minecraft:potion"
@@ -27,8 +27,8 @@ const (
 	// potionWater is the water bottle's ID.
 	potionWater = 0
 
-	// splashDurationScale is what a splash keeps of an effect's duration, BDS's 0.75
-	// (dword_FD33A28), before the distance scale.
+	// splashDurationScale is what a splash keeps of an effect's duration, BDS's 0.75,
+	// before the distance scale.
 	splashDurationScale = 0.75
 	// splashMinTicks is the shortest splashed effect given: BDS gives none of 20 ticks or less.
 	splashMinTicks = 20
@@ -146,7 +146,7 @@ func vanillaPotions() []Potion {
 // waterColour is the colour of a potion with no effects that show, BDS's 0x385DC6.
 const waterColour uint32 = 0xFF385DC6
 
-// potionColour is BDS's mix of a potion's colour (0xCABAEC0), as ARGB: each effect that shows
+// potionColour is BDS's mix of a potion's colour, as ARGB: each effect that shows
 // counts its colour once per level, and the mix is their average. A potion with no effects
 // is the colour of water; one whose effects all hide is black.
 func (s *Host) potionColour(effects []ActiveEffect) uint32 {
@@ -183,7 +183,7 @@ func (p *Player) startPotion(held ItemStack) {
 	p.sendActorFlags()
 }
 
-// drinkPotion is BDS's finished drink (0xC90ABD0): every effect of the potion, at its full
+// drinkPotion is BDS's finished drink: every effect of the potion, at its full
 // duration, then one potion used, the bottle.empty sound at the mouth and a glass bottle,
 // which takes the potion's place when it was the last one and goes into the inventory (or
 // drops) otherwise.
@@ -215,7 +215,7 @@ func (p *Player) drinkPotion(held ItemStack) {
 // soundBottleEmpty is BDS's sound 478, played when a potion is finished.
 const soundBottleEmpty = "bottle.empty"
 
-// aimRotation is BDS's throw aim (0x7147BC0): the pitch turned by the definition's angle
+// aimRotation is BDS's throw aim: the pitch turned by the definition's angle
 // offset, less of it the further up or down the thrower looks.
 func aimRotation(rot world.Rotation, offset float32) world.Rotation {
 	if offset != 0 {

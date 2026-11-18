@@ -13,7 +13,7 @@ import (
 // The player's side of farming (the rules are in package farm): hoes tilling, bone meal and
 // trampling, as BDS 1.26.60 runs them.
 const (
-	// tagHoe is the item tag BDS's dirt blocks look for (minecraft:is_hoe, 0xFD44698).
+	// tagHoe is the item tag BDS's dirt blocks look for (minecraft:is_hoe).
 	tagHoe = "minecraft:is_hoe"
 	// nameBoneMeal is the bone meal item.
 	nameBoneMeal = "minecraft:bone_meal"
@@ -37,8 +37,8 @@ func (p *Player) holdsHoe(s ItemStack) bool {
 	return ok && slices.Contains(t.Tags, tagHoe)
 }
 
-// tillWithHoe is a dirt block's use with a hoe (BDS 0xCB13A00 and the others): the block is
-// tilled, and unless it was rooted dirt the hoe's on_tool_used (0xC981EA0) plays the use-on
+// tillWithHoe is a dirt block's use with a hoe (BDS and the others): the block is
+// tilled, and unless it was rooted dirt the hoe's on_tool_used plays the use-on
 // sound with the new block and wears the hoe a point; rooted dirt drops hanging roots. False
 // if the block is not tilled.
 func (p *Player) tillWithHoe(r *world.Region, u *BlockUse) bool {
@@ -64,7 +64,7 @@ func (p *Player) tillWithHoe(r *world.Region, u *BlockUse) bool {
 	return true
 }
 
-// useBoneMeal is BoneMealItem's useOn (0xC988B20): on a crop or stem that grows, the growth
+// useBoneMeal is BoneMealItem's useOn: on a crop or stem that grows, the growth
 // particles where the block was clicked and one bone meal used up. True if bone meal was used
 // on something that takes it, grown or not.
 func (p *Player) useBoneMeal(r *world.Region, clicked cube.Pos, click mgl32.Vec3, held ItemStack) bool {
@@ -82,7 +82,7 @@ func (p *Player) useBoneMeal(r *world.Region, clicked cube.Pos, click mgl32.Vec3
 	return true
 }
 
-// dispenseBoneMeal is BoneMealItem's dispense (0xC988490): the block in front is fertilized
+// dispenseBoneMeal is BoneMealItem's dispense: the block in front is fertilized
 // as by a player in survival; if it grew, a click, the growth particles and one bone meal
 // used up, else a failed click and nothing used. Either way the dispenser smokes, as BDS's
 // does when an item's dispense returns true, which bone meal's always does.
@@ -102,7 +102,7 @@ func (s *Host) dispenseBoneMeal(r *world.Region, c *Chest, slot int, front cube.
 // dispenseBoneMealFail is the data of BDS's failed click when bone meal grows nothing.
 const dispenseBoneMealFail = 1000
 
-// pickBerries is a sweet berry bush's use (BDS 0xD4DF790 and 0xD4E0390): from growth 2 the
+// pickBerries is a sweet berry bush's use: from growth 2 the
 // bush drops its drops (the berries by its growth), plays the pick sound and goes back to
 // growth 1. With bone meal in hand a bush that is not fully grown takes the bone meal instead.
 // False if the click was not taken.
@@ -120,7 +120,7 @@ func (p *Player) pickBerries(r *world.Region, u *BlockUse) bool {
 	})
 }
 
-// pickGlowBerries is a cave vine with berries' use (BDS 0xCB517C0): it drops its drops (the
+// pickGlowBerries is a cave vine with berries' use: it drops its drops (the
 // glow berries), plays the pick sound and goes back to plain cave vines. False if the click
 // was not taken.
 func (p *Player) pickGlowBerries(r *world.Region, u *BlockUse) bool {
@@ -181,8 +181,8 @@ func (p *Player) trample(r *world.Region, feet mgl32.Vec3, distance float32) {
 	f.Trample(r, pos, distance, playerVolume, p.abilities.Flag(AbilityMine))
 }
 
-// useComposter is ComposterBlock's use (0xCB26D40): a full composter gives a bone meal
-// (thrown out as a block's drop, 0xCB27920) and empties; one at 7 does not take the click;
+// useComposter is ComposterBlock's use: a full composter gives a bone meal
+// (thrown out as a block's drop) and empties; one at 7 does not take the click;
 // otherwise one of the held item is composted (farm.Ticker.Compost), and if it was used the
 // growth particles show a little above the composter's corner and one is used up outside
 // creative. False if the click was not taken, so the item is used instead.
@@ -224,7 +224,7 @@ func (s *Host) dropComposterBoneMeal(r *world.Region, pos cube.Pos) {
 }
 
 // composterDrops adds a full composter's bone meal to what breaking it drops (BDS's
-// composter gives it when the block goes, 0xCB27E40).
+// composter gives it when the block goes).
 func (s *Host) composterDrops(r *world.Region, pos cube.Pos, items []ItemStack) []ItemStack {
 	f := s.farm
 	if f == nil {

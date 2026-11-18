@@ -122,7 +122,7 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 		}
 	}
 	// A player sneaking with something in hand uses the item, not the block, except a hoe:
-	// BDS's GameMode::useItemOn (0xCA46800) lets an item tagged minecraft:is_hoe use the
+	// BDS's code lets an item tagged minecraft:is_hoe use the
 	// block while sneaking, so it tills.
 	if (held.Empty() || !p.Moving(MoveSneaking) || p.holdsHoe(held)) && p.lastUse != useItem {
 		u := &BlockUse{Player: p, Pos: clicked, Block: target, Face: face, ClickPos: click, Item: held}
@@ -337,7 +337,7 @@ const (
 	snowHeightFilled = 7
 )
 
-// snowReplaceable is BDS 1.26.60's TopSnowBlock::canBeBuiltOver (sub_D4EB2B0): unless a snow
+// snowReplaceable is BDS 1.26.60's BDS's code: unless a snow
 // layer is placed, a block in the snow's second layer (a plant it covers) decides; otherwise
 // only snow below its full height (8 layers, which looks like a snow block) is built over.
 func (g *gameplay) snowReplaceable(s *Host, r *world.Region, pos cube.Pos, b, block uint32) bool {
@@ -387,7 +387,7 @@ func vanillaPlaceCheck(pl *Placement) bool {
 }
 
 // BuildBlocker is an entity owner that keeps blocks from being placed where it is: BDS's
-// actor flag that mayPlace (sub_CE5DEE0) reads (Actor+620), set by falling blocks.
+// actor flag that mayPlace reads (Actor), set by falling blocks.
 type BuildBlocker interface {
 	// BuildBox is its box, false if it does not block now.
 	BuildBox() (lo, hi mgl32.Vec3, ok bool)
@@ -465,7 +465,7 @@ func vanillaPlace(pl *Placement) bool {
 	}
 	blocks := p.s.reg.Blocks
 	if f := p.s.falling; f != nil && f.Kind(pl.Block) == fall.Snow {
-		// TopSnowBlock::tryToPlace (slot 70, 0xD4EA610), the same one landing snow runs:
+		// BDS's code (slot 70), the same one landing snow runs:
 		// layers add to snow already there up to a full block, the rest goes on top.
 		if !f.Land(r, pl.Pos, pl.Block) {
 			return false

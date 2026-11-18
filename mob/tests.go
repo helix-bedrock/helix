@@ -94,7 +94,7 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 	case "is_riding":
 		return definition.CompareBool(op, a.Vehicle() != behavior.NoID, rawBool(test.Value, true)), true
 	case "has_ranged_weapon":
-		// ActorHasRangedWeaponTest::evaluate (1.21.3 names): a bow or crossbow in the main hand.
+		// BDS's code (1.21.3 names): a bow or crossbow in the main hand.
 		var hand []string
 		if eq := mobEquip(m, s); eq != nil {
 			hand = equipmentNames(eq, "hand", nil)
@@ -144,7 +144,7 @@ func (t tester) more(test *definition.Test, a behavior.Actor, m *Mob, s *Snapsho
 		missing := m != nil && m.health < m.maxHealth
 		return definition.CompareBool(op, missing, rawBool(test.Value, true)), true
 	case "in_contact_with_water":
-		// ActorInContactWithWater::evaluate (0xCA58BB0): isInWaterOrRain, or a water bottle's
+		// BDS's code: isInWaterOrRain, or a water bottle's
 		// splash (not tracked yet). Another mob's snapshot knows only water.
 		wet := m != nil && m.Wet() || s != nil && s.inWater
 		return definition.CompareBool(op, wet, rawBool(test.Value, true)), true

@@ -7,9 +7,9 @@ import (
 	"github.com/helix-bedrock/helix/player"
 )
 
-// BDS 1.26.60's /kill (KillCommand: names 0x9FCDF50, execute 0x9FCE090): kill [target],
-// the runner without one. Every target is killed (Actor::kill) except creative players, which
-// only add commands.kill.attemptKillPlayerCreative (the filter 0x9FEE2B0 -> 0xB654710).
+// BDS 1.26.60's /kill (KillCommand: names, execute): kill [target],
+// the runner without one. Every target is killed except creative players, which
+// only add commands.kill.attemptKillPlayerCreative (the filter).
 
 var kill = command.Spec{
 	Name: "kill", Description: "commands.kill.description", Permission: command.GameDirectors,

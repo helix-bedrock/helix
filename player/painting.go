@@ -16,7 +16,7 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Paintings as BDS 1.26.60 runs them: HangingActor and Painting, HangingActorItem::_useOn. The
+// Paintings as BDS 1.26.60 runs them: HangingActor and Painting, BDS's code. The
 // research note is private.
 const (
 	paintingID = "minecraft:painting"
@@ -60,8 +60,8 @@ type Motive struct {
 	Placeable     bool
 }
 
-// vanillaMotives are BDS 1.26.60's motives in its order (the static table at 0xC021D00, listed
-// by 0xBFF0E40 then 0xBFF1780); a placed painting draws from them in this order. The first is
+// vanillaMotives are BDS 1.26.60's motives in its order (the static table, listed
+// by then); a placed painting draws from them in this order. The first is
 // what a painting with an unknown motive shows.
 var vanillaMotives = [...]Motive{
 	{"Kebab", 16, 16, true}, {"Aztec", 16, 16, true}, {"Aztec2", 16, 16, true}, {"Alban", 16, 16, true},
@@ -167,7 +167,7 @@ func evenOffset(size int32) float32 {
 	return 0
 }
 
-// paintingPos is BDS's position of a painting hanging in dir on the block wall (0xBFC3D80).
+// paintingPos is BDS's position of a painting hanging in dir on the block wall.
 func paintingPos(wall cube.Pos, dir int32, m Motive) mgl32.Vec3 {
 	pos := blockCenter(wall)
 	side := evenOffset(m.Width)
@@ -189,7 +189,7 @@ func paintingPos(wall cube.Pos, dir int32, m Motive) mgl32.Vec3 {
 	return pos
 }
 
-// paintingWall is the wall block of a painting at pos, as BDS's wouldSurvive finds it (0xBFC4A10).
+// paintingWall is the wall block of a painting at pos, as BDS's wouldSurvive finds it.
 func paintingWall(pos mgl32.Vec3, dir int32, m Motive) cube.Pos {
 	side := evenOffset(m.Width)
 	switch dir {
@@ -209,7 +209,7 @@ func paintingWall(pos mgl32.Vec3, dir int32, m Motive) cube.Pos {
 	return floorPos(pos)
 }
 
-// paintingBox is BDS's box of a painting at pos (0xBFC3F60).
+// paintingBox is BDS's box of a painting at pos.
 func paintingBox(pos mgl32.Vec3, dir int32, m Motive) (lo, hi mgl32.Vec3) {
 	across, up := m.halfSize()
 	half := mgl32.Vec3{across, up, paintingThick}
@@ -220,7 +220,7 @@ func paintingBox(pos mgl32.Vec3, dir int32, m Motive) (lo, hi mgl32.Vec3) {
 	return pos.Sub(half).Add(shrink), pos.Add(half).Sub(shrink)
 }
 
-// paintingFits is BDS's HangingActor survive check (0xBFC4BC0) without the facing rules of the
+// paintingFits is BDS's HangingActor survive check without the facing rules of the
 // blocks behind and in front, which are not ported: no block's box in its box, every block
 // behind it of solid material, and no other painting in its box. self is left out.
 func (s *Host) paintingFits(r *world.Region, wall cube.Pos, pos mgl32.Vec3, dir int32, m Motive, self *Painting, near *[]*world.Entity) bool {
@@ -276,7 +276,7 @@ func (s *Host) paintingFits(r *world.Region, wall cube.Pos, pos mgl32.Vec3, dir 
 	return true
 }
 
-// pickMotive is Painting's placement (0xBFF64D0): of the placeable motives that fit, the
+// pickMotive is Painting's placement: of the placeable motives that fit, the
 // biggest by area, one of them at random. False if none fits.
 func (s *Host) pickMotive(r *world.Region, wall cube.Pos, dir int32, near *[]*world.Entity) (Motive, bool) {
 	var fit []Motive
@@ -313,7 +313,7 @@ func (p *Painting) config(uniqueID int64, runtimeID uint64, pos mgl32.Vec3, rot 
 	}
 }
 
-// spawnPackets are BDS's AddPainting (0x8AF8A00).
+// spawnPackets are BDS's AddPainting.
 func (p *Painting) spawnPackets(e *world.Entity) []packet.Packet {
 	return []packet.Packet{&packet.AddPainting{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Direction: p.dir, Title: p.motive.Name,
@@ -325,7 +325,7 @@ func (p *Painting) movePacket(e *world.Entity) packet.Packet {
 	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw}}
 }
 
-// tick is HangingActor's tick (0xBFC44D0): every 80 to 119 ticks, with the chunks around it
+// tick is HangingActor's tick: every 80 to 119 ticks, with the chunks around it
 // loaded, a painting that no longer fits breaks.
 func (p *Painting) tick(e *world.Entity) {
 	r := e.Region()
@@ -356,8 +356,8 @@ func (p *Painting) tick(e *world.Entity) {
 	}
 }
 
-// Hurt is HangingActor's hurt (0xBFC56B0): any hit takes it down. It leaves no item: BDS
-// 1.26.60's drop (0xBFF6140) is gated by a check (0xB3CA270, 0xB3CA010) that, tested in game on
+// Hurt is HangingActor's hurt: any hit takes it down. It leaves no item: BDS
+// 1.26.60's drop is gated by a check that, tested in game on
 // BDS by the lead (2026-11-10), lets no painting drop, even for a survival player. True if
 // it broke.
 func (p *Painting) Hurt(r *world.Region, _ *Player) bool {
@@ -368,7 +368,7 @@ func (p *Painting) Hurt(r *world.Region, _ *Player) bool {
 	return true
 }
 
-// Break takes it down with BDS's sound and particles (0xBFF63A0). Vanilla passes drops false;
+// Break takes it down with BDS's sound and particles. Vanilla passes drops false;
 // with drops set it leaves its item if doentitydrops is on.
 func (p *Painting) Break(r *world.Region, drops bool) {
 	if p.gone {
@@ -406,7 +406,7 @@ func (p *Painting) BlastHit(float32, DamageSource) {
 // BlastPush does nothing: a painting does not move.
 func (p *Painting) BlastPush(mgl32.Vec3) {}
 
-// placePainting is HangingActorItem::_useOn (0xC914F60): only on the side of a block, with the
+// placePainting matches BDS: only on the side of a block, with the
 // biggest motive that fits; the level event at the wall and the item used up outside creative.
 func (p *Player) placePainting(r *world.Region, clicked cube.Pos, face int32) bool {
 	dir, ok := paintingDir(cube.Face(face))
@@ -494,7 +494,7 @@ func oldPaintingDir(dir int32) int32 {
 	return dir
 }
 
-// loadPainting brings back a saved painting as BDS reads one (0xBFF5BD0, 0xBFC5350).
+// loadPainting brings back a saved painting as BDS reads one.
 func (s *Host) loadPainting(r *world.Region, at mcdb.ChunkPos, saved chunk.Entity) bool {
 	pos, ok := floats(saved.Data["Pos"])
 	if !ok || len(pos) != 3 {

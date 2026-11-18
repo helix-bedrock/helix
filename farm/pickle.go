@@ -5,10 +5,10 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Sea pickles, from BDS 1.26.60's SeaPickle (vt 0xFC1C4A8; the research note is private). Their
-// footing is foliage.go's rule. Their tick 0xD51CBF0 (after any neighbour change, 0xD51CB50)
-// breaks them when they cannot stay, else 0xD51CC30 sets dead_bit by whether water is in the
-// block, as onPlace does. Bone meal (canBeFertilized 0xD51D770, onFertilized 0xD51D0F0) works
+// Sea pickles, from BDS 1.26.60's SeaPickle (vt; the research note is private). Their
+// footing is foliage.go's rule. Their tick (after any neighbour change)
+// breaks them when they cannot stay, else sets dead_bit by whether water is in the
+// block, as onPlace does. Bone meal (canBeFertilized, onFertilized) works
 // on pickles in water on a coral block: across a diamond 5 wide and from one below to their
 // level, each water block over a coral block gets, one time in 3, 1 to 3 pickles, and the
 // pickles fertilized become 4.
@@ -58,7 +58,7 @@ func (t *Ticker) isPickle(block uint32) bool {
 	return ok
 }
 
-// pickleLive is BDS's 0xD51CC30: dead_bit set by whether water is in the block.
+// pickleLive is BDS's code: dead_bit set by whether water is in the block.
 func (t *Ticker) pickleLive(r *world.Region, pos cube.Pos, block uint32) {
 	k := t.pickleKit
 	of, ok := k.of[block]

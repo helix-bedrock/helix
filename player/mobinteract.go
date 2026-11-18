@@ -27,9 +27,9 @@ import (
 // slot such as "slot.armor.body", where wolf armour goes) and repair_entity_item. Not done: add_items,
 // health_amount, particles, vibration (game events) and interact_text.
 //
-// Spawned items are BDS 1.26.60's (the interact runtime 0x71FABF0): each item of the table
+// Spawned items are BDS 1.26.60's (the interact runtime): each item of the table
 // appears y_offset above the mob's feet, with the item's own spawn speed (ItemActor's
-// constructor 0xBD61040: up 0.2, sideways up to 0.1 each way) plus a push of (r1-r2)*0.1,
+// constructor: up 0.2, sideways up to 0.1 each way) plus a push of (r1-r2)*0.1,
 // r3*0.05, (r4-r5)*0.1, and a 10 tick pick-up delay. y_offset's default of 1 is Mojang's
 // documented default, not read from BDS.
 
@@ -106,7 +106,7 @@ func (p *Player) interactMob(o *Mob, d *protocol.UseItemOnEntityTransactionData)
 }
 
 // mobInteractions are the components' interactions after minecraft:interact, in BDS
-// 1.26.60's PlayerInteractionSystem order (mob/tame.go), after Actor::getInteraction's dye
+// 1.26.60's PlayerInteractionSystem order (mob/tame.go), after BDS's code's dye
 // (mobdye.go): bucketable, tameable, trusting,
 // ageable, healable and breedable, bribeable, leashable, nameable, tamemount, rideable,
 // sittable, trading, giveable, then the open inventory. The first that applies wins.
@@ -181,9 +181,9 @@ func feetBlock(v mgl32.Vec3) cube.Pos {
 const nameTagItem = "minecraft:name_tag"
 
 // nameMob is a renamed name tag used on a mob, NameableComponent's interaction (1.26.60
-// getInteraction 0x7139820, its callback 0x72009D0): the mob takes the tag's custom name
+// getInteraction, its callback): the mob takes the tag's custom name
 // (nameEntity: name, flag, persistent, name actions) and the player uses the item up
-// (Player::useItem, so not in creative). A name tag without a custom name does nothing, as
+// (so not in creative). A name tag without a custom name does nothing, as
 // does a mob without minecraft:nameable. True if the mob was named.
 func (p *Player) nameMob(o *Mob) bool {
 	held := p.inventory.Held()
@@ -240,8 +240,8 @@ func (p *Player) repairInteractSlot(o *Mob, it interaction) {
 }
 
 // dropInteractSlot is drop_item_slot: what the mob's inventory slot holds drops
-// drop_item_y_offset above its feet (BDS 1.26.60's interact runtime 0x71FABF0 through the
-// container's slot drop 0x737FEE0), and the emptied slot runs on_unequip.
+// drop_item_y_offset above its feet (BDS 1.26.60's interact runtime through the
+// container's slot drop), and the emptied slot runs on_unequip.
 func (p *Player) dropInteractSlot(r *world.Region, o *Mob, it interaction) {
 	if it.DropItemSlot == "" {
 		return

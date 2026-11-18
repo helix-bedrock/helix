@@ -11,7 +11,7 @@ import (
 type BlockEnv interface {
 	// ItemBlock is the block an item places; ok is false for an item that places none.
 	ItemBlock(it behavior.Item) (block string, ok bool)
-	// MayPlace is the block's mayPlace at p (BlockType vt+536).
+	// MayPlace is the block's mayPlace at p.
 	MayPlace(r *world.Region, p behavior.Pos, block string) bool
 }
 
@@ -40,7 +40,7 @@ func (m *Mob) MayPlace(block string, p behavior.Pos) bool {
 	return ok && m.v.r != nil && e.MayPlace(m.v.r, p, block)
 }
 
-// CanSeeBlock implements behavior.BlockCarrier (0xB5C5190): the line from the mob's attach
+// CanSeeBlock implements behavior.BlockCarrier: the line from the mob's attach
 // point 3 to the block's centre hits nothing, or hits that block.
 func (m *Mob) CanSeeBlock(p behavior.Pos) bool {
 	if m.v.r == nil {

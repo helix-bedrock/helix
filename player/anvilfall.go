@@ -10,11 +10,11 @@ import (
 )
 
 // Falling anvils, as BDS 1.26.60 does them. An anvil's falling block hurts what it lands in
-// (AnvilBlock's falling hurt flag 0xCCF4910; FallingBlockActor's causeFallDamage 0xBD5DD80 with
+// (AnvilBlock's falling hurt flag; FallingBlockActor's causeFallDamage with
 // its defaults of 2 a block, at most 40, cause Anvil). The same landing may wear the anvil, by
 // chance 0.05 + 0.05 a block fallen: an anvil becomes chipped, a chipped one damaged, and a
 // damaged one breaks, the falling block vanishing with nothing placed or dropped. A placed
-// anvil sends LevelEvent 1022 (its onLand 0xCCF4920).
+// anvil sends LevelEvent 1022 (its onLand).
 const (
 	causeAnvil DamageCause = 17
 

@@ -16,21 +16,21 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Fishing as BDS 1.26.60 does it: FishingRodItem::use (0xC990440) casts and reels in, and the
-// FishingHook actor (vtable 0xFAFAA08) runs its tick (0xC08F3B0: floating, hooking entities,
-// the fish coming and biting), its retrieve (0xC08DBF0: what reeling in does) and its pull
-// (0xC08DAA0, [PullVelocity]). 1.21.3 was read for names only.
+// Fishing as BDS 1.26.60 does it: BDS's code casts and reels in, and the
+// FishingHook actor runs its tick (: floating, hooking entities,
+// the fish coming and biting), its retrieve (: what reeling in does) and its pull
+// ([PullVelocity]). 1.21.3 was read for names only.
 const (
 	nameFishingRod  = "minecraft:fishing_rod"
 	nameFishingHook = "minecraft:fishing_hook"
 
-	// hookHalf and hookHeight are its box: reloadHardcoded (0xC08D360) sets 0.5 by 0.5,
+	// hookHalf and hookHeight are its box: reloadHardcoded sets 0.5 by 0.5,
 	// over the definition's 0.15.
 	hookHalf   = 0.25
 	hookHeight = 0.5
 	// hookCastSpeed is how long the look direction is before the angler's own speed is
 	// added; hookCastPower what the direction, made one long, is multiplied by after its
-	// gaussian spread of hookSpread (constructor 0xC08D150, reloadHardcoded).
+	// gaussian spread of hookSpread (constructor, reloadHardcoded).
 	hookCastSpeed = 0.4
 	hookCastPower = 1.5
 	hookSpread    = 0.0075
@@ -187,7 +187,7 @@ func OnFishCatch(s *Setup, fn func(e *FishCatchEvent), p Priority) error {
 	return addListener(s, &s.h.game.fishCatchEv, fn, p)
 }
 
-// useFishingRod is FishingRodItem::use: with a hook out it reels in and the rod wears by
+// useFishingRod matches BDS: with a hook out it reels in and the rod wears by
 // what that did; without one it casts a hook. Runs: the player's region.
 func (p *Player) useFishingRod() bool {
 	if p.entity == nil {
@@ -218,7 +218,7 @@ func (p *Player) useFishingRod() bool {
 // castHook adds a hook in front of p as reloadHardcoded aims it: the look direction times
 // hookCastSpeed plus the angler's speed, made one long, spread by a gaussian on each axis,
 // times hookCastPower. It starts at the angler's drop attach point plus the angler's speed,
-// as FishingRodItem::use (0xC990440) places it.
+// as BDS places it.
 func (s *Host) castHook(r *world.Region, p *Player) *FishingHook {
 	rot := p.entity.Rotation()
 	start := p.AttachPos(AttachDrop).Add(p.move.velocity)
@@ -361,7 +361,7 @@ func (h *FishingHook) remove() {
 	}
 }
 
-// tick is the hook's tick (0xC08F3B0) in its order: floating and sinking, then hanging
+// tick is the hook's tick in its order: floating and sinking, then hanging
 // on its target, or the hit check and the move with the fish in water, then the angler
 // checks, and last its place on its target.
 func (h *FishingHook) tick(e *world.Entity) {
@@ -474,7 +474,7 @@ func hookBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
 	return mgl32.Vec3{pos[0] - hookHalf, pos[1], pos[2] - hookHalf}, mgl32.Vec3{pos[0] + hookHalf, pos[1] + hookHeight, pos[2] + hookHalf}
 }
 
-// waterShare is _getWaterPercentage (0xC08F210): of hookWaterSlices slices of its box from
+// waterShare is _getWaterPercentage: of hookWaterSlices slices of its box from
 // the bottom, the share that touch water.
 func (h *FishingHook) waterShare(r *world.Region, pos mgl32.Vec3) float32 {
 	lo, hi := hookBox(pos)
@@ -575,7 +575,7 @@ func (h *FishingHook) hitCheck(r *world.Region, from mgl32.Vec3) bool {
 	return false
 }
 
-// move is Actor::move by its speed through the blocks' boxes, y then x then z; a blocked
+// move matches BDS by its speed through the blocks' boxes, y then x then z; a blocked
 // axis loses its speed.
 func (h *FishingHook) move(r *world.Region, pos mgl32.Vec3) mgl32.Vec3 {
 	h.onGround, h.against = false, false
@@ -747,12 +747,12 @@ func (h *FishingHook) waterAnimalsNear(r *world.Region, pos mgl32.Vec3) bool {
 }
 
 // pullPoint is where reeling in pulls toward: hookPullAbove over the angler's head attach
-// point, as _pullCloser (0xC08DAA0) aims.
+// point, as _pullCloser aims.
 func (h *FishingHook) pullPoint() mgl32.Vec3 {
 	return h.owner.AttachPos(AttachHead).Add(mgl32.Vec3{0, hookPullAbove, 0})
 }
 
-// retrieve is FishingHook::retrieve (0xC08DBF0): a hooked entity is pulled to the angler, a
+// retrieve matches BDS: a hooked entity is pulled to the angler, a
 // biting fish is caught, and the hook goes. It returns what the rod wears by.
 func (h *FishingHook) retrieve(r *world.Region) int32 {
 	var wear int32

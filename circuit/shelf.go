@@ -8,13 +8,12 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Shelves and redstone, from BDS 1.26.60's shelf power handler (0xD520720): a shelf that
+// Shelves and redstone, from BDS 1.26.60's shelf power handler: a shelf that
 // gains power plays activate (538), one that loses it deactivate (539), and powered shelves
 // side by side facing the same way join in rows of up to three, kept in
 // powered_shelf_type: 0 alone, 1 the row's start, 2 its middle, 3 its end. A row runs from
 // its start toward the next side, the cardinal direction one turn on from the shelf's.
 // Not ported: BDS's repair of a row whose shelves changed without power changing
-// (0xD521640).
 const (
 	stateShelfType   = "powered_shelf_type"
 	stateShelfFacing = "minecraft:cardinal_direction"
@@ -56,7 +55,7 @@ func shelfSide(pos cube.Pos, dir, steps int) cube.Pos {
 	return pos.Add(cube.Pos{step[0] * steps, step[1] * steps, step[2] * steps})
 }
 
-// shelfJoins is BDS's 0xD523870: the shelf at pos is powered and faces dir.
+// shelfJoins is BDS's code: the shelf at pos is powered and faces dir.
 func (t *Ticker) shelfJoins(c *regionCircuit, pos cube.Pos, dir int) bool {
 	block, ok := c.r.Block(pos, 0)
 	if !ok || !isShelf(t.blocks.Name(block)) {
@@ -66,7 +65,7 @@ func (t *Ticker) shelfJoins(c *regionCircuit, pos cube.Pos, dir int) bool {
 	return bitState(states, statePowered) && shelfDirection(states) == dir
 }
 
-// shelfIs is BDS's 0xD5232A0: the shelf at pos is powered with the row place typ.
+// shelfIs is BDS's code: the shelf at pos is powered with the row place typ.
 func (t *Ticker) shelfIs(c *regionCircuit, pos cube.Pos, typ int32) bool {
 	block, ok := c.r.Block(pos, 0)
 	if !ok || !isShelf(t.blocks.Name(block)) {
@@ -76,7 +75,7 @@ func (t *Ticker) shelfIs(c *regionCircuit, pos cube.Pos, typ int32) bool {
 	return bitState(states, statePowered) && intState(states, stateShelfType) == typ
 }
 
-// setShelf is BDS's 0xD523B50: the shelf's power bit and row place.
+// setShelf is BDS's code: the shelf's power bit and row place.
 func (t *Ticker) setShelf(c *regionCircuit, pos cube.Pos, powered bool, typ int32) {
 	block, ok := c.r.Block(pos, 0)
 	if !ok || !isShelf(t.blocks.Name(block)) {

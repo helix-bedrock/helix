@@ -47,7 +47,7 @@ func targetSignal(pos cube.Pos, hit mgl32.Vec3) int32 {
 }
 
 // HitTarget is a projectile landing at hit on the target block at pos, BDS's
-// TargetBlock::onProjectileHit: power by how near the centre, for longer if it was an arrow
+// BDS's code: power by how near the centre, for longer if it was an arrow
 // or trident. A hit while it is on starts the wait again. A player's hand does nothing to a
 // target in BDS. False if the block is not a target. Runs: owner of the region.
 func (t *Ticker) HitTarget(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow bool) bool {

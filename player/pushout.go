@@ -9,7 +9,7 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// BDS 1.26.60's push out of blocks (0xB3C5570), which only items and experience orbs run.
+// BDS 1.26.60's push out of blocks, which only items and experience orbs run.
 const (
 	// pushSpeed is how fast it leaves a block, pushSpeedStairs how fast it leaves stairs.
 	pushSpeed       = 0.25

@@ -5,12 +5,12 @@
 // This package decides when a block falls and how it settles; the falling block itself is
 // an entity, made by the StartFunc the Ticker is given (the engine's player package).
 //
-// Read from BDS 1.26.60 (Linux, IDA): FallingBlock's onPlace listener sub_CAF7900,
-// neighborChanged sub_CAF8870, tick listener sub_CAF7B40 -> sub_CAF8640, isFreeToFall
-// sub_CAF84C0, startFalling sub_CAF7ED0, tickBlocksAround2D sub_CAF7B90, tryToPlace
-// sub_CB7BD70; TopSnowBlock's tick listener sub_D4E9720, neighborChanged sub_D4EAC10,
-// isFreeToFall sub_D4EB730, its support check (vtable slot 68) sub_D4EA3C0, startFalling
-// sub_D4EB7F0, shouldStopFalling sub_D4EB630, tryToPlace sub_D4EA610.
+// Read from BDS 1.26.60 (Linux, BDS): FallingBlock's onPlace listener,
+// neighborChanged, tick listener, isFreeToFall,
+// startFalling, tickBlocksAround2D, tryToPlace;
+// TopSnowBlock's tick listener, neighborChanged,
+// isFreeToFall, its support check, startFalling,
+// shouldStopFalling, tryToPlace.
 package fall
 
 import (
@@ -76,7 +76,7 @@ const (
 )
 
 // fallingNames are the blocks BDS registers as FallingBlock subclasses that fall the plain
-// way (the 1.26.60 block registration, sub_5BC7DE0): sand and red sand (SandBlock), gravel,
+// way (the 1.26.60 block registration): sand and red sand (SandBlock), gravel,
 // the dragon egg, the anvils and every concrete powder (whose hardening in water is its
 // own). Scaffolding, pointed dripstone and suspicious sand and gravel are FallingBlocks
 // too, but with their own tick: they are not here.
@@ -86,7 +86,7 @@ var fallingNames = map[string]bool{
 	"minecraft:damaged_anvil": true, "minecraft:deprecated_anvil": true,
 }
 
-// corals are the coral plants and fans a falling block falls into (sub_CAF84C0's five
+// corals are the coral plants and fans a falling block falls into ('s five
 // block lists): live and dead, plants, fans and wall fans.
 var corals = [...]string{"tube", "brain", "bubble", "fire", "horn"}
 
@@ -217,7 +217,7 @@ func (t *Table) FreeBelow(r *world.Region, pos cube.Pos, k Kind) bool {
 	return s.free || (k == Snow && s.leaves)
 }
 
-// SnowSurvives is TopSnowBlock's support check (vtable slot 68): the block at pos must be air,
+// SnowSurvives is TopSnowBlock's support check: the block at pos must be air,
 // snow or a plant snow covers, and the one below a full snow layer, leaves, or a block
 // that holds things on top that is not ice or a barrier.
 func (t *Table) SnowSurvives(r *world.Region, pos cube.Pos) bool {
@@ -303,7 +303,7 @@ func (t *Table) landSnow(r *world.Region, pos cube.Pos, layers int) bool {
 	return true
 }
 
-// addSnow is BDS's snow builder (sub_D4E8C60) with n layers: n more on a snow layer, a new
+// addSnow is BDS's snow builder with n layers: n more on a snow layer, a new
 // one on air, a covered one over a plant snow covers, which moves to the second layer.
 func (t *Table) addSnow(r *world.Region, pos cube.Pos, n int) {
 	b, ok := r.Block(pos, 0)

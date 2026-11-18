@@ -11,10 +11,10 @@ var mobArmourSlots = [...]int{mob.EquipHead, mob.EquipChest, mob.EquipLegs, mob.
 
 // AfterArmor is what a mob's armour leaves of damage v of cause: BDS 1.26.60's Mob hurt
 // takes the same steps for every mob as for players: a helmet against falling blocks, the
-// armour share (Mob::getDamageAfterArmorReduction, 0xBFE8020) from the worn pieces'
-// protection and toughness, then the protection enchantments (0xC4A2AA0). The worn pieces
-// wear by the damage before armour, as the health change's Mob::hurtArmor (0xBFE91C0) does.
-// Resistance and the absorption attribute come last, as the health delegate (0xBC45336)
+// armour share from the worn pieces'
+// protection and toughness, then the protection enchantments. The worn pieces
+// wear by the damage before armour, as the health change's BDS's code does.
+// Resistance and the absorption attribute come last, as the health delegate
 // takes them.
 func (m *Mob) AfterArmor(_ *mob.Mob, v float32, cause int) float32 {
 	c := DamageCause(cause)
@@ -73,7 +73,7 @@ func (m *Mob) protectionShare(v float32, c DamageCause) float32 {
 	return v * (1 - counted*protectionPoint)
 }
 
-// wearArmour is Mob::hurtArmorSlots (0xBFE9500) over every armour slot: each worn piece
+// wearArmour matches BDS over every armour slot: each worn piece
 // takes a quarter of the damage, at least one, by the item's own hurtAndBreak (Unbreaking,
 // Unbreakable); fire spares fire resistant pieces. A broken piece plays its break sound at
 // the mob and those who see the mob are sent its armour again; wear alone sends nothing,

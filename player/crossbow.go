@@ -8,9 +8,9 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// Crossbows, from BDS 1.26.60's CrossbowItem (vtable 0xFB61328, constructor 0xC9AEBE0):
-// use 0xC9AF5C0 starts loading or shoots what is loaded, releaseUsing 0xC9B0EA0 loads once
-// fully drawn, useTimeDepleted 0xC9B0E70 lets go by itself when the draw is done.
+// Crossbows, from BDS 1.26.60's CrossbowItem (constructor):
+// use starts loading or shoots what is loaded, releaseUsing loads once
+// fully drawn, useTimeDepleted lets go by itself when the draw is done.
 const (
 	nameCrossbow = "minecraft:crossbow"
 
@@ -24,8 +24,8 @@ const (
 	// crossbowLoadTicks is a full draw, less crossbowQuickChargeTicks a Quick Charge level.
 	crossbowLoadTicks        = 25
 	crossbowQuickChargeTicks = 5
-	// crossbowMultishotCount is how many a Multishot crossbow loads (+748), and
-	// crossbowMultishotAngle how many degrees apart they fly (+752).
+	// crossbowMultishotCount is how many a Multishot crossbow loads, and
+	// crossbowMultishotAngle how many degrees apart they fly.
 	crossbowMultishotCount = 3
 	crossbowMultishotAngle = 10
 	// crossbowWearArrow is one arrow's wear; crossbowWearMore a firework's or Multishot's.
@@ -69,7 +69,7 @@ func (inv *playerItems) crossbowAmmo() (ItemStack, int, bool) {
 	return ItemStack{}, 0, false
 }
 
-// useCrossbow is BDS's CrossbowItem::use: a loaded crossbow shoots, an empty one starts
+// useCrossbow is BDS's code: a loaded crossbow shoots, an empty one starts
 // loading if there is something to load (anything in creative). False if nothing happened.
 func (p *Player) useCrossbow(held ItemStack) bool {
 	if !crossbowCharged(held).Empty() {
@@ -143,7 +143,7 @@ func (p *Player) loadCrossbow(held ItemStack, drawn int32) {
 }
 
 // shootCrossbow is BDS's use of a loaded crossbow: each loaded item flies along the look,
-// Multishot's at -10, 0 and +10 degrees, arrows with the crossbow's arrow definition,
+// Multishot's at -10, 0 and degrees, arrows with the crossbow's arrow definition,
 // critical, only the middle one of three picked up; rockets fly free along the aim. The
 // crossbow wears 1 for one arrow, 3 for a rocket or Multishot, then the shot sound and the
 // crossbow is empty.
@@ -203,7 +203,7 @@ func (p *Player) shootCrossbowArrow(r *world.Region, held, loaded ItemStack, dir
 	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, p.entity.Position(), p.entity.Rotation()), dir, spec.Power, p)
 	t.critical = true
 	t.pierce = heldEnchant(held, enchantPiercing)
-	// BDS (0xC9CD650) gives the arrow the loaded arrow's potion; its effects wait for the
+	// BDS gives the arrow the loaded arrow's potion; its effects wait for the
 	// potion table, but the arrow keeps its aux so a tipped one is picked up tipped.
 	if loaded.Meta > 0 {
 		t.item = ItemStack{Name: nameArrow, Meta: loaded.Meta, Count: 1}

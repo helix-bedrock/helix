@@ -451,7 +451,7 @@ func (t *Ticker) playNote(r *world.Region, pos cube.Pos, note uint8) {
 // nameTNT is the block redstone lights.
 const nameTNT = "minecraft:tnt"
 
-// SetPowerDripleaf sets what power reaching a big dripleaf does (BDS's 0xCCDBA50: a tilted
+// SetPowerDripleaf sets what power reaching a big dripleaf does (BDS's code: a tilted
 // head goes back up). Call it before the world ticks.
 func (t *Ticker) SetPowerDripleaf(fn func(r *world.Region, pos cube.Pos)) { t.powerDripleaf = fn }
 

@@ -12,14 +12,14 @@ import (
 )
 
 // What a lightning strike does to the blocks it lands on, from BDS 1.26.60's LightningBolt
-// tick (0xBD52630) on its first tick: the block at the bolt is hit (onLightningHit, vtable slot
+// tick on its first tick: the block at the bolt is hit (onLightningHit,
 // 16), then copper is cleaned: the block a struck rod stands on, else the block under the bolt.
 // If that is copper that is not waxed, 3 to 5 times it is hit and a walk of 1 to 8 steps cleans
 // a copper neighbour (one of the 27 around, up to 10 tries a step) and moves there. A copper
-// block hit goes back one oxidation stage (CopperLightningRodBlock 0xD559BF0); a rod hit turns
+// block hit goes back one oxidation stage (CopperLightningRodBlock); a rod hit turns
 // it on (circuit.StrikeRod) with an electric spark (LevelEvent 2033).
 //
-// Channeling tridents on rods are LightningRodBlock::onProjectileHit (slot 15, 0xD558820): the
+// Channeling tridents on rods are BDS's code (slot 15): the
 // top rod of a stack takes it, and under rain with open sky it strikes there.
 const (
 	// rodHitsBase and rodHitsSpread: the target is hit rodHitsBase + rand(rodHitsSpread) times.

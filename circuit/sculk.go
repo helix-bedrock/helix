@@ -6,11 +6,11 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Sculk sensors and shriekers as BDS 1.26.60: SculkSensorBlock (vtable 0xFC1B7B0) and
-// CalibratedSculkSensorBlock (0xFBA7390) with their producer (setupRedstoneComponent: all sides,
+// Sculk sensors and shriekers as BDS 1.26.60: SculkSensorBlock and
+// CalibratedSculkSensorBlock with their producer (setupRedstoneComponent: all sides,
 // attachments, power up; the calibrated one gives none out of its back, where its input comes
-// from), activation (0xD515AB0: active phase, strength from the vibration, a tick after the
-// block's active ticks, 30 or 10) and the tick listener 0xD5148C0 (active -> cooldown at 0 for 10
+// from), activation (: active phase, strength from the vibration, a tick after the
+// block's active ticks, 30 or 10) and the tick listener (active -> cooldown at 0 for 10
 // ticks -> inactive with the power off sound). Hearing vibrations is the player package's
 // (player/sculk.go); this is only the block and its power. The shrieker's tick is handed to
 // SculkHooks.ShriekerTick.
@@ -24,7 +24,7 @@ const (
 	phaseActive   int32 = 1
 	phaseCooldown int32 = 2
 	// sensorActiveTicks and calibratedActiveTicks are how long each stays active (the
-	// block's field +936), sensorCooldownTicks how long the cooldown lasts.
+	// block's field), sensorCooldownTicks how long the cooldown lasts.
 	sensorActiveTicks     = 30
 	calibratedActiveTicks = 10
 	sensorCooldownTicks   = 10

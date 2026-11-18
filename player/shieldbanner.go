@@ -8,7 +8,7 @@ import (
 	"github.com/helix-bedrock/protocol"
 )
 
-// BDS 1.26.60's shield + banner recipe (ShieldRecipe: matches 0xC497C50, assemble 0xC496C90,
+// BDS 1.26.60's shield + banner recipe (ShieldRecipe: matches, assemble,
 // recipe ID shield_banner_recipeId). The research note is private.
 const shieldItem = "minecraft:shield"
 

@@ -146,7 +146,7 @@ func NewExplosion(pos mgl32.Vec3, radius float32) *Explosion {
 	}
 }
 
-// ExplodeFunc runs an explosion, BDS's Explosion::explode. False if nothing happened.
+// ExplodeFunc runs an explosion, BDS's code. False if nothing happened.
 type ExplodeFunc func(s *Host, r *world.Region, e *Explosion) bool
 
 // ExplosionEvent fires once an explosion knows which blocks it reaches, before anything
@@ -241,7 +241,7 @@ func (s *Host) Explode(r *world.Region, e *Explosion) bool {
 	return s.game.sys.Explode(s, r, e)
 }
 
-// vanillaExplode is BDS 1.26.60's Explosion::explode.
+// vanillaExplode is BDS 1.26.60's BDS's code.
 func vanillaExplode(s *Host, r *world.Region, e *Explosion) bool {
 	if e.Radius == 0 {
 		return false
@@ -269,7 +269,7 @@ func vanillaExplode(s *Host, r *world.Region, e *Explosion) bool {
 		levelEvent(r, at, e.Pos, e.Particle, int32(e.Radius))
 	}
 	if e.ToggleBlocks {
-		// BDS's explode (0xCE03BA0) toggles each block (0xCB79C30) before breaking any.
+		// BDS's explode toggles each block before breaking any.
 		for _, pos := range blocks {
 			s.windToggle(r, pos)
 		}

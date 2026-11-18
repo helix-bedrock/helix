@@ -64,7 +64,7 @@ type Rules struct {
 	// Dismount is how riders get off.
 	Dismount DismountMode
 	// ExitAbove is the upward one of the three searches ExitVehicleSystemImpl picks from
-	// (1.26.60 0xBFA8F80, against the eight places around of 0xBFA89D0): the rider gets up
+	// (against the eight places around of): the rider gets up
 	// where it sat, standing on the vehicle. Boats land riders this way in BDS.
 	ExitAbove bool
 }

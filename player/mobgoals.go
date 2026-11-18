@@ -45,9 +45,9 @@ func (m *Mob) HurtBy(_ *mob.Mob, target behavior.ID, cause int, damage float32, 
 }
 
 // RaidBlock is minecraft:on_raided on the block at p (raid_garden). BDS 1.26.60's vanilla
-// blocks that answer it: a sweet berry bush is picked (0xD4DF540, the use's 0xD4E0390), cave
-// vines with berries are picked (0xCB50F60, the use's 0xCB52C10), and a crop loses a growth
-// stage and shows LevelEvent 2011 with its new block (0xCB3BBF0). The block-changed game
+// blocks that answer it: a sweet berry bush is picked (the use's), cave
+// vines with berries are picked (the use's), and a crop loses a growth
+// stage and shows LevelEvent 2011 with its new block. The block-changed game
 // events BDS posts are not posted: Helix's game events come from players only.
 func (s *Host) RaidBlock(r *world.Region, p behavior.Pos, _ behavior.ID) {
 	f := s.farm
@@ -115,7 +115,7 @@ func (m *Mob) DropLoot(_ *mob.Mob, table string, at behavior.Vec3, killed behavi
 	}
 }
 
-// TimeOfDay is BDS's Dimension::getTimeOfDay: the sun angle of the overworld clock.
+// TimeOfDay is BDS's code: the sun angle of the overworld clock.
 func (s *Host) TimeOfDay() float32 {
 	if s.clock == nil {
 		return 0

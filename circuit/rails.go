@@ -41,7 +41,7 @@ type CartBoxFunc func(e *world.Entity) (signal int32, ok bool)
 // SetCartBox sets how detector rails see carts. Call it before any player joins.
 func (t *Ticker) SetCartBox(fn CartBoxFunc) { t.cartBox = fn }
 
-// railAt is BDS's BaseRailBlock::Rail: a rail and the places it wants to connect to.
+// railAt is BDS's Rail: a rail and the places it wants to connect to.
 type railAt struct {
 	t        *Ticker
 	c        *regionCircuit
@@ -184,7 +184,7 @@ func (a *railAt) slope(dir int32) int32 {
 	return dir
 }
 
-// place is BDS's Rail::place: work out the direction from the rails around, set it, and
+// place is BDS's code: work out the direction from the rails around, set it, and
 // have the rails around connect back.
 func (a *railAt) place(strength int32, force bool) {
 	x, y, z := a.pos[0], a.pos[1], a.pos[2]
@@ -275,7 +275,7 @@ func powerCurve(dir, strength int32, n, s, w, e bool) int32 {
 	return dir
 }
 
-// connectTo is BDS's Rail::connectTo: this rail gains a link and takes the shape that gives.
+// connectTo is BDS's code: this rail gains a link and takes the shape that gives.
 func (a *railAt) connectTo(o *railAt) {
 	a.links = append(a.links, o.pos)
 	var n, s, w, e bool

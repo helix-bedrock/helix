@@ -18,26 +18,26 @@ const (
 
 	// fireworkHalf is half of its 0.25 box.
 	fireworkHalf = 0.125
-	// Lifetime (0xBD5EFC0): fireworkLifeBase ticks, or fireworkLifePerFlight per Flight
+	// Lifetime: fireworkLifeBase ticks, or fireworkLifePerFlight per Flight
 	// level plus fireworkLifeBase with one, plus nextInt(6) + nextInt(7).
 	fireworkLifeBase      = 10
 	fireworkLifePerFlight = 10
 	fireworkLifeRandA     = 6
 	fireworkLifeRandB     = 7
 	// It starts with a gaussian push of fireworkJitter and fireworkThrust along its
-	// direction (0xBD5EB40); flying free its speed grows by fireworkSpeedUp and
-	// fireworkThrust along its direction each tick (0x75ECFC0).
+	// direction; flying free its speed grows by fireworkSpeedUp and
+	// fireworkThrust along its direction each tick.
 	fireworkJitter  = 0.001
 	fireworkThrust  = 0.03
 	fireworkSpeedUp = 1.05
-	// Its explosion (0xBD5F2E0) hurts fireworkDamageBase plus fireworkDamagePerStar per
+	// Its explosion hurts fireworkDamageBase plus fireworkDamagePerStar per
 	// explosion in it: in full the one it is attached to, and those within fireworkReach
 	// it sees by sqrt((reach - distance) / reach) of that.
 	fireworkDamageBase    = 5
 	fireworkDamagePerStar = 2
 	fireworkReach         = 5
 
-	// The synched data BDS gives a rocket (0xBD5ED60): its item's tag, its direction and
+	// The synched data BDS gives a rocket: its item's tag, its direction and
 	// the unique ID of what it is attached to, -1 for nothing.
 	fireworkKeyItem      = protocol.EntityDataKeyDisplayFirework
 	fireworkKeyDirection = protocol.EntityDataKeyDisplayOffset
@@ -45,7 +45,6 @@ const (
 	fireworkNotAttached  = int64(-1)
 
 	// fireworkUseRise is the direction, straight up, of a rocket launched from a block
-	// (0xC98CF10).
 	fireworkUseRise = 1
 )
 
@@ -67,7 +66,7 @@ type FireworkRocket struct {
 	lifetime int32
 	// attached is the player it rides with, if any.
 	attached *Player
-	// dispensed is set for rockets from a dispenser (BDS's +944).
+	// dispensed is set for rockets from a dispenser.
 	dispensed bool
 	// shot is set for rockets from a crossbow (BDS's init with its last argument set), which
 	// explode when they hit a block or an entity (fireworksRocketServerProjectileHit);
@@ -166,7 +165,7 @@ func fireworkExplosions(item ItemStack) int {
 	return 0
 }
 
-// fireworkLifetime is BDS's lifetime (0xBD5EFC0) for an item.
+// fireworkLifetime is BDS's lifetime for an item.
 func fireworkLifetime(item ItemStack) int32 {
 	life := int32(fireworkLifeBase)
 	if v, ok := fireworksTag(item)["Flight"]; ok {
@@ -176,7 +175,7 @@ func fireworkLifetime(item ItemStack) int32 {
 }
 
 // LaunchFirework adds a firework rocket made from item at pos, flying along dir, or riding
-// with attached when it is not nil, as BDS's rocket init (0xBD5EB40) starts one. Runs:
+// with attached when it is not nil, as BDS's rocket init starts one. Runs:
 // owner of the chunk at pos.
 func (s *Host) LaunchFirework(d *world.Dimension, pos, dir mgl32.Vec3, item ItemStack, attached *Player) *FireworkRocket {
 	f := &FireworkRocket{s: s, dir: dir, item: item, attached: attached, lifetime: fireworkLifetime(item)}
@@ -222,8 +221,8 @@ func (f *FireworkRocket) movePacket(e *world.Entity) packet.Packet {
 	return &packet.MoveActorAbsolute{EntityRuntimeID: e.RuntimeID(), Position: e.Position(), Rotation: mgl32.Vec3{rot.Pitch, rot.Yaw, rot.HeadYaw}}
 }
 
-// tick is BDS's rocket tick (0xBD5F2E0): the launch sound on its first tick, its age, and
-// the explosion once its age passes its lifetime; then its movement (0x75ECFC0), a system
+// tick is BDS's rocket tick: the launch sound on its first tick, its age, and
+// the explosion once its age passes its lifetime; then its movement, a system
 // of its own in BDS whose place in the tick was not worked out.
 func (f *FireworkRocket) tick(e *world.Entity) {
 	r := e.Region()
@@ -246,7 +245,7 @@ func (f *FireworkRocket) tick(e *world.Entity) {
 	f.move(r, e)
 }
 
-// move is BDS's rocket movement (0x75ECFC0): attached, it is where the player is; free,
+// move is BDS's rocket movement: attached, it is where the player is; free,
 // its speed grows by 1.05 and 0.03 along its direction, and it moves through the blocks'
 // collision boxes, turned along its flight.
 // think works out a free rocket's flight through the blocks (see think.go); one on a gliding
@@ -292,7 +291,7 @@ func (f *FireworkRocket) move(r *world.Region, e *world.Entity) {
 	}
 }
 
-// vanillaFirework is BDS's rocket explosion (0xBD5F2E0): its item's tag is sent again and
+// vanillaFirework is BDS's rocket explosion: its item's tag is sent again and
 // the explosion event (ActorEvent 25), from which every client draws the explosion's
 // particles and plays its sounds, the rocket attached to a gliding player too. With stars
 // it hurts with cause 23: the attached player the full 5 + 2 per star, and every other
@@ -365,7 +364,7 @@ func (f *FireworkRocket) OutOfWorld(_ *Host, e *world.Entity) {
 	e.Remove()
 }
 
-// useFirework is BDS's FireworksItem::use (0xC98D580): only while gliding, a rocket
+// useFirework is BDS's code: only while gliding, a rocket
 // attached to the player, one item used up outside creative, and the glide boost for the
 // rocket's lifetime sent to the player (MovementEffect), which its client flies by.
 func (p *Player) useFirework(held ItemStack) bool {
@@ -383,7 +382,7 @@ func (p *Player) useFirework(held ItemStack) bool {
 	return true
 }
 
-// useFireworkOn is BDS's FireworksItem::useOn (0xC98CF10): not while gliding; a rocket
+// useFireworkOn is BDS's code: not while gliding; a rocket
 // flying up from where the block was clicked, one item used up outside creative.
 func (p *Player) useFireworkOn(r *world.Region, clicked cube.Pos, click mgl32.Vec3, held ItemStack) bool {
 	if p.Gliding() {
@@ -410,7 +409,7 @@ func (p *Player) useUpHeld() {
 	p.sendHeld()
 }
 
-// dispenseFirework is BDS's FireworksItem::dispense (0xC98DC70): a rocket flying out of
+// dispenseFirework is BDS's code: a rocket flying out of
 // the face, just outside it, with the dispenser's click. False if the item is not a rocket.
 func (s *Host) dispenseFirework(r *world.Region, pos cube.Pos, face cube.Face, at mgl32.Vec3, item ItemStack) bool {
 	if item.Name != nameFireworkRocket {

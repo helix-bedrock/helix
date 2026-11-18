@@ -493,7 +493,7 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 				r.ScheduleTick(pos, block, 1, 0)
 			}
 		case kindLever:
-			// LeverBlock's neighborChanged (0xD556440) looks only when its holder changed.
+			// LeverBlock's neighborChanged looks only when its holder changed.
 			if from == t.attach.LeverHolder(pos, block) && !t.attach.LeverHeld(r, pos, block) {
 				r.ScheduleTick(pos, block, 1, 0)
 			}

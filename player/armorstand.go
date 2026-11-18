@@ -13,10 +13,10 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Armour stands as BDS 1.26.60 runs them: ArmorStand (vtable 0xFAFA028), a mob of the
-// armor_stand definition with its own hurt (slot 134, 0xC084820), interaction (slot 117,
-// 0xC0841B0, with the equip lambda 0xC29F530 and the pose lambda 0xC29F210), tick (slot 25,
-// 0xC085BE0) and save (0xC083FC0 / slot 136), and ArmorStandItem::_useOn (0xC9CC010).
+// Armour stands as BDS 1.26.60 runs them: ArmorStand, a mob of the
+// armor_stand definition with its own hurt (slot 134), interaction (slot 117,,
+// with the equip lambda and the pose lambda), tick (slot 25,)
+// and save (/ slot 136), and BDS's code.
 const (
 	armorStandID = "minecraft:armor_stand"
 	// armorStandPoses is how many poses it has; poses go round 0 to 12.
@@ -134,7 +134,7 @@ func (p *Player) interactArmorStand(o *Mob, d *protocol.UseItemOnEntityTransacti
 	if r == nil || o.gone || p.entity.Position().Sub(o.entity.Position()).Len() > attackRangeCreative {
 		return
 	}
-	// Mob's own interactions come first (0xB3D1540): a name tag names the stand.
+	// Mob's own interactions come first: a name tag names the stand.
 	if p.nameMob(o) {
 		return
 	}
@@ -370,7 +370,7 @@ func (o *Mob) loadArmorStand(data map[string]any) {
 	}
 }
 
-// placeArmorStand is ArmorStandItem::_useOn: not on the bottom of a block; in the clicked
+// placeArmorStand matches BDS: not on the bottom of a block; in the clicked
 // block if it can be built over, else next to it; that block and the one above must be air
 // or built over, with no entity in the two blocks. Those blocks are cleared (liquids
 // stay), and the stand faces back toward the player in steps of 45 degrees.

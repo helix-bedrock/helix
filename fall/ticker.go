@@ -87,7 +87,7 @@ func (k *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 	}
 }
 
-// tickBlock is FallingBlock's tick (sub_CAF8640): the lowest falling block of the column
+// tickBlock is FallingBlock's tick: the lowest falling block of the column
 // pos is in falls, if it is above the bottom of the world and free to fall.
 func (k *Ticker) tickBlock(r *world.Region, pos cube.Pos) {
 	minY := r.Dimension().Range()[0]
@@ -112,7 +112,7 @@ func (k *Ticker) tickBlock(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// tickAround is tickBlocksAround2D (sub_CAF7B90): the falling blocks beside pos, west, east,
+// tickAround is tickBlocksAround2D: the falling blocks beside pos, west, east,
 // north and south, look again in 2 ticks.
 func (k *Ticker) tickAround(r *world.Region, pos cube.Pos) {
 	for _, f := range [...]cube.Face{cube.FaceWest, cube.FaceEast, cube.FaceNorth, cube.FaceSouth} {
@@ -123,7 +123,7 @@ func (k *Ticker) tickAround(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// tickSnow is TopSnowBlock's tick listener (sub_D4E9720): a snow layer free to fall falls;
+// tickSnow is TopSnowBlock's tick listener: a snow layer free to fall falls;
 // one that is neither free to fall nor held is destroyed.
 func (k *Ticker) tickSnow(r *world.Region, pos cube.Pos, block uint32) {
 	minY := r.Dimension().Range()[0]

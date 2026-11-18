@@ -18,12 +18,12 @@ import (
 // Mob equipment and death drops, as BDS 1.26.60 does them.
 //
 // A mob created (not loaded) rolls its minecraft:equipment table once it has read its
-// components (Actor::initializeComponents 0xB38F1A0), and each item goes where BDS's
-// Actor::equip (0xB3C8A40) puts it: something wearable in its armour slot, something the
+// components, and each item goes where BDS's
+// BDS's code puts it: something wearable in its armour slot, something the
 // offhand takes in the offhand, anything else in the main hand. The table's slot drop
 // chances are kept for its death.
 //
-// On death (Mob::dropEquipmentOnDeath, then the loot system's die event; read from the
+// On death (BDS's code, then the loot system's die event; read from the
 // 1.21.3 names, not compared with 1.26.60 line by line): each slot with a drop chance, or
 // an item the mob picked up, may drop: always at a chance of 1 or more, else only when a
 // player killed it, at the slot's chance plus 1% per Looting level, worn down at random
@@ -32,7 +32,7 @@ import (
 // Experience (minecraft:experience_reward's on_death) drops when its death has run its
 // course.
 
-// mobDropDelay is the pick-up delay of a mob's drops (Actor::spawnAtLocation, 10 ticks).
+// mobDropDelay is the pick-up delay of a mob's drops (10 ticks).
 const mobDropDelay = 10
 
 // lootDropBelow is how far under its feet a mob's loot appears (the loot system's -0.05).
@@ -116,10 +116,10 @@ func (m *Mob) equipFromTable(r *world.Region) {
 	m.sendEquipment()
 }
 
-// equipSlotFor is where Actor::equip (0xB3C8A40) puts an item: a wearable in its armour
-// slot; the illager banner in the chest slot, as a captain wears it (0xC8ECCD0 gives slot 1
+// equipSlotFor is where BDS's code puts an item: a wearable in its armour
+// slot; the illager banner in the chest slot, as a captain wears it (gives slot 1
 // for a banner whose Type is 1); an item the offhand takes in the offhand; anything else in
-// the main hand. Other banners stay on the head, as before (that test, Item vt+384, was not
+// the main hand. Other banners stay on the head, as before (that test,, was not
 // read).
 func (s *Host) equipSlotFor(it ItemStack) int {
 	t, ok := s.reg.Items.ByName(it.Name)
@@ -340,7 +340,7 @@ func (m *Mob) dropOnDeath(r *world.Region) {
 	}
 }
 
-// dropEquipment is Mob::dropEquipmentOnDeath.
+// dropEquipment matches BDS.
 func (m *Mob) dropEquipment(r *world.Region, at mgl32.Vec3, killer *Player) {
 	rnd := lootRandom{m.m.Rand()}
 	bonus := float32(m.s.lootingOf(killer)) * lootingDropBonus
@@ -375,7 +375,7 @@ func (m *Mob) dropEquipment(r *world.Region, at mgl32.Vec3, killer *Player) {
 	}
 }
 
-// spawnMobDrop throws an item out where a mob is, as Actor::spawnAtLocation: the usual
+// spawnMobDrop throws an item out where a mob is, as BDS: the usual
 // scatter and a 10 tick pick-up delay.
 func (s *Host) spawnMobDrop(r *world.Region, it ItemStack, at mgl32.Vec3) {
 	s.spawnItem(r.Dimension(), s.freshStack(it), at, mgl32.Vec3{dropDrift(), dropUp, dropDrift()}, world.Rotation{}, mobDropDelay, 0)
@@ -390,7 +390,7 @@ func (m *Mob) dropExperience(r *world.Region) {
 }
 
 // Shoot is ShooterComponent's shot, fired from the mob at its target as BDS's
-// ProjectileFactory::shootProjectileFromDefinition aims at a target: from the shooter's
+// BDS's code aims at a target: from the shooter's
 // eyes with the projectile's offset, toward the middle of the target's box, starting a
 // block out toward it; with gravity the pitch is the lower of the two that reach it at
 // that speed (45 degrees up when none does). power above 0 replaces the projectile's own.
@@ -447,8 +447,8 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 	}
 }
 
-// Explode is minecraft:explode going off (ExplodeComponent::explode, 1.21.3 0x1405AFFF0):
-// Level::explode with the mob as the source, so it is not hurt and distances are measured
+// Explode is minecraft:explode going off (1.21.3 0x1405AFFF0):
+// BDS's code with the mob as the source, so it is not hurt and distances are measured
 // from it. Damage is an entity explosion; the creeper is not credited as the attacker yet
 // (Explosion has players only). An empty particle or sound effect keeps the default.
 func (m *Mob) Explode(_ *mob.Mob, at behavior.Vec3, e state.Explosion) {

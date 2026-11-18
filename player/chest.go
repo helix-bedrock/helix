@@ -710,7 +710,7 @@ func (c *Chest) BlockEntityMoved(_ *world.Region, to cube.Pos) { c.pos = to }
 // barrels, hoppers, dispensers, droppers, crafters, furnaces and carts.
 //
 // Lenient where the lead says so (2026-11-08): BDS 1.26.60's container drop
-// (0xB53D210) throws chests, barrels, shulker boxes and hoppers in piles of 10 to
+// throws chests, barrels, shulker boxes and hoppers in piles of 10 to
 // 30 (their breaks pass 1; the furnace's passes 0), yet in game BDS ends with one
 // stack and Helix's piles stayed apart, so every slot drops whole as a furnace's do.
 // With scatter, as a block's drop, each slot lands at its own place inside the block
@@ -1084,7 +1084,7 @@ func (p *Player) tickChest() {
 		return
 	}
 	// Checked first, since only then may the cart be read: BDS measures to the middle of the
-	// block a cart is in (0xBC30280).
+	// block a cart is in.
 	// A horse window has no chest behind it: the mob holds its slots.
 	gone := p.windowChest(r) == nil
 	if p.window.horse != nil {

@@ -9,7 +9,7 @@ import (
 )
 
 // Flower pots as BDS 1.26.60: FlowerPotBlockActor (type 7, saved as "FlowerPot") with its
-// save 0xD40E530 (the plant as a block state compound, "PlantBlock") and load 0xD40E700.
+// save (the plant as a block state compound, "PlantBlock") and load.
 // The block's use, place, take, removal and creative break follow FlowerPotBlock's
 // use/_tryPlaceFlower/_tryTakeFlower/onRemove/playerWillDestroy, read in the 1.21.3 names
 // build; onChanged sets update_bit while a plant is in.
@@ -23,7 +23,7 @@ const (
 )
 
 // pottablePlants are the blocks BDS 1.26.60 gives the flower_pottable component: the 39
-// BlockFlowerPottableDescription creations in its vanilla block registration (0x5BC7DE0),
+// BlockFlowerPottableDescription creations in its vanilla block registration,
 // named by the FNV-1 hash of the block name each one follows. Seven (dead bush, red
 // mushroom, cactus, bamboo, wither rose, torchflower, oak sapling) follow no hashed name and
 // are placed by their spot in the registration order.
@@ -166,7 +166,7 @@ func (p *Player) heldPlant(held ItemStack) (uint32, bool) {
 	return blocks.Block(held.Name)
 }
 
-// useFlowerPot is FlowerPotBlock::use: put the held plant in, or else take the plant out.
+// useFlowerPot matches BDS: put the held plant in, or else take the plant out.
 func (p *Player) useFlowerPot(r *world.Region, u *BlockUse) bool {
 	fp, ok := FlowerPotAt(r, u.Pos)
 	if !ok {

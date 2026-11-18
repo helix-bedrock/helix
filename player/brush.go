@@ -12,23 +12,23 @@ import (
 
 // Brushing suspicious sand and gravel, as BDS 1.26.60 does it (research note: memory
 // research-brushing.md):
-//   - The brush's use on a block (BrushItem::_useOn, 0xC9D78D0) runs on every use the client
+//   - The brush's use on a block runs on every use the client
 //     sends while the button is held. On air it does nothing. On a brushable block (block actor
 //     type 52) it brushes it; when that finishes the block the brush wears 1 (hurtAndBreak,
 //     none in creative) and, if the brush broke, nothing more. Then on any block, at most once
 //     every 8 ticks per player (BrushEffectsCooldownComponent), the brush sound (LevelSoundEvent
 //     462, "brush") plays at the block's centre with the default state of the block's type. The
 //     dust is the client's.
-//   - BrushableBlockActor::brush (0xD4457C0): one stroke per 10 ticks (the next stroke is due 10
+//   - BDS's code: one stroke per 10 ticks (the next stroke is due 10
 //     ticks after the last was due, or after now on the first); the first stroke keeps the face
 //     brushed and unpacks the loot table into the one slot; the count goes up by one and at 10
 //     brushing completes; each stroke queues a block tick in 40 and marks it busy for 40 ticks.
-//   - Completing (0xD445970): the item comes out on the side brushed, at that block's centre,
+//   - Completing: the item comes out on the side brushed, at that block's centre,
 //     standing still, with throw time 10; brush_completed (463) plays with the block; level
-//     event 2021 (destroy particles, no sound) at the block; the block becomes sand or gravel
-//     (BrushableBlockUtils::getBrushedBlock); game event block_destroy at the block's bottom
+//     event 2021 (destroy particles, no sound) at the block; the block becomes sand or gravel;
+//     game event block_destroy at the block's bottom
 //     centre.
-//   - Its queued tick (BrushableBlockActor::update via BrushableBlock::tick): while busy it ticks
+//   - Its queued tick: while busy it ticks
 //     again in 20; else the count drops by 2 (to 0 at least) with another tick in 10; at 0 the
 //     brushed face is forgotten.
 //   - brushed_progress follows the count (onChanged): 0, 1 for 1-2, 2 for 3-5, 3 from 6, set
@@ -79,7 +79,7 @@ type Brushable struct {
 	item  ItemStack
 	count int32
 	dir   uint8
-	// unpacked is whether the loot table was rolled this load (BDS's +717).
+	// unpacked is whether the loot table was rolled this load.
 	unpacked bool
 	// nextStroke is the tick the next stroke may come after; stroked whether one came.
 	nextStroke int64
@@ -281,7 +281,7 @@ func (b *Brushable) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// update is one queued tick (BrushableBlockActor::update).
+// update is one queued tick.
 func (b *Brushable) update(r *world.Region, pos cube.Pos, now int64) {
 	if now <= b.busyUntil {
 		b.queueTick(now + brushBusyRetickTicks)

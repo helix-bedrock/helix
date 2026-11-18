@@ -11,11 +11,11 @@ import (
 // The horse inventory, as BDS 1.26.60 lays it out for a mob with minecraft:inventory of
 // container_type "horse" (horses, donkeys, mules, llamas, camels): the slots of
 // minecraft:equippable come first, in its list's order (the horse window's HorseEquip
-// container, LevelContainerModel::_getContainerOffset 0xBC3ABF0 puts the window's chest
-// part after them), then the chest. The chest slots (0xB3ACD90) exist only while the mob is
+// container, BDS's code puts the window's chest
+// part after them), then the chest. The chest slots exist only while the mob is
 // chested: strength times additional_slots_per_strength with minecraft:strength (llamas),
 // otherwise inventory_size less the equip slots (a donkey's 15). Changing an equip slot
-// (0xBFEB260 calling 0x72551D0) runs the slot's on_equip when the new stack is one of its
+// (calling) runs the slot's on_equip when the new stack is one of its
 // accepted_items and on_unequip otherwise, so a saddle saddles a horse.
 
 // The container actor data: type, base size and slots per strength (InventoryComponent),
@@ -32,7 +32,7 @@ const (
 const (
 	containerTypeHorse     = 12
 	containerTypeHorseName = "horse"
-	// flagChested is the chested actor flag (minecraft:is_chested), which 0xB3ACD90 reads.
+	// flagChested is the chested actor flag (minecraft:is_chested), which reads.
 	flagChested = 36
 )
 

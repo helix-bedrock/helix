@@ -84,7 +84,7 @@ func (p *Player) wearStack(s *ItemStack, n int32) (changed, broke bool) {
 // wearRoll is the random a wear's Unbreaking roll draws from.
 type wearRoll interface{ Int32N(n int32) int32 }
 
-// wearStack is BDS's ItemStackBase::hurtAndBreak (0xC8EE070) for anyone's item: none for
+// wearStack is BDS's code for anyone's item: none for
 // items without durability or marked Unbreakable, each enchantment's DamageChance may skip
 // it, past the most damage the item breaks (one of the stack goes).
 func (g *gameplay) wearStack(s *ItemStack, n int32, rng wearRoll) (changed, broke bool) {

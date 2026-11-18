@@ -15,7 +15,7 @@ import (
 // (riding.go). Its seats live on the mob (mob/ride.go), which seats mob riders itself; the
 // engine seats players, shows the links and lands those who get off. A tamed, saddled horse
 // whose rider steers it is client-predicted, as BDS's
-// SetShouldBeSimulatedSystem::tickHorseSetIsClientPredicted (0x76D4E40): the rider's client
+// BDS's code: the rider's client
 // moves it and Helix takes its place, as for boats.
 
 // flagSaddled is the actor flag of a saddled mob; a client-predicted horse needs it and
@@ -189,8 +189,8 @@ func (m *Mob) EjectPlayer(v *mob.Mob, rider behavior.ID) {
 }
 
 // boostMount is a boost item used by a player riding a mob with minecraft:boostable (BDS
-// 1.26.60 0x736ACB0): the mob boosts, the used stack takes the boost item's damage
-// (hurtAndBreak, 0x736B0B0) and, if that broke it, becomes the boost item's replace_item.
+// 1.26.60): the mob boosts, the used stack takes the boost item's damage
+// (hurtAndBreak) and, if that broke it, becomes the boost item's replace_item.
 func (p *Player) boostMount(held ItemStack) bool {
 	o, ok := p.vehicle.(*Mob)
 	if !ok {

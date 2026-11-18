@@ -7,9 +7,9 @@ import (
 )
 
 // Shears on blocks, from BDS 1.26.60's ShearsItem. Mining speed and wear are mining.go's and
-// durability.go's, cutting trip wire circuit's. The item's use on a block (vtable slot 132,
-// sub_C8DD9A0) carves pumpkins. Not done: honeycomb from beehives and bee nests, dispensers
-// shearing (slot 86, sub_C8DE070), and shearing mobs (their minecraft:interact).
+// durability.go's, cutting trip wire circuit's. The item's use on a block ()
+// carves pumpkins. Not done: honeycomb from beehives and bee nests, dispensers
+// shearing (slot 86), and shearing mobs (their minecraft:interact).
 
 // The names and numbers of carving a pumpkin.
 const (
@@ -21,7 +21,7 @@ const (
 	stateCardinal = "minecraft:cardinal_direction"
 )
 
-// carvedFacing is BDS's table from the face clicked to the carved face (0x1A94C48): the
+// carvedFacing is BDS's table from the face clicked to the carved face: the
 // face carved looks out of the side clicked. The top and bottom have none, and BDS then
 // places the carved pumpkin's default state.
 var carvedFacing = [...]string{cube.FaceNorth: "north", cube.FaceSouth: "south", cube.FaceWest: "west", cube.FaceEast: "east"}

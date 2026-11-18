@@ -11,31 +11,31 @@ import (
 // Vines, weeping and twisting vines and cave vines, from BDS 1.26.60 (the research note is
 // private):
 //
-//   - VineBlock (vt 0xFC08BA0): its random tick 0xD499AF0 (one in 4; a random face: up grows a
+//   - VineBlock (vt): its random tick (one in 4; a random face: up grows a
 //     vine above with a random share of its sides that have something to hang on, if fewer
 //     than 5 vines are within 4 blocks across and 1 up or down; a side it does not hang on
 //     spreads there, round a corner or onto the block, with the same count; down, and every
-//     other case, grows or adds sides to the vine below), up 0xD49A930, sideways 0xD49AE20,
-//     down 0xD49B7A0. Its neighbour change 0xD49A360 keeps only the sides that still hang on
-//     something (0xD49A640: a full block on that side, or the vine above hanging on that side),
-//     and with none left its tick 0xD4998F0 breaks it (canSurvive 0xD49BDC0).
-//   - WeepingVinesBlock (vt 0xFBFADF0) and TwistingVinesBlock (vt 0xFC03FD0), the same block
-//     growing down and up: onPlace 0xD428200 (age 0 takes a random age below 25), the growth
-//     tick 0xD429250 (with air beyond its tip and no tick waiting, a tick one more than a
-//     geometric draw of p 0.000102539, kelp's), its tick 0xD428620 (broken when it cannot stay,
-//     else up to age 25 a vine one older beyond it), survival 0xD429490 (no liquid in the block,
+//     other case, grows or adds sides to the vine below), up, sideways,
+//     down. Its neighbour change keeps only the sides that still hang on
+//     something (: a full block on that side, the vine above hanging on that side),
+//     and with none left its tick breaks it (canSurvive).
+//   - WeepingVinesBlock (vt) and TwistingVinesBlock (vt), the same block
+//     growing down and up: onPlace (age 0 takes a random age below 25), the growth
+//     tick (with air beyond its tip and no tick waiting, a tick one more than a
+//     geometric draw of p 0.000102539, kelp's), its tick (broken when it cannot stay,
+//     else up to age 25 a vine one older beyond it), survival (no liquid in the block,
 //     and its own vine or a face that holds things where it hangs from), neighbour change
-//     0xD429560 (its growth tick again when the block it grows into changes), bone meal
-//     0xD429A50 (from the tip, one vine and then each next at 0.826 times the odds, while there
+//     (its growth tick again when the block it grows into changes), bone meal
+//     (from the tip, one vine and then each next at 0.826 times the odds, while there
 //     is air).
-//   - CaveVinesBlock (vt 0xFB9EDA0; cave_vines, cave_vines_body_with_berries,
-//     cave_vines_head_with_berries): onPlace 0xCB511B0 (age 0 takes a random age below 25 plus
-//     one below 12, at most 25), its random tick 0xCB52170 (a vine with berries turns to the
+//   - CaveVinesBlock (vt; cave_vines, cave_vines_body_with_berries,
+//     cave_vines_head_with_berries): onPlace (age 0 takes a random age below 25 plus
+//     one below 12, at most 25), its random tick (a vine with berries turns to the
 //     body or head form by whether a cave vine is under it; the tip grows down at odds 0.1 up
-//     to age 25, the new tip with berries at 0.11), bone meal 0xCB53340 (berries on one without:
-//     the head form at the tip, else the body form), use 0xCB517C0 (picking the berries).
+//     to age 25, the new tip with berries at 0.11), bone meal (berries on one without:
+//     the head form at the tip, else the body form), use (picking the berries).
 //   - Shears on the tip of weeping, twisting or cave vines stop it growing: age 25, with the
-//     shear sound (LevelSoundEvent 45; the use handlers 0xD428AE0, 0xCB517C0).
+//     shear sound (LevelSoundEvent 45; the use handlers).
 //
 // Not ported: VineBlock's last sideways case (a vine with no side, which BDS does not keep),
 // and cave vines' liquid rule (not read).
@@ -154,7 +154,7 @@ func (t *Ticker) vineHolds(r *world.Region, pos cube.Pos, f cube.Face) bool {
 	return h != nil && (*h)(b, f)
 }
 
-// vineAttached is BDS's 0xD49A640: the sides of the vine at pos that still hang on
+// vineAttached is BDS's code: the sides of the vine at pos that still hang on
 // something, a block on that side or the vine above hanging on the same side.
 func (t *Ticker) vineAttached(r *world.Region, pos cube.Pos, bits int) int {
 	if bits <= 0 {
@@ -335,7 +335,7 @@ func (t *Ticker) netherVinePlaced(r *world.Region, pos cube.Pos, s stateInfo) {
 	t.netherVineGrowthTick(r, pos, block, s)
 }
 
-// netherVineGrowthTick is BDS's 0xD429250: with air where it grows and no tick waiting, a
+// netherVineGrowthTick is BDS's code: with air where it grows and no tick waiting, a
 // tick one more than a geometric draw.
 func (t *Ticker) netherVineGrowthTick(r *world.Region, pos cube.Pos, block uint32, s stateInfo) {
 	if s.age >= plantMaxAge || !t.isAir(r, pos.Side(netherVineDir(s))) || r.HasScheduledTick(pos, block) {

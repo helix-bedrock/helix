@@ -25,7 +25,7 @@ type exitPortalSource interface {
 }
 
 // enterEnd builds the End's exit portal, closed, the first time a player arrives in the
-// End, as BDS's EndDragonFight spawns it (sub_497D5B0) when the fight starts rather than
+// End, as BDS's EndDragonFight spawns it when the fight starts rather than
 // in generation. With no dragon yet it stays closed. Runs: a player's region.
 func (s *Server) enterEnd() {
 	if s.end == nil || !s.endPodium.CompareAndSwap(false, true) {

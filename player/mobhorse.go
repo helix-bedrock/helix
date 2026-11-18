@@ -9,14 +9,14 @@ import (
 )
 
 // The horse window: the inventory of a mob with minecraft:inventory of container_type horse
-// (mob/horse.go has its slots). BDS 1.26.60 opens it from Horse::openContainerComponent
-// (0xBEB2B30; other mounts take the generic ContainerComponent path) when the mob has no
+// (mob/horse.go has its slots). BDS 1.26.60 opens it from BDS's code
+// (other mounts take the generic ContainerComponent path) when the mob has no
 // rider or the player is its rider: ContainerOpen of type 12 at the mob's floored position
-// with its unique ID, then UpdateEquip (built at 0x72554D0) with the same window ID, which
+// with its unique ID, then UpdateEquip with the same window ID, which
 // tells the client the equip slots and what each takes. The window shows the equip slots
 // as container HorseEquip and the chest as LevelEntity, numbered after the equip slots.
-// A player's use on the mob opens it when nothing else applies (Actor::getInteraction
-// 0xB3D1540's open-container interaction, checked by 0x737E1B0: alive, the player may open
+// A player's use on the mob opens it when nothing else applies (BDS's code
+// 's open-container interaction, checked by: alive, the player may open
 // containers, and a private inventory only for its owner); so does a rider asking for its
 // inventory, whose client opens the screen itself: a packet capture of BDS 1.26.60 shows
 // a rider's Interact OpenInventory answered with UpdateEquip and InventoryContent only.
@@ -24,7 +24,7 @@ import (
 // ContainerHorse is a horse's, donkey's, mule's, llama's or camel's inventory.
 const ContainerHorse = ContainerBeacon + 1
 
-// The UpdateEquip compound's keys (0x7255620) and the item descriptor's (0xC96F240).
+// The UpdateEquip compound's keys and the item descriptor's.
 const (
 	equipKeySlots    = "slots"
 	equipKeySlotNum  = "slotNumber"
@@ -35,7 +35,7 @@ const (
 	itemKeyAux       = "Aux"
 	// anyAux is an item descriptor's aux when it names none.
 	anyAux int16 = 0x7FFF
-	// flagContainerPrivate is the actor flag Actor::getInteraction checks before offering
+	// flagContainerPrivate is the actor flag BDS's code checks before offering
 	// the open-container interaction.
 	flagContainerPrivate = 54
 )
@@ -128,7 +128,7 @@ func (o *Mob) updateEquip(window byte) *packet.UpdateEquip {
 	}
 }
 
-// descriptorTag is an item descriptor as InternalItemDescriptor::save writes it.
+// descriptorTag is an item descriptor as BDS writes it.
 func descriptorTag(d string) map[string]any {
 	return map[string]any{itemKeyName: itemName(d), itemKeyAux: anyAux}
 }
@@ -192,7 +192,7 @@ func (o *Mob) leaveHorse(p *Player) {
 }
 
 // dropInventoryOnDeath drops every stack of the mob's minecraft:inventory where it died,
-// as Mob::die (BDS 1.26.60, the container drop at 0xBFDE374) does, and empties the slots.
+// as BDS (the container drop) does, and empties the slots.
 func (o *Mob) dropInventoryOnDeath(r *world.Region) {
 	inv := o.m.Inventory()
 	if r == nil || len(inv) == 0 {

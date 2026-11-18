@@ -8,8 +8,8 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Brewing stands, from BDS 1.26.60's BrewingStandBlockActor (vtable 0xFBFDE90, tick
-// 0xD442FA0, load 0xD441E70, save 0xD442400) and PotionBrewing: blaze powder gives 20 brews,
+// Brewing stands, from BDS 1.26.60's BrewingStandBlockActor (tick,
+// load, save) and PotionBrewing: blaze powder gives 20 brews,
 // a brew takes 400 ticks and stops when the ingredient changes or nothing can be brewed, and
 // each bottle with a mix for the ingredient becomes its result. The recipes are BDS's own,
 // from the CraftingData packet ([crafting.Table.Brew]). Hoppers and the window take the
@@ -28,7 +28,7 @@ const (
 const (
 	// brewTicks is how long one brew takes.
 	brewTicks = 400
-	// blazePowderBrews is how many brews one blaze powder gives (PotionBrewing::getFuelValue).
+	// blazePowderBrews is how many brews one blaze powder gives.
 	blazePowderBrews = 20
 	nameBlazePowder  = "minecraft:blaze_powder"
 	namePufferfish   = "minecraft:pufferfish"
@@ -43,7 +43,7 @@ const (
 // bottleStates are the block states that show a bottle in slots 1 to 3.
 var bottleStates = [3]string{"brewing_stand_slot_a_bit", "brewing_stand_slot_b_bit", "brewing_stand_slot_c_bit"}
 
-// potionItems are BDS's potion items (ItemStackBase::isPotionItem), which hoppers put in the
+// potionItems are BDS's potion items, which hoppers put in the
 // bottle slots.
 var potionItems = map[string]bool{
 	"minecraft:potion": true, "minecraft:splash_potion": true, "minecraft:lingering_potion": true,
@@ -145,7 +145,7 @@ func vanillaBrewFuel(_ BrewInfo, fuel ItemStack) int32 {
 	return 0
 }
 
-// vanillaBrewResult is BDS's PotionBrewing::mix over the recipes now in force.
+// vanillaBrewResult is BDS's code over the recipes now in force.
 func vanillaBrewResult(b BrewInfo, ingredient, bottle ItemStack) (ItemStack, bool) {
 	if b.Stand == nil || ingredient.Empty() || bottle.Empty() {
 		return ItemStack{}, false
@@ -191,7 +191,7 @@ func (s *Host) brewSystems() (BrewFuelFunc, BrewResultFunc) {
 	return fuel, result
 }
 
-// brewIngredient is BDS's PotionBrewing::isIngredient: the reagent of a mix, or pufferfish.
+// brewIngredient is BDS's code: the reagent of a mix, or pufferfish.
 func (s *Host) brewIngredient(it ItemStack) bool {
 	if it.Empty() {
 		return false
@@ -203,7 +203,7 @@ func (s *Host) brewIngredient(it ItemStack) bool {
 	return ok && s.Recipes().BrewIngredient(b)
 }
 
-// brewBottle is BDS's PotionBrewing::isPotionRecipeInput, what a player may put in a bottle
+// brewBottle is BDS's code, what a player may put in a bottle
 // slot: a potion of any kind or a potion some mix starts from.
 func (s *Host) brewBottle(it ItemStack) bool {
 	if it.Empty() {

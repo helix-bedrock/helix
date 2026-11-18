@@ -20,7 +20,7 @@ const (
 	enchantSilkTouch = int16(16)
 	enchantFortune   = int16(18)
 	enchantLooting   = int16(14)
-	// Every new item's speed, from BDS 1.26.60's ItemActor constructor (0xBD61040):
+	// Every new item's speed, from BDS 1.26.60's ItemActor constructor:
 	// sideways r*0.2-0.1 on x and z, up 0.2.
 	dropDriftSpan = 0.2
 	dropUp        = 0.2
@@ -118,7 +118,6 @@ func (p *Player) blockDrops(r *world.Region, pos cube.Pos, block uint32) ([]Bloc
 		}
 	}
 	// A creative player's break leaves nothing, but BDS still drops a box with items in it
-	// (0xD525270).
 	if c := p.s.chestAt(r, pos); p.creative() && c != nil && c.shulker && !c.emptySlots(chestSize) {
 		items, _ := g.sys.Drops(p.s, block, p.breakContext(r, pos))
 		for _, it := range p.s.shulkerDrops(r, pos, items) {

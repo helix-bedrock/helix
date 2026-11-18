@@ -8,34 +8,34 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Flowers, grass and the other foliage, from BDS 1.26.60's FoliageBlock (vt 0xFB8C100): when a
+// Flowers, grass and the other foliage, from BDS 1.26.60's FoliageBlock (vt): when a
 // neighbour changes and the block can no longer stay (canSurvive, slot 976), a tick 1 later
-// destroys it with its drops (0xCB060E0, 0xCB06340). What each may stand on (mayPlaceOn, slot
+// destroys it with its drops. What each may stand on (mayPlaceOn, slot
 // 552), read from the code and its lists at runtime:
 //
-//   - soil: BDS's plant soil list (0xCB03DE0; dirt, grass, podzol, coarse dirt, mycelium,
-//     rooted dirt, moss, pale moss, mud, muddy mangrove roots, farmland). Flowers (0xCB03CA0)
+//   - soil: BDS's plant soil list (; dirt, grass, podzol, coarse dirt, mycelium,
+//     rooted dirt, moss, pale moss, mud, muddy mangrove roots, farmland). Flowers
 //     too; crimson and warped roots also on soul soil and nylium.
-//   - wither rose (0xD42A990): a flower's, or netherrack or soul sand.
-//   - dead bush (0xCB0EC30): soil, a block type tagged sand, hardened clay or terracotta.
-//   - dry grass (0xD524120): sand, red sand, suspicious sand, hardened clay, terracotta or soil.
-//   - azalea (0xCCF5B10): clay or soil.
-//   - double plants (0xCB1ACC0): the upper half needs its own block under it and soil two
+//   - wither rose: a flower's, or netherrack or soul sand.
+//   - dead bush: soil, a block type tagged sand, hardened clay or terracotta.
+//   - dry grass: sand, red sand, suspicious sand, hardened clay, terracotta or soil.
+//   - azalea: clay or soil.
+//   - double plants: the upper half needs its own block under it and soil two
 //     down; the lower half its own block above and soil under it. So breaking either half
 //     takes the other a tick later.
-//   - flower beds (leaf litter, pink petals, wildflowers; 0xCB03000): no water or lava in the
+//   - flower beds (leaf litter, pink petals, wildflowers): no water or lava in the
 //     block and a block tagged dirt under it.
 //
-//   - mushrooms (0xD541A40, 0xD5419E0): no liquid in the block and a block under it whose top
+//   - mushrooms: no liquid in the block and a block under it whose top
 //     holds things (canProvideSupport, taken as the attach table's top face). Light only
 //     matters to their spreading.
-//   - lily pads (0xD49FE30): a water source under it, or ice.
-//   - mangrove propagules (0xD562FF0): hanging ones mangrove leaves above, others soil or clay.
-//   - sea pickles (0xD51DA50): a decorated pot or a block whose top holds things under it.
-//   - cactus flowers (0xCB88580): soil, cactus, or a block whose top holds things.
+//   - lily pads: a water source under it, or ice.
+//   - mangrove propagules: hanging ones mangrove leaves above, others soil or clay.
+//   - sea pickles: a decorated pot or a block whose top holds things under it.
+//   - cactus flowers: soil, cactus, or a block whose top holds things.
 //
-//   - coral fans (0xCB32E30): a block under them whose top holds things.
-//   - wall coral fans (0xCB33650) and shelf mushrooms (0xD49F6F0): the block behind them must
+//   - coral fans: a block under them whose top holds things.
+//   - wall coral fans and shelf mushrooms: the block behind them must
 //     hold things on the face they point out of.
 //
 // Not ported: coral blocks' and fans' dying out of water and coral plants (one tick with both).
@@ -93,10 +93,10 @@ var foliageRules = map[string]foliageRule{
 // coralColours are the coral kinds, each with a fan, a wall fan and their dead forms.
 var coralColours = [...]string{"tube", "brain", "bubble", "fire", "horn"}
 
-// wallFanFace is the face a wall coral fan's coral_direction points to (0xCB33650).
+// wallFanFace is the face a wall coral fan's coral_direction points to.
 var wallFanFace = [...]cube.Face{cube.FaceWest, cube.FaceEast, cube.FaceNorth, cube.FaceSouth}
 
-// shelfFace is the face a shelf mushroom's cardinal_direction points to (0xD49F6F0).
+// shelfFace is the face a shelf mushroom's cardinal_direction points to.
 var shelfFace = map[string]cube.Face{"south": cube.FaceSouth, "west": cube.FaceWest, "north": cube.FaceNorth, "east": cube.FaceEast}
 
 // The materials foliage rules read (BDS's MaterialType).
@@ -293,7 +293,7 @@ func (t *Ticker) hasTag(block uint32, tag string) bool {
 	return false
 }
 
-// doublePlantMayPlace is BDS's mayPlace for a double plant's lower half (0xCB1AAF0): no water
+// doublePlantMayPlace is BDS's mayPlace for a double plant's lower half: no water
 // or lava where it goes, room for the upper half in the dimension, soil under it, and air or
 // water above.
 func (t *Ticker) doublePlantMayPlace(r *world.Region, pos cube.Pos) bool {
@@ -315,7 +315,7 @@ func (t *Ticker) doublePlantMayPlace(r *world.Region, pos cube.Pos) bool {
 	return ok && (above == t.blocks.Air() || t.blocks.Properties(above).Material == registry.MaterialWater)
 }
 
-// doublePlantPlaced is a double plant's onPlace (0xCB1A880): a lower half puts its upper half
+// doublePlantPlaced is a double plant's onPlace: a lower half puts its upper half
 // above it.
 func (t *Ticker) doublePlantPlaced(r *world.Region, pos cube.Pos, block uint32) {
 	if up, ok := t.foliageKit.upper[block]; ok {

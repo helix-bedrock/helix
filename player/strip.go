@@ -7,16 +7,16 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// Axes stripping logs, as BDS 1.26.60's log block use (0xD5609C0, LogBlock::use in 1.21.3's
+// Axes stripping logs, as BDS 1.26.60's log block use (BDS's code in 1.21.3's
 // names). Every log, wood, stem, hyphae and the bamboo block is registered with the stripped
-// block it turns into (the block's +936); BDS's string table names one stripped_ block for
+// block it turns into (the block's); BDS's string table names one stripped_ block for
 // each, so Helix finds the pair by name: "minecraft:X" strips when "minecraft:stripped_X"
-// exists. Clicked with an item tagged minecraft:is_axe (0xFD44668), the block becomes the
+// exists. Clicked with an item tagged minecraft:is_axe, the block becomes the
 // stripped block's default state with the same pillar_axis (update flag 3), the axe's
-// on_tool_used (0xC981EA0) plays ItemUseOn with the stripped block at the block's centre and
+// on_tool_used plays ItemUseOn with the stripped block at the block's centre and
 // wears the axe 1 (hurtAndBreak, none in creative), the held item is set back and the
 // block_change game event is posted. Sneaking players use the item, not the block, so they
-// do not strip (GameMode::useItemOn lets only hoes through).
+// do not strip (lets only hoes through).
 const (
 	strippedPrefix = "stripped_"
 	statePillar    = "pillar_axis"

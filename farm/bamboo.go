@@ -9,20 +9,19 @@ import (
 
 // Bamboo and kelp, from BDS 1.26.60 (the research note is private):
 //
-//   - BambooSaplingBlock: random tick 0xCCC3DC0 (age_bit 0 becomes 1; at 1, one in 3, with
-//     air above lit to 9, it grows), growth 0xCCC40F0 (it becomes a thin bare bamboo with a
-//     thin small-leaved bamboo above), bone meal 0xCCC43E0 (grows with air above), mayPlace
-//     0xCCC4510.
-//   - BambooStalkBlock: random tick 0xCCC59E0 (as the sapling's, then grows on top while the
-//     column is shorter than 12 + a hash of x and z mod 5), the new top's state 0xCCC5EC0,
-//     onPlace 0xCCC4AE0 (the stalk under a new top gets small leaves, the one under that
-//     none, thick once the column has leaves two down), bone meal 0xCCC6A00 (one block on top
-//     while shorter than that height), mayPlace 0xCCC6670.
-//   - KelpBlock: onPlace 0xCAD7BE0 (on anything but kelp, a random age below 25 and a growth
-//     tick), tick 0xCAD8760 (with a water source above and an age below 25, kelp one older on
-//     top, which gets its own growth tick), the growth tick 0xCAD8BD0 (its delay one more than
-//     a geometric draw with BDS's p), canGrow 0xCAD8AA0, mayPlace 0xCAD8F90, bone meal
-//     0xCAD9340 (the top kelp's tick brought to the next tick).
+//   - BambooSaplingBlock: random tick (age_bit 0 becomes 1; at 1, one in 3, with
+//     air above lit to 9, it grows), growth (it becomes a thin bare bamboo with a
+//     thin small-leaved bamboo above), bone meal (grows with air above), mayPlace
+//   - BambooStalkBlock: random tick (as the sapling's, then grows on top while the
+//     column is shorter than 12 + a hash of x and z mod 5), the new top's state,
+//     onPlace (the stalk under a new top gets small leaves, the one under that
+//     none, thick once the column has leaves two down), bone meal (one block on top
+//     while shorter than that height), mayPlace.
+//   - KelpBlock: onPlace (on anything but kelp, a random age below 25 and a growth
+//     tick), tick (with a water source above and an age below 25, kelp one older on
+//     top, which gets its own growth tick), the growth tick (its delay one more than
+//     a geometric draw with BDS's p), canGrow, mayPlace, bone meal
+//     (the top kelp's tick brought to the next tick).
 const (
 	bamboo         = "minecraft:bamboo"
 	bambooSapling  = "minecraft:bamboo_sapling"
@@ -413,7 +412,7 @@ func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8
 	t.BlockTicker.Placed(r, pos, block, layer)
 }
 
-// BambooPlacement is BambooItem's useOn (BDS 0xC9CFC00): the bamboo item puts a bamboo sapling
+// BambooPlacement is BambooItem's useOn: the bamboo item puts a bamboo sapling
 // at pos when a sapling may stand there (no water or lava, and its ground), and false
 // otherwise, when bamboo is placed as its block. Runs: owner of the chunk.
 func (t *Ticker) BambooPlacement(r *world.Region, pos cube.Pos) (uint32, bool) {

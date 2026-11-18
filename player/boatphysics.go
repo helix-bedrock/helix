@@ -12,11 +12,11 @@ import (
 
 // An empty boat's own movement, as BDS 1.26.60's systems run it for a boat no client
 // steers, each tick in this order:
-//   - IncreaseBuoyancyTimer (0x7926470): the wave timer.
+//   - IncreaseBuoyancyTimer: the wave timer.
 //   - CheckAndAddBuoyancyFloatRequest: whether it floats or must come up.
-//   - BuoyancyGravity (0x79280F0): apply_gravity pulls it down.
-//   - BuoyancyFloat (0x7925140): the water lifts it to its waterline, rocking on the timer.
-//   - BoatMoveFriction (0x75EE370): water, the ground under it or nothing slows it.
+//   - BuoyancyGravity: apply_gravity pulls it down.
+//   - BuoyancyFloat: the water lifts it to its waterline, rocking on the timer.
+//   - BoatMoveFriction: water, the ground under it or nothing slows it.
 //
 // Then it moves through the blocks' collision boxes. The numbers of the buoyant component
 // are entities/boat.json's: base_buoyancy 1, movement_type waves, big_wave_probability 0.03,
@@ -46,7 +46,7 @@ const (
 
 	// The legacy_boat preset of entities/boat.json's pushable_by_entity: strength_multiplier
 	// 0.1, min_distance 0.55 and push_scale_self 0.5 (the player has no pushable_by_entity,
-	// so push_scale_other never pushes it back). boatPushReach is how far Mob::pushActors
+	// so push_scale_other never pushes it back). boatPushReach is how far BDS's code
 	// grows the pusher's box on x and z; boatPushScan how far to look for pushers.
 	boatPushStrength = 0.1
 	boatPushMin      = 0.55
@@ -56,7 +56,7 @@ const (
 )
 
 // boatBuoyancyData is the boat's buoyant component as BDS 1.26.60 hands it to clients in
-// actor data 121 (BuoyancyComponent setup 0xC3DDDA0, written by 0x7375900 with JsonCpp's
+// actor data 121 (BuoyancyComponent setup, written by with JsonCpp's
 // FastWriter: keys in order, no spaces, a closing newline). The client floats a boat it
 // steers, and shows one it does not, by these; without them a boat sinks.
 var boatBuoyancyData = `{"apply_gravity":true,"base_buoyancy":1.0,"big_wave_probability":0.029999999329447746,` +
@@ -147,12 +147,12 @@ func (b *Boat) plan(r *world.Region, e *world.Entity) thought {
 	return thought{pos: pos, hitY: onGround, ok: true}
 }
 
-// pushedByPlayers is BDS 1.26.60's Mob::pushActors (0xBFEE7F0) from each player's side
+// pushedByPlayers is BDS 1.26.60's BDS's code from each player's side
 // against an empty boat: a player whose box, grown by 0.2 on x and z, touches the boat
-// pushes it away along the line between them with the legacy_boat push (0x7516F70,
-// 0x7517D90), min(1, 1/d) * 0.1 * 0.5 over the unit direction, d at least 0.55. A sneaking
-// player does not push, nor one riding, nor the one who just got off it until they part
-// (0x7517560). The push is added to the boat's speed before its own movement; where
+// pushes it away along the line between them with the legacy_boat push (),
+// min(1, 1/d) * 0.1 * 0.5 over the unit direction, d at least 0.55. A sneaking
+// player does not push, nor one riding, nor the one who just got off it until they part.
+// The push is added to the boat's speed before its own movement; where
 // PushActorsSystem runs against the boat's buoyancy systems is not read yet. Region tick.
 func (b *Boat) pushedByPlayers(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
 	lo, hi := boatBox(pos)
@@ -209,7 +209,7 @@ func (s *Host) boatFloat(r *world.Region, at cube.Pos, y float32) (floats, resur
 	return s.liquidHeight(r, at) > y, false
 }
 
-// liquidHeight is BlockUtils::getLiquidBlockHeight (1.26.60 0xB656EF0) of the liquid at
+// liquidHeight matches BDS of the liquid at
 // pos: the top of the block less a ninth per level of depth, a source and falling liquid
 // (depth 8 and up) reaching the top. It is higher than liquidTop by a ninth.
 func (s *Host) liquidHeight(r *world.Region, pos cube.Pos) float32 {
@@ -246,7 +246,7 @@ func (s *Host) boatFriction(r *world.Region, at cube.Pos, inWater, onGround bool
 		case s.reg.Blocks.Properties(b).Material == registry.MaterialWater:
 			return boatWaterDrag
 		case onGround:
-			// BoatFrictionUtility::getFrictionBasedOnCollision: the block's own friction,
+			// BDS's code: the block's own friction,
 			// or the one below when it has no collision box.
 			if len(s.reg.Blocks.Properties(b).Collision) == 0 {
 				return s.frictionOf(r, below)

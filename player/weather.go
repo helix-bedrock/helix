@@ -25,7 +25,7 @@ func (s *Host) BroadcastLevelEvent(event, data int32) {
 	s.Broadcast(&packet.LevelEvent{EventType: event, EventData: data})
 }
 
-// inRain is BDS's Actor::isInRain: it rains on the block at top, the top of the entity's box.
+// inRain is BDS's code: it rains on the block at top, the top of the entity's box.
 // Runs: owner of the region.
 func (s *Host) inRain(r *world.Region, top mgl32.Vec3) bool {
 	if s.chunkWeather == nil {

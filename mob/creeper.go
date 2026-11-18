@@ -5,8 +5,8 @@ import (
 	"github.com/helix-bedrock/entity/state"
 )
 
-// The creeper: BDS 1.26.60 writes it as its own class (vtable 0xFAC6800). Its tick
-// (0xBD33C20) runs before the mob's own: while alive, the swell direction follows the
+// The creeper: BDS 1.26.60 writes it as its own class. Its tick
+// runs before the mob's own: while alive, the swell direction follows the
 // ignited flag (+1 lit, -1 not), the swell moves by it and stays in 0..30, and a lit creeper
 // whose swell was 0 hisses (LevelSoundEvent 51, fuse) at its head (attach point 3). The
 // explosion itself is minecraft:explode, the definition's component.
@@ -24,7 +24,7 @@ type ExplodeHooks interface {
 }
 
 // TransformHooks is what an engine that turns mobs into other mobs implements on its Hooks:
-// minecraft:transformation came due (TransformationComponent::transformIfAble). The engine
+// minecraft:transformation came due. The engine
 // makes the new entity from c and removes m. It runs in m's Apply.
 type TransformHooks interface {
 	Transform(m *Mob, c state.TransformationConfig)

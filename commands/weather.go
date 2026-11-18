@@ -6,8 +6,8 @@ import (
 	"github.com/helix-bedrock/helix/weather"
 )
 
-// BDS 1.26.60's /weather (WeatherCommand: setup 0xBBA0780, execute 0xBBA16D0): weather
-// <clear|rain|thunder> [duration] and weather query, and /toggledownfall (0xBB9C9C0). The
+// BDS 1.26.60's /weather (WeatherCommand: setup, execute): weather
+// <clear|rain|thunder> [duration] and weather query, and /toggledownfall. The
 // duration is in ticks, 1 to 1000000; without one, 6000 to 17980.
 
 // weatherMaxTime is the longest duration BDS takes.

@@ -17,7 +17,7 @@ import (
 var _ behavior.PlayerControlled = (*Mob)(nil)
 
 // rideAirFriction is the friction controlled_by_player takes for an air block (BDS 1.26.60
-// qword 0xFEE92F0).
+// qword).
 const rideAirFriction = 0.6
 
 // The stairs states WalkThrough reads.
@@ -26,7 +26,7 @@ const (
 	stateUpsideDown      = "upside_down_bit"
 )
 
-// The facings BDS 1.26.60 0x7513DE0 compares: the side of the stairs the mob is on, and a
+// The facings BDS 1.26.60 compares: the side of the stairs the mob is on, and a
 // stairs' facing, 5 minus its weirdo_direction.
 const (
 	facingNorth      = 2
@@ -37,7 +37,7 @@ const (
 )
 
 // boostModifier is minecraft:boostable's movement modifier, "Boosting speed boost", on the
-// base value (BDS 1.26.60 0x736AEC0); its UUID is made at BDS's start, so Helix names it.
+// base value; its UUID is made at BDS's start, so Helix names it.
 var boostModifier = attrModifier{id: "helix:boosting_speed_boost", op: modMultiplyBase}
 
 // boosting is BoostableComponent's state: on while boosted, the ticks so far and in all.
@@ -70,7 +70,7 @@ func (m *Mob) YawOf(id behavior.ID) float32 {
 	return yaw
 }
 
-// SetSpeed implements behavior.PlayerControlled: Mob::setSpeed.
+// SetSpeed implements behavior.PlayerControlled: BDS's code.
 func (m *Mob) SetSpeed(s float32) { m.moveSpeed = s }
 
 // ResetMovement implements behavior.PlayerControlled: the movement attribute is worked out
@@ -93,7 +93,7 @@ func (m *Mob) MaxAutoStep() (float32, bool) { return m.body.MaxAutoStep, true }
 // MoveRelativeSpeed implements behavior.PlayerControlled.
 func (m *Mob) MoveRelativeSpeed() float32 { return m.body.RelativeSpeed(physWorld{&m.v}) }
 
-// WalkThrough implements behavior.PlayerControlled (BDS 1.26.60 0x7513DE0): the block at p
+// WalkThrough implements behavior.PlayerControlled: the block at p
 // is stairs, not upside down, that the mob comes at from its low side, so it walks up
 // without jumping.
 func (m *Mob) WalkThrough(p behavior.Pos) bool {
@@ -129,9 +129,9 @@ func stateSet(v any) bool {
 	return false
 }
 
-// Boost is a rider using it on the mob, as BDS 1.26.60's boost item use (0x736ACB0): a mob
+// Boost is a rider using it on the mob, as BDS 1.26.60's boost item use: a mob
 // with minecraft:boostable that is not boosting yet, and one of its boost_items matching,
-// starts boosting (0x736AEC0): the boost sound, and the speed modifier until the duration
+// starts boosting: the boost sound, and the speed modifier until the duration
 // runs out. It returns the boost item, whose damage and replace_item the engine applies to
 // the used stack. Runs: the region's goroutine, outside the think phase.
 func (m *Mob) Boost(it behavior.Item) (state.BoostItem, bool) {
@@ -156,7 +156,7 @@ func (m *Mob) Boost(it behavior.Item) (state.BoostItem, bool) {
 // soundBoost is LevelSoundEvent 20, "boost".
 const soundBoost = 20
 
-// boostTick is BoostableSystem::tick (BDS 1.26.60 0x7912480): once the boost has run its
+// boostTick matches BDS: once the boost has run its
 // duration it ends and the modifier goes; the mob sprints while it lasts.
 func (m *Mob) boostTick() {
 	if !m.boost.on {

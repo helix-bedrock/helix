@@ -9,12 +9,12 @@ import (
 )
 
 // The warden's sonic boom on the engine side (mob.WardenHooks, mob.WardenEnv): the hit,
-// Mob::knockback and the particle level events.
+// BDS's code and the particle level events.
 
 // DamageSonicBoom is BDS's ActorDamageCause SonicBoom.
 const DamageSonicBoom DamageCause = 31
 
-// knockbackLiftScale is Mob::knockback's (1.26.60 0xBFDD340) scale on the height.
+// knockbackLiftScale matches BDS's scale on the height.
 const knockbackLiftScale = 1.2
 
 // LevelEventXYZ broadcasts LevelEventGeneric id with x, y and z float tags at p, as BDS's
@@ -46,7 +46,7 @@ func (m *Mob) SonicHit(_ *mob.Mob, target behavior.ID, damage float32) {
 	}
 }
 
-// Knockback is Mob::knockback (1.26.60 0xBFDD340) with the parameters the goal fills: the
+// Knockback matches BDS with the parameters the goal fills: the
 // velocity kept by Extra, pushed along the reversed direction by Power and up by Height
 // times 1.2 (capped at HeightCap), both scaled by the target's knockback resistance.
 func (m *Mob) Knockback(_ *mob.Mob, target behavior.ID, k behavior.Knockback) {
@@ -74,7 +74,7 @@ func (m *Mob) Knockback(_ *mob.Mob, target behavior.ID, k behavior.Knockback) {
 	}
 }
 
-// knockbackParams is Mob::knockback's velocity for the goal's parameters.
+// knockbackParams matches BDS's velocity for the goal's parameters.
 func knockbackParams(vel mgl32.Vec3, k behavior.Knockback, resist float32) mgl32.Vec3 {
 	retain := min(max(k.Extra, 0), 1)
 	return knockbackOf(vel, -k.DirX, -k.DirZ, k.Power*resist, k.Height*resist, retain, knockbackLiftScale, k.HeightCap)

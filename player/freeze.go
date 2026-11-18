@@ -7,11 +7,11 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Freezing in powder snow, as BDS 1.26.60's FreezingSystem::tickSystem (sub_78663F0): while
+// Freezing in powder snow, as BDS 1.26.60's BDS's code: while
 // any block the player's box touches is powder snow, the freeze strength climbs by 1/140 a
 // tick to 1, else it falls by 2/140 to 0. At full strength the player shakes (actor flag 40)
 // and every 40 ticks takes 1 freezing damage (1.5 with the Freezing effect). Leather armour
-// (any piece, BDS's FreezingImmuneFromEquipment, sub_B3C4130) stops it climbing, as do being
+// (any piece, BDS's FreezingImmuneFromEquipment) stops it climbing, as do being
 // dead or a spectator. The strength is sent as actor data 120, which the client draws as the
 // frost overlay. BDS also adds a "Freeze effect" movement modifier of strength * -0.05; a
 // player's movement is the client's own, so it is not sent.

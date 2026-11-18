@@ -7,8 +7,8 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Grass blocks dying and spreading, from BDS 1.26.60's GrassBlockBase random tick (0xCAE28F0)
-// and its survival check (0xCAE2D40):
+// Grass blocks dying and spreading, from BDS 1.26.60's GrassBlockBase random tick
+// and its survival check:
 //
 //   - Grass survives when the light above it (with the sky's darkening) is under 4 and the
 //     block above is not one of dark_dies, or when that light is 4 or more and the block above

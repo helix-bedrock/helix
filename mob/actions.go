@@ -7,8 +7,8 @@ import (
 )
 
 // The state components' actions that reach past the mob, as BDS 1.26.60 does them:
-// minecraft:teleport's move (TeleportComponent::teleport 0x7170A80), minecraft:spawn_entity
-// (SpawnActorSystem::tick 0x76CBF10), minecraft:trail's blocks, and the game events the
+// minecraft:teleport's move, minecraft:spawn_entity,
+// minecraft:trail's blocks, and the game events the
 // components post. Each is checked while the mob thinks, from what the mob may read, and
 // done at Apply.
 
@@ -24,7 +24,7 @@ type TeleportHooks interface {
 // SpawnHooks is what an engine that runs minecraft:spawn_entity implements on its Hooks. Both
 // run in the spawning mob's Apply.
 type SpawnHooks interface {
-	// SpawnItem spawns one of the item at the mob as Spawner::spawnItem, with a pick-up delay
+	// SpawnItem spawns one of the item at the mob as BDS, with a pick-up delay
 	// of 10 ticks; false when the item does not exist.
 	SpawnItem(m *Mob, item string) bool
 	// SpawnEntity spawns a mob of the type from m by the spawn method (born, spawned,
@@ -46,7 +46,7 @@ type ArmorEnchantHooks interface {
 	Respiration(m *Mob) int32
 }
 
-// The spawn methods BDS's ActorSpawnHelper knows (0xB33BD60), and what born does to a
+// The spawn methods BDS's ActorSpawnHelper knows, and what born does to a
 // rideable newborn.
 const (
 	spawnBorn     = "born"
@@ -62,7 +62,7 @@ const (
 	gameEventRoar        = "entity_roar"
 )
 
-// Teleport is TeleportComponent::teleport's search: from the block at p it walks down to the
+// Teleport matches BDS's search: from the block at p it walks down to the
 // first block that holds things on its top face (above the world's bottom), then the mob's
 // box moved there must hit no block and hold no liquid. The move, the trail, the sounds and
 // the game event happen at Apply; the answer is given now.
@@ -107,7 +107,7 @@ func (m *Mob) teleportSpot(p behavior.Vec3) (behavior.Vec3, bool) {
 	return to, true
 }
 
-// teleportTo moves the mob as Actor::teleportTo with its stop riding flag, then shows it.
+// teleportTo moves the mob as BDS with its stop riding flag, then shows it.
 // Runs: Apply.
 func (m *Mob) teleportTo(to behavior.Vec3) {
 	from := m.body.Pos
@@ -134,7 +134,7 @@ func (a stateActions) Spawn(e state.SpawnEntry) {
 	a.m.do(op{kind: opSpawnEntry, spawn: &e})
 }
 
-// spawnEntry is the rest of SpawnActorSystem::tick for one entry: the spawn sound at the
+// spawnEntry is the rest of BDS's code for one entry: the spawn sound at the
 // mob's body, then num_to_spawn items or entities. An item that spawns runs
 // spawn_item_event on the mob; an entity is spawned by the entry's method with its event,
 // posts entity_place at the mob, takes the mob's leash when should_leash is set, and a
@@ -203,7 +203,7 @@ func (m *Mob) postGameEvent(name string, p behavior.Vec3) {
 	m.do(op{kind: opGameEvent, name: name, at: p})
 }
 
-// EatGameEvent posts the eat game event at p (Actor::feed's, at attach point 8).
+// EatGameEvent posts the eat game event at p ('s, at attach point 8).
 func (m *Mob) EatGameEvent(p behavior.Vec3) { m.postGameEvent(gameEventEat, p) }
 
 // RoarGameEvent implements behavior.Roarer: entity_roar at p.

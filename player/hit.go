@@ -12,8 +12,8 @@ import (
 // can turn off or scale one piece (armour, one enchantment, Resistance, Thorns...)
 // without redoing the rest. The engine builds the parts vanilla would apply, fires
 // one HitEvent, then resolves the parts still on in BDS 1.26.60's order and caps
-// (BDS 0xBCEC360 attack, 0xBFDB910 attack damage, 0xBC46230 the health attribute's
-// new value: armour 0xBFE8020, enchantments 0xC4A2AA0, Resistance, hurt time, then
+// (BDS attack, attack damage, the health attribute's
+// new value: armour, enchantments, Resistance, hurt time, then
 // absorption). The maths happens last, so rules that sum and cap (protection) or act
 // on the final hit (Thorns) stay right however the parts were changed.
 type Hit struct {
@@ -239,7 +239,7 @@ func (h *Hit) reduce(v float32) float32 {
 	return v
 }
 
-// afterArmor is BDS's armour share (0xBFE8020): v = dmg/(tough*0.25+2) + armour, the
+// afterArmor is BDS's armour share: v = dmg/(tough*0.25+2) + armour, the
 // share max(v, armour*0.2)/25 up to 20 points, else the tuned maximum; the attacker's
 // Breach then changes the share.
 func (h *Hit) afterArmor(v float32, armor *Part) float32 {
@@ -272,7 +272,7 @@ func (h *Hit) afterArmor(v float32, armor *Part) float32 {
 	return v * (1 - share)
 }
 
-// afterProtection is BDS's armour enchantments (0xC4A2AA0): the points summed, the
+// afterProtection is BDS's armour enchantments: the points summed, the
 // count stopping at 26, then capped and each worth a share.
 func (h *Hit) afterProtection(v float32) float32 {
 	t := h.Target
@@ -399,7 +399,7 @@ func vanillaHitParts(h *Hit) {
 	h.After = append(h.After, part(PartTargetExhaust, p.Tuning(TuneExhaustDamage)))
 }
 
-// vanillaAttackParts is BDS's melee damage (0xBFDB910): the attack damage attribute
+// vanillaAttackParts is BDS's melee damage: the attack damage attribute
 // and the weapon, each melee enchantment, the attack effects in order, a critical hit,
 // the attacker's scale; then the knockback, weapon wear and attack exhaustion.
 func vanillaAttackParts(p, target *Player) *Hit {
@@ -473,7 +473,7 @@ func vanillaTakeHit(h *Hit) bool {
 	}
 	abs := h.Part(PartAbsorption, 0)
 	p.takeHealth(damage, src, abs != nil && !abs.Off)
-	// Mob::_hurt (0xBFDC98F in BDS 1.26.60) takes Absorption away once its health is used up.
+	// BDS's code takes Absorption away once its health is used up.
 	if p.attributes.get(attrAbsorption) <= 0 {
 		p.RemoveEffect(EffectAbsorption)
 	}

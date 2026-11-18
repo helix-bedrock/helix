@@ -8,7 +8,7 @@ import (
 	"github.com/helix-bedrock/helix/player"
 )
 
-// BDS 1.26.60's /give (GiveCommand: setup 0x9FC1530, execute 0x9FC1C30): give <player>
+// BDS 1.26.60's /give (GiveCommand: setup, execute): give <player>
 // <itemName> [amount] [data] [components]. Of the components, can_place_on and can_destroy are
 // built (givecomponents.go).
 

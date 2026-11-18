@@ -15,21 +15,21 @@ import (
 // (the baby, the experience, the lead item) through Hooks.
 //
 // BDS 1.26.60: a player's use on a mob tries the interaction components in a fixed order,
-// interact, ageable, breedable, leashable, nameable (the provider table at 0xF70DB30 and
-// on); the first that takes it wins. Mating (BreedableComponent 0x7371850) makes each baby
-// with createBornActor (0xBFF2400, which always adds the persistent marker), then spawns
-// seven heart particles and experience_reward's on_bred, each expression rounded (0x73710C0).
+// interact, ageable, breedable, leashable, nameable (the provider table and
+// on); the first that takes it wins. Mating (BreedableComponent) makes each baby
+// with createBornActor (which always adds the persistent marker), then spawns
+// seven heart particles and experience_reward's on_bred, each expression rounded.
 // The heart particles are the client's and are not sent.
 
 // dataLeashHolder is the actor data key with the leash holder's unique ID, -1 for none.
 const dataLeashHolder = 37
 
-// actorEventBabyEat is the actor event a fed baby sends (ActorEvent 60, 0x744B350).
+// actorEventBabyEat is the actor event a fed baby sends (ActorEvent 60).
 const actorEventBabyEat = 60
 
 // SavedState is the age and breeding state a mob saves, BDS's AgeableComponent ("Age",
-// "GrowthPaused", load 0x7444D80) and BreedableComponent ("InLove", "LoveCause",
-// "BreedCooldown", load 0x7372E40) fields. Has* are false when the component was not there.
+// "GrowthPaused", load) and BreedableComponent ("InLove", "LoveCause",
+// "BreedCooldown", load) fields. Has* are false when the component was not there.
 type SavedState struct {
 	HasAge       bool
 	Age          int32
@@ -39,7 +39,7 @@ type SavedState struct {
 	Cooldown     int32
 	LoveCause    int64
 	// HasAnger is set when anger_level was there; Nuisances are its suspects as BDS saves
-	// them (AngerLevelComponent "Nuisances", save 0x735D5D0, load 0x7384410).
+	// them (AngerLevelComponent "Nuisances", save, load).
 	HasAnger  bool
 	Nuisances []state.Nuisance
 }
@@ -159,7 +159,7 @@ func (m *Mob) Feed(player behavior.Actor, h state.Hand) (result string, ok bool)
 	}
 	if a := m.states.Ageable; a != nil {
 		if i := a.Feed(&m.stateEnv, player, h); i >= 0 {
-			// BDS's feed (1.26.60 0x744B350) only moves the age and sends baby_eat, from
+			// BDS's feed only moves the age and sends baby_eat, from
 			// which the client plays the eating sound and particles. The baby flag stays:
 			// the next ageable tick grows the mob up and fires grow_up, which takes off the
 			// baby component groups (scale included).
@@ -252,7 +252,7 @@ var oldItemNames = map[string]string{
 	"fish":           "minecraft:cod",
 	"clownfish":      "minecraft:tropical_fish",
 	"cooked_fish":    "minecraft:cooked_cod",
-	// The horse armour, by BDS 1.26.60's item alias table (0xC66BA90).
+	// The horse armour, by BDS 1.26.60's item alias table.
 	"horsearmorleather": "minecraft:leather_horse_armor",
 	"horsearmoriron":    "minecraft:iron_horse_armor",
 	"horsearmorgold":    "minecraft:golden_horse_armor",
@@ -290,7 +290,7 @@ func (m *Mob) LeashInteract(player behavior.Actor, h state.Hand) (state.LeashAct
 }
 
 // LeashToHolder moves the mob's leash to another holder (a fence's knot), as
-// LeashFenceKnotActor's binding does with Actor::setLeashHolder.
+// LeashFenceKnotActor's binding does with BDS's code.
 func (m *Mob) LeashToHolder(id behavior.ID) {
 	if m.leashHolder != behavior.NoID {
 		m.SetLeashHolder(id)
@@ -309,7 +309,7 @@ func (m *Mob) LeashMaxDistance(holder behavior.Actor) float32 {
 // Leashable reports minecraft:leashable.
 func (m *Mob) Leashable() bool { return m.states != nil && m.states.Leashable != nil }
 
-// Unleash takes the leash off as Actor::dropLeash, dropping the lead when asked. Runs: the
+// Unleash takes the leash off as BDS, dropping the lead when asked. Runs: the
 // mob's region.
 func (s stateMob) DropLeash(dropItem, _ bool) {
 	if s.leashHolder == behavior.NoID {

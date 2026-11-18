@@ -19,10 +19,10 @@ import (
 )
 
 // Villager trading as BDS 1.26.60's EconomyTradeableComponent: offers made from the trade
-// table (_generateTrades), priced when a player opens the window (0x734AAD0, price 0xCEF2620),
+// table (_generateTrades), priced when a player opens the window (price),
 // traded through the item stack request's craft (CraftHandlerTrade), the experience and tiers
-// of notifyTrade, the daily restock (resupplyTrades), and the save (0x7241CD0, MerchantRecipe
-// 0xCEF2A50). The offers belong to the economy_trade_table component: a villager that loses its
+// of notifyTrade, the daily restock (resupplyTrades), and the save (MerchantRecipe).
+// The offers belong to the economy_trade_table component: a villager that loses its
 // profession loses the component, and so its offers, which is how breaking a job site rerolls an
 // unlocked villager's trades.
 
@@ -478,7 +478,7 @@ func (o *Mob) tradeFunction(st *ItemStack, f tradeFunction) int32 {
 	return 0
 }
 
-// enchantBookForTrading is EnchantBookForTradingFunction (1.26.60 0xD6BD400): a random
+// enchantBookForTrading is EnchantBookForTradingFunction: a random
 // enchantment books may have (Lootable) at a random level, and its price: base_cost +
 // random(base_random_cost + level * per_level_random_cost) + level * per_level_cost, doubled
 // for a treasure enchantment and then capped at the book's stack size.
@@ -544,7 +544,7 @@ func (o *Mob) resupplyTrades() {
 	}
 }
 
-// price is an offer's buyA count for the player (0xCEF2620): demand, the cured discounts
+// price is an offer's buyA count for the player: demand, the cured discounts
 // (none yet: curing is not built) and Hero of the Village, at least 1 and at most a stack.
 func (o *Mob) price(p *Player, off *tradeOffer) uint8 {
 	base := float32(off.baseA)
@@ -556,7 +556,7 @@ func (o *Mob) price(p *Player, off *tradeOffer) uint8 {
 	return uint8(min(max(price, 1), int32(off.buyA.maxStack(o.s.reg)))) //nolint:gosec // bounded
 }
 
-// openTrade opens the villager's trade window for the player (the interaction 0x734AAD0):
+// openTrade opens the villager's trade window for the player (the interaction):
 // it records the player, prices the offers for it, sends UpdateTrade and plays the haggle
 // sound. False when the villager does not trade now: no table, a baby, or another player
 // trading.

@@ -9,7 +9,7 @@ import (
 // range, so a world built deeper moves the void down with it.
 const voidDepth = 16
 
-// voidDamage is what the void deals a player each tick it is in it (BDS's Mob::outOfWorld).
+// voidDamage is what the void deals a player each tick it is in it (BDS's code).
 const voidDamage = 4
 
 // OutOfWorldFunc reports whether the entity is in the void. Runs: owner of the entity.
@@ -18,7 +18,7 @@ type OutOfWorldFunc func(s *Host, e *world.Entity) bool
 // VoidFunc is what the void does to an entity in it, once a tick. Runs: owner of the entity.
 type VoidFunc func(s *Host, e *world.Entity)
 
-// OutOfWorlder is an entity owner with its own answer to the void (BDS's Actor::outOfWorld,
+// OutOfWorlder is an entity owner with its own answer to the void (BDS's code,
 // which each kind of actor overrides). An owner without one is removed.
 type OutOfWorlder interface {
 	OutOfWorld(s *Host, e *world.Entity)
@@ -51,7 +51,7 @@ func vanillaOutOfWorld(_ *Host, e *world.Entity) bool {
 }
 
 // vanillaVoid fires the event, then hands the entity to its owner's OutOfWorld; anything
-// else is removed, as BDS's Actor::outOfWorld does.
+// else is removed, as BDS's code does.
 func vanillaVoid(s *Host, e *world.Entity) {
 	p, _ := e.Owner().(*Player)
 	if s.game != nil && s.game.voidEv.Has() {
@@ -97,7 +97,7 @@ func (s *Host) checkVoid(e *world.Entity) {
 	}
 }
 
-// OutOfWorld hurts the player with the void each tick (BDS's Mob::outOfWorld): fall distance
+// OutOfWorld hurts the player with the void each tick (BDS's code): fall distance
 // cleared, then TuneVoidDamage. Creative and spectator players are hurt too, as in BDS.
 func (p *Player) OutOfWorld(*Host, *world.Entity) { p.voidHurt(p.Tuning(TuneVoidDamage)) }
 
@@ -133,7 +133,7 @@ func (m *Minecart) OutOfWorld(_ *Host, e *world.Entity) {
 }
 
 // OutOfWorld removes the projectile, except a trident with Loyalty, which starts back to its
-// owner as BDS's (sub_BC99300).
+// owner as BDS's.
 func (t *Projectile) OutOfWorld(_ *Host, e *world.Entity) {
 	if tr := t.trident; tr != nil && tr.loyalty > 0 && t.owner != nil && !t.owner.dead() {
 		if r := e.Region(); r != nil && t.owner.entity != nil && t.owner.entity.Region() == r {

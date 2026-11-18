@@ -12,26 +12,26 @@ import (
 
 // Candles, candle cakes and cakes, from BDS 1.26.60.
 //
-// Candles (CandleBlock vtable 0xFB9D380, CandleBlockItem 0xFB5D3B8): the item's useOn
-// (0xC9A3560) adds one to the same candle when it holds fewer than four, else places a new
+// Candles (CandleBlockItem): the item's useOn
+// adds one to the same candle when it holds fewer than four, else places a new
 // one, on a block whose top holds it (canProvideSupport up). Lit, a candle gives 3 light per
-// candle (0xCCF36E0; helix-data's light emission). Clicking one (0xCB45550): flint and steel,
+// candle (helix-data's light emission). Clicking one: flint and steel,
 // a fire charge or a Fire Aspect item lights it and wears the item by one (BDS's hurtAndBreak,
 // so a fire charge is not used up); an empty hand puts a lit one out; any other item goes to
 // the item. Lighting and going out are the fire package's.
 //
-// Cakes (CakeBlock 0xFBA6F50, use 0xCB88A90): a candle on a whole cake makes the candle cake of
+// Cakes (CakeBlock, use): a candle on a whole cake makes the candle cake of
 // its colour (sound cake.add_candle at the corner, one candle used outside creative); else a
-// player who may eat (creative, peaceful or not full) eats a slice (0xCB89090): nutrition 2,
+// player who may eat (creative, peaceful or not full) eats a slice: nutrition 2,
 // saturation modifier 0.1, one more bite, the last bite removes the cake, and a burp at the
 // head. Comparators read 14 - 2 * bites (circuit package).
 //
-// Candle cakes (CandleCakeBlock 0xFB9D7F8, use 0xCB47140): a fire starter lights it; an empty
+// Candle cakes (CandleCakeBlock, use): a fire starter lights it; an empty
 // hand puts a lit one out; anything else eats from it as from a whole cake, throwing out its
 // candle first (as a block's drop, when blocks drop). Cakes and candle cakes need a solid block
 // below (attach package).
 //
-// Not done: the item candle cakes refuse (a name compare at 0xCB47140, FEE1680, not read), the
+// Not done: the item candle cakes refuse (a name compare, not read), the
 // air-only check of the candle item (Helix lets a candle replace what any block item replaces),
 // and the cake's gameEvent.
 
@@ -87,7 +87,7 @@ func candleState(pl *Placement) (uint32, bool) {
 }
 
 // ignitesCandle reports whether an item lights a candle: flint and steel, a fire charge, or
-// anything with Fire Aspect (BDS's sub_BD04470).
+// anything with Fire Aspect (BDS's code).
 func ignitesCandle(s ItemStack) bool { return s.Name == nameFireCharge || ignitesCampfire(s) }
 
 // lightCandleWith lights the candle or candle cake at pos with the held fire starter, wearing it

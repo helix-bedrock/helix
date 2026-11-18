@@ -300,7 +300,7 @@ func (t *Ticker) stopsRain(b uint32) bool {
 	return p == data.PrecipitationAccumulateSnow || p == data.PrecipitationObstructRain
 }
 
-// RainTop is BDS's rain height map (LevelChunk::getTopRainBlockPos, sub_CFAD480): the Y above
+// RainTop is BDS's rain height map: the Y above
 // the highest block in the column that stops rain, on either layer. Runs: owner of the region.
 func (t *Ticker) RainTop(r *world.Region, x, z int) (int, bool) {
 	return r.ColumnTop(x, z, func(b0, b1 uint32) bool {
@@ -336,7 +336,7 @@ func (t *Ticker) Temperature(r *world.Region, pos cube.Pos) (float32, bool) {
 	return b.Temperature + float32(pos[1]-limit)*coolingRate/coolingDivisor, true
 }
 
-// Precipitating is BDS's Weather::isPrecipitatingAt (sub_CD9EC30): the biome has rain, the rain
+// Precipitating is BDS's code: the biome has rain, the rain
 // level is above RainingLevel, and nothing above pos stops sunlight or rain. Runs: owner of
 // the region.
 func (t *Ticker) Precipitating(r *world.Region, pos cube.Pos) bool {
@@ -351,7 +351,7 @@ func (t *Ticker) Precipitating(r *world.Region, pos cube.Pos) bool {
 	return ok && pos[1] >= top
 }
 
-// RainingAt is BDS's Weather::isRainingAt (sub_CD9EE30): precipitation that is warm enough to
+// RainingAt is BDS's code: precipitation that is warm enough to
 // be rain. Runs: owner of the region.
 func (t *Ticker) RainingAt(r *world.Region, pos cube.Pos) bool {
 	if !t.Precipitating(r, pos) {
@@ -361,7 +361,7 @@ func (t *Ticker) RainingAt(r *world.Region, pos cube.Pos) bool {
 	return ok && temp > FreezeTemperature
 }
 
-// SnowingAt is BDS's Weather::isSnowingAt (sub_CD9EF00). Runs: owner of the region.
+// SnowingAt is BDS's code. Runs: owner of the region.
 func (t *Ticker) SnowingAt(r *world.Region, pos cube.Pos) bool {
 	if !t.Precipitating(r, pos) {
 		return false
@@ -376,7 +376,7 @@ func inWorld(r *world.Region, y int) bool {
 	return y >= rg[0] && y <= rg[1]
 }
 
-// ShouldFreeze is BDS's Weather::shouldFreeze (sub_CD9FF40): source water cold enough, dark
+// ShouldFreeze is BDS's code: source water cold enough, dark
 // enough by block light and, with sides, not walled in by water on all four sides. Runs: owner
 // of the region.
 func (t *Ticker) ShouldFreeze(r *world.Region, pos cube.Pos, sides bool) bool {
@@ -402,7 +402,7 @@ func (t *Ticker) ShouldFreeze(r *world.Region, pos cube.Pos, sides bool) bool {
 	return false
 }
 
-// layersAt is BDS's count of snow in the column from pos down (sub_CD9F440): each snow layer
+// layersAt is BDS's count of snow in the column from pos down: each snow layer
 // its height, a snow block a full block's worth, at most most + 1 blocks down.
 func (t *Ticker) layersAt(r *world.Region, pos cube.Pos, most int) int {
 	n := 0
@@ -424,7 +424,7 @@ func (t *Ticker) layersAt(r *world.Region, pos cube.Pos, most int) int {
 	return n
 }
 
-// canSnow is BDS's Weather::canPlaceTopSnow (sub_CD9EFE0): whether snow may settle at pos, and
+// canSnow is BDS's code: whether snow may settle at pos, and
 // the layer height it would be. fromRain checks the height of the world and what is below,
 // limit the biome's snow_accumulation.
 func (t *Ticker) canSnow(r *world.Region, pos cube.Pos, fromRain, limit bool) (int, bool) {
@@ -480,7 +480,7 @@ func (t *Ticker) canSnow(r *world.Region, pos cube.Pos, fromRain, limit bool) (i
 	return 1, true
 }
 
-// PlaceSnow is BDS's Weather::tryToPlaceTopSnow (sub_CD9F5D0): with doweathercycle, a layer of
+// PlaceSnow is BDS's code: with doweathercycle, a layer of
 // snow settles at pos, or, with spread, in the column north or south of it that has less snow
 // and lies at its rain top. A snowlogged plant moves to the second layer under a covered snow
 // layer. Runs: owner of the region.
@@ -515,7 +515,7 @@ func (t *Ticker) PlaceSnow(r *world.Region, pos cube.Pos, fromRain, spread bool)
 	return true
 }
 
-// layer adds a layer of snow at pos (sub_D4E8C60): one more on a snow layer, a new one on
+// layer adds a layer of snow at pos: one more on a snow layer, a new one on
 // air, a covered one over a snowlogging plant, which moves to the second layer.
 func (t *Ticker) layer(r *world.Region, pos cube.Pos) {
 	b, ok := r.Block(pos, 0)

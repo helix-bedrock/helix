@@ -7,7 +7,7 @@ import "github.com/helix-bedrock/entity/behavior"
 // Jump implements behavior.Celebrator: the jump control jumps this tick.
 func (m *Mob) Jump() { m.jump.Jumping = true }
 
-// Remove implements behavior.Silverfish: the mob leaves the level without dying (Actor::remove),
+// Remove implements behavior.Silverfish: the mob leaves the level without dying,
 // so it drops nothing; its entity goes when its tick is applied.
 func (m *Mob) Remove() { m.despawned = true }
 

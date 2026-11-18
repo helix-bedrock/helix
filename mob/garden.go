@@ -7,7 +7,7 @@ import (
 )
 
 // raid_garden's and lay_egg's hooks (behavior.GardenRaider, behavior.EggLayer). BDS 1.26.60's
-// RaidGardenGoal::tick (0x550C5C0) fires the block event minecraft:on_raided on the block
+// BDS's code fires the block event minecraft:on_raided on the block
 // above the target as the mob, then posts the eat game event at the mob's attach point 8.
 // Only crops, sweet berry bushes and cave vines with berries answer it (GardenEnv).
 
@@ -26,8 +26,8 @@ func (m *Mob) MatchesBlock(p behavior.Pos, descriptors []string) bool {
 // event is not posted: Helix's game events come from players only.
 func (m *Mob) RaidBlock(p behavior.Pos) { m.do(op{kind: opRaidBlock, pos: p}) }
 
-// ProbePath implements behavior.PathProber: the navigation's createPath to the point
-// (NavigationComponent vt+40), made and not followed.
+// ProbePath implements behavior.PathProber: the navigation's createPath to the point,
+// made and not followed.
 func (m *Mob) ProbePath(to behavior.Vec3) (behavior.PathProbe, bool) {
 	if m.nv == nil {
 		return behavior.PathProbe{}, false

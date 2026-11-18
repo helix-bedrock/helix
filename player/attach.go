@@ -11,7 +11,7 @@ import (
 // toward the head, a thrown item's sound plays at the drop point, a bow's at the weapon point.
 type AttachPoint uint8
 
-// The attach points, in BDS's order (sub_7560A00 switches on these numbers).
+// The attach points, in BDS's order (switches on these numbers).
 const (
 	AttachFeet AttachPoint = iota
 	AttachBody
@@ -25,9 +25,9 @@ const (
 )
 
 // The player's attach point offsets, from BDS 1.26.60. A player's position is its eyes
-// (OffsetsComponent height offset 1.62001, set by the Player constructor 0xBCC9950), and the
+// (OffsetsComponent height offset 1.62001, set by the Player constructor), and the
 // player sets none of the head, eyes, breathing or mouth offsets, so those four points are
-// the position itself. The drop offset is the one every actor starts with (0xB38ABA0):
+// the position itself. The drop offset is the one every actor starts with:
 // 0.2 down and 0.15 ahead, turned with the yaw.
 const (
 	attachDropDown  = 0.2
@@ -35,7 +35,7 @@ const (
 )
 
 // AttachPos returns where point a is on the player now, as BDS's attach position
-// (sub_7560A00 through sub_B39CED0) works it out for a player:
+// (through) works it out for a player:
 //   - feet and explosion: the eyes less the eye height;
 //   - body and weapon: the middle of the bounding box;
 //   - head, eyes, breathing, mouth: the eyes;

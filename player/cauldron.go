@@ -11,9 +11,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Cauldrons as BDS 1.26.60 runs them: the cauldron's use 0xCB4AAE0 (CauldronBlock::use in
-// 1.21.3's names), its level setter 0xCB4DC30, its level event 0xCB4DF60, the dye mix
-// 0xD44CE40/0xD44CC90 and the block actor's save. The research note is private.
+// Cauldrons as BDS 1.26.60 runs them: the cauldron's use (BDS's code in
+// 1.21.3's names), its level setter, its level event, the dye mix
+// and the block actor's save. The research note is private.
 //
 // The block holds the liquid and its level (fill_level 0 to 6, cauldron_liquid); the block
 // entity holds a potion (an ID, -1 for none, and the potion item it came from) and a dye
@@ -41,7 +41,7 @@ const (
 	// lastPlainPotion is the awkward potion's ID; bottles up to it are not kept in a cauldron.
 	lastPlainPotion = 4
 
-	// cauldronWaterColour is BDS's CauldronBlockActor::WATER_COLOR (0.2065, 0.3185, 0.35,
+	// cauldronWaterColour is BDS's WATER_COLOR (0.2065, 0.3185, 0.35,
 	// alpha 0.75) as the ARGB its level events carry.
 	cauldronWaterColour uint32 = 0xBF345159
 	// customColorTag is the item tag a dyed armour piece keeps its colour in.
@@ -67,7 +67,7 @@ const (
 	cauldronPowderSnow = "powder_snow"
 )
 
-// cauldronDyeColours is BDS's dye colour table the cauldron mixes with (0xFC02528), RGB by
+// cauldronDyeColours is BDS's dye colour table the cauldron mixes with, RGB by
 // dye colour (black 0 to white 15). Black is not the sign table's pure black.
 var cauldronDyeColours = [16]uint32{
 	0x1d1d21, 0xb02e26, 0x5e7c16, 0x835432, 0x3c44aa, 0x8932b8, 0x169c9c, 0x9d9d97,

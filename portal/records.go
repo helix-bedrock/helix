@@ -124,7 +124,7 @@ func (rs *Records) Remove(dim mcdb.Dimension, drop func(Record) bool) {
 	}
 }
 
-// Nearest is BDS's PortalForcer findPortal (sub_CDADE40): of every column of every
+// Nearest is BDS's PortalForcer findPortal: of every column of every
 // record of dim within radius of pos on x and z, the closest one (by squared distance,
 // height counted), and its record.
 func (rs *Records) Nearest(dim mcdb.Dimension, pos cube.Pos, radius int) (Record, cube.Pos, bool) {

@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Game events as BDS 1.26.60's GameEventDispatcher::post (0xCA517E0 and its block form): an
+// Game events as BDS 1.26.60's BDS's code (its block form): an
 // event at a position reaches the listeners kept by the chunks within 16 blocks of it, each
 // that is within its own range and 16 blocks, in chunk then registration order. Listeners are
 // block entities (sculk sensors and shriekers); what an event means is the caller's.

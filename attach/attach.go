@@ -252,7 +252,7 @@ func (t *Table) MayPlace(r *world.Region, pos cube.Pos, block uint32, clicked cu
 		return t.onFloor(r, pos)
 	}
 	if strings.HasSuffix(name, "candle") {
-		// CandleBlockItem's useOn (0xC9A3560): the block below must hold it on its top.
+		// CandleBlockItem's useOn: the block below must hold it on its top.
 		return t.onFloor(r, pos)
 	}
 	if isFrame(name) {
@@ -310,7 +310,7 @@ func (t *Table) ButtonHeld(r *world.Region, pos cube.Pos, block uint32) bool {
 	return !ok || t.Supports(b, face)
 }
 
-// LeverHeld is BDS's canSurvive for levers (LeverBlock 0xD556630): the block behind holds
+// LeverHeld is BDS's canSurvive for levers (LeverBlock): the block behind holds
 // things on the face the lever sits on, as a button's holder does. What is not loaded counts
 // as holding.
 func (t *Table) LeverHeld(r *world.Region, pos cube.Pos, block uint32) bool {
@@ -528,14 +528,14 @@ func (t *Ticker) NeighbourChanged(r *world.Region, pos, from cube.Pos, block uin
 	t.BlockTicker.NeighbourChanged(r, pos, from, block, layer)
 }
 
-// flowerPot is the flower pot, whose canSurvive (BDS 1.26.60 0xCB053F0) needs the block below
+// flowerPot is the flower pot, whose canSurvive needs the block below
 // to hold it on its top face; both mayPlace and neighborChanged ask it.
 const flowerPot = "minecraft:flower_pot"
 
 // isCake reports whether name is a cake or a candle cake. BDS 1.26.60's CakeBlock and
-// CandleCakeBlock canSurvive (0xCB895B0, 0xCB48690) need a solid material below; both
+// CandleCakeBlock canSurvive need a solid material below; both
 // mayPlace and neighborChanged ask it. BDS breaks the block on a tick it schedules then
-// (sub_CE58DD0, one tick); Helix breaks it at once.
+// (one tick); Helix breaks it at once.
 func isCake(name string) bool { return name == "minecraft:cake" || strings.HasSuffix(name, "candle_cake") }
 
 // isFrame reports whether name is an item frame or a glow item frame.

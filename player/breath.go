@@ -18,8 +18,8 @@ import (
 )
 
 // Breathing and drowning. A player runs the entity library's minecraft:breathable component,
-// the same one mobs run, as BDS's players and mobs share BreathableComponent (1.26.60 tick
-// sub_79139D0): its numbers come from the player definition (15 seconds of air, hurt from
+// the same one mobs run, as BDS's players and mobs share BreathableComponent (1.26.60 tick):
+// its numbers come from the player definition (15 seconds of air, hurt from
 // -1 second, 3.75 seconds to breathe back in, no bubbles).
 
 // The damage causes of running out of air.
@@ -153,7 +153,7 @@ type breather struct {
 
 func (b breather) Alive() bool { return !b.p.dead() }
 
-// Breath is BDS's medium (sub_7370980) at the player's breathing point: the definition's
+// Breath is BDS's medium at the player's breathing point: the definition's
 // block lists, then water or lava in either layer, then a block BDS's breathing check calls
 // solid (registry Suffocates: not glass, ice, leaves or slabs) whose collision bounds, one box
 // around all of its boxes as BDS takes them, hold the point. A crawling or swimming player's
@@ -225,7 +225,7 @@ func (b breather) HasEffect(id int) bool {
 	return ok
 }
 
-// UnderWater is Actor::isHeadInLiquid with water (sub_B39C240): water at the breathing point
+// UnderWater matches BDS with water: water at the breathing point
 // whose surface is above it.
 func (b breather) UnderWater() bool {
 	s := b.p.s
@@ -332,7 +332,7 @@ func (s *Host) liquidIn(r *world.Region, pos cube.Pos) (uint32, bool) {
 	return 0, false
 }
 
-// liquidHeightOf is BlockUtils::getLiquidBlockHeight (0xB656EF0) of liquid block liq at pos.
+// liquidHeightOf matches BDS of liquid block liq at pos.
 func (s *Host) liquidHeightOf(liq uint32, pos cube.Pos) float32 {
 	depth, _ := s.reg.Blocks.States(liq)["liquid_depth"].(int32)
 	if depth >= liquidFalling {

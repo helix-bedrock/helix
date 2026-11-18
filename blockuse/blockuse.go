@@ -117,9 +117,9 @@ func Use(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32, y
 }
 
 // WindToggle is what a wind burst does to block at pos, BDS 1.26.60's BlockType slot 132
-// overrides: doors (0xCB19200, from the lower half only), trapdoors (0xD46F6E0) and gates
-// (0xCAFE4B0, keeping their direction) open or close, iron ones never; levers flip
-// (0xD5574E0); a button not pressed is pressed (0xCB84930). Doors, trapdoors and gates
+// overrides: doors (from the lower half only), trapdoors and gates
+// (keeping their direction) open or close, iron ones never; levers flip;
+// a button not pressed is pressed. Doors, trapdoors and gates
 // stay as they are while their circuit part has power: powered reports that for a
 // position (BDS's circuit component strength > 0). False if the block takes no wind.
 // Runs: owner of the region.
@@ -301,7 +301,7 @@ func doorStands(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block ui
 	return blocks.Name(other) == blocks.Name(block) && bit(blocks, other, stateUpper) != upper
 }
 
-// ButtonFeelsArrows says arrows press the button called name: wood ones, BDS's flag at +936.
+// ButtonFeelsArrows says arrows press the button called name: wood ones, BDS's flag.
 func ButtonFeelsArrows(name string) bool {
 	return name != "minecraft:stone_button" && name != "minecraft:polished_blackstone_button"
 }

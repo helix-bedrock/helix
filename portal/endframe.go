@@ -11,7 +11,7 @@ const endRingReach = 2
 
 // ringFrame is one of the twelve frame places around a portal's middle, and the way the
 // frame there must face: toward the middle, as the frames of BDS's stronghold portal
-// room do and its pattern check (sub_CAF3EF0) wants.
+// room do and its pattern check wants.
 type ringFrame struct {
 	off    cube.Pos
 	facing string
@@ -53,7 +53,7 @@ func (p *Portals) WithEye(block uint32) (uint32, bool) {
 	return p.reg.StateID(nameFrame, next)
 }
 
-// OpenEndPortal is the end portal frame's pattern check (BDS sub_CAF30D0 on a 5 by 5
+// OpenEndPortal is the end portal frame's pattern check (BDS on a 5 by 5
 // BlockPattern): when the frame at pos got its eye and it completes a ring of twelve
 // frames with eyes, all facing the middle, around a 3 by 3 square, the square becomes
 // end portal. It reports whether a portal opened, with the middle of the square.

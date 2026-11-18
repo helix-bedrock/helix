@@ -29,7 +29,7 @@ var (
 // pullLift is what each block of a pull's length, square rooted, adds upward.
 const pullLift = 0.08
 
-// PullVelocity is the speed BDS's FishingHook::_pullCloser (0xC08DAA0) gives what it pulls
+// PullVelocity is the speed BDS's code gives what it pulls
 // from from toward to: the way there times scale, plus the square root of that step's
 // length times 0.08 upward, so a long pull arcs. The fishing rod uses scale 0.1, toward one
 // block above the angler's head.

@@ -97,8 +97,8 @@ func (p *Player) fillBucket(clicked cube.Pos) bool {
 	return true
 }
 
-// pourBucket is BDS's bucket emptying for water and lava (BucketItem::_emptyBucket,
-// 0xC99EC80): pourLiquid, the empty sound, and an empty bucket outside creative. Water in
+// pourBucket is BDS's bucket emptying for water and lava (BDS's code,):
+// pourLiquid, the empty sound, and an empty bucket outside creative. Water in
 // the Nether boils away instead, and the bucket is still emptied. False if nothing was
 // poured.
 func (p *Player) pourBucket(clicked cube.Pos, face int32, held ItemStack) bool {
@@ -145,7 +145,7 @@ const (
 	pourLand
 )
 
-// bucketTarget is where BDS 1.26.60's BucketItem::_useOn (0xC99AC00) empties a bucket: the
+// bucketTarget is where BDS 1.26.60's BDS's code empties a bucket: the
 // neighbour on the clicked face, never the clicked block built over, except water clicked on
 // a block that can hold it and a water animal's bucket clicked on water or lava, which go in
 // the clicked block. A snow layer right under that spot is broken, with its particles and no

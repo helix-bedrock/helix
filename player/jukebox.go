@@ -32,7 +32,7 @@ const (
 	jukeboxNoteHeight    = 1.2
 	jukeboxNoteParticle  = "minecraft:note_particle"
 	// jukeboxExtraReach is added to a player's view radius in blocks to get how far off,
-	// along the ground, BDS lets them hear a song (0xA141110, 0xCDC3AF0).
+	// along the ground, BDS lets them hear a song.
 	jukeboxExtraReach = 46
 	blocksInChunk     = 16
 )
@@ -46,8 +46,8 @@ func loadDiscs() (map[string]data.MusicDisc, error) {
 	return discs, nil
 }
 
-// jukeboxEntity is a jukebox's block entity. BDS sends the song itself as a sound with a handle
-// (0xD41E080), to each player in reach, and stops it through the handle; the block entity data
+// jukeboxEntity is a jukebox's block entity. BDS sends the song itself as a sound with a handle,
+// to each player in reach, and stops it through the handle; the block entity data
 // does not start it.
 type jukeboxEntity struct {
 	s      *Host
@@ -122,7 +122,7 @@ func (e *jukeboxEntity) insert(r *world.Region, pos cube.Pos, disc ItemStack) {
 	e.updateHearing(r, pos)
 }
 
-// updateHearing is BDS's sound range (0xCDDB7A0): a player who came into reach is sent the song
+// updateHearing is BDS's sound range: a player who came into reach is sent the song
 // from where it has got to, and one who went out of reach has it stopped. Only one who started
 // it with the jukebox is told that a record started.
 func (e *jukeboxEntity) updateHearing(r *world.Region, pos cube.Pos) {
@@ -181,7 +181,7 @@ func (e *jukeboxEntity) stopPacket() *packet.ClientboundUpdateSoundData {
 	return &packet.ClientboundUpdateSoundData{ServerSoundHandle: e.handle, Update: protocol.SoundDataUpdate{Type: protocol.SoundDataUpdateStop}}
 }
 
-// stopSong stops the song for everyone sent it (0xCDDC510, sent out by 0xCDDA990).
+// stopSong stops the song for everyone sent it (sent out by).
 func (e *jukeboxEntity) stopSong(r *world.Region) {
 	for p := range e.hearing {
 		if p.entity != nil && p.entity.Region() == r {

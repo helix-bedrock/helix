@@ -45,7 +45,7 @@ const (
 	defaultMaxAutoStep = 0.5625
 	defaultAirSpeed    = 0.02
 	// defaultLiquidSpeed is the underwater and lava movement every BDS mob
-	// registers (Mob attribute setup 0xBFEF1F0); definitions may override it.
+	// registers (Mob attribute setup); definitions may override it.
 	defaultLiquidSpeed = 0.02
 	defaultFollowRange = 16
 	defaultHealth      = 10
@@ -160,7 +160,7 @@ type Hooks interface {
 	// Hurt hurts the mob through the engine's hurt (its packets included) with no attacker.
 	Hurt(m *Mob, amount float32, cause int)
 	// Born makes the baby of a mating beside the parent m (BDS's
-	// ActorFactory::createBornActor) and returns it as the mob runtime sees it, nil when
+	// BDS's code) and returns it as the mob runtime sees it, nil when
 	// none was made. It runs in m's Apply.
 	Born(m *Mob, b state.Birth) behavior.Actor
 	// Experience drops experience orbs worth amount at the mob.
@@ -168,7 +168,7 @@ type Hooks interface {
 	// Ignite sets the entity with the ID on fire for at least seconds: a melee hit's
 	// can_spread_on_fire. It runs in the mob's Apply.
 	Ignite(m *Mob, target behavior.ID, seconds int32)
-	// LeashDropped is the mob's leash coming off (Actor::dropLeash); dropLead drops a lead
+	// LeashDropped is the mob's leash coming off; dropLead drops a lead
 	// item at the mob.
 	LeashDropped(m *Mob, dropLead bool)
 }
@@ -209,8 +209,8 @@ type Mob struct {
 	jumpCtl bool
 	// slimer is movement.jump's slime move control state.
 	slimer move.Slimer
-	// swimDir is a squid's swim direction (Squid +1172) and squidPitch its body pitch
-	// (Squid +1156); see squid.go.
+	// swimDir is a squid's swim direction and squidPitch its body pitch;
+	// see squid.go.
 	swimDir    behavior.Vec3
 	squidPitch float32
 	lookSet    bool
@@ -299,15 +299,15 @@ type Mob struct {
 	// and follow_caravan's state (pack.go).
 	chasing                                bool
 	targetLeader, caravanHead, caravanTail behavior.ID
-	// hurtThisTick and wasHurt are Actor +784 and +785 (wasHurt is +785, copied from +784 by
-	// Actor::baseTick, 1.26.60); pushedBy is PushedByComponent; rollCount is the panda's
+	// hurtThisTick and wasHurt are and (wasHurt is, copied from by
+	// BDS's code, 1.26.60); pushedBy is PushedByComponent; rollCount is the panda's
 	// RollCounterComponent (flyer.go, golem.go, panda.go).
 	hurtThisTick, wasHurt bool
 	pushedBy              behavior.ID
 	hasPushedBy           bool
 	rollCount             int32
-	// customBox is set while a goal's Actor::setAABB box stands in for the mob's size;
-	// hurtAt is the tick of the last hurt that landed (Actor::getLastHurtTimestamp);
+	// customBox is set while a goal's BDS's code box stands in for the mob's size;
+	// hurtAt is the tick of the last hurt that landed;
 	// fallImmune is CurrentlyImmuneToFallDamageComponent; ramHorn is the ram's horn dropper
 	// flag; mingle is MingleComponent, set when hasMingle is (jumper.go, ram.go, mingle.go).
 	customBox, fallImmune, ramHorn bool
@@ -318,7 +318,7 @@ type Mob struct {
 	effects effect.List
 	// leashHolder is the entity holding the mob's leash, NoID for none (breed.go).
 	leashHolder behavior.ID
-	// owner is the entity that tamed the mob (Actor::setOwner), NoID for none; madTime
+	// owner is the entity that tamed the mob, NoID for none; madTime
 	// counts the ticks of a refused horse's rear-up (tame.go).
 	owner   behavior.ID
 	madTime int32
@@ -376,7 +376,7 @@ type Mob struct {
 	dw        dweller
 	trade     tradeState
 	pathNodes []behavior.Pos
-	// moveSpeed is the speed the move control last chose (BDS's Mob::mSpeed), kept between
+	// moveSpeed is the speed the move control last chose (BDS's code), kept between
 	// ticks so walking speeds up a tenth at a time.
 	moveSpeed float32
 
@@ -792,7 +792,7 @@ func (m *Mob) moveControl() {
 		Eye: path.Vec3{X: m.body.Pos.X, Y: m.body.Pos.Y + m.eyeHeight(), Z: m.body.Pos.Z},
 	}
 	// The walking controls speed up towards the end of the path the mob follows (BDS's
-	// Mob::mSpeed and the navigation's last node); without them the speed stays 0.
+	// BDS's code and the navigation's last node); without them the speed stays 0.
 	var end path.Pos
 	if m.nv != nil {
 		if p, _ := m.nv.Path(); p != nil && len(p.Points) > 0 {
@@ -831,7 +831,7 @@ func (m *Mob) moveControl() {
 	m.flags = b.Flags
 }
 
-// lookControl is LookControl::tick (BDS 1.26.60 0xBFBF1E0): the head turns toward what a
+// lookControl matches BDS: the head turns toward what a
 // goal looks at, or to the rotation a control asked for; with neither, the pitch goes back
 // to level and the head to the body, 10 degrees a tick. The head then stays within 75
 // degrees of the body.
@@ -904,7 +904,7 @@ func (m *Mob) physicsTick() {
 	m.traceBlocks()
 }
 
-// liquidPush is BDS 1.26.60's LiquidPhysicsSystem push (sub_77DCDE0) before the mob moves: the
+// liquidPush is BDS 1.26.60's LiquidPhysicsSystem push before the mob moves: the
 // current of the lava or water in the body's liquid boxes, the same push items get.
 func (m *Mob) liquidPush() {
 	lava, water := m.body.LiquidBoxes()
@@ -945,8 +945,8 @@ const (
 	nameChestBoat = "minecraft:chest_boat"
 )
 
-// headInWater is BDS 1.26.60's Actor::isHeadInLiquid with water (sub_B39C240): the block at
-// the mob's eyes is water whose surface, by BlockUtils::getLiquidBlockHeight (0xB656EF0), is
+// headInWater is BDS 1.26.60's BDS's code with water: the block at
+// the mob's eyes is water whose surface, by BDS's code, is
 // above them.
 func (m *Mob) headInWater() bool {
 	eyes := m.Eyes()
@@ -999,7 +999,7 @@ func (m *Mob) Hurt(amount float32, by behavior.ID, cause int, tick uint64) float
 }
 
 // HurtIgnoringCooldown is Hurt with the hurt time skipped, as BDS's hurt cooldown bypass
-// (Actor +849) does for the guardian's magic hit: the damage counts in full and a new hurt
+// does for the guardian's magic hit: the damage counts in full and a new hurt
 // time starts.
 func (m *Mob) HurtIgnoringCooldown(amount float32, by behavior.ID, cause int, tick uint64) float32 {
 	return m.hurt(amount, by, cause, tick, true)

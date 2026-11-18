@@ -632,7 +632,7 @@ func (p *Player) destroy(count byte, srcInfo protocol.StackRequestSlotInfo) (uin
 	if !p.creative() || !p.mayRemove(src, *src.stack) {
 		return protocol.ItemStackResponseStatusCannotDestroyItem, nil
 	}
-	// The same check as a drop's (0xC9F3510 with the destroy action): no locked item.
+	// The same check as a drop's (with the destroy action): no locked item.
 	if itemLocked(*src.stack) {
 		return protocol.ItemStackResponseStatusError, nil
 	}
@@ -708,7 +708,7 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 		return false
 	}
 	// A locked item stays with the player: BDS 1.26.60's validation of every other container
-	// (chests, barrels, boxes, crafting, furnaces... 0xC9FCB40) refuses it.
+	// (chests, barrels, boxes, crafting, furnaces...) refuses it.
 	if itemLocked(s) && !playerOwnSlot(r.kind) {
 		return false
 	}
@@ -734,8 +734,8 @@ func (p *Player) mayPlace(r slotRef, s ItemStack) bool {
 	case protocol.ContainerEnchantingInput:
 		return s.Count == 1
 	case protocol.ContainerBeaconPayment:
-		// BeaconPaymentContainerValidation (1.26.60 0xC9FB170): one item, and only an iron
-		// ingot, gold ingot, diamond, emerald or netherite ingot (isPaymentItem 0xD437310).
+		// BeaconPaymentContainerValidation: one item, and only an iron
+		// ingot, gold ingot, diamond, emerald or netherite ingot (isPaymentItem).
 		return s.Count == 1 && slices.Contains(beaconPayments, s.Name)
 	case protocol.ContainerEnchantingMaterial:
 		material := p.s.game.rules().material

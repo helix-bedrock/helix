@@ -11,8 +11,8 @@ import (
 
 // Wind charges, from BDS 1.26.60: the item throws wind_charge_projectile (its throwable and
 // projectile components) with a 0.5 second use cooldown; the projectile's
-// wind_burst_on_hit (WindBurstOnHitSubcomponent 0x71573C0) explodes it with its
-// minecraft:explode component (ExplodeComponent 0x725A720) where it hits, then removes it.
+// wind_burst_on_hit (WindBurstOnHitSubcomponent) explodes it with its
+// minecraft:explode component (ExplodeComponent) where it hits, then removes it.
 const (
 	nameWindCharge           = "minecraft:wind_charge"
 	nameWindChargeProjectile = "minecraft:wind_charge_projectile"
@@ -21,7 +21,7 @@ const (
 	windChargeCooldownCategory = "wind_charge"
 	windChargeCooldownTicks    = 10
 
-	// windBurstLift is how far off the hit face a burst on a block starts (0x71573C0).
+	// windBurstLift is how far off the hit face a burst on a block starts.
 	windBurstLift = 0.25
 
 	// The particle_effect names of minecraft:explode and the level events they send.
@@ -87,7 +87,7 @@ func (s *Host) windToggle(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// hitParticles is BDS's particle_on_hit (ParticleOnHitSubcomponent 0x7156E10): the
+// hitParticles is BDS's particle_on_hit (ParticleOnHitSubcomponent): the
 // definition's particle, once a particle, as level event 2009 at the projectile, which BDS
 // has moved to where it hit by then. Runs: owner of the region.
 func (t *Projectile) hitParticles(r *world.Region, pos mgl32.Vec3, kind projectileHitKind) {
@@ -124,8 +124,8 @@ func throwableCooldown(item string) (string, int32, bool) {
 // reflectTicksPerSecond turns reflect_immunity into ticks, as BDS's floor(seconds * 20).
 const reflectTicksPerSecond = 20
 
-// useOnProjectile is a player hitting a projectile, BDS's ProjectileComponent hurt
-// (0x7146660): one whose definition reflects on hurt and that has flown at least its
+// useOnProjectile is a player hitting a projectile, BDS's ProjectileComponent hurt:
+// one whose definition reflects on hurt and that has flown at least its
 // reflect immunity turns to fly along the attacker's view at speed 1, with the attacker as
 // its owner. True if the target was a projectile.
 func (p *Player) useOnProjectile(d *protocol.UseItemOnEntityTransactionData) bool {

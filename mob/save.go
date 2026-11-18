@@ -7,7 +7,7 @@ import "github.com/helix-bedrock/entity/definition"
 
 // BDS's actor flag and data numbers for a name (ActorFlags, ActorDataIDs).
 const (
-	// FlagCanShowName is set by NameableComponent::nameEntity (1.26.60 0x7139940).
+	// FlagCanShowName is set by BDS's code.
 	FlagCanShowName = 14
 	// FlagAlwaysShowName is minecraft:nameable's always_show.
 	FlagAlwaysShowName = 15
@@ -26,7 +26,7 @@ func (m *Mob) Restore(stack []definition.StackEntry, health float32) {
 	m.savedHealth = health
 }
 
-// SetNameTag names the mob as BDS's Actor::setNameTag does: the name actor data and the can
+// SetNameTag names the mob as BDS's code does: the name actor data and the can
 // show name flag; "" takes the name away. A name never makes the mob persistent by itself:
 // naming with a name tag does that (Name). Runs: the mob's region, outside its think.
 func (m *Mob) SetNameTag(name string) {
@@ -39,14 +39,14 @@ func (m *Mob) SetNameTag(name string) {
 func (m *Mob) SetNameVisible(on bool) { m.SetFlag(FlagAlwaysShowName, on) }
 
 // Nameable reports whether a name tag may name the mob: it has minecraft:nameable and the
-// component allows renaming (NameableComponent::getInteraction, 1.26.60 0x7139820, offers
+// component allows renaming (BDS's code, 1.26.60, offers
 // nothing when the first field, allow_name_tag_renaming, is off).
 func (m *Mob) Nameable() bool {
 	return m.states != nil && m.states.Nameable != nil && m.states.Nameable.CanRename()
 }
 
-// Name is a name tag used on the mob, NameableComponent::nameEntity (1.26.60 0x7139940):
-// the name and its flag, the persistent marker (the component Actor::load also adds for
+// Name is a name tag used on the mob, BDS's code:
+// the name and its flag, the persistent marker (the component BDS's code also adds for
 // Persistent), always_show, then the name_actions event whose filter lists the name, else
 // default_trigger. False when the mob cannot be named. Runs: the mob's region, outside its
 // think.

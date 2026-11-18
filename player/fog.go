@@ -6,8 +6,8 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// BDS 1.26.60's /fog stack on a player (its fog component: push 0x743EA10, pop 0x743EC80,
-// remove 0x743EF50, load 0x743FF40): fog settings by ID, each tagged with a user ID, the
+// BDS 1.26.60's /fog stack on a player (its fog component: push, pop,
+// remove, load): fog settings by ID, each tagged with a user ID, the
 // newest drawn on top. Saved as fogCommandStack, the fog then user ID of each in turn.
 const (
 	// MaxFogs is how many fog settings a player's stack holds.

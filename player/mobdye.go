@@ -9,7 +9,7 @@ import (
 const dyeItemSuffix = "_dye"
 
 // dyeMob is a dye used on a mob with minecraft:is_dyeable (a sheep, a tamed wolf's collar),
-// as BDS 1.26.60's Actor::getInteraction (0xB3D1540) checks it before the components'
+// as BDS 1.26.60's BDS's code checks it before the components'
 // interactions: the dye's colour is 15 less its dye index, and when the mob's colour (actor
 // data 3) differs it takes the dye's and one dye is used (not in creative). True if it did.
 func (p *Player) dyeMob(o *Mob) bool {

@@ -7,17 +7,17 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 )
 
-// Flower beds (wildflowers, pink petals, leaf litter), BDS 1.26.60's FlowerBedBlock (vtable
-// 0xFB8B378; leaf litter's LeafLitterBlock 0xFB7F6C0 keeps the same two rules). A bed is built
-// over only by its own block while its growth is below 3 (canBeBuiltOver 0xCB02E70), and
-// placing it there adds one to the growth and keeps the bed's facing (getPlacementBlock
-// 0xCB03150), so one block holds up to four. A new bed faces by BDS's placement_direction trait,
-// cardinal with a 180 degree offset (the block registrations at 0x5C948E2 and 0x5D12F7B). A
+// Flower beds (wildflowers, pink petals, leaf litter), BDS 1.26.60's FlowerBedBlock (;
+// leaf litter's LeafLitterBlock keeps the same two rules). A bed is built
+// over only by its own block while its growth is below 3 (canBeBuiltOver), and
+// placing it there adds one to the growth and keeps the bed's facing (getPlacementBlock),
+// so one block holds up to four. A new bed faces by BDS's placement_direction trait,
+// cardinal with a 180 degree offset (the block registrations). A
 // broken bed drops growth + 1 of its item (helix-data's block drops). Natural beds are the
 // same blocks, so they stack and drop the same way.
 //
-// Not done: canBeBuiltOver's other branch, which lets a block with a flag (+264 bit 3) build
-// over a bed when a check on the region (sub_D277CF0, value 3) passes; what both mean was not read.
+// Not done: canBeBuiltOver's other branch, which lets a block with a flag (bit 3) build
+// over a bed when a check on the region (value 3) passes; what both mean was not read.
 
 // flowerBeds are the blocks of FlowerBedBlock.
 var flowerBeds = map[string]bool{

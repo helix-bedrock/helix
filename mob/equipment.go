@@ -9,9 +9,8 @@ import (
 // owns the real stacks (enchantments, damage) and tells the mob their names with
 // SetEquipment; the mob rolls nothing itself. BDS rolls the definition's
 // minecraft:equipment table once, when the mob is created and not when it is loaded
-// (Actor::initializeComponents 0xB38F1A0, 1.26.60; Actor::equip 0xB3C8A40).
 
-// The equipment slots, BDS's SharedTypes::Legacy::EquipmentSlot order: hands, then armour
+// The equipment slots, BDS's EquipmentSlot order: hands, then armour
 // head to feet, then the body slot (horse and wolf armour).
 const (
 	EquipMainhand = iota
@@ -175,7 +174,7 @@ func (m *Mob) ChargeAmount() int8 { return m.chargeAmount }
 
 func (m *Mob) SetChargeAmount(v int8) { m.chargeAmount = v }
 
-// Shoot is ShooterComponent::onShoot: the projectile its minecraft:shooter picks for the
+// Shoot matches BDS: the projectile its minecraft:shooter picks for the
 // target, fired at Apply by the engine. Nothing without the component or a target.
 func (m *Mob) Shoot() {
 	if m.states == nil || m.states.Shooter == nil || m.target == behavior.NoID {
@@ -200,7 +199,7 @@ func (m *Mob) RestartAngry() {
 	}
 }
 
-// RangedAttack is Actor::performRangedAttack, which in BDS only sends a gameplay event: the
+// RangedAttack matches BDS, which in BDS only sends a gameplay event: the
 // shot itself is Shoot's.
 func (m *Mob) RangedAttack(behavior.Actor, float32) {}
 

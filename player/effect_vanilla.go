@@ -9,8 +9,8 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// BDS 1.26.60's effects, from MobEffect::initEffects (0xCAB20B0) and the attribute
-// modifiers, buffs and amplifiers its static init makes (0xBC53980). Every effect BDS
+// BDS 1.26.60's effects, from BDS's code and the attribute
+// modifiers, buffs and amplifiers its static init makes. Every effect BDS
 // has is registered, with its ID, name, harmfulness and colour; what each does is in its
 // hooks. Effects whose engine part Helix lacks (raids, trial spawners, the client's own
 // movement and screen effects) are registered with no hooks, so they can be given, saved,
@@ -151,7 +151,7 @@ const (
 	// effectHealthStep is what one of those changes heals or hurts.
 	effectHealthStep = 1
 	// poisonFloor is the least health a Poison hit may leave (the health attribute
-	// delegate's check 0xBC46140 for buff type 7); Fatal Poison has no floor.
+	// delegate's check for buff type 7); Fatal Poison has no floor.
 	poisonFloor = 1
 	// absorptionPerLevel is the extra health Absorption gives per level.
 	absorptionPerLevel = 4
@@ -170,22 +170,22 @@ const (
 // Numbers of the effects that act when a player dies or is hurt (BDS 1.26.60).
 const (
 	// windChargedRadius + rand * windChargedSpread is the death burst's power
-	// (WindChargedMobEffect slot 5, 0xCABC5E0); windChargedKnockback its knockback.
+	// (WindChargedMobEffect slot 5); windChargedKnockback its knockback.
 	windChargedRadius    = 3
 	windChargedSpread    = 2
 	windChargedKnockback = 1
 	// weavingMin + rand(weavingExtra) cobwebs, in at most weavingTries spots
-	// (WeavingMobEffect slot 5, 0xCABC1A0).
+	// (WeavingMobEffect slot 5).
 	weavingMin   = 2
 	weavingExtra = 2
 	weavingTries = 15
-	// oozingSlimes medium slimes come out of the dead (OozingMobEffect slot 5, 0xCABB5C0),
+	// oozingSlimes medium slimes come out of the dead (OozingMobEffect slot 5),
 	// oozingLift above the feet.
 	oozingSlimes = 2
 	oozingLift   = 0.5
 	oozingEvent  = "minecraft:slime_medium"
 	// infestedChance is the odds a hurt lets out 1 + rand(infestedExtra) silverfish
-	// (InfestedMobEffect slot 6, 0xCAB19E0), thrown at infestedSpeed along the player's
+	// (InfestedMobEffect slot 6), thrown at infestedSpeed along the player's
 	// view, turned by up to a quarter turn either way, infestedLift times faster upward.
 	infestedChance = 0.1
 	infestedExtra  = 2
@@ -197,8 +197,8 @@ const (
 	nameSilverfish = "minecraft:silverfish"
 )
 
-// Damage causes of the effects (BDS's ActorDamageCause, from its buff type table
-// 0x1B34DE4: Harm, Poison and Fatal Poison are magic, Wither is wither).
+// Damage causes of the effects (BDS's ActorDamageCause, from its buff type table:
+// Harm, Poison and Fatal Poison are magic, Wither is wither).
 const (
 	DamageMagic  DamageCause = 14
 	DamageWither DamageCause = 15
@@ -270,8 +270,8 @@ func regenerationTick(p *Player, amplifier, left int32) {
 }
 
 // poisonTick is BDS's Poison ("Poison" buff) and Fatal Poison ("FatalPoison"): magic
-// damage at each spaced tick (buff types 7 and 8 both map to cause 14 in BDS's table
-// 0x1B34DE4). A Poison hit only lands if it leaves at least poisonFloor health.
+// damage at each spaced tick (buff types 7 and 8 both map to cause 14 in BDS's table).
+// A Poison hit only lands if it leaves at least poisonFloor health.
 func poisonTick(fatal bool) func(p *Player, amplifier, left int32) {
 	return func(p *Player, amplifier, left int32) {
 		if !spaced(poisonBase, amplifier, left) || p.dead() || !fatal && p.Health()-effectHealthStep < poisonFloor {

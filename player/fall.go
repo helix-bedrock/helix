@@ -33,7 +33,7 @@ type DamageSource struct {
 	// Block is the name of the block that hurt, for contact damage.
 	Block string
 	// IgnoreHurtTime turns the hit's hurt time part off, as BDS's hurt cooldown bypass
-	// (Actor +849) does for a guardian's magic hit.
+	// does for a guardian's magic hit.
 	IgnoreHurtTime bool
 }
 
@@ -47,7 +47,7 @@ const (
 	fallFree           = 3
 )
 
-// vanillaFall is BDS's fall distance (Actor::checkFallDamage, with the
+// vanillaFall is BDS's fall distance (BDS's code, with the
 // resets of climbing, gliding and slow falling that BDS's movement does
 // before it): in water it is cleared; on landing the FallDamage system
 // runs with the distance fallen, then it is cleared; it grows while the

@@ -262,7 +262,7 @@ func carpetShape(string, map[string]any) []Box {
 	return []Box{{0, 0, 0, 1, 0.0625, 1}}
 }
 
-// shulkerShape is a whole block. BDS grows it to the box its open lid fills (0xD525530), which
+// shulkerShape is a whole block. BDS grows it to the box its open lid fills, which
 // Helix does not keep yet, so an open one is the same.
 func shulkerShape(string, map[string]any) []Box {
 	return []Box{{0, 0, 0, 1, 1, 1}}

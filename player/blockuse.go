@@ -156,7 +156,7 @@ func lightLevel(name string) int {
 	return level
 }
 
-// useLightBlock is BDS 1.26.60's light block click (sub_D557A40): a light block held on a
+// useLightBlock is BDS 1.26.60's light block click: a light block held on a
 // light block always takes the click, so nothing is placed, and in creative the block
 // becomes the next level, 15 going round to 0 (the chain its registration builds).
 func (p *Player) useLightBlock(r *world.Region, u *BlockUse) bool {

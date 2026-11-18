@@ -10,12 +10,12 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// The eye of ender, as BDS 1.26.60 does it. Using one (EnderEyeItem::use 0xC986C00) asks the
+// The eye of ender, as BDS 1.26.60 does it. Using one asks the
 // dimension for the stronghold it points to (StrongholdFeature's search; only the
 // Overworld's generator places strongholds, so it does nothing in the Nether and the End),
 // swings the arm, spawns an eye_of_ender_signal at the player's position + 0.5 on each axis,
-// aims it (signalTo 0xBD5A6D0) and uses the item up. The eye flies by its own tick (0xBD5A8F0)
-// and after 80 ticks (its normal tick 0xBD5B7C0) drops as an item 4 times in 5, or else
+// aims it (signalTo) and uses the item up. The eye flies by its own tick
+// and after 80 ticks (its normal tick) drops as an item 4 times in 5, or else
 // shatters: LevelEvent 2003 (data 10) and 1041.
 //
 // Not done: the game rule BDS checks first (index 40, not registered with the others, so not
@@ -65,7 +65,7 @@ type EnderEye struct {
 // Entity returns its entity.
 func (y *EnderEye) Entity() *world.Entity { return y.entity }
 
-// throwEnderEye is EnderEyeItem::use: false, and nothing happens, when the dimension has no
+// throwEnderEye matches BDS: false, and nothing happens, when the dimension has no
 // stronghold to point to.
 func (p *Player) throwEnderEye(held ItemStack) bool {
 	if held.Name != nameEnderEye || p.entity == nil {
@@ -93,7 +93,7 @@ func (p *Player) throwEnderEye(held ItemStack) bool {
 	at := pos.Add(mgl32.Vec3{enderEyeSpawnOffset, enderEyeSpawnOffset, enderEyeSpawnOffset})
 	y := &EnderEye{s: p.s}
 	y.signalTo(at, mgl32.Vec3{float32(target[0]), float32(target[1]), float32(target[2])})
-	// The throw sound snowballs and pearls make, heard on BDS (not found in EnderEyeItem::use).
+	// The throw sound snowballs and pearls make, heard on BDS (not found).
 	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
 	y.entity = r.Dimension().AddEntity(y.config(itemUniqueIDBase|rand.Int64N(itemUniqueIDBase), p.s.runtimeIDs.Add(1), at)) //nolint:gosec // an entity ID, not a secret
 	if !p.creative() {

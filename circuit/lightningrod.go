@@ -8,10 +8,10 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Lightning rods as BDS 1.26.60's LightningRodBlock (vtable 0xFC2B708): the producer made on
-// place (slot 56, 0xD5584C0: the direction the rod points away from, powered to the block it
-// stands on, 15 while powered_bit is set), a strike (onLightningHit, slot 16 0xD558E70) and the
-// tick that ends it (listener 0xD5582D0).
+// Lightning rods as BDS 1.26.60's LightningRodBlock: the producer made on
+// place (slot 56,: the direction the rod points away from, powered to the block it
+// stands on, 15 while powered_bit is set), a strike (onLightningHit, slot 16) and the
+// tick that ends it (listener).
 const (
 	// rodPowerTicks is how long a struck rod gives power.
 	rodPowerTicks  = 8

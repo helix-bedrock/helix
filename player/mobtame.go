@@ -25,7 +25,7 @@ func (p *Player) tameMob(o *Mob) bool {
 	return true
 }
 
-// trustMob is minecraft:trusting: the mob shows eating the item (Actor::feed), the item is
+// trustMob is minecraft:trusting: the mob shows eating the item, the item is
 // used up, then the mob rolls.
 func (p *Player) trustMob(o *Mob) bool {
 	held := p.inventory.Held()
@@ -38,8 +38,8 @@ func (p *Player) trustMob(o *Mob) bool {
 	return true
 }
 
-// bribeMob is minecraft:bribeable: Player::useItem uses up the item (method 11), the mob
-// shows eating it (Actor::feed) and is bribed (callback 0x7404580).
+// bribeMob is minecraft:bribeable: BDS's code uses up the item (method 11), the mob
+// shows eating it and is bribed (callback).
 func (p *Player) bribeMob(o *Mob) bool {
 	held := p.inventory.Held()
 	if held.Empty() || !o.m.Bribe(mob.HeldItem{Name: held.Name}) {
@@ -52,7 +52,7 @@ func (p *Player) bribeMob(o *Mob) bool {
 }
 
 // giveMob is minecraft:giveable: one of the held item goes into the mob's inventory and the
-// player's is used up (callback 0x734AF40).
+// player's is used up (callback).
 func (p *Player) giveMob(o *Mob) bool {
 	held := p.inventory.Held()
 	if held.Empty() || !o.m.Give(actorOf(p.entity), held.Name) {
@@ -63,7 +63,7 @@ func (p *Player) giveMob(o *Mob) bool {
 	return true
 }
 
-// showFeed is Actor::feed (0xB3AF5A0): ActorEvent 57 with the item's ID and aux for those
+// showFeed matches BDS: ActorEvent 57 with the item's ID and aux for those
 // who see the mob, and the eat game event at its mouth (the eyes stand in: mobs have no
 // attach points yet).
 func (p *Player) showFeed(o *Mob, held ItemStack) {

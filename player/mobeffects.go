@@ -15,9 +15,9 @@ import (
 // Mob effects. The list is the mob's (mob.Mob.Effects); this file gives, ticks and shows
 // them with the same registered effects players have, through each effect's mob hooks
 // (MobTick, MobApply). BDS 1.26.60 sends MobEffect packets only for players
-// (onEffectUpdated 0xB3CC950 sends it only when the actor's category has the player bit);
+// (onEffectUpdated sends it only when the actor's category has the player bit);
 // those who see a mob learn its effects from the visible effects actor data (131), and
-// Invisibility sets its invisible flag (0xCABBC70).
+// Invisibility sets its invisible flag.
 
 // effectDef is the registered effect with the ID.
 func (o *Mob) effectDef(id int32) (*Effect, bool) {
@@ -75,7 +75,7 @@ func (o *Mob) EffectTicks(_ *mob.Mob, target behavior.ID, id int32) int32 {
 }
 
 // CanReceiveEffect implements mob.EffectHooks: a living player not in creative or
-// spectator, or a living mob. Actor::canReceiveMobEffectsFromGameplay and the
+// spectator, or a living mob. BDS's code and the
 // invulnerability check are not read from BDS yet.
 func (o *Mob) CanReceiveEffect(_ *mob.Mob, target, _ behavior.ID) bool {
 	switch t := o.effectTarget(target).(type) {
@@ -122,7 +122,7 @@ func (o *Mob) effectTarget(id behavior.ID) any {
 	return o.s.entityByID(r, id)
 }
 
-// giveEffect gives the mob an effect, as Actor::addEffect: an instant one works at once,
+// giveEffect gives the mob an effect, as BDS: an instant one works at once,
 // others are merged into its list and shown.
 func (o *Mob) giveEffect(e effect.Instance) {
 	if o.m.Dead() {
@@ -274,7 +274,7 @@ func (o *Mob) loadEffects(data map[string]any) {
 // --- what effects do to mobs ---
 
 // mobHeal heals the mob, or hurts an undead one with magic, as BDS's health delegate swaps
-// the heal and harm buffs for undead (0xBC44C80).
+// the heal and harm buffs for undead.
 func mobHeal(o *Mob, amount float32) {
 	if o.m.Dead() {
 		return
@@ -298,8 +298,8 @@ func mobHarm(o *Mob, amount float32) {
 	o.hurtBy(amount, behavior.NoID, DamageMagic)
 }
 
-// Actor types whose class overrides Actor::canBeAffected, by runtime ID (the ActorType's low
-// byte), from BDS 1.26.60's actor factory (0xBC5B490).
+// Actor types whose class overrides BDS's code, by runtime ID (the ActorType's low
+// byte), from BDS 1.26.60's actor factory.
 const (
 	typeSpider     = 35
 	typeCaveSpider = 40
@@ -311,10 +311,10 @@ const (
 	skeletonWitherVariant = 1
 )
 
-// canBeAffected is BDS's Actor::canBeAffected (0xB3CD280), which Actor::addEffect asks
-// first, with its class overrides: the wither takes only Instant Health and Instant Damage
-// (0xBD4F950), the ender dragon, NPCs and agents nothing, spiders no Poison (0xBD19160) and
-// a Skeleton of variant 1 no Wither (0xBD168A0). Otherwise the mob must be alive, of a type
+// canBeAffected is BDS's code, which BDS's code asks
+// first, with its class overrides: the wither takes only Instant Health and Instant Damage,
+// the ender dragon, NPCs and agents nothing, spiders no Poison and
+// a Skeleton of variant 1 no Wither. Otherwise the mob must be alive, of a type
 // with the Mob bit, not undead by family for Regeneration and Poison, and not immune by
 // minecraft:mob_effect_immunity.
 func (o *Mob) canBeAffected(id int32) bool {
@@ -343,7 +343,7 @@ func (o *Mob) canBeAffected(id int32) bool {
 	return !ok || !o.m.EffectImmune(def.Name)
 }
 
-// familyUndead is the family Actor::canBeAffected keeps from Regeneration and Poison.
+// familyUndead is the family BDS's code keeps from Regeneration and Poison.
 const familyUndead = "undead"
 
 // mobActorType reports whether the actor type with the runtime ID has BDS 1.26.60's Mob bit
@@ -358,7 +358,7 @@ func mobActorType(id int32) bool {
 }
 
 // undead reports whether heal and harm swap on the mob: BDS asks its actor type for the Mob
-// and UndeadMob bits (0x10100, 0xB3CBBA0), not its families.
+// and UndeadMob bits (0x10100), not its families.
 func (o *Mob) undead() bool {
 	t, ok := o.s.reg.EntityTypes.ByName(o.m.Type())
 	return ok && undeadType(t.RuntimeID)
@@ -379,10 +379,10 @@ func undeadType(id int32) bool {
 	return false
 }
 
-// mobAbsorptionMax is the absorption attribute's maximum BDS gives every mob (0xBFEF1F0).
+// mobAbsorptionMax is the absorption attribute's maximum BDS gives every mob.
 const mobAbsorptionMax = 16
 
-// mobAbsorptionAdded is Absorption on a mob (AbsorptionMobEffect::applyEffects 0xCAB1160):
+// mobAbsorptionAdded is Absorption on a mob:
 // the absorption starts over at 0, then a living mob gets the effect's amount, up to the
 // attribute's maximum.
 func mobAbsorptionAdded(o *Mob, amplifier int32) {
@@ -392,11 +392,11 @@ func mobAbsorptionAdded(o *Mob, amplifier int32) {
 	}
 }
 
-// mobAbsorptionRemoved takes what is left of Absorption away (0xCAB0FC0).
+// mobAbsorptionRemoved takes what is left of Absorption away.
 func mobAbsorptionRemoved(o *Mob) { o.absorption = 0 }
 
 // absorb takes damage of the cause off the mob's absorption first, as BDS's health delegate
-// (0xBC45336) does after Resistance; self-destruct damage goes past it. It returns the
+// does after Resistance; self-destruct damage goes past it. It returns the
 // damage left and adds what was taken to absorbed.
 func (o *Mob) absorb(v float32, c DamageCause) float32 {
 	if v <= 0 || o.absorption <= 0 || c == DamageSelfDestruct {
@@ -521,7 +521,7 @@ func (o *Mob) meleeDamage() float32 {
 // --- mob.PotionHooks ---
 
 // UseDuration implements mob.PotionHooks: a potion takes potionUseTicks to drink and a
-// crossbow loads in 25 ticks less 5 per Quick Charge level (CrossbowItem::getMaxUseDuration).
+// crossbow loads in 25 ticks less 5 per Quick Charge level.
 // Other items' use durations are not known to mobs yet.
 func (o *Mob) UseDuration(_ *mob.Mob, it behavior.Item) int32 {
 	switch it.Name {

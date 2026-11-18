@@ -10,15 +10,15 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Lightning rods drawing a strike, from BDS 1.26.60's chunk tick (sub_CF951A0): before it
-// looks for mobs, lightning looks for a rod with sub_CF99310. That collects every rod block
-// within rodReach across (a circle) and rodReach up or down of the strike (sub_CE69F30 and
-// the sub chunk scan 0xCF6CB80, palettes first), sorts them by square distance and takes the
+// Lightning rods drawing a strike, from BDS 1.26.60's chunk tick: before it
+// looks for mobs, lightning looks for a rod with. That collects every rod block
+// within rodReach across (a circle) and rodReach up or down of the strike (and
+// the sub chunk scan, palettes first), sorts them by square distance and takes the
 // first one open to the sky where it rains just above it.
 const (
 	rodReach = 64
 	// rodSuffix ends the name of every lightning rod: plain, exposed, weathered, oxidized and
-	// their waxed forms, the list BDS's filter sub_CFBD8A0 holds.
+	// their waxed forms, the list BDS's filter holds.
 	rodSuffix = "lightning_rod"
 )
 
@@ -41,7 +41,7 @@ func rodTable(names func(id uint32) string, count int) []bool {
 func (t *Ticker) isRod(b uint32) bool { return int(b) < len(t.rods) && t.rods[b] }
 
 // lightningRod is where a strike aimed at at goes instead: the nearest rod that is open to
-// the sky and rained on, as BDS's sub_CF99310. Runs: owner of the region.
+// the sky and rained on, as BDS's code. Runs: owner of the region.
 func (t *Ticker) lightningRod(r *world.Region, s *regionState, at cube.Pos) (cube.Pos, bool) {
 	s.rods = t.rodsNear(r, at, s.rods[:0])
 	slices.SortFunc(s.rods, func(a, b rodHit) int { return a.dist - b.dist })

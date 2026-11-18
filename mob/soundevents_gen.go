@@ -1,4 +1,4 @@
-// Code generated from a dump of BDS 1.26.60's SharedTypes::Legacy::LevelSoundEvent enum. DO NOT EDIT.
+// Code generated from a dump of BDS 1.26.60's LevelSoundEvent enum. DO NOT EDIT.
 
 package mob
 

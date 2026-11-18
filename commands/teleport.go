@@ -11,8 +11,8 @@ import (
 	"github.com/helix-bedrock/helix/world"
 )
 
-// BDS 1.26.60's /teleport, alias /tp (TeleportCommand: setup 0xBBE57B0, execute
-// 0xBBE9C50), with its ten overloads in BDS's order. A position destination is read from
+// BDS 1.26.60's /teleport, alias /tp (TeleportCommand: setup, execute),
+// with its ten overloads in BDS's order. A position destination is read from
 // the command's source, ~ rotations from each victim's own. Not built yet: the
 // checkForBlocks check (commands.tp.safeTeleportFail) and commands.tp.far. Helix always
 // puts a player at the given position after a dimension change, which is what

@@ -264,7 +264,7 @@ func (t *Ticker) Fertilize(r *world.Region, pos cube.Pos, creative, rapid bool) 
 }
 
 // setCrop puts the crop of kind i at pos at age; the torchflower crop past age 6 becomes a
-// torchflower (TorchflowerCropBlock's stage for an age, 0xD46D860).
+// torchflower (TorchflowerCropBlock's stage for an age).
 func (t *Ticker) setCrop(r *world.Region, pos cube.Pos, i uint8, age int) {
 	if t.blocks.Name(t.crops[i].stages[0]) == torchflowerCro && age >= torchflowerGrownAge && t.plantKit.torch != math.MaxUint32 {
 		t.set(r, pos, t.plantKit.torch)
@@ -296,7 +296,7 @@ func (t *Ticker) Fertilizable(block uint32) bool {
 	return t.isPickle(block)
 }
 
-// RaidCrop is a crop's minecraft:on_raided (BDS 1.26.60 0xCB3BBF0): its growth goes down one
+// RaidCrop is a crop's minecraft:on_raided: its growth goes down one
 // stage, not below 0. It returns the block now at pos; ok is false when pos held no crop or
 // the crop became another block. Runs: owner of the region.
 func (t *Ticker) RaidCrop(r *world.Region, pos cube.Pos) (now uint32, ok bool) {

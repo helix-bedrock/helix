@@ -136,7 +136,7 @@ func (p *Player) playerNear(id uint64) *Player {
 	return nil
 }
 
-// vanillaAttack is BDS's player attack (0xBCEC360): the abilities and pvp rule, the
+// vanillaAttack is BDS's player attack: the abilities and pvp rule, the
 // hit's parts from the AttackParts system, the target's hurt (with the HitEvent), then
 // what the hit costs the attacker and its item, and its sound. Mace and cooldowns are
 // not built yet.

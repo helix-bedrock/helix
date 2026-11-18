@@ -5,10 +5,10 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// BDS 1.26.60 keeps where a player last died in its synched actor data (getters at
-// ServerPlayer's vtable +1008, +1016, +1024: keys 127 position, 128 dimension, 129 has died),
+// BDS 1.26.60 keeps where a player last died in its synched actor data
+// (keys 127 position, 128 dimension, 129 has died),
 // which is what the client's recovery compass points to, and saves it in the player's data
-// (Player::addAdditionalSaveData, 0xbce58b0) only once the player has died.
+// only once the player has died.
 const (
 	tagDeathX         = "DeathPositionX"
 	tagDeathY         = "DeathPositionY"

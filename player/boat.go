@@ -16,9 +16,9 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Boats and chest boats as BDS 1.26.60 runs them: BoatItem::_useOn (0xC9D4AC0) places them,
-// Boat::_hurt (0xBD543F0) and destroy (0xBD54C60, ChestBoat 0xBD56CB0) break them, the boat's
-// normal tick (0xBD55D40) brings its integrity back, and entities/boat.json and
+// Boats and chest boats as BDS 1.26.60 runs them: BDS's code places them,
+// BDS's code and destroy (ChestBoat) break them, the boat's
+// normal tick brings its integrity back, and entities/boat.json and
 // chest_boat.json give their seats and sizes. A boat someone steers is predicted by that
 // player's client, as BDS's are, and Helix takes its place from the client as it takes the
 // player's; one no one steers moves by itself (boatphysics.go). Not built yet: lava
@@ -30,9 +30,9 @@ const (
 	// boatWidth and boatHeight are collision_box.
 	boatWidth  = 1.4
 	boatHeight = 0.455
-	// boatHeightOffset is Boat::reloadHardcoded's height offset (1.26.60 0xBD54040): the
+	// boatHeightOffset matches BDS's height offset: the
 	// boat's position, which BDS sends, saves and runs its physics on, is this far above
-	// the bottom of its box. Actor::moveTo adds it to where a boat is put.
+	// the bottom of its box. BDS's code adds it to where a boat is put.
 	boatHeightOffset = 0.375
 	// boatIntegrity is what the boat starts with and comes back to, a point a tick.
 	boatIntegrity = 40
@@ -67,7 +67,7 @@ const (
 )
 
 // boatWoods are the boat items by their wood number, as BDS registers BoatItem and
-// ChestBoatItem (0xC66BA90) and the boat's Variant counts. Poplar is behind an experiment.
+// ChestBoatItem and the boat's Variant counts. Poplar is behind an experiment.
 var boatWoods = [...]string{"oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "bamboo", "cherry", "pale_oak", "poplar"}
 
 // boatItemName is the item of a boat of wood, with a chest or not.
@@ -175,7 +175,7 @@ func (s *Host) newBoat(wood int32, chest bool) *Boat {
 }
 
 // chestBoatSlots are a chest boat's: entities/chest_boat.json's inventory, 27 slots of
-// container type chest_boat. BDS opens them as a plain container (0x737E270), as a chest cart.
+// container type chest_boat. BDS opens them as a plain container, as a chest cart.
 var chestBoatSlots = &machineSpec{id: "ChestBoat", size: chestSize, window: byte(protocol.ContainerTypeChestBoat)}
 
 // boatRideRules is the rideable of can_ride_default or can_ride_bamboo. Every family the
@@ -255,7 +255,7 @@ func (b *Boat) movePacket(e *world.Entity) packet.Packet {
 }
 
 // tick is the boat's normal tick: its riders, then the hurt counter and integrity as
-// 0xBD55D40 brings them back.
+// brings them back.
 func (b *Boat) tick(e *world.Entity) {
 	r := e.Region()
 	if r == nil || b.gone {
@@ -332,7 +332,7 @@ func (b *Boat) sendHurt(e *world.Entity) {
 	}))
 }
 
-// Hurt is BDS's Boat::_hurt: the shake, damage times ten off its integrity, and it breaks
+// Hurt is BDS's code: the shake, damage times ten off its integrity, and it breaks
 // once that is gone or at once for a player in creative, who gets no drops. True if it
 // broke.
 func (b *Boat) Hurt(r *world.Region, damage float32, by *Player) bool {
@@ -531,7 +531,7 @@ func (p *Player) useOnBoat(d *protocol.UseItemOnEntityTransactionData) bool {
 	return true
 }
 
-// placeBoat is BDS's BoatItem::_useOn: only on the top of a block with air above, at the
+// placeBoat is BDS's code: only on the top of a block with air above, at the
 // point clicked, turned to the player's yaw plus 90, and only where no entity but a dropped
 // item is in the box BDS checks. The boat takes the item's name. The use counts once a
 // boat is made; the item is used up outside creative.
@@ -545,7 +545,7 @@ func (p *Player) placeBoat(r *world.Region, clicked cube.Pos, face int32, click 
 	}
 	pos := blockVec(clicked).Add(click)
 	// BDS builds this box from the boat's size as x and z by half its height, y up by its
-	// width (getAABBDim's two values, 0xC9D4AC0 and 1.21.3 alike).
+	// width (getAABBDim's two values, 1.21.3 alike).
 	half := float32(boatHeight / 2)
 	lo := mgl32.Vec3{pos[0] - half, pos[1], pos[2] - half}
 	hi := mgl32.Vec3{pos[0] + half, pos[1] + boatWidth, pos[2] + half}

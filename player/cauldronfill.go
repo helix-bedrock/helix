@@ -10,9 +10,9 @@ import (
 )
 
 // Cauldrons filling by themselves, as BDS 1.26.60: rain and snow (CauldronBlock's
-// handlePrecipitation 0xCB4F560, called by the chunk tick's weather on the block under the
-// rain's top) and stalactites dripping (the dripstone part of its queued tick 0xCB4A1D0, its
-// accept check 0xCB502D0 and fill 0xCB505D0; the search is the drip package's).
+// handlePrecipitation, called by the chunk tick's weather on the block under the
+// rain's top) and stalactites dripping (the dripstone part of its queued tick, its
+// accept check and fill; the search is the drip package's).
 const (
 	// cauldronSnowBelow is the temperature under which precipitation fills with powder snow.
 	cauldronSnowBelow = 0.15
@@ -54,7 +54,7 @@ func (s *Host) CauldronPrecipitation(r *world.Region, pos cube.Pos, downfall, te
 	s.postBlockGameEvent(r, gameEventBlockChange, pos, nil, 0, false)
 }
 
-// DripAccepts is BDS's 0xCB502D0: a cauldron with its block entity, no potion, and empty or
+// DripAccepts is BDS's code: a cauldron with its block entity, no potion, and empty or
 // holding water for a water drip.
 func (s *Host) DripAccepts(r *world.Region, pos cube.Pos, lava bool) bool {
 	c, ok := cauldronAt(r, pos)
@@ -69,7 +69,7 @@ func (s *Host) DripAccepts(r *world.Region, pos cube.Pos, lava bool) bool {
 	return c.potion < 0 && !lava && liquid == cauldronWater
 }
 
-// Drip fills a cauldron from a stalactite (BDS's 0xCB505D0 from the queued tick): lava fills
+// Drip fills a cauldron from a stalactite (BDS's code from the queued tick): lava fills
 // it, water adds two levels up to full; the drip sound at the block, the level event and the
 // block_change game event. A full water cauldron is left as it is, with no event.
 func (s *Host) Drip(r *world.Region, pos cube.Pos, lava bool) {

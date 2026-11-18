@@ -5,9 +5,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Scaffolding as BDS 1.26.60's ScaffoldingBlock (Linux, IDA): stability sub_D510EC0, its
-// update sub_D50FE50, onPlace listener sub_D50F860, neighborChanged (slot 75) sub_D510D40,
-// tick listener sub_D50FAB0, mayPlace (slot 68) sub_D511640, getPlacementBlock sub_D5114D0.
+// Scaffolding as BDS 1.26.60's ScaffoldingBlock (Linux, BDS): stability, its
+// update, onPlace listener, neighborChanged (slot 75),
+// tick listener, mayPlace (slot 68), getPlacementBlock.
 //
 // Each scaffolding keeps how far it is from something holding it up: 0 on a block that
 // holds things on top (or on the bottom of the world), the same as the scaffolding under it,
@@ -113,7 +113,7 @@ func (t *Table) ScaffoldMayPlace(r *world.Region, pos cube.Pos) bool {
 }
 
 // updateScaffold writes the stability a scaffolding at pos has now into its state, keeping
-// stability_check, and reports whether something holds it up (BDS's sub_D50FE50).
+// stability_check, and reports whether something holds it up (BDS's code).
 func (t *Table) updateScaffold(r *world.Region, pos cube.Pos, block uint32) bool {
 	s := t.Stability(r, pos)
 	c := 0

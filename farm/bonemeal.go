@@ -15,16 +15,16 @@ import (
 
 // Bone meal on grass blocks, short grass and ferns, from BDS 1.26.60:
 //
-//   - GrassBlock's onFertilized (0xCAE3040): with air above, 48 tries, each a walk of 1, 2 or 3
+//   - GrassBlock's onFertilized: with air above, 48 tries, each a walk of 1, 2 or 3
 //     steps from the block above (x and z each -1 to 1, y down one in 9, else up one in 8),
-//     stopping where the block below is not a grass block or the block is solid
-//     (0xCAE1E90); a try that was not stopped grows something there (0xCAE1F00).
-//   - What grows (0xCAE1F00): in air, a flower one in 8 (0xD901320, by the biome's tags),
+//     stopping where the block below is not a grass block or the block is solid;
+//     a try that was not stopped grows something there.
+//   - What grows: in air, a flower one in 8 (by the biome's tags),
 //     else a fern one in 7, else short grass, if it may stand there; on short grass with air
 //     above, one in 10, the short grass grows tall.
-//   - TallGrassBlock's onFertilized (0xD4E1710): short grass becomes tall grass and a fern a
-//     large fern, with air above and one of BDS's soils below (0xCB03DE0).
-//   - The flowers (0xD901320, 0xD9017A0, 0xD901980, 0xD901C60): flower forests pick from
+//   - TallGrassBlock's onFertilized: short grass becomes tall grass and a fern a
+//     large fern, with air above and one of BDS's soils below.
+//   - The flowers: flower forests pick from
 //     BDS's red flower list by a simplex noise (Random 2345, one octave) at x/48, z/48, a blue
 //     orchid becoming a poppy; plains pick tulips where the same noise at x/200, z/200 is
 //     under -0.8, else a dandelion one in 4, else a poppy, azure bluet, oxeye daisy or
@@ -92,7 +92,7 @@ var tulips = [...]string{"minecraft:red_tulip", "minecraft:orange_tulip", "minec
 // plainsFlowers are the plains' other flowers after a dandelion, in BDS's order.
 var plainsFlowers = [plainsKinds]string{poppy, "minecraft:azure_bluet", "minecraft:oxeye_daisy", cornflower}
 
-// tallSoils are what short grass and ferns grow tall on (BDS's list at 0xCB03DE0).
+// tallSoils are what short grass and ferns grow tall on (BDS's list).
 var tallSoils = [...]string{
 	dirt, grassBlock, "minecraft:podzol", coarseDirt, "minecraft:mycelium", rootedDirt, "minecraft:moss_block",
 	"minecraft:pale_moss_block", "minecraft:mud", "minecraft:muddy_mangrove_roots", Farmland,

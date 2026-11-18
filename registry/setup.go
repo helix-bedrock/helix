@@ -81,7 +81,7 @@ type Properties struct {
 	// MaterialFlags is the flag byte of the block's Material (never buildable, liquid,
 	// blocks motion...; helix-data's data.Material* constants).
 	MaterialFlags uint8
-	// BlockSolid is BDS's Block solid flag (Block::isSolid, helix-data's bds/block_solid.json):
+	// BlockSolid is BDS's Block solid flag (helix-data's bds/block_solid.json):
 	// full opaque blocks. Not glass, ice, leaves or shulker boxes. Mobs' pathfinding reads it.
 	BlockSolid bool
 	// Suffocates is set when BDS's breathing check calls the block solid: a mob or player

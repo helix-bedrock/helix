@@ -1,7 +1,7 @@
-// Package weather is BDS 1.26.60's weather: rain and thunder coming and going (Weather::tick and
-// its server tick, sub_CD9E590 and sub_CD9E6B0), /weather's change (Level::updateWeather,
-// sub_CDA0560), sleep clearing it (sub_CDA6DD0), and on every ticking chunk lightning, ice and
-// snow (LevelChunk::tick, sub_CF951A0). Only the overworld has weather.
+// Package weather is BDS 1.26.60's weather: rain and thunder coming and going (BDS's code and
+// its server tick), /weather's change (BDS's code,),
+// sleep clearing it, and on every ticking chunk lightning, ice and
+// snow. Only the overworld has weather.
 package weather
 
 import (
@@ -165,7 +165,7 @@ func approach(v, target float32) float32 {
 	return min(max(v, 0), 1)
 }
 
-// Tick is one world tick of the weather (Weather::tick): the levels fade towards their
+// Tick is one world tick of the weather: the levels fade towards their
 // targets, and with doweathercycle the timers count down and rain and thunder come and go.
 func (w *Weather) Tick() {
 	w.mu.Lock()
@@ -233,7 +233,7 @@ func level(on bool) float32 {
 	return 0
 }
 
-// Set is BDS's Level::updateWeather, which /weather runs: the levels head for rain and thunder
+// Set is BDS's code, which /weather runs: the levels head for rain and thunder
 // (0 to 1) and the timers are set. When a level changes everyone is told: rain and thunder
 // starting at their level, or stopping.
 func (w *Weather) Set(rainTime, thunderTime int32, rain, thunder float32) {
@@ -274,7 +274,7 @@ func (w *Weather) RandomTime() int32 {
 	return int32(20*w.rng.IntN(600)) + 6000
 }
 
-// Stop is the weather clearing after a night is slept through (sub_CDA6DD0): with
+// Stop is the weather clearing after a night is slept through: with
 // doweathercycle, rain or thunder stops at once, both timers are drawn again and everyone is
 // told.
 func (w *Weather) Stop() {
@@ -299,7 +299,7 @@ func (w *Weather) Stop() {
 	}
 }
 
-// Toggle is BDS's /toggledownfall (sub_BB9C9C0): with no rain, rain starts for 12000 to 23999
+// Toggle is BDS's /toggledownfall: with no rain, rain starts for 12000 to 23999
 // ticks; with rain, rain and thunder stop and both timers are drawn again. Everyone is told.
 func (w *Weather) Toggle() {
 	w.mu.Lock()

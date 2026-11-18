@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/player"
 )
 
-// BDS 1.26.60's /clear (ClearCommand: setup 0xA02BD20, execute 0xA02C2B0): clear [player]
+// BDS 1.26.60's /clear (ClearCommand: setup, execute): clear [player]
 // [itemName] [data] [maxCount]. With no player it clears whoever runs it. data -1 matches any
 // aux value, maxCount -1 takes every match and 0 only counts them (commands.clear.testing).
 // It takes from the inventory, armour, offhand and the UI slots (cursor, crafting grid).

@@ -9,7 +9,7 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// The current's push, from BDS 1.26.60's LiquidPhysicsSystem (sub_77DCDE0): items and mobs are
+// The current's push, from BDS 1.26.60's LiquidPhysicsSystem: items and mobs are
 // pushed alike, only the boxes they look in differ.
 const (
 	// WaterPush and LavaPush are how strongly a current pushes each tick.
@@ -65,7 +65,7 @@ func solidAt(blocks *registry.Blocks, r BlockReader, pos cube.Pos) bool {
 	return ok && blocks.Properties(b).SolidMaterial
 }
 
-// Flow is BDS's flow of the liquid of a material at pos (LiquidBlock's flow, sub_D55CEC0):
+// Flow is BDS's flow of the liquid of a material at pos (LiquidBlock's flow):
 // towards shallower neighbours and neighbours with a drop below them, and down along solid
 // walls when it falls. It is a unit vector, or zero. Stairs and slabs letting liquid through
 // only on some sides are not ported.

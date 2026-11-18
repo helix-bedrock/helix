@@ -8,8 +8,8 @@ import (
 	"github.com/helix-bedrock/helix/world"
 )
 
-// Bottles o' enchanting, from BDS 1.26.60's GrantXpSubcomponent (parse 0x714d030, hit
-// 0x714d290): the xp_bottle entity's grant_xp shows a potion splash in the bottle's colour and
+// Bottles o' enchanting, from BDS 1.26.60's GrantXpSubcomponent (parse, hit):
+// the xp_bottle entity's grant_xp shows a potion splash in the bottle's colour and
 // leaves experience orbs worth minXP plus a random number below maxXP - minXP.
 const (
 	nameXPBottleItem = "minecraft:experience_bottle"

@@ -110,7 +110,7 @@ func TestAnvil(t *testing.T) {
 
 	a, b := stack("minecraft:iron_sword", 200), stack("minecraft:iron_sword", 200)
 	out = vanillaAnvil(p, a, b, "")
-	// 200+200-250-30 = 120; repairing alone costs 2.
+	// 200-250-30 = 120; repairing alone costs 2.
 	if itemDamage(out.Result) != 120 || out.Cost != 2 {
 		t.Fatalf("merge: damage %d cost %d", itemDamage(out.Result), out.Cost)
 	}
@@ -157,7 +157,7 @@ func TestGrindstone(t *testing.T) {
 		t.Fatalf("book: %s", out.Result.Name)
 	}
 	out = vanillaGrindstone(p, stack("minecraft:iron_sword", 200), stack("minecraft:iron_sword", 100))
-	// 200+100-250-12 = 38.
+	// 200-250-12 = 38.
 	if itemDamage(out.Result) != 38 {
 		t.Fatalf("merge: %d", itemDamage(out.Result))
 	}

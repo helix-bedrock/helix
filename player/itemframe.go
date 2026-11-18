@@ -66,7 +66,7 @@ func (f *ItemFrame) DropChance() float32 { return f.dropChance }
 // SetDropChance sets the chance, 0 to 1, that the item drops when it comes out.
 func (f *ItemFrame) SetDropChance(c float32) { f.dropChance = c }
 
-// loadFrame brings a frame back as BDS reads one (0xD4197C0).
+// loadFrame brings a frame back as BDS reads one.
 func (s *Host) loadFrame(saved map[string]any, glow bool) *ItemFrame {
 	f := s.newFrame(glow)
 	f.saved = maps.Clone(saved)
@@ -85,7 +85,7 @@ func (s *Host) loadFrame(saved map[string]any, glow bool) *ItemFrame {
 	return f
 }
 
-// SaveData is what BDS saves of a frame (0xD419FC0): the item, its rotation and drop chance
+// SaveData is what BDS saves of a frame: the item, its rotation and drop chance
 // only while it holds one.
 func (f *ItemFrame) SaveData(pos cube.Pos) map[string]any {
 	m := maps.Clone(f.saved)
@@ -145,7 +145,7 @@ func (f *ItemFrame) setMapBit(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// Put shows item in the frame, one of it, turned back to 0, as BDS's setItem (0xD41AB60).
+// Put shows item in the frame, one of it, turned back to 0, as BDS's setItem.
 // Runs: owner of the region.
 func (f *ItemFrame) Put(r *world.Region, pos cube.Pos, item ItemStack) {
 	item.Count = 1
@@ -162,7 +162,7 @@ func (f *ItemFrame) Turn(r *world.Region, pos cube.Pos) {
 	r.SendBlockEntity(pos)
 }
 
-// Take takes the item out, as BDS's dropItem (0xD41A3B0, 0xD41A680): it drops at the middle of
+// Take takes the item out, as BDS's dropItem: it drops at the middle of
 // the block if drop is set and the frame's drop chance comes up, and with sound reports it
 // to players. Runs: owner of the region.
 func (f *ItemFrame) Take(r *world.Region, pos cube.Pos, drop, sound bool) {
@@ -182,8 +182,8 @@ func (f *ItemFrame) Take(r *world.Region, pos cube.Pos, drop, sound bool) {
 	r.SendBlockEntity(pos)
 }
 
-// BlockEntityRemoved drops the item of a frame that is gone, as the block's removal does
-// (0xCAEB620), without the sound.
+// BlockEntityRemoved drops the item of a frame that is gone, as the block's removal does,
+// without the sound.
 func (f *ItemFrame) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	if f.item.Empty() {
 		return
@@ -206,7 +206,7 @@ func FrameAt(r *world.Region, pos cube.Pos) (*ItemFrame, bool) {
 	return f, ok
 }
 
-// useFrame is BDS's frame interaction (0xCAEAF10): an empty frame takes one of the held item,
+// useFrame is BDS's frame interaction: an empty frame takes one of the held item,
 // which is used up outside creative; a full one turns its item. An empty hand on an empty
 // frame does not take the click, and neither does a locked item.
 func (p *Player) useFrame(r *world.Region, u *BlockUse) bool {
@@ -228,7 +228,7 @@ func (p *Player) useFrame(r *world.Region, u *BlockUse) bool {
 	return true
 }
 
-// punchFrame is ItemFrameBlock's part of starting to break it (0xCAEBD80): a frame holding
+// punchFrame is ItemFrameBlock's part of starting to break it: a frame holding
 // an item gives it up, dropping it unless the player is in creative, and does not break.
 // True if it gave one up.
 func (p *Player) punchFrame(r *world.Region, pos cube.Pos) bool {

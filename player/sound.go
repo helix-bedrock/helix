@@ -29,8 +29,8 @@ func (s soundEvent) packet() *packet.LevelSoundEvent {
 }
 
 // handleLevelSoundEvent is a sound the client says it made, such as a sweet berry bush
-// rustling as the player moves through it. BDS 1.26.60's handler (0x8CDBF50, through
-// 0xCDD91F0 with no player left out) plays whatever is sent, where it says, to every player
+// rustling as the player moves through it. BDS 1.26.60's handler (through
+// with no player left out) plays whatever is sent, where it says, to every player
 // near it, the sender too; the client waits for that copy instead of playing these itself.
 //
 // Helix goes past BDS here (lead's decision, 2026-11-10): a client could fake any sound,

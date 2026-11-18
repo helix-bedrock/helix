@@ -94,7 +94,7 @@ func (p *Player) dropAction(a *protocol.DropStackRequestAction) (uint8, []slotRe
 	if !p.abilities.Flag(AbilityDoorsAndSwitches) || !p.mayRemove(src, *src.stack) {
 		return protocol.ItemStackResponseStatusCannotDropItem, nil
 	}
-	// BDS 1.26.60 checks a drop's source before the drop (0xC9F3080, then 0xC9F3510 with the
+	// BDS 1.26.60 checks a drop's source before the drop (then with the
 	// drop's action): a locked item, in its slot or in the inventory, is refused with Error.
 	if itemLocked(*src.stack) {
 		return protocol.ItemStackResponseStatusError, nil
@@ -189,7 +189,7 @@ func (p *Player) legacyDrop(actions []protocol.InventoryAction) (slot int, count
 	}
 	slot = int(from.InventorySlot)
 	s := p.inventory.main[slot]
-	// A locked item is never dropped, as from a stack request (0xC9F3510).
+	// A locked item is never dropped, as from a stack request.
 	if s.Empty() || itemLocked(s) || !p.sameAsClient(s, from.OldItem) || out.OldItem.Stack.Count != 0 || out.NewItem.Stack.Count == 0 {
 		return 0, 0, false
 	}

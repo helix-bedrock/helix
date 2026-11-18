@@ -9,7 +9,7 @@ import (
 // runs (its sound and a point of wear), and an item the block drops.
 type Till struct {
 	Block uint32
-	// ToolUsed is false for rooted dirt, whose use with a hoe (0xD53DCC0) does not call it.
+	// ToolUsed is false for rooted dirt, whose use with a hoe does not call it.
 	ToolUsed bool
 	// Drop is the item dropped, "" for none: rooted dirt drops hanging roots.
 	Drop string

@@ -395,7 +395,7 @@ func (p *Player) consumed(src slotRef, used ItemStack) uint8 {
 
 // consumedAnywhere is the same for an auto craft: the grid or the inventory, and
 // never an enchanted, worn or locked item, as the recipe book leaves those alone (a locked
-// item fails BDS's Recipe::itemValidForRecipe 0xC4DDB70).
+// item fails BDS's code).
 func (p *Player) consumedAnywhere(src slotRef, used ItemStack) uint8 {
 	c := &p.requests.craft
 	if src.kind != protocol.ContainerCraftingInput && src.kind != containerCombined {

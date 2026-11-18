@@ -3,16 +3,16 @@
 // tilling dirt, and farmland trampled back to dirt. Read from BDS's code (the research
 // note is private):
 //
-//   - FarmBlock (0xCAF8F80): its random tick 0xCAF93B0, its tick 0xCAF91E0, its survival
-//     0xCAF9DE0, its fall-on 0xCAFA050 and its turn to dirt 0xCAF9C40.
-//   - CropBlock (0xCB3B3C0, the definition every vanilla crop passes: growth base 25, grows
-//     from light 9, age 7, survives from light 8, bone meal 2 to 4): its random tick
-//     0xCB3BED0, its growth speed 0xCB0C8F0, bone meal 0xCB3C880, survival 0xCB3C120 and its
-//     neighbour change 0xCB3C060. The torchflower crop's bone meal is its own (0xD46D9C0).
-//   - StemBlock (0xD506B60): its random tick 0xD506DF0, bone meal 0xCB061F0, survival
-//     0xCB06190 and neighbour change 0xD5076E0.
-//   - The dirt blocks' use with a hoe (dirt 0xCB13A00, grass 0xCAE3220, dirt path 0xD54D360,
-//     rooted dirt 0xD53DCC0) and the hoe's on_tool_used (0xC981EA0).
+//   - FarmBlock: its random tick, its tick, its survival,
+//     its fall-on and its turn to dirt.
+//   - CropBlock (the definition every vanilla crop passes: growth base 25, grows
+//     from light 9, age 7, survives from light 8, bone meal 2 to 4): its random tick,
+//     its growth speed, bone meal, survival and its
+//     neighbour change. The torchflower crop's bone meal is its own.
+//   - StemBlock: its random tick, bone meal, survival
+//     and neighbour change.
+//   - The dirt blocks' use with a hoe (dirt, grass, dirt path,
+//     rooted dirt) and the hoe's on_tool_used.
 //
 // The other farmable plants (torchflowers, pitcher crops, nether wart, sweet berries, cocoa,
 // sugar cane, cactus) are in plants.go. Bamboo and kelp are in bamboo.go; vines, weeping, twisting and cave vines in vines.go; big and
@@ -106,7 +106,7 @@ type Crop struct {
 	TwoStep bool
 }
 
-// DefaultCrop is the definition every vanilla CropBlock passes (0xCB495D0 and the others:
+// DefaultCrop is the definition every vanilla CropBlock passes (and the others:
 // 25, 9, 7, 8, 2, 4).
 func DefaultCrop() Crop {
 	return Crop{GrowthBase: 25, GrowLight: 9, SurviveLight: 8, MaxAge: 7, BoneMealMin: 2, BoneMealMax: 4}

@@ -133,7 +133,7 @@ func (s *Host) frontOf(block uint32, pos cube.Pos) (cube.Face, cube.Pos) {
 }
 
 // tickHopper is BDS's hopper tick: once per world tick, and only on the tick after
-// the circuits evaluate (0xd415f10), so the cooldown counts every other game tick; the
+// the circuits evaluate, so the cooldown counts every other game tick; the
 // hoppers this one feeds first, so an item goes all the way down a chain the same way
 // each tick; then the move, unless the hopper is turned off.
 func (c *Chest) tickHopper(r *world.Region, pos cube.Pos, depth int) {
@@ -259,7 +259,7 @@ func (c *Chest) pullOrCollect(r *world.Region, pos cube.Pos, conf *circuit.Hoppe
 }
 
 // compostOne is a hopper facing down onto a composter with no container there (BDS's
-// hopper, 0xBFC6FA0): one item of its first filled slot goes into the composter, used up
+// hopper): one item of its first filled slot goes into the composter, used up
 // whether or not it raised the level. False if the composter took none.
 func (c *Chest) compostOne(r *world.Region, at cube.Pos) bool {
 	f := c.s.farm
@@ -281,7 +281,7 @@ func (c *Chest) compostOne(r *world.Region, at cube.Pos) bool {
 	return false
 }
 
-// pullBoneMeal takes the bone meal of a full composter above (BDS's hopper, 0xBFC7AB0): the
+// pullBoneMeal takes the bone meal of a full composter above (BDS's hopper): the
 // composter empties first, so with no room for it the bone meal is lost, as in BDS.
 func (c *Chest) pullBoneMeal(r *world.Region, above cube.Pos) bool {
 	f := c.s.farm
@@ -772,7 +772,7 @@ func (c *Chest) randomFullSlot() int {
 	return slot
 }
 
-// dropIntoComposter is BDS's dropper (0xD40C260) facing down onto a composter: it puts
+// dropIntoComposter is BDS's dropper facing down onto a composter: it puts
 // one item in and drops nothing, whether or not the composter took it. False if the
 // block below is no composter, so the item is thrown out as usual.
 func (s *Host) dropIntoComposter(r *world.Region, c *Chest, slot int, below cube.Pos) bool {

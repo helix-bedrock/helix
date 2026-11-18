@@ -4,13 +4,13 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// Books and quills as BDS 1.26.60 (Linux, IDA): the BookEdit handler (ServerNetworkHandler
-// slot 180, 0x8CDD7C0 with text filtering off going to 0x8CDE040) takes the item in the
+// Books and quills as BDS 1.26.60 (Linux, BDS): the BookEdit handler (ServerNetworkHandler
+// slot 180, with text filtering off going to) takes the item in the
 // packet's inventory slot, edits a copy and puts it back in that slot. Each edit only works on
-// a book and quill with user data: replace a page (0xC6D8E10), add one (0xC6D93E0, inserting),
-// delete one (0xC6D9C20) and swap two (0xC6DA920), each page a compound of "text" and
-// "photoname" (0xC909470) in the "pages" list, at most 50 pages; signing (0xC6D7D90 ->
-// 0xC6D8430) writes author, xuid, title and generation 0 and turns it into one written book.
+// a book and quill with user data: replace a page, add one (inserting),
+// delete one and swap two, each page a compound of "text" and
+// "photoname" in the "pages" list, at most 50 pages; signing (->)
+// writes author, xuid, title and generation 0 and turns it into one written book.
 // Anything else in the slot becomes nothing, which BDS then does not put back.
 //
 // BDS takes text of any length, so one client can grow a book by megabytes a page. Helix's own

@@ -14,8 +14,8 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Area effect clouds, the lingering potion's cloud, BDS 1.26.60's AreaEffectCloud (vtable
-// 0xFAF9BD0, constructor 0xC07F480, tick 0xC07FE50, save 0xC081340, load 0xC082560). A cloud
+// Area effect clouds, the lingering potion's cloud, BDS 1.26.60's AreaEffectCloud (,
+// constructor, tick, save, load). A cloud
 // lasts its duration from its spawn tick and is gone sooner once its radius is below half a
 // block. Every fifth tick of its life it gives its effects to the players within its radius
 // of its centre that it has not touched for its reapplication delay, at a quarter of their
@@ -35,8 +35,8 @@ const (
 	cloudInstantScale  = 0.5
 	// cloudTicksPerSecond turns spawn_aoe_cloud's duration, in seconds, into ticks.
 	cloudTicksPerSecond = 20
-	// cloudParticleDefault is spawn_aoe_cloud's particle when the definition gives none
-	// (0x714E6E0). Helix used to send 35 here, which is mobspellinstantaneous: the instant
+	// cloudParticleDefault is spawn_aoe_cloud's particle when the definition gives none.
+	// Helix used to send 35 here, which is mobspellinstantaneous: the instant
 	// potion's square sparkles instead of the lingering swirl.
 	cloudParticleDefault = "mobspellambient"
 	// cloudChangeOnPickup is the constructor's radius change when a bottle takes from it.
@@ -59,7 +59,7 @@ const (
 	cloudTagPickupCount    = "PickupCount"
 )
 
-// CloudSpec is a definition's spawn_aoe_cloud on hit subcomponent (parsed as 0x714E6A0).
+// CloudSpec is a definition's spawn_aoe_cloud on hit subcomponent (parsed as).
 type CloudSpec struct {
 	// Duration is in ticks; Radius is where it starts, RadiusOnUse what each player it
 	// touches takes from it.
@@ -109,7 +109,7 @@ func (c *AreaEffectCloud) Entity() *world.Entity { return c.entity }
 // Effects returns the effects it gives.
 func (c *AreaEffectCloud) Effects() []ActiveEffect { return append([]ActiveEffect(nil), c.effects...) }
 
-// spawnCloud is BDS's spawn_aoe_cloud (0x714EA60) where a lingering potion lands: a potion with
+// spawnCloud is BDS's spawn_aoe_cloud where a lingering potion lands: a potion with
 // no effects other than water shows only its splash; any other leaves a cloud of its effects,
 // owned by the thrower.
 func (t *Projectile) spawnCloud(r *world.Region, at mgl32.Vec3) {
@@ -149,7 +149,7 @@ func (s *Host) SpawnCloud(d *world.Dimension, pos mgl32.Vec3, potion int16, spec
 			c.reapplication = 0
 		}
 	}
-	// BDS's setup (0xC07FC60): the radius grows by the on use amount over the cloud's life.
+	// BDS's setup: the radius grows by the on use amount over the cloud's life.
 	if c.duration > 0 {
 		c.perTick = -c.radiusOnUse / float32(c.duration)
 	}
@@ -189,7 +189,7 @@ func (c *AreaEffectCloud) spawnPackets(e *world.Entity) []packet.Packet {
 	}}
 }
 
-// currentRadius is BDS's radius (0xC07F7F0): the radius it was given, grown by its change a
+// currentRadius is BDS's radius: the radius it was given, grown by its change a
 // tick for each tick of its life.
 func (c *AreaEffectCloud) currentRadius(age int64) float32 {
 	return max(c.radius+float32(age)*c.perTick, 0)

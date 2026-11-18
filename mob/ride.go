@@ -239,7 +239,7 @@ func (m *Mob) AcceptsRider(mount behavior.ID) bool {
 	return false
 }
 
-// CanRide implements behavior.MountSeeker: BDS 1.26.60 0xB3C4ED0 asks the mount's rideable
+// CanRide implements behavior.MountSeeker: BDS 1.26.60 asks the mount's rideable
 // component, its canAddPassenger and the passenger_max_width fit.
 func (m *Mob) CanRide(mount behavior.ID) bool {
 	if !m.AcceptsRider(mount) {
@@ -299,7 +299,7 @@ func (m *Mob) runRideOp(o *op) {
 	}
 }
 
-// spawnRiders is minecraft:addrider (BDS's AddRiderComponent::reloadComponent): each rider
+// spawnRiders is minecraft:addrider (BDS's code): each rider
 // is spawned at the mob, with its event, and gets on.
 func (m *Mob) spawnRiders() {
 	h, ok := m.hooks.(RideHooks)
@@ -358,7 +358,7 @@ func (m *Mob) stopRiding(land bool) {
 	}
 }
 
-// ejectRiders takes every rider off, last first, as Actor::removeAllPassengers.
+// ejectRiders takes every rider off, last first, as BDS.
 func (m *Mob) ejectRiders() {
 	if m.ride.seats == nil {
 		return
@@ -383,12 +383,12 @@ func (m *Mob) Unlink() {
 	m.ejectRiders()
 }
 
-// SavedRiders are the riders the mob's save lists, in seat order, as Actor::saveWithoutId
-// writes its LinksTag (BDS 1.26.60 0xB3B6C10). Runs: the region's goroutine, outside the
+// SavedRiders are the riders the mob's save lists, in seat order, as BDS
+// writes its LinksTag. Runs: the region's goroutine, outside the
 // think phase.
 func (m *Mob) SavedRiders() []behavior.ID { return m.ride.riders }
 
-// LoadRiders keeps the riders of the mob's save (Actor::loadLinks, 0xB3C1550): each gets on
+// LoadRiders keeps the riders of the mob's save: each gets on
 // once it is in the region, in the order saved. Runs: before the mob first ticks.
 func (m *Mob) LoadRiders(ids []behavior.ID) { m.ride.loaded = append(m.ride.loaded[:0], ids...) }
 

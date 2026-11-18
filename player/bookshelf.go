@@ -10,12 +10,12 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Chiseled bookshelves as BDS 1.26.60 (Linux, IDA): ChiseledBookshelfBlock (vtable 0xFBA07A0)
-// with its use listener 0xCB57B50, the comparator signal (slot 93, 0xCB58620: the last slot used)
-// and the drop on remove (slot 116, 0xCB586C0); ChiseledBookshelfBlockActor (type 51, vtable
-// 0xFC00860, saved as "ChiseledBookshelf") with its load 0xD45DFC0, setItem 0xD45CDD0 (only items
+// Chiseled bookshelves as BDS 1.26.60 (Linux, BDS): ChiseledBookshelfBlock
+// with its use listener, the comparator signal (slot 93,: the last slot used)
+// and the drop on remove (slot 116); ChiseledBookshelfBlockActor (type 51,,
+// saved as "ChiseledBookshelf") with its load, setItem (only items
 // tagged minecraft:bookshelf_books, LastInteractedSlot = slot + 1) and the books_stored update
-// 0xD45DD80 (bit i for a book in slot i).
+// (bit i for a book in slot i).
 const (
 	nameChiseledBookshelf = "minecraft:chiseled_bookshelf"
 	bookshelfEntityID     = "ChiseledBookshelf"

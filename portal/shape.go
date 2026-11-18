@@ -29,7 +29,7 @@ const (
 	stateDirection = "minecraft:cardinal_direction"
 )
 
-// BDS's PortalShape limits (sub_CDAFD10).
+// BDS's PortalShape limits.
 const (
 	minWidth, maxWidth   = 2, 21
 	minHeight, maxHeight = 3, 21
@@ -152,7 +152,7 @@ func axisStep(a Axis) (right, left cube.Pos) {
 	return cube.Pos{0, 0, 1}, cube.Pos{0, 0, -1}
 }
 
-// findShape is BDS's PortalShape (sub_CDAFD10) from pos along axis a: down to the
+// findShape is BDS's PortalShape from pos along axis a: down to the
 // floor, out to the left side, then the width, the height and the top row.
 func (b *Blocks) findShape(r *world.Region, pos cube.Pos, a Axis) shape {
 	s := shape{axis: a}
@@ -204,7 +204,7 @@ rows:
 	return s
 }
 
-// edge is BDS's sub_CDB0210: how far from pos along dir the floor of empty blocks on
+// edge is BDS's code: how far from pos along dir the floor of empty blocks on
 // obsidian goes before an obsidian side, 0 if there is none within reach.
 func (b *Blocks) edge(at func(cube.Pos) uint32, pos, dir cube.Pos) int {
 	i := 0
@@ -221,7 +221,7 @@ func (b *Blocks) edge(at func(cube.Pos) uint32, pos, dir cube.Pos) int {
 }
 
 // fill sets the inside of s to portal blocks. Like BDS's createPortalBlocks
-// (sub_CDB0D00, which writes into a buffer that trySpawnPortal applies after), every
+// (which writes into a buffer that trySpawnPortal applies after), every
 // block is set before any neighbour update goes out: a portal told about its neighbour
 // while the frame is half filled would see it not full and break.
 func (b *Blocks) fill(r *world.Region, s shape) {

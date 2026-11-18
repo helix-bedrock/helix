@@ -64,7 +64,7 @@ func (m *Mob) damageSensed(amount float32, cause int, other behavior.Actor) (flo
 // SetTarget changes the mob's target and fires on_target_acquired or on_target_escape.
 func (m *Mob) SetTarget(id behavior.ID) {
 	if id == behavior.NoID {
-		// Mob::setTarget (BDS 1.26.60 0xBFEE2A0) forgets who hurt the mob when it drops its
+		// BDS's code forgets who hurt the mob when it drops its
 		// target, so a mob that calmed down does not take its attacker back.
 		m.lastHurtBy, m.lastHurtByTime = behavior.NoID, 0
 	}
@@ -74,7 +74,7 @@ func (m *Mob) SetTarget(id behavior.ID) {
 	m.traceTarget(id)
 	old := m.target
 	m.target = id
-	// Mob::setTarget writes the target's unique ID to actor data 6 (1.21.3 names), which
+	// BDS's code writes the target's unique ID to actor data 6 (1.21.3 names), which
 	// the client's query.has_target reads: a skeleton raises its bow by it.
 	m.flagsChanged()
 	switch {
@@ -97,7 +97,7 @@ func (m *Mob) actor(id behavior.ID) behavior.Actor {
 const causeEntityAttack = 2
 
 // StruckByLightning is a lightning bolt reaching the mob, before it is hurt: BDS 1.26.60's
-// LightningBolt::normalTick (0xBD52630) runs the mob's damage sensor first (0x7239A20) with
+// BDS's code runs the mob's damage sensor first with
 // the bolt as the attacker, cause entity_attack, no damage and the event always fired, so a
 // trigger filtering on the "lightning" family fires (a creeper becomes charged, a pig turns
 // into a zombified piglin). It reports whether the trigger stops the damage, in which case

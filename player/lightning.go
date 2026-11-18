@@ -13,8 +13,8 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// BDS 1.26.60's lightning bolt (LightningBolt: init 0xBD525A0, normalTick 0xBD52630,
-// Actor::thunderHit 0xB3AAC20).
+// BDS 1.26.60's lightning bolt (LightningBolt: init, normalTick,
+// BDS's code).
 const (
 	nameLightningBolt = "minecraft:lightning_bolt"
 	// boltLife is the ticks a strike lasts; a bolt flashes again 1 to boltFlashes times.
@@ -162,7 +162,7 @@ func (b *LightningBolt) fire(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// hitAround is each living entity in reach struck (Actor::thunderHit): 5 damage, and set on fire for
+// hitAround is each living entity in reach struck: 5 damage, and set on fire for
 // 8 seconds unless it does not burn.
 func (b *LightningBolt) hitAround(r *world.Region, at mgl32.Vec3) {
 	lo := mgl32.Vec3{at[0] - boltReach, at[1] - boltReach, at[2] - boltReach}

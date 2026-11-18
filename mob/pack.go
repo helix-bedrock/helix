@@ -3,10 +3,10 @@ package mob
 import "github.com/helix-bedrock/entity/behavior"
 
 // The goals that tie a mob to others of its kind: play's chase flag
-// (IsChasingDuringPlayFlagComponent), follow_target_captain's leader (Mob::mTargetCaptainId,
-// saved as TargetCaptainID by Mob::addAdditionalSaveData, BDS 1.26.60) and follow_caravan's
-// head and tail (Mob +1088 and +1096). The other mob's half of a caravan link is written at
-// Apply, as BDS 1.26.60's joinCaravan (0xBFEDF10) and leaveCaravan (0xBFEDDB0) do in place.
+// (IsChasingDuringPlayFlagComponent), follow_target_captain's leader (BDS's code,
+// saved as TargetCaptainID by BDS's code, BDS 1.26.60) and follow_caravan's
+// head and tail. The other mob's half of a caravan link is written at
+// Apply, as BDS 1.26.60's joinCaravan and leaveCaravan do in place.
 
 // actorEventCaravanUpdated is the actor event the caravan's front gets with its length.
 const actorEventCaravanUpdated = 64
@@ -44,8 +44,7 @@ func (m *Mob) TargetLeader() behavior.ID { return m.targetLeader }
 // first tick when loaded.
 func (m *Mob) SetTargetLeader(id behavior.ID) { m.targetLeader = id }
 
-// InCaravan implements behavior.CaravanMember: the head still exists (Mob::inCaravan
-// 0xBFEE0B0).
+// InCaravan implements behavior.CaravanMember: the head still exists (BDS's code).
 func (m *Mob) InCaravan() bool {
 	return m.caravanHead != behavior.NoID && m.v.r != nil && goalWorld{&m.v}.Actor(m.caravanHead) != nil
 }

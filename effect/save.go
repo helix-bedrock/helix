@@ -3,7 +3,7 @@ package effect
 import "slices"
 
 // Keys of an effect in a saved entity's ActiveEffects, as BDS 1.26.60 writes them
-// (MobEffectInstance save 0xCAB8B90, load 0xCAB9E10).
+// (MobEffectInstance save, load).
 const (
 	Tag          = "ActiveEffects"
 	tagID        = "Id"

@@ -17,9 +17,9 @@ import (
 	wgrand "github.com/helix-bedrock/worldgen/rand"
 )
 
-// Map colours as BDS 1.26.60's map render reads them (MapItem render 0xC8FC7B0): each block's
+// Map colours as BDS 1.26.60's map render reads them (MapItem render): each block's
 // minecraft:map_color component or BlockType colour, from helix-data's bds/map_colors.json,
-// times the biome tint its tint method names (0xCD54EF0).
+// times the biome tint its tint method names.
 const mapColoursFile = "bds/map_colors.json"
 
 // The tint methods, BDS's order.
@@ -33,7 +33,7 @@ const (
 	tintWater
 )
 
-// BDS's fixed tints (0xCD548A0, 0xCD548B0, 0xCD548C0) and swamp grass (0xCD54AF0).
+// BDS's fixed tints and swamp grass.
 const (
 	tintBirch      = 0x80a755
 	tintEvergreen  = 0x619961
@@ -50,7 +50,7 @@ const (
 // mapColour is an RGBA colour, each part 0 to 1, as BDS's mce::Color.
 type mapColour [4]float32
 
-// none reports whether the colour is BDS's Color::NIL, which the render looks through.
+// none reports whether the colour is BDS's NIL, which the render looks through.
 func (c mapColour) none() bool { return c == mapColour{} }
 
 // blockMapColour is what one block state draws on a map.
@@ -215,7 +215,7 @@ func colourMap(t biomeTint, corners [4][3]float32) uint32 {
 	return out[0]<<16 | out[1]<<8 | out[2]
 }
 
-// The corner colours (red, green, blue) of BDS's foliage (0xCD548D0) and grass maps.
+// The corner colours (red, green, blue) of BDS's foliage and grass maps.
 var (
 	foliageCorners = [4][3]float32{{0.10196079, 0.7490196, 0}, {0.29411766, 0.65882355, 0.45882353}, {0.68235296, 0.6431373, 0.16470589}, {0.3764706, 0.6313726, 0.48235294}}
 	grassCorners   = [4][3]float32{{0.2784314, 0.8156863, 0.2}, {0.42352942, 0.7058824, 0.5764706}, {0.7490196, 0.7137255, 0.33333334}, {0.5019608, 0.7058824, 0.5921569}}
@@ -252,7 +252,7 @@ func (p *mapPalette) tintOf(method uint8, b biomeTint, x, z int) uint32 {
 	return 0xffffff
 }
 
-// The blocks BDS mixes a tint over (sub_CD55430): 1 the ring at 4, 2 the 3 by 3 around, 3 the
+// The blocks BDS mixes a tint over: 1 the ring at 4, 2 the 3 by 3 around, 3 the
 // corners at 8 and the block.
 var (
 	tintRing   = [][2]int{{-4, -4}, {0, -4}, {4, -4}, {4, 0}, {4, 4}, {0, 4}, {-4, 4}, {-4, 0}}
@@ -260,7 +260,7 @@ var (
 	tintWide   = [][2]int{{-8, -8}, {-8, 8}, {8, 8}, {8, -8}, {0, 0}}
 )
 
-// tintSamples is the sampling of each tint method (0xCD54EF0).
+// tintSamples is the sampling of each tint method.
 func tintSamples(method uint8) [][2]int {
 	switch method {
 	case tintGrass:
@@ -271,7 +271,7 @@ func tintSamples(method uint8) [][2]int {
 	return tintRing
 }
 
-// tint is the colour a tint method gives at pos, the mean of its samples' biomes (0xCD809D0).
+// tint is the colour a tint method gives at pos, the mean of its samples' biomes.
 func (p *mapPalette) tint(r *world.Region, method uint8, pos cube.Pos) mapColour {
 	if method == tintNone || method > tintWater {
 		return mapColour{1, 1, 1, 1}
@@ -313,7 +313,7 @@ func (s *Host) colourAt(r *world.Region, pos cube.Pos, state uint32) mapColour {
 	return mapColour{e.colour[0] * t[0], e.colour[1] * t[1], e.colour[2] * t[2], e.colour[3] * t[3]}
 }
 
-// bedDyeColours are BDS's bed map colours by dye (BedBlock::getMapColor 0xCCD2A70).
+// bedDyeColours are BDS's bed map colours by dye.
 var bedDyeColours = [16][4]float32{
 	{249, 255, 254, 255}, {216, 127, 51, 255}, {178, 76, 216, 255}, {102, 153, 216, 255},
 	{229, 229, 51, 255}, {127, 204, 25, 255}, {242, 127, 165, 255}, {76, 76, 76, 255},

@@ -32,7 +32,7 @@ func (p *Player) AddEffect(id, amplifier, duration int32) {
 
 // GiveEffect gives the player an effect. An instant effect does its work at once, at full
 // strength. One the player has already is merged by BDS's MobEffectInstance update
-// (0xCAB7840, mergeEffect) and the player is told of it again, as BDS's onEffectUpdated.
+// (mergeEffect) and the player is told of it again, as BDS's onEffectUpdated.
 // Effects are kept in ID order, as BDS keeps them in a vector by ID. Runs: the player's
 // region.
 func (p *Player) GiveEffect(e ActiveEffect) {
@@ -112,10 +112,10 @@ func (p *Player) effectGone(id int32) {
 }
 
 // tickEffects runs each effect's Tick and counts it down one tick, as BDS's
-// MobEffectInstance tick (0xCAB7FD0): the kept effects count down too and go at 0; one
+// MobEffectInstance tick: the kept effects count down too and go at 0; one
 // that runs out gives way to the first kept effect, if any, else goes. The player is told
-// of a kept effect coming back only when its level differs, as BDS's effect system
-// (0x76B5550). Runs: the player's region, once per tick.
+// of a kept effect coming back only when its level differs, as BDS's effect system.
+// Runs: the player's region, once per tick.
 func (p *Player) tickEffects() {
 	for i := 0; i < len(p.effects); {
 		id := p.effects[i].ID
@@ -140,7 +140,7 @@ func (p *Player) tickEffects() {
 }
 
 // effectsDied runs the Died hooks of the effects a dying player has (BDS's
-// MobEffect::onActorDied), before death takes them away.
+// BDS's code), before death takes them away.
 func (p *Player) effectsDied() {
 	for _, e := range p.Effects() {
 		if def, ok := p.s.game.effects[e.ID]; ok && def.Died != nil {
@@ -150,7 +150,7 @@ func (p *Player) effectsDied() {
 }
 
 // effectsHurt runs the Hurt hooks of the player's effects after it was hurt (BDS's
-// MobEffect::onActorHurt).
+// BDS's code).
 func (p *Player) effectsHurt(src DamageSource) {
 	for _, e := range p.Effects() {
 		if def, ok := p.s.game.effects[e.ID]; ok && def.Hurt != nil {

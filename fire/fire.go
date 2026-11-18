@@ -65,7 +65,7 @@ const (
 	// stayAge is the oldest a fire with nothing to burn stays on a sturdy block, and on TNT
 	// that cannot explode the age below which it stays.
 	stayAge, tntStayAge = 3, 4
-	// keepFire is the chance against (out of age+10) a burnt block turning to fire; at or
+	// keepFire is the chance against (out of age) a burnt block turning to fire; at or
 	// under keepFireMax it does.
 	keepFire = 10
 	keepMax  = 4

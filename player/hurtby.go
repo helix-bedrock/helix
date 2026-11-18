@@ -5,8 +5,8 @@ import "github.com/helix-bedrock/entity/behavior"
 // What a player last hurt and what last hurt it, as BDS 1.26.60 keeps them on every Mob:
 // a tamed wolf's owner_hurt_by_target goal reads who hurt its owner, and owner_hurt_target
 // what its owner hit. A mob that hurts the player is kept lastHurtByTicks (setLastHurtByMob
-// 0xB3A0620 sets 60) and forgotten when that runs out or it is gone or dead
-// (Actor::baseTick 0xB39F790). Each hit the player lands on a mob moves the stamp on, so a
+// sets 60) and forgotten when that runs out or it is gone or dead.
+// Each hit the player lands on a mob moves the stamp on, so a
 // pet starts on it once per hit.
 type hurtRecord struct {
 	by     behavior.ID

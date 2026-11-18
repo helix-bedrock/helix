@@ -7,8 +7,8 @@ import (
 	"github.com/helix-bedrock/protocol"
 )
 
-// BDS 1.26.60's repair item recipe (RepairItemRecipe: matches 0xC4948A0, assemble
-// 0xC493530, recipe ID repair_item_recipeId), two worn items of one kind crafted into one.
+// BDS 1.26.60's repair item recipe (RepairItemRecipe: matches, assemble,
+// recipe ID repair_item_recipeId), two worn items of one kind crafted into one.
 // The research note is private.
 
 // repairItemRecipe is the UUID BDS sends the recipe under in CraftingData.

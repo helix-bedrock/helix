@@ -1,8 +1,8 @@
 // Package drip is pointed dripstone dripping water and lava into cauldrons, as BDS 1.26.60
-// does it: a stalactite's random tick (0xD553150, 0xD553380) finds the source above its base
+// does it: a stalactite's random tick finds the source above its base
 // and a cauldron below its tip that takes it, shows the drip and queues a tick on the
-// cauldron; the cauldron's queued tick (CauldronBlock's BlockQueuedTickEvent handler
-// 0xCB4A1D0, its dripstone part) looks up for a tip again and fills it. The research note is
+// cauldron; the cauldron's queued tick (CauldronBlock's BlockQueuedTickEvent handler,
+// its dripstone part) looks up for a tip again and fills it. The research note is
 // private. The cauldron itself (levels, block entity) is the player package's, reached
 // through Cauldrons.
 package drip
@@ -157,7 +157,7 @@ func (t *Ticker) RandomTick(r *world.Region, pos cube.Pos, block uint32, layer u
 	t.dripFromBase(r, pos, lava)
 }
 
-// dripFromBase is BDS's 0xD553380: only the base (no dripstone above it) drips; its tip, then
+// dripFromBase is BDS's code: only the base (no dripstone above it) drips; its tip, then
 // the cauldron under it, then the drip particle and the cauldron's tick.
 func (t *Ticker) dripFromBase(r *world.Region, base cube.Pos, lava bool) {
 	if k := t.kind(r, base.Side(cube.FaceUp)); k == kindHanging || k == kindTip {
@@ -189,8 +189,8 @@ func (t *Ticker) tipBelow(r *world.Region, pos cube.Pos) (cube.Pos, bool) {
 	return t.lowestHanging(r, pos, reach)
 }
 
-// fluidAbove is BDS's 0xD5531E0: from a hanging dripstone up past the stalactite to the block
-// it hangs from (0xD500250, within reach), then the source on top of that block, lava or water.
+// fluidAbove is BDS's code: from a hanging dripstone up past the stalactite to the block
+// it hangs from (within reach), then the source on top of that block, lava or water.
 func (t *Ticker) fluidAbove(r *world.Region, pos cube.Pos) (lava, ok bool) {
 	for range reach {
 		pos = pos.Side(cube.FaceUp)
@@ -208,7 +208,7 @@ func (t *Ticker) fluidAbove(r *world.Region, pos cube.Pos) (lava, ok bool) {
 	return false, false
 }
 
-// cauldronBelow is BDS's 0xD553870: the first block under the tip that is a cauldron taking
+// cauldronBelow is BDS's code: the first block under the tip that is a cauldron taking
 // the fluid, through air only, within reach.
 func (t *Ticker) cauldronBelow(r *world.Region, tip cube.Pos, lava bool) (cube.Pos, bool) {
 	rg := r.Dimension().Range()

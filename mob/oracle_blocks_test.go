@@ -12,7 +12,7 @@ import (
 // TestOracleBlockFacts compares the goal block facts with BDS 1.26.60's, as
 // the component oracle recorded them for every cell of its randpos arena:
 // the ground test (material blocks motion and is not never-buildable, block
-// type flag 0x40000), a non-empty collision shape, and Material::isSolid. It
+// type flag 0x40000), a non-empty collision shape, and BDS's code. It
 // compares each block's default state, so a block placed in another state
 // can differ in shape. The file holds BDS outputs and is never committed;
 // the test is skipped unless ORACLE_CELLS names one.

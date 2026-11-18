@@ -8,17 +8,17 @@ import (
 
 // The hooks of ram_attack (behavior.Rammer, the goat) and stalk_and_pounce_on_target
 // (behavior.Pouncer, the fox). BDS 1.26.60's RamAttackGoal hurts the rammed mob through
-// Mob::doHurtTarget (vt+424) with damage cause 30, and keeps a RamGoalItemDropperImpl (goats)
-// whose checkForHornDropOnCollision (0x5517AF0) notes whether the block past the target is one
-// that breaks a horn off, tryDropHorn (0x5517430) drops the horn when the ram ends against it,
-// and dontDropHorn (0x5517C50) forgets it. Mob::lookAt (0xBFE5310) turns the mob itself, not
-// its look control; Mob::getJumpPrevention (0xBFE4520) posts LevelEvent 9810 with the honey
+// BDS's code with damage cause 30, and keeps a RamGoalItemDropperImpl (goats)
+// whose checkForHornDropOnCollision notes whether the block past the target is one
+// that breaks a horn off, tryDropHorn drops the horn when the ram ends against it,
+// and dontDropHorn forgets it. BDS's code turns the mob itself, not
+// its look control; BDS's code posts LevelEvent 9810 with the honey
 // block's runtime ID at the mob's x and z and its box bottom.
 
 const (
 	// damageRam is the ram's damage cause.
 	damageRam = 30
-	// attachHead is the attach point Mob::lookAt aims from and at.
+	// attachHead is the attach point BDS's code aims from and at.
 	attachHead = 3
 	// levelEventJumpPrevented is the level event of a jump a honey block stopped.
 	levelEventJumpPrevented = 9810
@@ -34,11 +34,11 @@ type HornHooks interface {
 	DropHorn(m *Mob, p behavior.Vec3)
 }
 
-// ResetLook implements behavior.Rammer: LookControl::initialize drops the look target.
+// ResetLook implements behavior.Rammer: BDS's code drops the look target.
 func (m *Mob) ResetLook() { m.look.Has = false }
 
 // RamHit implements behavior.Rammer: the mob's attack damage with the ram's cause, at Apply.
-// Mob::doHurtTarget's own swing and knockback are not run: the goal knocks the mob back
+// BDS's code's own swing and knockback are not run: the goal knocks the mob back
 // itself.
 func (m *Mob) RamHit(a behavior.Actor) {
 	m.do(op{kind: opHurtBy, id: a.ID(), n: damageRam, amount: m.attackDamage})
@@ -60,7 +60,7 @@ func (m *Mob) RamImpact(p behavior.Vec3) {
 // RamReset implements behavior.Rammer (dontDropHorn).
 func (m *Mob) RamReset() { m.ramHorn = false }
 
-// FaceActor implements behavior.Pouncer: Mob::lookAt. It aims from the mob's head at a mob's
+// FaceActor implements behavior.Pouncer: BDS's code. It aims from the mob's head at a mob's
 // head or another entity's box middle, and turns the pitch and yaw by at most pitchMax and
 // yawMax. The pitch comes out negated, as BDS writes it.
 func (m *Mob) FaceActor(a behavior.Actor, yawMax, pitchMax float32) {
@@ -82,7 +82,7 @@ func (m *Mob) FaceActor(a behavior.Actor, yawMax, pitchMax float32) {
 	m.yaw += dy
 }
 
-// lookWrap is Mob::lookAt's angle wrap: fmod(d+180, 360), moved into [0, 360), less 180.
+// lookWrap matches BDS's angle wrap: fmod(d, 360), moved into [0, 360), less 180.
 func lookWrap(d float32) float32 {
 	w := float32(math.Mod(float64(d+180), 360))
 	if w < 0 {

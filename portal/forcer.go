@@ -10,7 +10,7 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// BDS 1.26.60's PortalForcer numbers (sub_CDA9350).
+// BDS 1.26.60's PortalForcer numbers.
 const (
 	// SearchRadius is how far on x and z a traveller's arrival looks for a portal.
 	SearchRadius = 128
@@ -28,8 +28,7 @@ const (
 	buildPasses = 4
 )
 
-// The End's arrival (TheEndDimension translate, sub_4B9DC70; the platform in
-// sub_CDA9350).
+// The End's arrival (TheEndDimension translate,; the platform in).
 var (
 	// EndArrival is where every traveller into the End lands.
 	EndArrival = cube.Pos{100, 50, 0}
@@ -46,7 +45,7 @@ type Portals struct {
 	Records *Records
 }
 
-// Light is BDS's PortalBlock::trySpawnPortal (sub_D52A9C0): fire lit at pos in a valid
+// Light is BDS's code: fire lit at pos in a valid
 // empty obsidian frame (along X first, then Z) fills it with portal blocks and records
 // it. It reports whether a portal was made.
 func (p *Portals) Light(r *world.Region, dim mcdb.Dimension, pos cube.Pos) bool {
@@ -62,7 +61,7 @@ func (p *Portals) Light(r *world.Region, dim mcdb.Dimension, pos cube.Pos) bool 
 	return false
 }
 
-// Check is the portal block's neighborChanged (sub_D52A490): a portal whose frame is no
+// Check is the portal block's neighborChanged: a portal whose frame is no
 // longer whole and full breaks into air.
 func (p *Portals) Check(r *world.Region, pos cube.Pos, block uint32) {
 	s := p.findShape(r, pos, p.axisOf(block))
@@ -122,7 +121,7 @@ func (p *Portals) Along(dim mcdb.Dimension, pos cube.Pos, feet mgl32.Vec3) float
 	return -1
 }
 
-// Make is BDS's PortalForcer building a portal for a traveller at from (sub_CDA9350,
+// Make is BDS's PortalForcer building a portal for a traveller at from (
 // Java 1.12's Teleporter.makePortal shape): the nearest spot within 16 blocks where a
 // 3 by 4 floor with 4 free blocks above fits, else one where a single row fits, else in
 // the open at a clamped height on a built platform with BDS's netherrack ledge. The
@@ -221,7 +220,7 @@ func (sp *portalSearch) fits(x, y, z, k, depth int) bool {
 // buildFrame sets the obsidian frame and portal blocks at bx, by, bz along sx, sz. Each
 // pass sets every frame and portal block first, as BDS's setBlock with flag 2 (no
 // neighbour update), and only then updates the neighbours of all of them in the same
-// order (sub_CE5EAC0 after the pass). A portal told of a neighbour while the frame is
+// order (after the pass). A portal told of a neighbour while the frame is
 // half built would find it not whole and break.
 func (p *Portals) buildFrame(r *world.Region, bx, by, bz, sx, sz int) {
 	axis := AxisX
@@ -265,7 +264,7 @@ func (p *Portals) solid(b uint32) bool {
 
 // platform builds the open-air floor of a forced portal: obsidian under three rows of
 // two blocks across the portal with air above, then netherrack wherever the floor
-// around it is air (BDS-only, sub_CDA9350).
+// around it is air (BDS-only).
 func (p *Portals) platform(r *world.Region, x, y, z, sx, sz int) {
 	set := func(pos cube.Pos, b uint32) {
 		if r.SetBlock(pos, 0, b) {
@@ -302,7 +301,7 @@ func (p *Portals) platform(r *world.Region, x, y, z, sx, sz int) {
 	}
 }
 
-// EndPlatform builds the End's arrival platform (sub_CDA9350, dimension 2): obsidian
+// EndPlatform builds the End's arrival platform (dimension 2): obsidian
 // 5 by 5 under EndArrival and air three blocks up.
 func (p *Portals) EndPlatform(r *world.Region) {
 	for dx := -endPlatformReach; dx <= endPlatformReach; dx++ {

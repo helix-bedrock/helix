@@ -27,7 +27,7 @@ type Villages interface {
 // BDS's numbers for dwellers.
 const (
 	// poiFailEvent is the level event a failed trip to a POI shows, poiFailShows times on
-	// the POI's top while the fail count is poiFailMax or less (0xBD0D270).
+	// the POI's top while the fail count is poiFailMax or less.
 	poiFailEvent = 2009
 	poiFailShows = 3
 	poiFailMax   = 2
@@ -161,7 +161,7 @@ func (m *Mob) Village(search int32) (behavior.Box, bool) {
 // HeadY is the height of the mob's eyes.
 func (m *Mob) HeadY() float32 { return m.eyeHeight() }
 
-// BodySpot is a random point over the mob, as BDS places claim particles (0xBEDFC60).
+// BodySpot is a random point over the mob, as BDS places claim particles.
 func (m *Mob) BodySpot() behavior.Vec3 {
 	w, h, p := m.body.Width, m.body.Height, m.body.Pos
 	x := p.X + m.rnd.NextFloat()*w*2 - w
@@ -199,7 +199,7 @@ func (m *Mob) Profession() string {
 // SetProfession sets the preferred profession; "" falls back to the component's.
 func (m *Mob) SetProfession(name string) { m.dw.profession = name }
 
-// Locked reports the trade lock (1.26.60 0x7240180): trade experience or tier above 0.
+// Locked reports the trade lock: trade experience or tier above 0.
 func (m *Mob) Locked() bool { return m.TradeExperience() != 0 || m.TradeTier() != 0 }
 
 // Fire runs a definition event on the mob. Runs: the mob's region, outside its think.
@@ -334,7 +334,7 @@ func (m *Mob) PlayWorkSound(sound string) {
 // the iron golem spawn, which is not built.
 func (m *Mob) StampWork() {}
 
-// The move_indoors facts (BDS 1.26.60 MoveIndoorsGoal::canUse 0x5437360).
+// The move_indoors facts.
 const (
 	// shelterRain is the rain level above which the level counts as raining.
 	shelterRain = 0.2
@@ -462,8 +462,8 @@ func (m *Mob) openDoorsTick(nm *nav.Mob) {
 }
 
 // readOpenDoors adds or drops the open_door annotation's state as the component comes and
-// goes, with actor flag 81 (DoorOpener), as BDS's actor reload does (0xBFD62E0 sets the
-// flag; 0x7141F90 clears it and forgets the doors without closing them).
+// goes, with actor flag 81 (DoorOpener), as BDS's actor reload does (sets the
+// flag; clears it and forgets the doors without closing them).
 func (m *Mob) readOpenDoors() {
 	has := m.UsesDoors()
 	switch {

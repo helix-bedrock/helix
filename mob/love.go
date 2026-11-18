@@ -5,7 +5,7 @@ import (
 	"github.com/helix-bedrock/entity/state"
 )
 
-// The villager breeding food (BDS 1.26.60 0xBD24A10 finds the slot, 0xBD24FE0 eats it): a
+// The villager breeding food (BDS 1.26.60 finds the slot, eats it): a
 // slot of bread holding breadBreed or more, or of one of the crops holding cropBreed or
 // more. The three crop items are read as BDS item globals that are not named in the db;
 // they are taken as carrot, potato and beetroot.
@@ -18,8 +18,8 @@ const (
 // breedCrops are the items of which cropBreed make a villager ready to breed.
 var breedCrops = [...]string{"minecraft:carrot", "minecraft:potato", "minecraft:beetroot"}
 
-// love is the Villager's love state: its partner (Actor +664, set with the in-love flag by
-// 0xB3D14F0), whether it started the pairing (+1128) and its willing flag (+1129).
+// love is the Villager's love state: its partner (set with the in-love flag by),
+// whether it started the pairing and its willing flag.
 type love struct {
 	partner behavior.ID
 	leader  bool
@@ -46,7 +46,7 @@ func (m *Mob) SetLovePartner(id, partner behavior.ID) {
 	m.do(op{kind: opLovePartner, id: id, other: partner})
 }
 
-// setLovePartner is 0xB3D14F0: the partner and the in-love flag together.
+// setLovePartner is: the partner and the in-love flag together.
 func (m *Mob) setLovePartner(partner behavior.ID) {
 	m.love.partner = partner
 	m.SetFlag(behavior.FlagInLove, partner != behavior.NoID)

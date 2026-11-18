@@ -9,9 +9,9 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// Tridents, from BDS 1.26.60: TridentItem's release (sub_C663550) throws a thrown_trident, or
-// with Riptide launches the player; ThrownTrident's tick (sub_BC998C0) and its Loyalty return
-// (sub_BC99330); its void (sub_BC99300). Its flight, damage, sticking and hit sounds come
+// Tridents, from BDS 1.26.60: TridentItem's release throws a thrown_trident, or
+// with Riptide launches the player; ThrownTrident's tick and its Loyalty return;
+// its void. Its flight, damage, sticking and hit sounds come
 // from the thrown_trident definition through the projectile code.
 //
 // The Riptide launch is the client's movement; its spin attack is below. Not done: Channeling
@@ -164,7 +164,7 @@ func (t *Projectile) tridentReturns(r *world.Region, e *world.Entity) bool {
 	return true
 }
 
-// returnStep is one tick of flying back to the owner (sub_BC99330), through blocks; the owner
+// returnStep is one tick of flying back to the owner, through blocks; the owner
 // picks it up on touching it.
 func (t *Projectile) returnStep(r *world.Region, e *world.Entity, o *Player, level float32) {
 	tr := t.trident
@@ -209,13 +209,13 @@ func (t *Projectile) loadTrident(data map[string]any) {
 	}
 }
 
-// The Riptide spin attack, from BDS 1.26.60's spin attack systems (registered by sub_76CE4D0).
-// The release sets the damage-nearby-mobs actor flag (StartSpinAttackActionSystem,
-// sub_76EE600, which also launches the player; Helix leaves the launch to the client). While it
-// is set, SpinAttackFetchNearbyMobsSystem (sub_76CDC40) finds every other mob or player whose
-// box touches the spinner's grown by 1, and DamageNearbyMobsServerSystem (sub_76CE0B0) hits
+// The Riptide spin attack, from BDS 1.26.60's spin attack systems (registered by).
+// The release sets the damage-nearby-mobs actor flag (StartSpinAttackActionSystem,,
+// which also launches the player; Helix leaves the launch to the client). While it
+// is set, SpinAttackFetchNearbyMobsSystem finds every other mob or player whose
+// box touches the spinner's grown by 1, and DamageNearbyMobsServerSystem hits
 // each with the player's own attack, the held trident's damage and enchantments. A hit ends
-// the spin (PostDamageNearbyMobsSystem, sub_76F7010), as does its 20th tick, or any from the
+// the spin (PostDamageNearbyMobsSystem), as does its 20th tick, or any from the
 // 5th on with a condition BDS reads from a component not named here: Helix takes it as being
 // on the ground. The bounce back after a hit (the speed times -0.2 for each mob hit) runs in
 // that shared system on the client too, which moves the player, so the server sends none.

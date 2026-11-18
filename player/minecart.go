@@ -140,7 +140,7 @@ type cartSpec struct {
 	// block is the item its block drops as, empty for a plain cart.
 	block string
 	// machine is its slots, if it has any. Its window is what the cart says it holds;
-	// opens is the window the client is told to open, which BDS sets apart (0x737E270):
+	// opens is the window the client is told to open, which BDS sets apart:
 	// a chest cart opens a plain container and a hopper cart a hopper.
 	machine *machineSpec
 	opens   byte
@@ -426,7 +426,7 @@ func (m *Minecart) findRail(r *world.Region, pos mgl32.Vec3) (cube.Pos, uint32, 
 	return cube.Pos{}, 0, false
 }
 
-// solidBlock is Block::isSolid as far as Helix has it.
+// solidBlock matches BDS as far as Helix has it.
 func (s *Host) solidBlock(b uint32) bool {
 	return s.attach != nil && s.attach.Solid(b)
 }
@@ -668,7 +668,7 @@ func (m *Minecart) boost(r *world.Region, rail cube.Pos, dir int) {
 	}
 }
 
-// railKickOff is Block::isSolidBlockingBlockAndNotSignalSource: BDS's flags as Helix has
+// railKickOff matches BDS: BDS's flags as Helix has
 // them, with the full blocks that give power left out by name.
 func (s *Host) railKickOff(r *world.Region, pos cube.Pos) bool {
 	b, ok := r.Block(pos, 0)
@@ -719,7 +719,7 @@ func cartBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
 	return lo, mgl32.Vec3{pos[0] + cartHalfWidth, lo[1] + cartHeight, pos[2] + cartHalfWidth}
 }
 
-// pushes is what touches the cart: players walking into it push it (BDS's Mob::pushActors
+// pushes is what touches the cart: players walking into it push it (BDS's code
 // from the player's side), and it pushes other carts it runs into along its rail
 // (postNormalTick).
 func (m *Minecart) pushes(r *world.Region, e *world.Entity, pos mgl32.Vec3) {
@@ -845,7 +845,7 @@ func (m *Minecart) railSensor(r *world.Region, pos mgl32.Vec3) {
 	}
 }
 
-// tickHopper is HopperComponent::pullInItems, on HopperSystem's timer: the same pull as a
+// tickHopper matches BDS, on HopperSystem's timer: the same pull as a
 // hopper block from where the cart's middle is, then an item lying at the cart.
 func (m *Minecart) tickHopper(r *world.Region, pos mgl32.Vec3) {
 	if m.hopperOff || m.chest == nil {
@@ -947,7 +947,7 @@ func (m *Minecart) sendHurt(e *world.Entity) {
 	}))
 }
 
-// Hurt is BDS's Minecart::_hurt: the shake, and it breaks once its integrity is gone or at
+// Hurt is BDS's code: the shake, and it breaks once its integrity is gone or at
 // once for a player in creative, who gets no drops. True if it broke.
 func (m *Minecart) Hurt(r *world.Region, damage float32, by *Player) bool {
 	if m.gone {
@@ -1070,8 +1070,8 @@ func (m *Minecart) settleRiders() {
 	}
 }
 
-// openCart opens the cart's slots for the player, as BDS's ContainerComponent (0x737E1B0,
-// 0x737E270) then its window (0x4A43A40): refused without the ability, for one who is dead or
+// openCart opens the cart's slots for the player, as BDS's ContainerComponent ()
+// then its window: refused without the ability, for one who is dead or
 // has a window open, and for a cart that is gone. The window names the block the cart is in
 // and the cart.
 func (p *Player) openCart(m *Minecart) {
@@ -1179,7 +1179,7 @@ func (p *Player) useOnCart(d *protocol.UseItemOnEntityTransactionData) bool {
 	return true
 }
 
-// placeCart is BDS's MinecartItem::_useOn: on a rail with nothing else in the way, in the
+// placeCart is BDS's code: on a rail with nothing else in the way, in the
 // middle of its block. The use counts either way.
 func (p *Player) placeCart(r *world.Region, clicked cube.Pos, id string) bool {
 	if !p.s.railBlock(r, clicked) || !p.inReach(clicked) {
@@ -1203,7 +1203,7 @@ func (p *Player) placeCart(r *world.Region, clicked cube.Pos, id string) bool {
 	return true
 }
 
-// dispenseCart is BDS's MinecartItem::dispense: a rail in front, or a rail under an empty
+// dispenseCart is BDS's code: a rail in front, or a rail under an empty
 // block in front. False throws the item out as any other.
 func (s *Host) dispenseCart(r *world.Region, front cube.Pos, dir mgl32.Vec3, id string) bool {
 	y := float32(front[1])

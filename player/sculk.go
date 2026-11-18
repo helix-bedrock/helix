@@ -15,13 +15,13 @@ import (
 )
 
 // Sculk sensors, calibrated sculk sensors and sculk shriekers as BDS 1.26.60 (research note
-// memory/research-sculk.md): each block actor holds a VibrationListener (0xCA54180 hearing, its
-// tick moving the chosen vibration through the air) and a config: the sensor's (0xFBF08D0: hears
+// memory/research-sculk.md): each block actor holds a VibrationListener (hearing, its
+// tick moving the chosen vibration through the air) and a config: the sensor's (: hears
 // every vibration but its own block's break or place, and sculk_touch only on itself, while
-// inactive; activates with power by distance), the calibrated one's (0xFBFEA28: also only the
-// frequency its back input gives, if any; range 16) and the shrieker's (0xFBF0918: hears only a
-// sensor's tendrils clicking set off by a player, and shrieks: tryShriek 0xD3DF9F0, shriek
-// 0xD3DEAF0, response 0xD3E0310). Players carry BDS's WardenSpawnTrackerComponent. The sensor's
+// inactive; activates with power by distance), the calibrated one's (: also only the
+// frequency its back input gives, if any; range 16) and the shrieker's (: hears only a
+// sensor's tendrils clicking set off by a player, and shrieks: tryShriek, shriek,
+// response). Players carry BDS's WardenSpawnTrackerComponent. The sensor's
 // block and power are circuit/sculk.go.
 const (
 	sculkSensorBlock     = "minecraft:sculk_sensor"
@@ -105,7 +105,7 @@ type vibrationListener struct {
 	latest int32
 }
 
-// consider is VibrationSelector::addCandidate.
+// consider matches BDS.
 func (l *vibrationListener) consider(r *world.Region, pos cube.Pos, ev world.GameEvent) {
 	now := r.CurrentTick()
 	if l.hasCand && l.candTick != now {
@@ -128,7 +128,7 @@ func (l *vibrationListener) consider(r *world.Region, pos cube.Pos, ev world.Gam
 	l.hasCand, l.candTick = true, now
 }
 
-// tick is VibrationListener::tick: a candidate from an earlier tick takes flight, and one in
+// tick matches BDS: a candidate from an earlier tick takes flight, and one in
 // flight arrives when its ticks run out, handed to arrive.
 func (l *vibrationListener) tick(r *world.Region, pos cube.Pos, arrive func(v vibration)) {
 	if !l.inFlight && l.hasCand && l.candTick != r.CurrentTick() {
@@ -163,7 +163,7 @@ func vibrationParticle(r *world.Region, from, to cube.Pos, secs float32) {
 	}
 }
 
-// vec3Source is a fixed position as BDS's PositionSource::serializeTo writes it.
+// vec3Source is a fixed position as BDS's code writes it.
 func vec3Source(v mgl32.Vec3) map[string]any {
 	return map[string]any{"type": "vec3", "x": v[0], "y": v[1], "z": v[2]}
 }
@@ -275,7 +275,7 @@ func (e *SculkSensor) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	e.l.tick(r, pos, func(v vibration) { e.receive(r, pos, v) })
 }
 
-// receive is SculkSensorVibrationConfig::onSignalReceive: an inactive sensor turns on with power
+// receive matches BDS: an inactive sensor turns on with power
 // by distance, max(1, 15 - floor(distance / range * 15)).
 func (e *SculkSensor) receive(r *world.Region, pos cube.Pos, v vibration) {
 	e.chunk.Changed()
@@ -287,7 +287,7 @@ func (e *SculkSensor) receive(r *world.Region, pos cube.Pos, v vibration) {
 	e.s.activateSensor(r, pos, v, power)
 }
 
-// activateSensor is SculkSensorBlock::activate (0xD515AB0) past the block and its power: the
+// activateSensor matches BDS past the block and its power: the
 // power on sound unless waterlogged, amethyst blocks on any side resonating at the vibration's
 // frequency, and the tendrils clicking event a shrieker hears.
 func (s *Host) activateSensor(r *world.Region, pos cube.Pos, v vibration, power int32) {
@@ -321,10 +321,10 @@ func (s *Host) resonate(r *world.Region, at cube.Pos, src *Player, freq int32) {
 	levelEvent(r, at, blockVec(at), packet.LevelEventSoundAmethystResonate, pitch)
 }
 
-// sculkFaces are the six sides in BDS's Facing::DIRECTIONS order.
+// sculkFaces are the six sides in BDS's DIRECTIONS order.
 var sculkFaces = [...]cube.Face{cube.FaceDown, cube.FaceUp, cube.FaceNorth, cube.FaceSouth, cube.FaceWest, cube.FaceEast}
 
-// resonateNotes are BDS's notes (0x1C645BC) by frequency.
+// resonateNotes are BDS's notes by frequency.
 var resonateNotes = [...]float64{0, 0, 2, 4, 6, 7, 9, 10, 12, 14, 15, 18, 19, 21, 22, 24}
 
 // waterlogged reports water in the second layer at pos.
@@ -490,7 +490,7 @@ func (e *SculkShrieker) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	})
 }
 
-// tryShriek is SculkShriekerBlockActor::tryShriek: when it can summon, the warning level of the
+// tryShriek matches BDS: when it can summon, the warning level of the
 // most warned player nearby goes up (none while any nearby is on cooldown or a warden is near,
 // and then no shriek either) and is queued; then it shrieks.
 func (e *SculkShrieker) tryShriek(r *world.Region, pos cube.Pos, p *Player) bool {
@@ -613,7 +613,7 @@ func (s *Host) withState(block uint32, key string, v any) uint32 {
 	return block
 }
 
-// ShriekerTick is the shrieker's tick (SculkShriekerBlock::tick): it stops shrieking and
+// ShriekerTick is the shrieker's tick: it stops shrieking and
 // responds. Runs: owner of the region.
 func (s *Host) ShriekerTick(r *world.Region, pos cube.Pos, block uint32) {
 	v, _ := s.reg.Blocks.States(block)[stateShrieking].(uint8)
@@ -672,7 +672,7 @@ func (s *Host) wardenReply(r *world.Region, pos cube.Pos, level int32) {
 	playSound(r, pos, soundEvent{name: wardenReplies[level-1], pos: at, extra: -1, entity: wardenType}, nil)
 }
 
-// summonWarden is BDS's _trySummonWarden through MobSpawnUtils::trySpawnMob: up to 20 tries at a
+// summonWarden is BDS's _trySummonWarden through BDS's code: up to 20 tries at a
 // random column within 5 blocks, each from 6 above down to 6 below for a free place on a solid
 // block; the warden emerges there (minecraft:spawn_emerging) with the agitated sound. False if
 // none was found.

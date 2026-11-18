@@ -1,10 +1,10 @@
 package mob
 
-// A wolf shaking off water, as BDS 1.26.60's Wolf. Its normal tick (0xBD83D90) marks it wet
+// A wolf shaking off water, as BDS 1.26.60's Wolf. Its normal tick marks it wet
 // while it is in water or rain, and a shake that is running stops there (ActorEvent 79). Its
-// newServerAiStep (Wolf::newServerAiStep 0xBD83A50) starts a shake once the wet wolf is out
+// newServerAiStep starts a shake once the wet wolf is out
 // of the water and rain, on the ground and done with its path: ActorEvent 8, which the
-// client animates (Wolf::handleEntityEvent 0xBD84E80). The shake timer then goes up 0.05 a
+// client animates. The shake timer then goes up 0.05 a
 // tick; its first tick sends the entity_act game event at the wolf's body, and once it was
 // 2 the wolf is dry again.
 const (

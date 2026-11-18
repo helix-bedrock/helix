@@ -7,25 +7,25 @@ import (
 
 // Taming, trusting, healing and sitting: the interactions a player's use on a mob runs, as
 // BDS 1.26.60's PlayerInteractionSystem (its list, built in
-// VanillaGameModuleServer::configureLevel 0x4A3B490, is tried in order by
-// Actor::getInteraction 0xB3D1540, and the first component that offers an interaction
+// BDS's code, is tried in order by
+// BDS's code, and the first component that offers an interaction
 // wins). The engine calls these in that order and does the item work.
 
-// dataOwner is actor data 5, the owner's unique ID (Actor::setOwner 0xB39B090).
+// dataOwner is actor data 5, the owner's unique ID.
 const dataOwner = 5
 
 // Owner is the entity that tamed the mob, behavior.NoID for none.
 func (m *Mob) Owner() behavior.ID { return m.owner }
 
 // SetOwner makes an entity the mob's owner and shows it to those who see the mob, as
-// Actor::setOwner. Loading a saved owner calls it too.
+// BDS's code. Loading a saved owner calls it too.
 func (m *Mob) SetOwner(id behavior.ID) {
 	m.owner = id
 	m.setData(dataOwner, int64(id))
 }
 
 // Tame is a player trying to tame the mob with the item in hand, as BDS 1.26.60's
-// TameableComponent (getInteraction 0x7170480, its callback 0x72346B0): a mob that is not
+// TameableComponent (getInteraction, its callback): a mob that is not
 // tame yet takes one of tame_items, then tames with the probability or sends the failed
 // event. It returns the item the used one turns into ("" to use it up). Runs: the mob's
 // region.
@@ -42,9 +42,9 @@ func (m *Mob) Tame(player behavior.Actor, h state.Hand) (result string, ok bool)
 }
 
 // FeedTrust is a player feeding a mob with minecraft:trusting, as BDS 1.26.60's
-// TrustingComponent (getInteraction 0x74069D0, its callback 0x740A160): a mob that does not
+// TrustingComponent (getInteraction, its callback): a mob that does not
 // trust yet takes one of trust_items and trusts with the probability. The engine shows the
-// eating first (Actor::feed) and uses up the item. Runs: the mob's region.
+// eating first and uses up the item. Runs: the mob's region.
 func (m *Mob) FeedTrust(h state.Hand) bool {
 	if m.states == nil || m.states.Trusting == nil || m.stateEnv.Self == nil || m.Dead() {
 		return false
@@ -75,7 +75,7 @@ func (m *Mob) FeedMount(h state.Hand) (state.MountResult, bool) {
 	r, _ := m.states.Tamemount.Feed(&m.stateEnv, h)
 	if r == state.InteractReject {
 		// A packet capture of BDS 1.26.60 shows each use of an auto_reject_items item
-		// (a saddle on a wild horse) running Horse::makeMad.
+		// (a saddle on a wild horse) running BDS's code.
 		stateMob{m}.MakeMad()
 	}
 	return r, r != state.InteractNone
@@ -90,10 +90,10 @@ func (m *Mob) ToggleSit(player behavior.Actor) bool {
 	return state.Sit(&m.stateEnv, m.states.Sittable, player)
 }
 
-// The horse's refusal, as BDS 1.26.60's Horse::makeMad (0xBEB41A0): it stands up
-// (Horse::setStanding 0xBEB4050: actor flag 39, and on the server HorseStandCounterComponent
+// The horse's refusal, as BDS 1.26.60's BDS's code: it stands up
+// (BDS's code: actor flag 39, and on the server HorseStandCounterComponent
 // set to 1, which HorsePostTravelSystem counts down and clears, see standTick), raises
-// horse flag 128 for 30 ticks (0xBEB25E0, counted down in the horse's tick 0xBEB3950) and
+// horse flag 128 for 30 ticks (counted down in the horse's tick) and
 // plays the mad sound (LevelSoundEvent 19) at its head.
 const (
 	flagStanding   = 39
@@ -132,7 +132,7 @@ func (m *Mob) madTick() {
 // its counter was already 20.
 const standTicks = 20
 
-// standTick is HorsePostTravelSystem's stand step (BDS 1.26.60 0x7881CC0): a standing
+// standTick is HorsePostTravelSystem's stand step: a standing
 // horse's counter goes up each tick, and once it was 20 the counter goes back to 0 and
 // actor flag 39 is cleared, so the horse comes down. BDS also ends the stand when
 // HorseLandedOnGroundFlagComponent is set (a jump landing); horse jumps are not built, so
@@ -175,7 +175,7 @@ var horseClass = map[string]bool{
 	"minecraft:skeleton_horse": true, "minecraft:zombie_horse": true,
 }
 
-// DropItem spawns one of the item a descriptor names at the mob (Actor::spawnAtLocation),
+// DropItem spawns one of the item a descriptor names at the mob,
 // at Apply.
 func (s stateMob) DropItem(item string) bool {
 	name := ns(item)
@@ -187,9 +187,9 @@ func (s stateMob) DropItem(item string) bool {
 }
 
 // Bribe is a player bribing a mob with minecraft:bribeable one of its bribe_items, as BDS
-// 1.26.60's BribeableComponent (getInteraction 0x7375240, callback 0x7404580): offered while
+// 1.26.60's BribeableComponent (getInteraction, callback): offered while
 // the bribe time and the cooldown are over; a mob not yet bribed gets the bribe time and
-// the treasure flag. The engine shows the eating (Actor::feed) and uses up the item. Runs:
+// the treasure flag. The engine shows the eating and uses up the item. Runs:
 // the mob's region.
 func (m *Mob) Bribe(h state.Hand) bool {
 	if m.states == nil || m.states.Bribeable == nil || m.stateEnv.Self == nil || m.Dead() {
@@ -204,7 +204,7 @@ func (m *Mob) Bribe(h state.Hand) bool {
 }
 
 // Give is a player giving a mob with minecraft:giveable the item in hand, as BDS 1.26.60's
-// GiveableComponent (getInteraction 0x7265080, callback 0x734AF40): the first trigger not
+// GiveableComponent (getInteraction, callback): the first trigger not
 // cooling down that takes the item, when the inventory has room; one of the item (no aux,
 // no user data) goes into the inventory and on_give fires. The engine uses up the item.
 // BDS adds the item before on_give; here on_give runs first. Runs: the mob's region.

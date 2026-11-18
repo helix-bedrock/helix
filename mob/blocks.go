@@ -25,7 +25,7 @@ type Blocks struct {
 	// wall is what a cell of a border column reads as: the barrier, a solid block of one
 	// whole box. BDS walls the column off for actors without IgnoresBorderCollisions.
 	wall uint32
-	// topSupport is BlockLegacy::canProvideSupport(block, up, Any) as the engine answers it
+	// topSupport matches BDS(block, up, Any) as the engine answers it
 	// (SetTopSupport); nil falls back to blocking motion.
 	topSupport func(id uint32) bool
 }
@@ -52,9 +52,9 @@ const (
 )
 
 // NewBlocks builds the tables for every state in reg from BDS 1.26.60's own block facts, as the
-// registry carries them from helix-data: the BlockProperty bits of the block type (BlockType
-// +264; the pathfinder's Props are the same bits), the Material's flag byte (never buildable,
-// liquid, blocks motion, solid) and the Block solid flag (Block::isSolid). Only Kind, the blocks
+// registry carries them from helix-data: the BlockProperty bits of the block type (BlockType;
+// the pathfinder's Props are the same bits), the Material's flag byte (never buildable,
+// liquid, blocks motion, solid) and the Block solid flag. Only Kind, the blocks
 // BDS tells apart by type, still comes from the name.
 func NewBlocks(reg *registry.Blocks) *Blocks {
 	n := reg.Count()
@@ -122,7 +122,7 @@ func (b *Blocks) fill(id uint32) {
 // from landing in the block.
 const propCausesDamage = 1 << 22
 
-// solidBlocking is Material::isSolidBlocking: the material blocks motion and is not never
+// solidBlocking matches BDS: the material blocks motion and is not never
 // buildable, the same bits as the ground test below.
 func solidBlocking(flags uint8) bool {
 	return flags&(data.MaterialNeverBuildable|data.MaterialBlocksMotion) == data.MaterialBlocksMotion

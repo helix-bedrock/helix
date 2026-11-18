@@ -38,7 +38,7 @@ type ItemType struct {
 	ArmorSlot uint8
 	// Offhand marks items the offhand accepts.
 	Offhand bool
-	// BodyArmor marks the items BDS treats as body armour (Item::isBodyArmor: horse, wolf
+	// BodyArmor marks the items BDS treats as body armour (BDS's code: horse, wolf
 	// and nautilus armour), which a mob wears in its body slot.
 	BodyArmor bool
 	// Storage is what the item holds when it holds items itself, as a bundle does

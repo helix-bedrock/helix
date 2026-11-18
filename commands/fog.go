@@ -5,7 +5,7 @@ import (
 	"github.com/helix-bedrock/helix/player"
 )
 
-// BDS 1.26.60's /fog (FogCommand: push 0x9FB0490, pop 0x9FB0A40, remove 0x9FB1010): fog
+// BDS 1.26.60's /fog (FogCommand: push, pop, remove): fog
 // <victim> push <fogId> [userProvidedId], fog <victim> pop|remove [userProvidedId]. Fog IDs
 // are not checked against the resource packs' fog definitions, which BDS does.
 

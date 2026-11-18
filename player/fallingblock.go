@@ -17,8 +17,8 @@ import (
 )
 
 // BDS 1.26.60's falling block actor (FallingBlockActor; its tick is
-// FallingBlockNormalTickSystem, sub_BD5C480; breaking into an item sub_BD5BAF0; saving
-// sub_BD5D620 and loading sub_BD5D8E0).
+// FallingBlockNormalTickSystem,; breaking into an item; saving
+// and loading).
 const (
 	fallingBlockID = "minecraft:falling_block"
 	// fallingHalf is half of its 0.98 box; its position is the box's middle.

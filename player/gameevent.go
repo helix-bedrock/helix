@@ -9,9 +9,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Game events (vibrations) as BDS 1.26.60: the GameEvent table (initializer 0xCA80031: an ID and
-// flags each), the frequency table (0xCA53420, 0x1C3278C) and the checks every vibration listener
-// makes before anything else (VibrationListener::handleGameEvent 0xCA54180, _shouldIgnoreVibration):
+// Game events (vibrations) as BDS 1.26.60: the GameEvent table (initializer: an ID and
+// flags each), the frequency table and the checks every vibration listener
+// makes before anything else (_shouldIgnoreVibration):
 // sneaking, vibration dampers (wool and carpets, a block component BDS sets at registration) under
 // the actor or as the event's block. The world dispatches them (world.Region.PostGameEvent); sculk
 // sensors and shriekers hear them (sculk.go).
@@ -160,7 +160,7 @@ func standingOn(feet mgl32.Vec3) cube.Pos {
 const standProbe = 0.2
 
 // vibrationSteps is a player's minecraft:game_event_movement_tracking, which BDS gives every mob
-// in code (Mob::_initHardCodedComponents, vertical tracking on): moving on the ground, climbing or
+// in code (vertical tracking on): moving on the ground, climbing or
 // in liquid adds three times the distance moved, and each time it passes the next step an
 // entity_move (swim in liquid) is posted at the feet. Players do not flap.
 type vibrationSteps struct {
@@ -170,7 +170,7 @@ type vibrationSteps struct {
 	started bool
 }
 
-// trackVibrations is GameEventMovementTrackingSystem::_trackMovement for a player after it
+// trackVibrations matches BDS for a player after it
 // moved, and BDS's landing (a block's onFallOn posts hit_ground at the feet) and standing on
 // sculk (onStandOn). Runs: the player's region.
 func (p *Player) trackVibrations(r *world.Region, m *MoveInfo) {

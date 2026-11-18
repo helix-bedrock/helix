@@ -8,12 +8,12 @@ import (
 	"github.com/helix-bedrock/helix/player"
 )
 
-// /give's components argument as BDS 1.26.60 reads it (GiveCommand::execute 0x9FC1C30, the
-// item's component update 0xC8F57A0): a JSON object whose keys are component names,
+// /give's components argument as BDS 1.26.60 reads it (BDS's code, the
+// item's component update): a JSON object whose keys are component names,
 // minecraft's when they have no namespace. can_place_on and can_destroy take {"blocks":
 // [names]}, a list that is replaced whole; a block that does not exist leaves the list empty
-// and fails. item_lock takes {"mode": "lock_in_slot" or "lock_in_inventory"} (0xC93F320),
-// keep_on_death any object (0xC93F700).
+// and fails. item_lock takes {"mode": "lock_in_slot" or "lock_in_inventory"},
+// keep_on_death any object.
 const (
 	componentCanPlaceOn  = "minecraft:can_place_on"
 	componentCanDestroy  = "minecraft:can_destroy"

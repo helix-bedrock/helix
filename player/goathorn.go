@@ -4,7 +4,7 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// Goat horns as BDS 1.26.60 runs them (GoatHornItem::use, 0xC913C30). The research note is
+// Goat horns as BDS 1.26.60 runs them. The research note is
 // private.
 const (
 	nameGoatHorn = "minecraft:goat_horn"

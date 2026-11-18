@@ -426,7 +426,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 	return true
 }
 
-// breakDoublePlantLower is a double plant's playerWillDestroy (BDS 0xCB1AEB0): a creative
+// breakDoublePlantLower is a double plant's playerWillDestroy: a creative
 // player breaking the upper half takes the lower one with it, with its break particles and no
 // drops. Otherwise the other half breaks a tick later, with its drops, as it can no longer
 // stand.

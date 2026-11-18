@@ -25,7 +25,7 @@ func IsBed(blocks *registry.Blocks, block uint32) bool {
 	return n == Bed || n == StrawBed
 }
 
-// BedFacing is the way from a bed's foot to its head (BDS's sub_CCD1570).
+// BedFacing is the way from a bed's foot to its head (BDS's code).
 func BedFacing(blocks *registry.Blocks, block uint32) direction.Cardinal {
 	states := blocks.States(block)
 	if v, ok := states[bedDirection].(int32); ok {
@@ -59,7 +59,7 @@ func BedIsOccupied(blocks *registry.Blocks, block uint32) bool {
 	return bit(blocks, block, BedOccupied)
 }
 
-// BedOther is where the other half of the bed at pos is (BDS's sub_CCD21E0): the head is
+// BedOther is where the other half of the bed at pos is (BDS's code): the head is
 // one step along its facing from the foot.
 func BedOther(blocks *registry.Blocks, pos cube.Pos, block uint32) cube.Pos {
 	f := BedFacing(blocks, block).Face()
@@ -69,8 +69,8 @@ func BedOther(blocks *registry.Blocks, pos cube.Pos, block uint32) cube.Pos {
 	return pos.Side(f)
 }
 
-// BedHeadPos is the head of the bed at pos, false if its other half is missing (BDS's
-// sub_CCD0D70, which refuses when the other block is not the same kind of bed).
+// BedHeadPos is the head of the bed at pos, false if its other half is missing (BDS's,
+// which refuses when the other block is not the same kind of bed).
 func BedHeadPos(blocks *registry.Blocks, r *world.Region, pos cube.Pos, block uint32) (cube.Pos, bool) {
 	if BedIsHead(blocks, block) {
 		return pos, true

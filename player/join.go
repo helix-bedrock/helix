@@ -86,7 +86,7 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 // baseGameVersion is the world's base game version in StartGame: "*", any version, as a BDS
 // world's level.dat has by default. The client reads behaviour from it: a version of 1.21.5 or
 // later swaps a lingering cloud's even disc of particles for the newer emitter
-// (AreaEffectCloud's tick, 0xC07FE50), so sending the protocol version looked unlike BDS.
+// (AreaEffectCloud's tick), so sending the protocol version looked unlike BDS.
 const baseGameVersion = "*"
 
 // startGame is the player's StartGame: who and where it is, and the world it joins.

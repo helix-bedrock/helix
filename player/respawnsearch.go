@@ -11,8 +11,8 @@ import (
 )
 
 // BDS 1.26.60's search for a place to respawn around the world spawn: the respawn state
-// machine (sub_BCED800, states 4 to 7) tries columns within the spawnradius game rule in a
-// random order and checks each with sub_BCF19F0. A column is walked down through leaves to
+// machine (states 4 to 7) tries columns within the spawnradius game rule in a
+// random order and checks each with. A column is walked down through leaves to
 // the ground under them; one that only offers leaves to stand on, or a spot with leaves
 // under the feet, is kept as a fallback and used once the nearby columns all fail. With
 // nothing found the player comes back at the world spawn itself.
@@ -20,7 +20,7 @@ import (
 // Not ported: BDS waits for the chunks of the search to load; Helix skips columns whose
 // chunk the player's region does not have. BDS seeds its order from the clock, so no two
 // respawns pick in the same order there either. The "solid blocking" check at the feet
-// (Block +432: material solid and block property bit 18) is left to the collision fit,
+// (: material solid and block property bit 18) is left to the collision fit,
 // which raises the player out of the same blocks; the second, column-climbing search BDS
 // runs for a rejected column is not ported.
 
@@ -43,13 +43,13 @@ const (
 	materialPortal = 16
 )
 
-// unsafeRespawnBlocks are the blocks sub_BD051A0 refuses besides portals and lava: magma
+// unsafeRespawnBlocks are the blocks refuses besides portals and lava: magma
 // (block property bit 22), sweet berry bushes (bits 22 and 27) and wither roses (by name).
 var unsafeRespawnBlocks = map[string]bool{
 	"minecraft:magma": true, "minecraft:sweet_berry_bush": true, "minecraft:wither_rose": true,
 }
 
-// spawnGrid is BDS's sub_BCC9820: the cells of a square of radius r visited once each in a
+// spawnGrid is BDS's code: the cells of a square of radius r visited once each in a
 // random order, by a prime step from a random start.
 type spawnGrid struct {
 	r, n, step, start, next uint32
@@ -62,7 +62,7 @@ func newSpawnGrid(r uint32) spawnGrid {
 	return spawnGrid{r: r, n: n, step: largestPrimeUpTo(2 * r), start: rand.Uint32N(n)}
 }
 
-// largestPrimeUpTo is the step rule of sub_BCC9820.
+// largestPrimeUpTo is the step rule of.
 func largestPrimeUpTo(v uint32) uint32 {
 	for ; v > 2; v-- {
 		if isPrime(v) {
@@ -169,7 +169,7 @@ func outerRadius(radius, inner uint32) uint32 {
 	return (past + step - 1) / step
 }
 
-// check is sub_BCF19F0 for the column dx, dz from the spawn: the place to stand in it, if
+// check is for the column dx, dz from the spawn: the place to stand in it, if
 // it is safe and not on leaves. A place on leaves becomes the fallback.
 func (q *respawnSearch) check(dx, dz int32) (cube.Pos, bool) {
 	x, z := q.spawn[0]+int(dx), q.spawn[2]+int(dz)
@@ -240,7 +240,7 @@ func (q *respawnSearch) ground(top cube.Pos) (feet cube.Pos, leafTop int, ok boo
 	return cube.Pos{}, leafTop, false
 }
 
-// unsafe is sub_BD051A0: portals, lava, magma, sweet berry bushes and wither roses.
+// unsafe is: portals, lava, magma, sweet berry bushes and wither roses.
 func (q *respawnSearch) unsafe(b uint32) bool {
 	props := q.s.reg.Blocks.Properties(b)
 	return props.Material == materialPortal || props.Material == registry.MaterialLava ||

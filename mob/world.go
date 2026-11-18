@@ -59,7 +59,7 @@ type Env interface {
 	GameRule(name string) (value, ok bool)
 	// RainingAt reports rain falling on pos: the weather, the biome and the sky.
 	RainingAt(r *world.Region, pos cube.Pos) bool
-	// BiomeRains reports that the biome at pos has rain (BDS Biome +64); false where the
+	// BiomeRains reports that the biome at pos has rain; false where the
 	// chunk is not loaded.
 	BiomeRains(r *world.Region, pos cube.Pos) bool
 	// SetDoorOpen opens or closes the door at p as a mob does, with its sound.
@@ -183,7 +183,7 @@ func (w pathWorld) Pathable(b path.Block, _, _ path.Pos) bool {
 
 func (w pathWorld) Door(p path.Pos) (facing int32, open, hinge bool) { return w.door(p) }
 
-// door reads the door at p, either half, as BDS's DoorBlock does (0xCB17EC0): facing
+// door reads the door at p, either half, as BDS's DoorBlock does: facing
 // (minecraft:cardinal_direction's value index, or the older direction state) and open_bit
 // from the lower half, door_hinge_bit from the upper half. Helix keeps the hinge only on the
 // upper half and open_bit only on the lower one.
@@ -331,7 +331,7 @@ func (w goalWorld) Players(dst []behavior.Actor) []behavior.Actor { return w.env
 func (w goalWorld) DefaultGameMode() int                          { return w.env.DefaultGameMode() }
 func (w goalWorld) Peaceful() bool                                { return w.env.Difficulty() == 0 }
 
-// Brightness is BlockSource::getBrightness: the dimension's brightness ramp at the raw
+// Brightness matches BDS: the dimension's brightness ramp at the raw
 // brightness (0 below the world, the darkened sky above it).
 func (w goalWorld) Brightness(p behavior.Pos) float32 {
 	darken := uint8(min(max(w.env.SkyDarken(w.r), 0), 15)) //nolint:gosec // clamped

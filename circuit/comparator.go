@@ -22,7 +22,7 @@ const (
 	// observer's back.
 	joinFacing
 	// joinNotFront connects on every side but the one the block points at, as BDS's
-	// PistonBlock::shouldConnectToRedstone (0xd551180): a piston facing up or down
+	// BDS's code: a piston facing up or down
 	// takes wire on all four.
 	joinNotFront
 )

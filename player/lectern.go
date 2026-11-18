@@ -9,15 +9,15 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Lecterns as BDS 1.26.60 (Linux, IDA): LecternBlock (vtable 0xFB7F208) with its use listener
-// 0xCADC910, attack (slot 82, 0xCADD570) and playerWillDestroy (slot 77, 0xCADD3A0) dropping the
-// book, the comparator signal (slot 93, 0xCADD6F0); LecternBlockActor (type 37, vtable
-// 0xFBF9E18, saved as "Lectern": hasBook, page, totalPages, book, only while it holds one) with
-// setBook 0xD423CD0 (page 0, totalPages from the book) and dropBook 0xD423BF0; the page the
+// Lecterns as BDS 1.26.60 (Linux, BDS): LecternBlock with its use listener,
+// attack (slot 82) and playerWillDestroy (slot 77) dropping the
+// book, the comparator signal (slot 93); LecternBlockActor (type 37,,
+// saved as "Lectern": hasBook, page, totalPages, book, only while it holds one) with
+// setBook (page 0, totalPages from the book) and dropBook; the page the
 // client turns to comes in LecternUpdate (ServerNetworkHandler: any lectern the player's
 // dimension has there, setPageOnServer pulses redstone when the page changes, then
 // setTotalPages), and clicking a lectern with a book opens window type 25 (ServerPlayer slot
-// 192, 0xA1466E0, openBook: no container manager, so nothing stays open).
+// 192,, openBook: no container manager, so nothing stays open).
 const (
 	lecternBlock      = "minecraft:lectern"
 	lecternEntityID   = "Lectern"
@@ -209,7 +209,7 @@ func (p *Player) putLecternBook(r *world.Region, u *BlockUse, l *Lectern, held I
 	playSound(r, u.Pos, soundEvent{name: packet.SoundEventLecternBookPlace, pos: blockVec(u.Pos), extra: -1}, nil)
 }
 
-// openLectern opens the lectern's book screen as BDS's ServerPlayer::openBook: only when no
+// openLectern opens the lectern's book screen as BDS's code: only when no
 // window is open, the next window ID and ContainerOpen type 25, but no window is kept open.
 // The client closes the book without a ContainerClose, so a window kept open here would stop
 // the player opening anything again. ContainerOpenEvent still runs and may stop it.

@@ -180,7 +180,7 @@ func vec(p mgl32.Vec3) behavior.Vec3 { return behavior.Vec3{X: p[0], Y: p[1], Z:
 func mglVec(p behavior.Vec3) mgl32.Vec3 { return mgl32.Vec3{p.X, p.Y, p.Z} }
 
 // metadata is the mob's actor data: flags, size, air, its target's unique ID (0 for none,
-// as Mob::setTarget writes it) and what its components wrote.
+// as BDS writes it) and what its components wrote.
 func (m *Mob) metadata() protocol.EntityMetadata {
 	f := m.m.Flags()
 	w, h := m.m.Size()
@@ -273,7 +273,7 @@ func (m *Mob) apply(e *world.Entity) {
 	}
 	if m.ended {
 		// A despawned mob (a creeper that blew up) leaves no experience, as BDS's
-		// Actor::despawn.
+		// BDS's code.
 		if r := e.Region(); r != nil && m.m.Dead() {
 			m.dropExperience(r)
 		}
@@ -304,7 +304,7 @@ func (m *Mob) apply(e *world.Entity) {
 	}
 }
 
-// sendTeleport tells the mob's viewers it teleported, as BDS's Actor::teleportTo does with a
+// sendTeleport tells the mob's viewers it teleported, as BDS's code does with a
 // MoveActorAbsolute marked as a teleport: the client snaps it there with its rotation, body
 // included, instead of walking it over. The delta sync starts again from there. It is sent
 // only when the place or rotation changed, so a mob held in place (a sleeping villager is
@@ -391,7 +391,7 @@ func (m *Mob) hurtWith(amount float32, by behavior.ID, cause DamageCause, ignore
 	if dealt <= 0 {
 		return 0
 	}
-	// Mob::_hurt (0xBFDC98F in BDS 1.26.60) takes Absorption away once its health is used up.
+	// BDS's code takes Absorption away once its health is used up.
 	if m.absorption <= 0 {
 		m.removeEffect(EffectAbsorption)
 	}
@@ -417,7 +417,7 @@ func (p *Player) feet() mgl32.Vec3 {
 // then a push away from the mob; on another mob, attackMob. BDS's difficulty scaling of
 // mob damage is not built yet.
 func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
-	// Mob::doHurtTarget (0xBFEE420, 1.26.60) swings and broadcasts ActorEvent 4 before it
+	// BDS's code swings and broadcasts ActorEvent 4 before it
 	// looks at the target.
 	m.swingEvent()
 	r := m.entity.Region()
@@ -471,7 +471,7 @@ func (m *Mob) attackMob(o *Mob) (hit, killed bool) {
 }
 
 // Ignite is a melee hit's can_spread_on_fire: the target, a player or a mob, burns for at
-// least seconds (Actor::setOnFire).
+// least seconds.
 func (m *Mob) Ignite(_ *mob.Mob, target behavior.ID, seconds int32) {
 	r := m.entity.Region()
 	if r == nil {
@@ -486,8 +486,8 @@ func (m *Mob) Ignite(_ *mob.Mob, target behavior.ID, seconds int32) {
 }
 
 // Swing is the attack goals' swing. BDS's melee goal swings and sends ActorEvent 4 (data
-// 0) only while the mob holds an item (MeleeAttackBaseGoal::_attemptAttackTarget,
-// 0x5431880 in 1.26.60); the hit itself sends one more (swingEvent).
+// 0) only while the mob holds an item (BDS's code,
+// in 1.26.60); the hit itself sends one more (swingEvent).
 func (m *Mob) Swing(*mob.Mob) {
 	if !m.m.Equipment(mob.EquipMainhand).Empty() {
 		m.swingEvent()
@@ -495,7 +495,7 @@ func (m *Mob) Swing(*mob.Mob) {
 }
 
 // swingEvent shows the mob's arm swing: ActorEvent 4 with data 0, which BDS broadcasts from
-// Mob::swing's callers. Mobs ignore the player's Animate swing.
+// BDS's code's callers. Mobs ignore the player's Animate swing.
 func (m *Mob) swingEvent() {
 	if m.entity == nil || m.entity.Region() == nil {
 		return
@@ -858,7 +858,7 @@ func (a playerActor) Alive() bool         { return !a.p.dead() }
 func (a playerActor) Removed() bool       { return false }
 func (a playerActor) Pickable() bool      { return !a.p.dead() && a.p.gameMode != GameModeSpectator }
 
-// Interacts is Player::canInteractWithOtherEntitiesInGame: not a spectator,
+// Interacts matches BDS: not a spectator,
 // dead or not.
 func (a playerActor) Interacts() bool { return a.p.gameMode != GameModeSpectator }
 

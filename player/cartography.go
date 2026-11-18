@@ -10,8 +10,8 @@ import (
 	"github.com/helix-bedrock/protocol"
 )
 
-// The cartography table and BDS 1.26.60's map recipes: MapExtendingRecipe (assemble 0xC4DABC0,
-// matches 0xC4DA5B0), MapCloningRecipe, MapLockingRecipe (0xC4DBAD0, 0xC4DB640) and
+// The cartography table and BDS 1.26.60's map recipes: MapExtendingRecipe (assemble,
+// matches), MapCloningRecipe, MapLockingRecipe and
 // MapUpgradingRecipe, each with a crafting table and a cartography table UUID (locking only at
 // the cartography table). The research note is private.
 const (
@@ -232,7 +232,7 @@ type cartographySlot struct {
 	item      ItemStack
 }
 
-// cartographyCraft is BDS 1.26.60's cartography craft result (0xC9FBBD0), for both craft
+// cartographyCraft is BDS 1.26.60's cartography craft result, for both craft
 // actions: with the input slot empty the second slot's item is the input; with nothing
 // else beside it a map or empty map is only renamed; otherwise the recipe with the network
 // ID is crafted from the two items. The result takes the name, or loses its name for none.

@@ -48,7 +48,7 @@ func (m *actorMoves) start(pos mgl32.Vec3, rot world.Rotation, dropped int32, fa
 	m.pos, m.rot, m.dropped, m.far = pos, rot, dropped, far
 }
 
-// update is BDS's check of whether a move is worth sending (0xb3c5260, 0x85a4be0): moved
+// update is BDS's check of whether a move is worth sending: moved
 // more than a hundredth of a block, or turned more than 4 degrees, or come to rest.
 func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 	pos, rot := e.Position(), e.Rotation()
@@ -71,9 +71,9 @@ func (m *actorMoves) update(e *world.Entity, vel mgl32.Vec3) {
 	m.send(e)
 }
 
-// send is BDS's MoveActorDelta (0x8ce8c80): only the fields that changed since the last one,
-// and the head rotation only for mobs. What differs per player is how far they are
-// (0x8ce9d60): further off they get it less often, and Ticks says how many ticks it is meant
+// send is BDS's MoveActorDelta: only the fields that changed since the last one,
+// and the head rotation only for mobs. What differs per player is how far they are:
+// further off they get it less often, and Ticks says how many ticks it is meant
 // to last. It is 0 near by, and 0 for all on the tick it lands or leaves the ground.
 func (m *actorMoves) send(e *world.Entity) { m.sendMove(e, false) }
 

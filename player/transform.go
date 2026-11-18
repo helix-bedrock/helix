@@ -11,11 +11,11 @@ import (
 )
 
 // Transform turns the mob into another one when its minecraft:transformation comes due:
-// BDS 1.26.60's TransformationComponent::transformIfAble (0x6FC1A40, from
-// TransformationSystem 0x5B52BE0) with ActorFactory::createTransformedEntity (0xB33CA80).
+// BDS 1.26.60's BDS's code (from
+// TransformationSystem) with BDS's code.
 // In BDS's order:
 //
-//   - drop_equipment throws out everything the mob holds and wears (Mob 0xBFDF9C0);
+//   - drop_equipment throws out everything the mob holds and wears (Mob);
 //     drop_inventory has nothing to drop, mobs have no inventory yet;
 //   - the new entity is made where the old one stands, with its rotation, init method
 //     transformed (or the event of an "id<event>" into), its name tag copied, and the old one

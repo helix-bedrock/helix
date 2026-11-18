@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/helix/player"
 )
 
-// BDS 1.26.60's /effect (EffectCommand, setup 0x9FA2660): effect <player> clear [effect],
+// BDS 1.26.60's /effect (EffectCommand, setup): effect <player> clear [effect],
 // effect <player> <effect> [seconds] [amplifier] [hideParticles], and effect <player>
 // <effect> infinite [amplifier] [hideParticles]. Read from BDS: the three overloads and
 // their argument names. The defaults (30 seconds, level I) and limits are vanilla's

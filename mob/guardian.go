@@ -3,8 +3,8 @@ package mob
 import "github.com/helix-bedrock/entity/behavior"
 
 // guardian_attack's hooks (behavior.GuardianAttacker). BDS 1.26.60's elder guardian factory
-// (0xBC8CB10) makes a Guardian and turns on actor flag 33 (elder); Guardian's save writes it
-// as Elder (0xBD400D0) and its load reads it back (0xBD401E0).
+// makes a Guardian and turns on actor flag 33 (elder); Guardian's save writes it
+// as Elder and its load reads it back.
 
 // typeElderGuardian is the type BDS's factory makes elder.
 const typeElderGuardian = "minecraft:elder_guardian"

@@ -75,7 +75,7 @@ func (e *bellEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	if e.ticks >= e.t.settings.Get().Bell.RingTicks {
 		e.ringing, e.ticks = false, 0
 	}
-	// BDS (0xd43c410) reads the power only on the tick after the circuits evaluate.
+	// BDS reads the power only on the tick after the circuits evaluate.
 	sys := e.t.circuitOf(r).sys
 	if sys.SignalTick() {
 		return
@@ -135,7 +135,7 @@ func (t *Ticker) RingBell(r *world.Region, pos cube.Pos, block uint32, yaw float
 	return true
 }
 
-// WindBell is a wind burst reaching a bell (BDS's BellBlock slot 132, 0xCCDA770): one not
+// WindBell is a wind burst reaching a bell (BDS's BellBlock slot 132): one not
 // already ringing rings the way its state faces. False if the block is not a bell or it
 // was ringing. Runs: owner of the region.
 func (t *Ticker) WindBell(r *world.Region, pos cube.Pos, block uint32) bool {

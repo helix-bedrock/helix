@@ -10,27 +10,27 @@ import (
 
 // The other farmable plants, from BDS 1.26.60 (the research note is private):
 //
-//   - NetherWartBlock: random tick 0xD543800 (one in 10, to age 3, no light), survival
-//     0xD543BD0 (soul sand under it, its mayPlaceOn 0xD543C10). No bone meal.
-//   - SweetBerryBushBlock: random tick 0xD4DFAF0 (one in 5, to growth 3), growth 0xD4DFCE0,
-//     bone meal 0xD4DFF30 (one stage, to the end for a creative player or rapid fertilizer),
-//     survival 0xD4DFCA0 on BDS's plant soil list (0xD4DFC20, the list tall grass uses),
-//     picking 0xD4DF790 and 0xD4E0390 (from growth 2: the bush's drops, back to growth 1).
-//   - CocoaBlock: random tick 0xCB5C640 (one in 5, to age 2), survival 0xCB5C940 (a jungle
-//     log or wood, stripped or not, on the side its direction names), bone meal 0xCB5D0E0
+//   - NetherWartBlock: random tick (one in 10, to age 3, no light), survival
+//     (soul sand under it, its mayPlaceOn). No bone meal.
+//   - SweetBerryBushBlock: random tick (one in 5, to growth 3), growth,
+//     bone meal (one stage, to the end for a creative player or rapid fertilizer),
+//     survival on BDS's plant soil list (the list tall grass uses),
+//     picking (from growth 2: the bush's drops, back to growth 1).
+//   - CocoaBlock: random tick (one in 5, to age 2), survival (a jungle
+//     log or wood, stripped or not, on the side its direction names), bone meal
 //     (one stage, to the end for rapid fertilizer).
-//   - SugarCaneBlock (reeds): random tick 0xD4DE740 (with air above and fewer than 3 canes in
-//     the column, at age 15 a new cane on top and age 0, else age + 1), survival 0xD4DEB10
+//   - SugarCaneBlock (reeds): random tick (with air above and fewer than 3 canes in
+//     the column, at age 15 a new cane on top and age 0, else age + 1), survival
 //     (cane under it, or a dirt or sand block with water or frosted ice beside it), bone meal
-//     0xD4DEFE0 (the column grows to 3 where there is air).
-//   - CactusBlock: random tick 0xCB87BA0 (as sugar cane; at age 7, one in 10 or with 3
-//     high one in 4, a cactus flower on top instead), survival 0xCB88240 (nothing solid and
+//     (the column grows to 3 where there is air).
+//   - CactusBlock: random tick (as sugar cane; at age 7, one in 10 or with 3
+//     high one in 4, a cactus flower on top instead), survival (nothing solid and
 //     no lava beside it, no lava above, cactus or sand under it). No bone meal.
-//   - PitcherCropBlock: random tick 0xD551570 (the lower half, light 9, the crops' odds),
-//     growth 0xD552330 (to growth 4, from 3 two blocks tall), survival 0xD5517F0 (the upper
+//   - PitcherCropBlock: random tick (the lower half, light 9, the crops' odds),
+//     growth (to growth 4, from 3 two blocks tall), survival (the upper
 //     half on its lower half; the lower on farmland, from growth 3 under its upper half),
-//     bone meal 0xD552B30 (one stage, to the end for rapid fertilizer, not on the upper half).
-//   - TorchflowerCropBlock: its stage for an age above 6 is a torchflower (0xD46D860).
+//     bone meal (one stage, to the end for rapid fertilizer, not on the upper half).
+//   - TorchflowerCropBlock: its stage for an age above 6 is a torchflower.
 const (
 	netherWart   = "minecraft:nether_wart"
 	soulSand     = "minecraft:soul_sand"
@@ -324,7 +324,7 @@ func (t *Ticker) plantSurvives(r *world.Region, pos cube.Pos, s stateInfo) bool 
 		block, _ := r.Block(pos, 0)
 		return t.foliageSurvives(r, pos, block, below, s)
 	case kindSapling:
-		// SaplingBlock's mayPlaceOn is the plant soil list (0xCB03DE0).
+		// SaplingBlock's mayPlaceOn is the plant soil list.
 		return t.grassKit.soils[below]
 	case kindWart:
 		return below == k.soulSand

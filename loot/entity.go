@@ -10,7 +10,7 @@ import (
 )
 
 // Entity loot tables: what mobs drop when they die and what they spawn wearing, as BDS
-// 1.26.60 rolls them (LootTable::getRandomItems; pool roll 0xD6B3690). The table is the
+// 1.26.60 rolls them (pool roll). The table is the
 // path a definition names, such as "loot_tables/entities/zombie.json".
 //
 // A pool runs when all its conditions pass. A pool with tiers picks one entry by index:
@@ -18,10 +18,10 @@ import (
 // bonus_chance. Other pools draw rolls (min plus a random part of the range) plus
 // bonus_rolls times luck, and each draw picks one entry by weight (weight plus quality
 // times luck, rounded down) among the entries whose conditions pass. An entry's nested
-// pools run when it gave something. Conditions and functions are BDS's (vtables of
-// LootItem*Condition and the *Function classes); see each case.
+// pools run when it gave something. Conditions and functions are BDS's
+// loot conditions and functions; see each case.
 
-// Random is what a roll draws from: the mob's own random, as BDS's Actor::getRandom.
+// Random is what a roll draws from: the mob's own random, as BDS's code.
 type Random interface {
 	// Intn returns 0 to n-1; Float returns 0 to 1.
 	Intn(n int32) int32
@@ -132,7 +132,7 @@ func (t *EntityTables) roll(name string, c *EntityContext, dst []Drop, depth int
 	return dst
 }
 
-// pool is BDS's pool roll (0xD6B3690).
+// pool is BDS's pool roll.
 func (t *EntityTables) pool(p *pool, c *EntityContext, dst []Drop, depth int) []Drop {
 	if !passes(p.Conditions, c) {
 		return dst
@@ -338,14 +338,14 @@ func (k *condition) applies(c *EntityContext) bool {
 	case "random_chance":
 		return k.Chance > c.Random.Float()
 	case "random_chance_with_looting":
-		// 0xD695060: chance + looting * multiplier.
+		// BDS: chance + looting * multiplier.
 		return k.Chance+float32(c.Looting)*k.LootingMultiplier > c.Random.Float()
 	case "random_difficulty_chance":
-		// 0xD6953B0 reads default_chance, then each difficulty with it as the default;
-		// 0xD695370 draws once.
+		// reads default_chance, then each difficulty with it as the default;
+		// draws once.
 		return k.difficultyChance(c.Difficulty) > c.Random.Float()
 	case "random_regional_difficulty_chance":
-		// 0xD695280: max_chance times the level's special multiplier.
+		// BDS: max_chance times the level's special multiplier.
 		return c.Special*k.MaxChance > c.Random.Float()
 	case "killed_by_player":
 		return c.KillerPlayer
@@ -435,13 +435,13 @@ func (f *function) apply(d *Drop, c *EntityContext) {
 	}
 	switch strings.TrimPrefix(f.Function, "minecraft:") {
 	case "set_count":
-		// 0xD6A86E0: min plus a random part of the range.
+		// BDS: min plus a random part of the range.
 		var r intRange
 		if json.Unmarshal(f.Count, &r) == nil {
 			d.Count = r.randomInt(c.Random)
 		}
 	case "looting_enchant":
-		// 0xD6A31D0: with Looting, count + round((min + draw * (max - min)) * looting).
+		// BDS: with Looting, count + round((min + draw * (max - min)) * looting).
 		if c.Looting <= 0 {
 			return
 		}
@@ -455,7 +455,7 @@ func (f *function) apply(d *Drop, c *EntityContext) {
 			d.Count = min(d.Count, f.Limit)
 		}
 	case "enchant_random_gear":
-		// 0xD6BD8E0: when chance * special beats the draw, enchant at level
+		// BDS: when chance * special beats the draw, enchant at level
 		// special * random(18) + 5.
 		if f.Chance*c.Special > c.Random.Float() {
 			d.EnchantLevel = int32(c.Special*float32(c.Random.Intn(18)) + 5)
@@ -495,7 +495,7 @@ func randomFloatInt(r floatRange, rnd Random) int32 {
 	return lo
 }
 
-// SpecialMultiplier is BDS's level special multiplier (ServerLevel 0xCE38310), the clamped
+// SpecialMultiplier is BDS's level special multiplier (ServerLevel), the clamped
 // regional difficulty: difficulty * (0.75 + a time part + a moon part + 0.375, 0.5 on hard,
 // the moon and fixed parts halved on easy), then 2 to 4 mapped to 0 to 1. The time part
 // is 0.25 once the world tick passes 1.5; the moon part is a quarter of the moon's

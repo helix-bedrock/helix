@@ -66,7 +66,7 @@ func newBrewing(pk *packet.CraftingData) *brewing {
 // ((aux + 1) & 0xFFFF7FFF) == 0 test.
 func anyAux(meta int32) bool { return (meta+1)&^0x8000 == 0 }
 
-// Brew is BDS's PotionBrewing::mix: what the bottle in becomes with reagent, false for
+// Brew is BDS's code: what the bottle in becomes with reagent, false for
 // nothing. A container mix comes first and keeps the bottle's aux value; then a potion mix
 // for that exact potion and the reagent (its aux too, unless the recipe takes any).
 func (t *Table) Brew(in, reagent BrewItem) (BrewItem, bool) {
@@ -84,7 +84,7 @@ func (t *Table) Brew(in, reagent BrewItem) (BrewItem, bool) {
 	return BrewItem{}, false
 }
 
-// HasBrew is BDS's PotionBrewing::hasMix, what the stand checks before brewing: a container
+// HasBrew is BDS's code, what the stand checks before brewing: a container
 // mix as in Brew, or a potion mix for the exact potion whose reagent is the same item, any
 // aux value.
 func (t *Table) HasBrew(in, reagent BrewItem) bool {
@@ -102,7 +102,7 @@ func (t *Table) HasBrew(in, reagent BrewItem) bool {
 	return false
 }
 
-// BrewIngredient is BDS's PotionBrewing::isIngredient as far as the recipes say: the reagent of
+// BrewIngredient is BDS's code as far as the recipes say: the reagent of
 // any mix. BDS also takes pufferfish whatever the recipes are; the player package adds that.
 func (t *Table) BrewIngredient(it BrewItem) bool {
 	b := t.brew()
@@ -114,7 +114,7 @@ func (t *Table) BrewIngredient(it BrewItem) bool {
 	return b.reagentIDs[it.ID] || b.reagents[brewKey{it.ID, it.Meta}]
 }
 
-// BrewBottle is BDS's PotionBrewing::isPotionRecipeInput as far as the recipes say: the
+// BrewBottle is BDS's code as far as the recipes say: the
 // items a bottle slot takes, any container mix's bottle, or a potion some mix starts from.
 func (t *Table) BrewBottle(it BrewItem) bool {
 	b := t.brew()

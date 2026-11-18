@@ -13,15 +13,15 @@ import (
 
 // The composter, from BDS 1.26.60's ComposterBlock:
 //
-//   - Adding items (0xCB29E20): an item composts with its chance (the item's percent, BDS's
+//   - Adding items: an item composts with its chance (the item's percent, BDS's
 //     table read at runtime, helix-data's bds/compost.json); a composter at 7 or 8 takes
 //     nothing. Each item of the count is used: on an empty composter it always raises the
 //     level, otherwise when a draw below 100 is at most its chance. Reaching 7 stops there
 //     and queues the composter's tick in 20 ticks. If the level rose, the block is set and
 //     block.composter.fill_success plays, else block.composter.fill.
-//   - The tick (0xCB275E0) and onPlace (0xCB26A30): at 7 a tick 20 later makes it 8, with
+//   - The tick and onPlace: at 7 a tick 20 later makes it 8, with
 //     block.composter.ready.
-//   - Emptying (0xCB27BB0): level 0 and block.composter.empty; the caller gives the bone meal.
+//   - Emptying: level 0 and block.composter.empty; the caller gives the bone meal.
 
 // Composter is the composter block.
 const Composter = "minecraft:composter"

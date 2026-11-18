@@ -10,12 +10,12 @@ import (
 // scaffoldingItem is the scaffolding block's item.
 const scaffoldingItem = "minecraft:scaffolding"
 
-// placeScaffolding is BDS 1.26.60's ScaffoldingBlockItem::useOn (0xC8DB170): using it on
+// placeScaffolding is BDS 1.26.60's BDS's code: using it on
 // scaffolding builds the column up. If the block on the clicked side is scaffolding and the
 // top or bottom was clicked, or the clicked block itself is scaffolding, the item goes on
 // the first block above that column that is not scaffolding, inside the world's height;
-// otherwise it places like any block. ScaffoldingBlock's mayPlace (0xD511640) and
-// getPlacementBlock (0xD5114D0) come after: never into lava, a loose one only over air or
+// otherwise it places like any block. ScaffoldingBlock's mayPlace and
+// getPlacementBlock come after: never into lava, a loose one only over air or
 // water, and the stability where it lands. The falling package runs the rest.
 func (p *Player) placeScaffolding(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
 	f := p.s.falling
@@ -70,7 +70,7 @@ func scaffoldTop(r *world.Region, f *fall.Table, from cube.Pos) (cube.Pos, bool)
 	return at, at[1] <= top
 }
 
-// climbableBlock is BDS 1.26.60's climbable check (0xBFA8720): the block's climbable flag,
+// climbableBlock is BDS 1.26.60's climbable check: the block's climbable flag,
 // or scaffolding, or powder snow, which BDS names by type instead of flagging. A player in
 // one climbs, so its fall distance is cleared.
 func (s *Host) climbableBlock(b uint32) bool {

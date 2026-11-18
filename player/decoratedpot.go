@@ -13,16 +13,16 @@ import (
 )
 
 // Decorated pots as BDS 1.26.60: DecoratedPotBlockActor (saved as "DecoratedPot") with its
-// save 0xD408E60 (sherds when not all bricks, item, animation), its tick 0xD409070 (the
-// animation ends after 10 ticks for a wobble, 7 for an insert) and tryAddItem 0xD409480; the
-// block's playerWillDestroy 0xCB102F0 (break or shatter sound), its resource drops 0x4BA4C10
-// (a shattered pot drops its four sherds, 0xCB10CD0, else the pot item with them; the held
-// item shatters it by 0xCB106B0), onProjectileHit 0xCB10990 (shatters it under the
-// projectilescanbreakblocks game rule) and getComparatorSignal 0xCB10C20. The pot is a
-// one-slot container (size 0xD40AA80, at most 64, 0xD40AAA0) that hoppers, hopper minecarts
+// save (sherds when not all bricks, item, animation), its tick (the
+// animation ends after 10 ticks for a wobble, 7 for an insert) and tryAddItem; the
+// block's playerWillDestroy (break or shatter sound), its resource drops
+// (a shattered pot drops its four sherds,, else the pot item with them; the held
+// item shatters it by), onProjectileHit (shatters it under the
+// projectilescanbreakblocks game rule) and getComparatorSignal. The pot is a
+// one-slot container (size, at most 64) that hoppers, hopper minecarts
 // and droppers fill and empty like any other; it is not a container block (slot 23), so a
-// hopper under it still picks up items. tryAddItem first unpacks its loot table
-// (0xD3DB930). The rest follows DecoratedPotBlock and DecoratedPotBlockActor in the 1.21.3
+// hopper under it still picks up items. tryAddItem first unpacks its loot table.
+// The rest follows DecoratedPotBlock and DecoratedPotBlockActor in the 1.21.3
 // names build: use adds the held item, onRemove drops what is inside, the dropped pot item
 // keeps the sherds.
 const (
@@ -52,7 +52,7 @@ const (
 
 	// silkTouchID is the enchantment that keeps a pot whole.
 	silkTouchID = 16
-	// potContainerMax is the most the pot's container holds of anything (0xD40AAA0).
+	// potContainerMax is the most the pot's container holds of anything.
 	potContainerMax = 64
 	potLootTag      = "LootTable"
 	potLootSeedTag  = "LootTableSeed"
@@ -242,7 +242,7 @@ func (dp *DecoratedPot) ComparatorSignal(_ *world.Region, _ cube.Pos) int32 {
 }
 
 // hopperPut puts one of s in, as a hopper or dropper fills the pot's container: into the
-// empty slot, or onto the same item while it has room. BDS's setItem (0xD40A3D0) plays no
+// empty slot, or onto the same item while it has room. BDS's setItem plays no
 // animation or sound for it.
 func (dp *DecoratedPot) hopperPut(r *world.Region, pos cube.Pos, s ItemStack) bool {
 	if s.Empty() {
@@ -305,7 +305,7 @@ func (dp *DecoratedPot) unpack(r *world.Region, pos cube.Pos) {
 }
 
 // shards puts its four sherds in place of the pot item: a side whose item does not exist
-// drops a brick, as 0xCB10CD0 does.
+// drops a brick, as does.
 func (dp *DecoratedPot) shards(items []ItemStack) []ItemStack {
 	out := make([]ItemStack, 0, len(items)+decoratedPotSherds)
 	for _, it := range items {
@@ -322,7 +322,7 @@ func (dp *DecoratedPot) shards(items []ItemStack) []ItemStack {
 	return out
 }
 
-// useDecoratedPot is DecoratedPotBlock::use and the block entity's tryAddItem: one of the
+// useDecoratedPot matches BDS and the block entity's tryAddItem: one of the
 // held item goes in when the pot is empty, or holds the same item with room left; otherwise
 // the pot wobbles. Either way the pot plays its sound and posts block_change. Always taken.
 func (p *Player) useDecoratedPot(r *world.Region, u *BlockUse) bool {
@@ -397,7 +397,7 @@ func (p *Player) decoratedPotBreakSound(r *world.Region, pos cube.Pos, block uin
 	playSound(r, pos, p.s.blockSound(sound, blockVec(pos), block), nil)
 }
 
-// shattersPot is 0xCB106B0: a trident, or a tool without silk touch.
+// shattersPot is: a trident, or a tool without silk touch.
 func (p *Player) shattersPot(held ItemStack) bool {
 	tags := p.s.craftItem(held).Tags
 	return slices.Contains(tags, tagTrident) || slices.Contains(tags, tagTool) && !hasEnchant(held, silkTouchID)

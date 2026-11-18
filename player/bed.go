@@ -17,7 +17,7 @@ import (
 )
 
 // Beds and straw beds as BDS 1.26.60 runs them (BedBlock, StrawBed, BedItem, StrawBedItem,
-// Player::startSleepInBed and stopSleepInBed, the sleep counter and ServerPlayerSleepManager).
+// BDS's code and stopSleepInBed, the sleep counter and ServerPlayerSleepManager).
 // The research note is private.
 const (
 	bedEntityID = "Bed"
@@ -85,7 +85,7 @@ var (
 	}
 	// standUpTurn is how BDS turns the spots for the bed's facing.
 	standUpTurn = [4]uint8{2, 3, 0, 1}
-	// bedYaw is the way a sleeper's body lies for each facing (BDS's table 0x13E7460).
+	// bedYaw is the way a sleeper's body lies for each facing (BDS's table).
 	bedYaw = [4]float32{0, 90, -180, -90}
 	// dangerousToStand are blocks a sleeper does not choose to get up on or in when anywhere
 	// else will do.
@@ -176,7 +176,7 @@ func (p *Player) placeBed(r *world.Region, clicked cube.Pos, face int32, held It
 	return false
 }
 
-// tryBed is BedItem's placing at one foot position (sub_C9D2BC0): the head goes the way the
+// tryBed is BedItem's placing at one foot position: the head goes the way the
 // player looks, both halves must be free and held from below, and no end portal may be near.
 // Unlike a block, nothing checks for entities in the way: BDS places a bed over the placer.
 func (p *Player) tryBed(r *world.Region, clicked, foot cube.Pos, block uint32, held ItemStack) bool {
@@ -281,7 +281,7 @@ const (
 // Sleeping reports whether the player lies in a bed. Runs: owner of its region.
 func (p *Player) Sleeping() bool { return p.sleep.asleep }
 
-// useBed is BDS's BedBlock use (sub_CCD0990, sub_D4DD380): sleep in the overworld; anywhere
+// useBed is BDS's BedBlock use: sleep in the overworld; anywhere
 // else a bed explodes and a straw bed falls apart, if respawn blocks explode.
 func (p *Player) useBed(r *world.Region, u *BlockUse) bool {
 	blocks := p.s.reg.Blocks
@@ -319,7 +319,7 @@ func (p *Player) useBed(r *world.Region, u *BlockUse) bool {
 	return true
 }
 
-// trySleep is BDS's sub_CCD0F00: a bed someone else sleeps in is occupied; a stale occupied
+// trySleep is BDS's code: a bed someone else sleeps in is occupied; a stale occupied
 // bit is cleared; then the player tries to sleep and is told why not.
 func (p *Player) trySleep(r *world.Region, head cube.Pos, setSpawn bool) {
 	blocks := p.s.reg.Blocks
@@ -372,7 +372,7 @@ func (p *Player) tell(key string) {
 	p.flush()
 }
 
-// startSleep is BDS's Player::startSleepInBed (sub_BCD20B0) as far as Helix has its parts:
+// startSleep is BDS's code as far as Helix has its parts:
 // the bed under water, distance, a place to get up, the spawn point, the time of day, then
 // lying down. Monsters nearby are not looked for: Helix has none yet.
 func (p *Player) startSleep(r *world.Region, head cube.Pos, setSpawn bool) int {
@@ -504,7 +504,7 @@ func (s *Host) useUpStrawBed(r *world.Region, head cube.Pos, b uint32) {
 	playSound(r, head, s.blockSound(packet.SoundEventStrawBedBreakLeave, blockVec(head), b), nil)
 }
 
-// standUpSpot is BDS's sub_CCD1AB0: the first of standUpSpots, turned for the bed, with
+// standUpSpot is BDS's code: the first of standUpSpots, turned for the bed, with
 // something to stand on and room to stand, the safe ones first. from is where the sleeper
 // is, which picks the side to look on first; nil starts on the usual side.
 func (s *Host) standUpSpot(r *world.Region, head cube.Pos, from *mgl32.Vec3) (cube.Pos, bool) {
@@ -704,7 +704,7 @@ const (
 
 // setBedSpawn makes the bed with its head at head the player's respawn point. False if it
 // already was. Where the player stands is kept every time (floored, feet rounded up), even
-// for the same bed, as BDS's setSpawnPoint (sub_BCF6300) writes SpawnX/Y/Z on every call and
+// for the same bed, as BDS's setSpawnPoint writes SpawnX/Y/Z on every call and
 // only reports whether the block changed: a respawn first shows the top of that column, so
 // a tower where the player stood shows it on the tower.
 func (p *Player) setBedSpawn(head cube.Pos) bool {

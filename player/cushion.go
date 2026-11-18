@@ -177,7 +177,7 @@ func cushionBox(pos mgl32.Vec3) (lo, hi mgl32.Vec3) {
 	return mgl32.Vec3{pos[0] - half, pos[1], pos[2] - half}, mgl32.Vec3{pos[0] + half, pos[1] + cushionHeight, pos[2] + half}
 }
 
-// resting is BDS's sub_C087200: something under it within cushionRest has a box its own
+// resting is BDS's code: something under it within cushionRest has a box its own
 // box, moved down that far, touches; and it is not stuck inside solid blocks.
 func (c *Cushion) resting(r *world.Region) bool {
 	pos := c.entity.Position()

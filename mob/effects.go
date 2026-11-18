@@ -20,20 +20,20 @@ type EffectHooks interface {
 	// any goroutine.
 	EffectID(name string) (int32, bool)
 	// GiveEffect gives the entity with the ID (m itself, another mob or a player) the
-	// effect, as Actor::addEffect. Runs: m's Apply.
+	// effect, as BDS. Runs: m's Apply.
 	GiveEffect(m *Mob, target behavior.ID, e effect.Instance)
 	// RemoveEffect takes effect id away from the entity with the ID. Runs: m's Apply.
 	RemoveEffect(m *Mob, target behavior.ID, id int32)
-	// ClearEffects takes all of m's effects away (Actor::removeAllEffects). Runs: m's Apply.
+	// ClearEffects takes all of m's effects away. Runs: m's Apply.
 	ClearEffects(m *Mob)
 	// EffectTicks is the ticks left of effect id on the entity with the ID, 0 for none.
 	// Runs: m's think.
 	EffectTicks(m *Mob, target behavior.ID, id int32) int32
-	// CanReceiveEffect is Actor::canReceiveMobEffectsFromGameplay of the entity with the
+	// CanReceiveEffect matches BDS of the entity with the
 	// ID and its not being invulnerable to an attack by the entity by. Runs: m's think.
 	CanReceiveEffect(m *Mob, target, by behavior.ID) bool
 	// MeleeEffect gives the entity with the ID m's attack effect after a melee goal's hit,
-	// unless it is not a mob or player or it blocks the hit (Actor::isDamageBlocked: a
+	// unless it is not a mob or player or it blocks the hit (BDS's code: a
 	// raised shield). Runs: m's Apply.
 	MeleeEffect(m *Mob, target behavior.ID, e effect.Instance)
 }
@@ -167,14 +167,14 @@ func (a stateActions) RemoveEffect(target behavior.Actor, name string) {
 
 // PotionHooks is what an engine with potions implements on its Hooks, for drink_potion.
 type PotionHooks interface {
-	// UseDuration is Item::getMaxUseDuration of the stack, 0 for none. Runs: m's think.
+	// UseDuration matches BDS of the stack, 0 for none. Runs: m's think.
 	UseDuration(m *Mob, it behavior.Item) int32
 	// DrinkPotion gives m the effects of the potion with the aux value. Runs: m's Apply.
 	DrinkPotion(m *Mob, aux int16)
 }
 
 // drinkSpeedPenalty is DrinkPotionGoal's "Drinking speed penalty" modifier (UUID from BDS
-// 1.26.60's static init 0xBFA7E60, made in 0x587D500): an addition on the movement value,
+// 1.26.60's static init, made): an addition on the movement value,
 // its amount the goal's speed_modifier.
 const drinkSpeedPenalty = "5CD17E52-A79A-43D3-A529-90FDE04B181E"
 
@@ -213,7 +213,7 @@ func (m *Mob) EffectImmune(name string) bool {
 	return m.states != nil && m.states.MobEffectImmunity != nil && m.states.MobEffectImmunity.Immune(name)
 }
 
-// attackEffect is the effect minecraft:attack gives (AttackDescription, parser 0x6FCAB10 in
+// attackEffect is the effect minecraft:attack gives (AttackDescription, parser in
 // BDS 1.26.60).
 type attackEffect struct {
 	name             string
@@ -225,7 +225,7 @@ const attackEffectDefault = 1
 
 // parseAttackEffect reads effect_name, effect_duration and effect_amplifier. The duration is
 // seconds, "infinite", or 0 when negative, turned into ticks as BDS's duration reader
-// (0x755FAE0: (int)(seconds * 20), at least 0).
+// (: (int)(seconds * 20), at least 0).
 func parseAttackEffect(raw json.RawMessage) attackEffect {
 	var a struct {
 		Name      string          `json:"effect_name"`
@@ -258,7 +258,7 @@ func effectTicks(raw json.RawMessage) int32 {
 }
 
 // meleeEffect is the attack effect of the melee goals' hit (MeleeAttackBaseGoal's
-// _attemptAttackTarget, 0x5431880 in BDS 1.26.60): after the attack, whether it landed or
+// _attemptAttackTarget, in BDS 1.26.60): after the attack, whether it landed or
 // not, a target that is a mob or player and does not block it gets the effect. Runs: Apply.
 func (m *Mob) meleeEffect(target behavior.ID) {
 	a := m.attackEffect

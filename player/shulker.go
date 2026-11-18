@@ -8,7 +8,7 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Shulker box rules from BDS 1.26.60. Its block actor is a chest's (ctor 0xD3E5380) with these
+// Shulker box rules from BDS 1.26.60. Its block actor is a chest's (ctor) with these
 // differences.
 const (
 	shulkerEntityID  = "ShulkerBox"
@@ -18,12 +18,12 @@ const (
 	shulkerDefaultFacing = uint8(cube.FaceUp)
 	// shulkerLidSpeed is how far the lid moves per tick, half a chest's.
 	shulkerLidSpeed = 0.05
-	// shulkerLidHeight is how high in the block it opens to the lid reaches (0xD3E66E0).
+	// shulkerLidHeight is how high in the block it opens to the lid reaches.
 	shulkerLidHeight = 0.5
 )
 
 // isShulkerBox reports whether a block or item is a shulker box of any colour. These are what
-// BDS keeps out of a box (its list at 0xFF1A6C8, read by 0xD3E6C60 and 0xC9DFCF0).
+// BDS keeps out of a box (its list, read by).
 func isShulkerBox(name string) bool { return strings.HasSuffix(name, "shulker_box") }
 
 // lidSpeed is how far the lid moves per tick.
@@ -34,7 +34,7 @@ func (c *Chest) lidSpeed() float32 {
 	return chestLidSpeed
 }
 
-// shulkerCanOpen is BDS's check for a box (0xD45BDD0 with the box of 0xD3E66E0): the lower half
+// shulkerCanOpen is BDS's check for a box (with the box of): the lower half
 // of the block the lid opens into must be free of collision boxes of any block but this one.
 // Whichever way it opens, that box is the same shape.
 func (c *Chest) shulkerCanOpen(r *world.Region, pos cube.Pos) bool {
@@ -70,7 +70,7 @@ func shulkerLidHits(box registry.Box, x, y, z float32) bool {
 	return box[3]+x > 0 && box[0]+x < 1 && box[5]+z > 0 && box[2]+z < 1 && box[4]+y > 0 && box[1]+y < shulkerLidHeight
 }
 
-// placedFrom is what BDS's block item does to a placed box (0xC9D0BE0): it opens towards the
+// placedFrom is what BDS's block item does to a placed box: it opens towards the
 // clicked side, and takes the item's contents and name. Runs: owner of its chunk.
 func (c *Chest) placedFrom(r *world.Region, pl *Placement) {
 	if pl.Face >= int32(cube.FaceDown) && pl.Face <= int32(cube.FaceEast) {

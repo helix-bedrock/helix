@@ -2,12 +2,12 @@ package player
 
 import "github.com/helix-bedrock/protocol/packet"
 
-// The ominous bottle as BDS 1.26.60 runs it (OminousBottleItem: constructor 0xC907E60, use
-// 0xC908A20, useTimeDepleted 0xC908A50). A patrol or raid captain drops one when a player
+// The ominous bottle as BDS 1.26.60 runs it (OminousBottleItem: constructor, use,
+// useTimeDepleted). A patrol or raid captain drops one when a player
 // kills it (loot_tables/entities/pillager_captain.json); its aux value is the amplifier.
 const (
 	nameOminousBottle = "minecraft:ominous_bottle"
-	// ominousUseTicks is the bottle's use duration (Item::setMaxUseDuration(32)).
+	// ominousUseTicks is the bottle's use duration (BDS's code(32)).
 	ominousUseTicks = 32
 	// ominousDuration is how long the Bad Omen lasts: 100 minutes.
 	ominousDuration = 120000

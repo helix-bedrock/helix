@@ -194,7 +194,7 @@ func (s ItemStack) withStored(reg *registry.Registry, items []ItemStack) ItemSta
 	return s
 }
 
-// itemWeight is what a stack weighs in a storage item, as BDS's sub_C4AFF60: a storage
+// itemWeight is what a stack weighs in a storage item, as BDS's code: a storage
 // item weighs its StorageWeight plus what it holds, any other item its count times
 // 64 / its stack size (whole numbers).
 func itemWeight(reg *registry.Registry, s ItemStack) int {
@@ -460,7 +460,7 @@ func (p *Player) sendStorage(owner ItemStack, id int32, slots int) {
 }
 
 // spillStored drops what a storage item on the ground holds where it is, as BDS's item
-// actor does when one is destroyed (sub_BD628A0). How BDS throws them is not read yet:
+// actor does when one is destroyed. How BDS throws them is not read yet:
 // they land where the item was, still.
 func (i *ItemActor) spillStored(e *world.Entity) {
 	if e == nil || i.stack.storedEmpty() {

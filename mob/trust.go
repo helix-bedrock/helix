@@ -10,8 +10,8 @@ import (
 // defend_trusted_target defends and the "trusts" filter test reads. BDS keeps them in an
 // unordered_set; Helix keeps them in the order they were added, so goals that walk them see
 // that order, not libc++'s bucket order. A born baby trusts the players who fed its parents
-// (createBornActor 0xBFF2400); BDS saves them as TrustedPlayersAmount and TrustedPlayer<n>
-// (save 0x7405E20, load 0x74061A0).
+// (createBornActor); BDS saves them as TrustedPlayersAmount and TrustedPlayer<n>
+// (save, load).
 
 // markerTrust is minecraft:trust.
 const markerTrust = "minecraft:trust"
@@ -50,7 +50,7 @@ func (m *Mob) SavedTrust() ([]behavior.ID, bool) {
 	return m.trusted, m.hasTrust()
 }
 
-// trusts is ActorTrustsSubjectTest (1.26.60 0xCA5A6E0): the mob has minecraft:trust and its
+// trusts is ActorTrustsSubjectTest: the mob has minecraft:trust and its
 // set holds the subject.
 func trusts(self behavior.Actor, subject behavior.ID) bool {
 	switch s := self.(type) {

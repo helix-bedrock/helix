@@ -16,10 +16,10 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Maps, from BDS 1.26.60: EmptyMapItem::use (0xC985C20), MapItem's inventory tick
-// (0xC8FDF90), the map render (0xC8FC7B0), MapItemSavedData (save 0xD75E9F0, origin
-// 0xD75CF40, decorations 0xD760EE0, update packets 0xD763470) and the map manager
-// (create 0xCDDD2E0, expand 0xCDDDE60, copy and lock 0xCDDDC20). The research note is
+// Maps, from BDS 1.26.60: BDS's code, MapItem's inventory tick,
+// the map render, MapItemSavedData (save, origin,
+// decorations, update packets) and the map manager
+// (create, expand, copy and lock). The research note is
 // private.
 const (
 	itemFilledMapName = "minecraft:filled_map"
@@ -312,7 +312,7 @@ func (s *Host) mapDimension(d *world.Dimension) mcdb.Dimension {
 	return mcdb.Dimension(s.dimensionID(d))
 }
 
-// useEmptyMap is BDS's EmptyMapItem::use: a filled map of the empty map's scale, centred on
+// useEmptyMap is BDS's code: a filled map of the empty map's scale, centred on
 // the player, its name numbered by the player's maps, a locator if the empty map was one.
 func (p *Player) useEmptyMap(held ItemStack) bool {
 	if held.Name != itemEmptyMapName || p.entity == nil {
@@ -474,7 +474,7 @@ func (s *Host) trackPlayers(d *mapData, now int64) {
 	}
 }
 
-// Marker colours BDS gives by the player's dimension (0xD761E20): white in the
+// Marker colours BDS gives by the player's dimension: white in the
 // Overworld for a player carrying the map, red in the Nether, blue in the End.
 var (
 	mapMarkerWhite  = color.RGBA{R: 255, G: 255, B: 255, A: 255}
@@ -580,7 +580,7 @@ func (d *mapData) updatePacket(player int64) *packet.ClientBoundMapItemData {
 }
 
 // mapCreation is the packet that makes the client know a map: its ID and those of its larger
-// maps, scale, dimension and centre (BDS 0x8824050).
+// maps, scale, dimension and centre.
 func (s *Host) mapCreation(d *mapData) *packet.ClientBoundMapItemData {
 	pk := d.basePacket()
 	ids := []int64{d.id}
@@ -616,7 +616,7 @@ func handleMapInfoRequest(p *Player, pk *packet.MapInfoRequest) {
 }
 
 // handleMapCreateLockedCopy is a client locking a map at a cartography table under an ID of its
-// own (BDS 0x8CB52C0): the player must carry the map; the copy is locked.
+// own: the player must carry the map; the copy is locked.
 func handleMapCreateLockedCopy(p *Player, pk *packet.MapCreateLockedCopy) {
 	if !p.carriesMap(pk.OriginalMapID) || p.s.mapByID(pk.NewMapID) != nil {
 		return

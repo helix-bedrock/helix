@@ -9,22 +9,22 @@ import (
 
 // Big and small dripleaf, from BDS 1.26.60 (the research note is private):
 //
-//   - BigDripleafBlock (vt 0xFBB88D8): onPlace 0xCCDADD0 (the dripleaf under a new one becomes
-//     a stem), its tick 0xCCDB5F0 (broken when it cannot stay; a head with power goes back up,
-//     else its tilt goes on: unstable to partial to full, full back up), the tilt 0xCCDE3C0
+//   - BigDripleafBlock (vt): onPlace (the dripleaf under a new one becomes
+//     a stem), its tick (broken when it cannot stay; a head with power goes back up,
+//     else its tilt goes on: unstable to partial to full, full back up), the tilt
 //     (unstable and partial tick again in 10, full in 100; partial and full play tilt_down)
-//     and its reset 0xCCDE030 (tilt_up unless it was unstable, the waiting tick dropped), an
-//     entity standing on a level head above 11/16 of the block 0xCCDE9D0 (it becomes unstable),
-//     power reaching it 0xCCDBA50 (back up), survival 0xCCDCC90 (the top of its column is a
-//     head, and what is under it is a dripleaf or its soil, 0xCCDCE70), neighbour change
-//     0xCCDE8E0 (from above or below), bone meal 0xCCDD1F0 and 0xCCDCF00 (the head grows one
+//     and its reset (tilt_up unless it was unstable, the waiting tick dropped), an
+//     entity standing on a level head above 11/16 of the block (it becomes unstable),
+//     power reaching it (back up), survival (the top of its column is a
+//     head, and what is under it is a dripleaf or its soil), neighbour change
+//     (from above or below), bone meal (the head grows one
 //     up into air or water).
-//   - SmallDripleafBlock (vt 0xFC149F0): its two halves (onPlace 0xD4F8620 puts the upper one),
-//     survival 0xD4F8D20 (each half on the other, the lower on clay or moss, or on dirt in
-//     water, 0xD4F8C20), bone meal 0xD4F9480 and 0xCCDD810 (a big dripleaf 2 to 5 high where
+//   - SmallDripleafBlock (vt): its two halves (onPlace puts the upper one),
+//     survival (each half on the other, the lower on clay or moss, or on dirt in
+//     water), bone meal (a big dripleaf 2 to 5 high where
 //     there is air, water or the small dripleaf).
 //
-// A projectile hitting a head (0xCCDEBD0) tilts it fully at once. Players and mobs tip it by
+// A projectile hitting a head tilts it fully at once. Players and mobs tip it by
 // standing on it, checked every tick. Not ported: the block_change game event a reset posts,
 // and items lying on a leaf.
 
@@ -189,7 +189,7 @@ func (t *Ticker) bigLeafTick(r *world.Region, pos cube.Pos, block uint32, s stat
 	}
 }
 
-// setTilt is BDS's 0xCCDE3C0: the head at tilt, its next tick, and tilt_down past unstable.
+// setTilt is BDS's code: the head at tilt, its next tick, and tilt_down past unstable.
 func (t *Ticker) setTilt(r *world.Region, pos cube.Pos, s stateInfo, tilt int8) {
 	block := t.leafKit.big[leafHd][tilt][s.crop]
 	r.SetBlock(pos, 0, block)
@@ -204,7 +204,7 @@ func (t *Ticker) setTilt(r *world.Region, pos cube.Pos, s stateInfo, tilt int8) 
 	}
 }
 
-// resetTilt is BDS's 0xCCDE030: level again, tilt_up unless it was unstable, and no tick left
+// resetTilt is BDS's code: level again, tilt_up unless it was unstable, and no tick left
 // waiting.
 func (t *Ticker) resetTilt(r *world.Region, pos cube.Pos, s stateInfo) {
 	if s.age != tiltUnstable {
@@ -248,7 +248,7 @@ func (t *Ticker) StandOnDripleaf(r *world.Region, pos cube.Pos, feetY float32) {
 	}
 }
 
-// ProjectileHitDripleaf is a projectile hitting the block at pos (BDS's 0xCCDEBD0): a big
+// ProjectileHitDripleaf is a projectile hitting the block at pos (BDS's code): a big
 // dripleaf head not fully tilted tilts fully at once. Runs: owner of the region.
 func (t *Ticker) ProjectileHitDripleaf(r *world.Region, pos cube.Pos) {
 	b, ok := r.Block(pos, 0)

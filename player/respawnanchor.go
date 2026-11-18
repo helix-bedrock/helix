@@ -11,10 +11,10 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Respawn anchors as BDS 1.26.60 (Linux, IDA): RespawnAnchorBlock's use listener
-// 0xD53B9F0, the charge change 0xD53CB90, Player::setSpawnPoint 0xBCF6300, the respawn
-// (0xBCED800) with its spawn check 0xBCD4290, the charge taken (slot 97) and the place
-// search 0xCD8EDB0.
+// Respawn anchors as BDS 1.26.60 (Linux, BDS): RespawnAnchorBlock's use listener,
+// the charge change, BDS's code, the respawn
+// with its spawn check, the charge taken (slot 97) and the place
+// search.
 const (
 	nameRespawnAnchor  = "minecraft:respawn_anchor"
 	stateAnchorCharge  = "respawn_anchor_charge"
@@ -184,7 +184,7 @@ func (p *Player) anchorSpot(r *world.Region, take bool) (mgl32.Vec3, bool) {
 	return mgl32.Vec3{float32(at[0]) + 0.5, float32(at[1]) + playerEyeHeight, float32(at[2]) + 0.5}, true
 }
 
-// standSpot is BDS's place search (0xCD8EDB0): where the player stood when it set the
+// standSpot is BDS's place search: where the player stood when it set the
 // spawn, if it can stand there still (a solid block below, it and the one above not solid);
 // else the first such place from x-1..x+2, z-1..z+2 at the same height, z changing fastest.
 func (a *respawnAnchorBlock) standSpot(s *Host, r *world.Region, from cube.Pos) (cube.Pos, bool) {
@@ -211,8 +211,8 @@ func (a *respawnAnchorBlock) canStand(s *Host, r *world.Region, pos cube.Pos) bo
 }
 
 // respawnAtAnchor respawns a player who died in the Nether at its anchor there, taking a
-// charge. BDS 1.26.60's Respawn (0xBCED800) checks the spawn against the dimension the
-// player died in (0xBCD4290), so an anchor never pulls a player back from another
+// charge. BDS 1.26.60's Respawn checks the spawn against the dimension the
+// player died in, so an anchor never pulls a player back from another
 // dimension: one who died elsewhere respawns as without it. False if the player is not in
 // the Nether or its spawn is no anchor; an anchor that is gone, empty or blocked is
 // forgotten with BDS's message, and the caller respawns the player as without one.

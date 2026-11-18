@@ -19,7 +19,7 @@ const leadItem = "minecraft:lead"
 const flagTamed = 28
 
 // Born makes a baby beside its parent with minecraft:entity_born, persistent as
-// createBornActor (1.26.60 0xBFF2400) makes every baby, and tame when the birth says so.
+// createBornActor makes every baby, and tame when the birth says so.
 // Its owner is not set: mob owners are not hooked up yet.
 func (m *Mob) Born(_ *mob.Mob, b state.Birth) behavior.Actor {
 	r := m.entity.Region()
@@ -35,7 +35,7 @@ func (m *Mob) Born(_ *mob.Mob, b state.Birth) behavior.Actor {
 	if b.Tame {
 		baby.m.SetFlag(flagTamed, true)
 	}
-	// createBornActor (0xBFF2400) adds the parents' player love causes to the baby's
+	// createBornActor adds the parents' player love causes to the baby's
 	// trust set after its born event.
 	baby.m.Trust(b.Trusted[0], b.Trusted[1])
 	baby.add(r.Dimension())

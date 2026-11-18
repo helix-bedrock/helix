@@ -6,7 +6,7 @@ import (
 )
 
 // The panda's roll (behavior.Roller) and sneeze (behavior.Sneezer). BDS 1.26.60's Panda
-// constructor (0xBEB6EC0) is the only one that adds RollCounterComponent; the panda's tick
+// constructor is the only one that adds RollCounterComponent; the panda's tick
 // counts it up while it rolls (actor flag 67) and resets it otherwise.
 
 // typePanda is the type that has a roll counter.

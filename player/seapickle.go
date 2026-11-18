@@ -6,7 +6,7 @@ import (
 	"github.com/helix-bedrock/helix/registry"
 )
 
-// Sea pickles stack as BDS 1.26.60's SeaPickleBlockItem (0x1C1C89D's class): a pickle placed on
+// Sea pickles stack as BDS 1.26.60's SeaPickleBlockItem ('s class): a pickle placed on
 // a pickle of fewer than 4 adds one to its cluster_count and keeps the rest of its state. Whether
 // a new one is dead is the farm's onPlace, by the water it is placed in.
 

@@ -221,7 +221,7 @@ func (p *Player) respawnPoint() mgl32.Vec3 {
 }
 
 // respawnShown is where the respawn sequence first puts a player with a bed spawn, as BDS's
-// respawn state machine (sub_BCED800 state 7) does: the saved spawn position (SpawnX/Z)
+// respawn state machine (state 7) does: the saved spawn position (SpawnX/Z)
 // raised to the top of its column, solid blocks, water and leaves counted, so a tower over
 // it (where the player stood when it slept) puts the player on its top until the respawn
 // action stands it beside the bed. Without a bed spawn, or with the column not loaded

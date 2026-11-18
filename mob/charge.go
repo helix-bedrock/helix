@@ -3,8 +3,8 @@ package mob
 import "github.com/helix-bedrock/entity/behavior"
 
 // The mob side of behavior.charge_held_item (pillagers and piglins loading crossbows), as BDS
-// 1.26.60 runs it: CrossbowItem::canBeCharged (Item vt+984), playSoundIncrementally
-// (0xC9B1B20, Item vt+992) and HumanoidMonster::getItemUseDuration (0xBD41FC0). The loaded
+// 1.26.60 runs it: BDS's code, playSoundIncrementally
+// and BDS's code. The loaded
 // arrow is kept as the mob's charged flag, not in the engine's stack.
 
 // The crossbow loading sounds (level sound events): start, middle and end, each 4 later with
@@ -58,7 +58,7 @@ func (m *Mob) ChargeTick(it behavior.Item) {
 	m.PlaySoundAt(sound, m.AttachPos(attachWeapon))
 }
 
-// chargeUseLeft is HumanoidMonster::getItemUseDuration: the load time scaled by the charge
+// chargeUseLeft matches BDS: the load time scaled by the charge
 // still to go, 0 once the charge pose is up or the crossbow is loaded.
 func (m *Mob) chargeUseLeft(it behavior.Item, d int32) int32 {
 	if m.Flag(behavior.FlagCharged) || m.Charged(it) || !m.Chargeable(it) {

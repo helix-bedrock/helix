@@ -11,8 +11,8 @@ import (
 )
 
 // Chorus fruit's teleport as BDS 1.26.60 runs a food's on_use_action "chorus_teleport"
-// (FoodItemComponentLegacy::useTimeDepleted 0xC9963A0 calls 0xB3A9A10 after the food's
-// effects and before it is eaten; one try is 0xB3A93F0). The research note is private.
+// (BDS's code calls after the food's
+// effects and before it is eaten; one try is). The research note is private.
 const (
 	// onUseChorusTeleport is the on_use_action that teleports.
 	onUseChorusTeleport = "chorus_teleport"

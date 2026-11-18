@@ -180,7 +180,7 @@ func protectionKind(kind int) func(level int16, cause DamageCause) int32 {
 	}
 }
 
-// wearArmor is BDS's armour wear (0xBFE91C0): each piece takes a quarter of the damage,
+// wearArmor is BDS's armour wear: each piece takes a quarter of the damage,
 // at least one. The PartArmorWear of a hit runs it for causes armour applies to.
 func (p *Player) wearArmor(damage float32) {
 	n := max(int32(damage)/armorWearShare, armorWearMin)

@@ -15,7 +15,7 @@ import (
 // damageSonicBoom is BDS's ActorDamageCause SonicBoom.
 const damageSonicBoom = 31
 
-// attrKnockbackResistance is the attribute component Mob::knockback scales by.
+// attrKnockbackResistance is the attribute component BDS's code scales by.
 const attrKnockbackResistance = "minecraft:knockback_resistance"
 
 // WardenHooks is what an engine that runs the sonic boom implements on its Hooks. Both run
@@ -23,7 +23,7 @@ const attrKnockbackResistance = "minecraft:knockback_resistance"
 type WardenHooks interface {
 	// SonicHit hurts the entity with the sonic boom cause (31) and the mob as attacker.
 	SonicHit(m *Mob, target behavior.ID, damage float32)
-	// Knockback is BDS 1.26.60's Mob::knockback (0xBFDD340) on the entity with the mob as
+	// Knockback is BDS 1.26.60's BDS's code on the entity with the mob as
 	// source.
 	Knockback(m *Mob, target behavior.ID, k behavior.Knockback)
 }
@@ -35,7 +35,7 @@ type WardenEnv interface {
 }
 
 // suspicion is SuspectTrackingComponent: a block position and the tick it was set, each
-// optional (BDS 1.26.60 SniffGoal::stop 0xBFA1280 writes both).
+// optional (BDS 1.26.60 writes both).
 type suspicion struct {
 	pos     behavior.Pos
 	tick    uint64
@@ -59,7 +59,7 @@ func (m *Mob) Suspects(dst []behavior.ID) []behavior.ID {
 	return dst
 }
 
-// ValidSuspect is the anger_level suspect test (0x735E4F0); true without the component.
+// ValidSuspect is the anger_level suspect test; true without the component.
 func (m *Mob) ValidSuspect(a behavior.Actor) bool {
 	if g := m.anger(); g != nil {
 		return g.Valid(&m.stateEnv, a)
@@ -67,7 +67,7 @@ func (m *Mob) ValidSuspect(a behavior.Actor) bool {
 	return true
 }
 
-// Calm reports the entity is no suspect or below angry_threshold (0x735E8C0).
+// Calm reports the entity is no suspect or below angry_threshold.
 func (m *Mob) Calm(id behavior.ID) bool {
 	if a := m.anger(); a != nil {
 		return a.Calm(id)
@@ -75,7 +75,7 @@ func (m *Mob) Calm(id behavior.ID) bool {
 	return true
 }
 
-// AddAnger raises the anger at a by default_annoyingness or angry_boost (0x735DC60).
+// AddAnger raises the anger at a by default_annoyingness or angry_boost.
 func (m *Mob) AddAnger(a behavior.Actor, by behavior.Anger, sound bool) {
 	g := m.anger()
 	if g == nil {
@@ -126,7 +126,7 @@ func (m *Mob) ClearSuspicion() { m.suspect.hasPos = false }
 // Named reports a name tag.
 func (m *Mob) Named() bool { return m.nameTag != "" }
 
-// InDaylight stands for Actor::isInDaylight (1.26.60 0xB3A88F0): day with the sky above
+// InDaylight stands for BDS's code: day with the sky above
 // the eyes. BDS's brightness test (above 0.5 after the rain's darkening) is not ported.
 func (m *Mob) InDaylight() bool { return stateMob{m}.CanSeeDaylight() }
 
@@ -140,7 +140,7 @@ func (m *Mob) Knockback(t behavior.Actor, k behavior.Knockback) {
 	m.do(op{kind: opKnockback, id: t.ID(), knock: k})
 }
 
-// SonicCooldown is the warden's shared sonic boom cooldown (Warden +1112).
+// SonicCooldown is the warden's shared sonic boom cooldown.
 func (m *Mob) SonicCooldown() (uint64, bool) { return m.sonicCooldown, m.hasSonicCooldown }
 
 // SetSonicCooldown sets it.

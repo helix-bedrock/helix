@@ -20,7 +20,7 @@ const (
 	// scanPerTick is how many blocks the scan reads in one tick.
 	scanPerTick = 1024
 	// scanXZ and scanBelow/scanAbove are the scan box around the dweller: x and z from -16
-	// to +15, y from -4 to +3.
+	// to, y from -4 to +3.
 	scanXZ, scanBelow, scanAbove = 16, 4, 3
 	// joinRange is how far a POI or a dweller looks for a village to join.
 	joinRange = 64
@@ -38,8 +38,8 @@ const (
 	radiusScale = 0.6
 	// particleEvent is the level event that spawns a particle of the type in its data
 	// (ParticleGenericSpawn). A claim shows happyCount happy villager particles over the
-	// dweller (_claimPOI 0xBEDFC60); losing a POI shows lostCount angry ones and plays
-	// lostSound at its head (0xBEE19A0). BDS's own particle numbers.
+	// dweller (_claimPOI); losing a POI shows lostCount angry ones and plays
+	// lostSound at its head. BDS's own particle numbers.
 	particleEvent = 2009
 	happyParticle = 41
 	happyCount    = 4
@@ -76,7 +76,7 @@ type Dweller interface {
 	Baby() bool
 	// Role is dweller_role; only "inhabitant" takes job sites.
 	Role() string
-	// Nitwit reports the family job sites are kept from (BDS's family at village +696).
+	// Nitwit reports the family job sites are kept from (BDS's family at village).
 	Nitwit() bool
 	// Profession is the preferred profession (DwellerComponent +8), "" for none.
 	Profession() string
@@ -176,7 +176,7 @@ func (v *Village) FreePOI(kind Kind, p behavior.Pos) (behavior.POI, bool) {
 	return s.free[kind][best], true
 }
 
-// WantsBabies is Village's room test for make_love (1.26.60 0xBEE5760): the beds, at least
+// WantsBabies is Village's room test for make_love: the beds, at least
 // one, outnumber the inhabitants. BDS counts its unclaimed beds plus the claimed ones whose
 // bed still exists, which is every bed here. Its no-breed timer (set by nothing Helix runs)
 // is not kept. Safe from any goroutine.
@@ -540,7 +540,7 @@ func (m *Manager) sync(r *world.Region, d Dweller, v *Village, now int64) {
 	_ = r
 }
 
-// lose is a claimed POI going, in _updateClaimedPOIs (0xBEE19A0), for any kind of POI, beds
+// lose is a claimed POI going, in _updateClaimedPOIs, for any kind of POI, beds
 // too: the dweller forgets it, drops its profession unless locked into it (running the POI's
 // end event, which beds have none of), and shows angry villager particles and the haggle.no
 // sound at its head.
@@ -567,7 +567,7 @@ func dropProfession(d Dweller, end string) {
 	}
 }
 
-// tickVillage is one tick of a village (Village::tick): the POIs still there, then every
+// tickVillage is one tick of a village: the POIs still there, then every
 // 30 ticks the dwellers that left, and the claims. It reports a village to remove.
 func (m *Manager) tickVillage(r *world.Region, v *Village, now int64) bool {
 	changed := m.checkPOIs(r, v)
@@ -741,7 +741,7 @@ func (m *Manager) available(v *Village, d Dweller, k Kind) *POI {
 	return nil
 }
 
-// give is _claimPOI (0xBEDFC60): the POI goes to the dweller, its init event runs, a job
+// give is _claimPOI: the POI goes to the dweller, its init event runs, a job
 // site sets the preferred profession, and happy villager particles show at the head.
 func (m *Manager) give(r *world.Region, d Dweller, mem *member, p *POI) {
 	p.owners = append(p.owners, mem.id)

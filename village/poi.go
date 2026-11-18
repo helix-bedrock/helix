@@ -23,25 +23,24 @@ const (
 	kinds   = 3
 )
 
-// Def is one kind of POI block: BDS's POI definition (1.26.60 ctor 0xBF27D50; beds and bells
-// 0xBEF7940).
+// Def is one kind of POI block: BDS's POI definition (1.26.60 ctor; beds and bells).
 type Def struct {
 	// Name is the POI's name: "villager" for beds and bells, the profession for a job site.
 	// A villager with a preferred profession only takes job sites of that name.
 	Name string
 	Kind Kind
-	// Capacity is how many dwellers may own one (+128).
+	// Capacity is how many dwellers may own one.
 	Capacity int32
-	// Weight is the job site's weight in the random pick of an unemployed villager (+136).
+	// Weight is the job site's weight in the random pick of an unemployed villager.
 	Weight int32
-	// Radius is how near counts as there (+124); UseBox makes the goals aim at the block's
-	// box instead (+184, beds).
+	// Radius is how near counts as there; UseBox makes the goals aim at the block's
+	// box instead (beds).
 	Radius float32
 	UseBox bool
-	// Sound is the work sound (+144), "" for none.
+	// Sound is the work sound, "" for none.
 	Sound string
-	// InitEvent runs on the dweller that claims it (+48); EndEvent on one that loses it
-	// while not locked into its profession (+88).
+	// InitEvent runs on the dweller that claims it; EndEvent on one that loses it
+	// while not locked into its profession.
 	InitEvent, EndEvent string
 }
 
@@ -53,12 +52,12 @@ type Table struct {
 // unskilled is every job site's end event.
 const unskilled = "minecraft:become_unskilled"
 
-// jobSite is a job site row of BDS's registry (0xBEF31F0): capacity 1, radius 2.
+// jobSite is a job site row of BDS's registry: capacity 1, radius 2.
 func jobSite(name string, weight int32, sound, event string) *Def {
 	return &Def{Name: name, Kind: Job, Capacity: 1, Weight: weight, Radius: 2, Sound: sound, InitEvent: event, EndEvent: unskilled}
 }
 
-// Vanilla is BDS 1.26.60's POI table (0xBEF31F0).
+// Vanilla is BDS 1.26.60's POI table.
 func Vanilla() *Table {
 	bed := &Def{Name: "villager", Kind: Bed, Capacity: 1, Weight: 1, Radius: 0.75, UseBox: true}
 	bell := &Def{Name: "villager", Kind: Meeting, Capacity: 20, Weight: 1, Radius: 7}

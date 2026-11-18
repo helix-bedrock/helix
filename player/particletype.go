@@ -2,9 +2,9 @@ package player
 
 // particleTypeID is the ParticleType number of a particle name as entity definitions write it
 // ("mobspellambient", "dragonbreath"), and false for a name BDS does not know. The names are
-// BDS 1.26.60's ParticleType reflection table (0xF4172B0), in enum order from "none" at 0,
+// BDS 1.26.60's ParticleType reflection table, in enum order from "none" at 0,
 // with the one value after portal that the table leaves unnamed (mobportal): BDS's cloud
-// sends mobspellambient as 35 (0xC07F480) and its tick checks dragonbreath as 49 (0xC07FE50).
+// sends mobspellambient as 35 and its tick checks dragonbreath as 49.
 // Runs: anywhere; it is read while definitions load.
 func particleTypeID(name string) (int32, bool) {
 	names := [...]string{
@@ -36,7 +36,7 @@ func particleTypeID(name string) (int32, bool) {
 
 // cloudParticle is a spawn_aoe_cloud's particle number: its definition's particle, or
 // mobspellambient when it names none. A name BDS does not know is 0, none, as its lookup
-// (0xF42F630) gives after logging it.
+// gives after logging it.
 func cloudParticle(name string) int32 {
 	if name == "" {
 		name = cloudParticleDefault

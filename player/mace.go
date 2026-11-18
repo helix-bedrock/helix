@@ -7,9 +7,9 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 )
 
-// The mace, from BDS 1.26.60's MaceItem: its attack bonus (vtable slot 39, sub_C8FC620),
+// The mace, from BDS 1.26.60's MaceItem: its attack bonus,
 // part of the base damage that Strength, Weakness and a critical hit then scale (the
-// attack's damage, sub_BFDB910), and its hurtEnemy (slot 90, sub_C8FBB10): wear 1, and
+// attack's damage), and its hurtEnemy (slot 90): wear 1, and
 // after a fall of more than 1.5 blocks the smash. Density and Breach are enchant.go's.
 //
 // Not done: Wind Burst, and the smash for mobs holding a mace. BDS skips pushing the

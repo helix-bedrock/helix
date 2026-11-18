@@ -7,7 +7,7 @@ import (
 	"github.com/helix-bedrock/entity/move"
 )
 
-// The squid motion numbers (BDS 1.26.60 Squid::postAiStep 0xBD80740).
+// The squid motion numbers.
 const (
 	squidSteer    = 0.22 // the velocity moves this share of the way to the swim direction a tick
 	squidTurn     = 0.1  // the body turns this share of the way to the movement a tick
@@ -32,7 +32,7 @@ const (
 // isSquid reports whether a mob type moves as a squid.
 func isSquid(typ string) bool { return typ == typeSquid || typ == typeGlowSquid }
 
-// SwimDir implements behavior.Squid: the swim direction the squid goals set (Squid +1172).
+// SwimDir implements behavior.Squid: the swim direction the squid goals set.
 func (m *Mob) SwimDir() behavior.Vec3 { return m.swimDir }
 
 // SetSwimDir implements behavior.Squid.
@@ -73,7 +73,7 @@ func (m *Mob) squidPreStep() {
 	}
 }
 
-// squidStep is the server half of Squid::postAiStep (BDS 1.26.60 0xBD80740): in water the
+// squidStep is the server half of BDS's code: in water the
 // velocity eases toward the swim direction, out of it the squid stops and sinks; the body
 // then turns toward the movement. Levitation (effect 24) counts as out of water for the
 // velocity; mobs have no effects yet, so it never applies. The tentacle animation is the

@@ -232,7 +232,7 @@ var _ mob.ItemHooks = (*Mob)(nil)
 // itemRules answers the mob item components from the item registry and BDS's stack rules.
 type itemRules struct{ s *Host }
 
-// The potion-like items whose aux is a variant (Item::getVariant).
+// The potion-like items whose aux is a variant.
 var variantItems = map[string]bool{"minecraft:potion": true, "minecraft:splash_potion": true, "minecraft:lingering_potion": true}
 
 // Matches reports the stack matching an item descriptor: a name ("minecraft:x", "x"), a
@@ -278,7 +278,7 @@ func (r itemRules) nameMatches(d string, it behavior.Item) bool {
 }
 
 // itemAliases are BDS's names for renamed items that entity files still use, as its item
-// registry's alias table (BDS 1.26.60 0xC66BA90) maps them; BDS looks names up in lower
+// registry's alias table maps them; BDS looks names up in lower
 // case.
 var itemAliases = map[string]string{
 	"minecraft:carrotonastick":    "minecraft:carrot_on_a_stick",

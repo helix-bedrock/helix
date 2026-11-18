@@ -17,16 +17,16 @@ import (
 )
 
 // Mobs saved with their chunk, in BDS 1.26.60's actor format, so a BDS world's mobs load
-// in Helix and Helix's in BDS. The field names and order are Actor::saveWithoutId
-// (0xB3B6C10): UniqueID, Pos, Rotation, Motion, CustomName, CustomNameVisible,
+// in Helix and Helix's in BDS. The field names and order are BDS's code:
+// UniqueID, Pos, Rotation, Motion, CustomName, CustomNameVisible,
 // FallDistance, OnGround, Invulnerable, PortalCooldown, IsGlobal, IsAutonomous,
 // LastDimensionId, LinksTag, LootDropped, Color, Color2, Strength, StrengthMax, Sheared,
 // IsIllagerCaptain, OwnerNew, Sitting, IsBaby, IsTamed, IsTrusting, IsOrphaned, IsAngry,
 // IsOutOfControl, Variant, MarkVariant, Saddled, Chested, ShowBottom, IsGliding,
-// IsSwimming, IsEating, IsScared, IsStunned, IsRoaring, SkinID; then the Mob's
-// (0xBFE21E0): Mainhand, Offhand, Armor, HurtTime, DeathTime, Dead, Surface,
+// IsSwimming, IsEating, IsScared, IsStunned, IsRoaring, SkinID; then the Mob's:
+// Mainhand, Offhand, Armor, HurtTime, DeathTime, Dead, Surface,
 // NaturalSpawn, TargetID, Attributes, ActiveEffects; and the components' own: identifier,
-// definitions (the group stack), Persistent (read back at 0xB3974B0 into the same
+// definitions (the group stack), Persistent (read back into the same
 // persistent marker a name tag adds), Fire, Air.
 //
 // What Helix runs is written from the live mob; every other field the mob was loaded with
@@ -52,7 +52,7 @@ const (
 	mobKeyOwner = "OwnerNew"
 )
 
-// mobFlagKeys are the saved bytes Actor::saveWithoutId writes from actor flags.
+// mobFlagKeys are the saved bytes BDS's code writes from actor flags.
 var mobFlagKeys = []struct {
 	key  string
 	flag int
@@ -66,7 +66,7 @@ var mobFlagKeys = []struct {
 	{"IsEating", protocol.EntityDataFlagEating}, {"IsScared", protocol.EntityDataFlagScared},
 }
 
-// mobDataKeys are the saved values Actor::saveWithoutId writes from actor data; Color and
+// mobDataKeys are the saved values BDS's code writes from actor data; Color and
 // Color2 are bytes, the rest ints.
 var mobDataKeys = []struct {
 	key   string
@@ -107,7 +107,7 @@ func (o *Mob) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
 }
 
-// saveActor writes Actor::saveWithoutId's fields: ID, place, motion, name and dimension.
+// saveActor writes BDS's code's fields: ID, place, motion, name and dimension.
 func (o *Mob) saveActor(e *world.Entity, data map[string]any) {
 	pos := e.Position()
 	pitch, yaw, _, _ := o.m.Rotation()
@@ -131,8 +131,8 @@ func (o *Mob) saveActor(e *world.Entity, data map[string]any) {
 	}
 }
 
-// The rider links BDS saves on a vehicle (Actor::saveWithoutId 0xB3B6C10, read back by
-// Actor::loadLinks 0xB3C1550): LinksTag, one compound per rider in seat order, with the
+// The rider links BDS saves on a vehicle (BDS's code, read back by
+// BDS's code): LinksTag, one compound per rider in seat order, with the
 // rider's unique ID and its seat index (0 is the driver); none when nobody rides.
 const (
 	mobKeyLinks    = "LinksTag"
@@ -355,9 +355,9 @@ func (o *Mob) loadEquipment(data map[string]any) {
 }
 
 // The age, breeding and leash fields BDS saves: AgeableComponent's Age (never above 0) and
-// GrowthPaused (0x7444D80), BreedableComponent's InLove, LoveCause and BreedCooldown
-// (0x7372E40), written while the mob has the component, and Actor's LeasherID (read at
-// 0xB3974B0), the holder's unique ID, -1 for none.
+// GrowthPaused, BreedableComponent's InLove, LoveCause and BreedCooldown,
+// written while the mob has the component, and Actor's LeasherID (read at),
+// the holder's unique ID, -1 for none.
 const (
 	mobKeyAge          = "Age"
 	mobKeyGrowthPaused = "GrowthPaused"
@@ -414,7 +414,7 @@ func (o *Mob) loadBreeding(data map[string]any) {
 }
 
 // The item component fields BDS saves: Actor's canPickupItems and hasSetCanPickupItems
-// (addAdditionalSaveData 0xB3990DD, 1.26.60), the spawn roll pickup_based_on_chance reads,
+// (addAdditionalSaveData), the spawn roll pickup_based_on_chance reads,
 // and the minecraft:inventory container as ChestItems, each stack with its Slot.
 const (
 	mobKeyCanPickUp    = "canPickupItems"
@@ -470,8 +470,8 @@ func (o *Mob) loadMobItems(data map[string]any) {
 const maxMobInventory = 256
 
 // The anger_level and trust keys BDS 1.26.60 saves: AngerLevelComponent's "Nuisances", a
-// list of ActorId, Anger and Priority (save 0x735D5D0, load 0x7384410), and TrustComponent's
-// TrustedPlayersAmount and TrustedPlayer<n> (save 0x7405E20, load 0x74061A0).
+// list of ActorId, Anger and Priority (save, load), and TrustComponent's
+// TrustedPlayersAmount and TrustedPlayer<n> (save, load).
 const (
 	mobKeyNuisances     = "Nuisances"
 	mobKeyNuisanceID    = "ActorId"
@@ -479,8 +479,8 @@ const (
 	mobKeyNuisancePrio  = "Priority"
 	mobKeyTrustedAmount = "TrustedPlayersAmount"
 	mobKeyTrustedPrefix = "TrustedPlayer"
-	// mobKeyCaptain is Mob::mTargetCaptainId, written only when set (Mob::addAdditionalSaveData,
-	// 1.26.60); mobKeyElder is a guardian's elder flag (Guardian save 0xBD400D0).
+	// mobKeyCaptain matches BDS, written only when set (BDS's code,
+	// 1.26.60); mobKeyElder is a guardian's elder flag (Guardian save).
 	mobKeyCaptain = "TargetCaptainID"
 	mobKeyElder   = "Elder"
 )

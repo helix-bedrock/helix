@@ -7,15 +7,15 @@ import (
 
 // The hooks of hold_ground (behavior.Holder, the pillager), send_event (behavior.EventSender,
 // the evoker's spells) and knockback_roar (behavior.Roarer, the ravager). BDS 1.26.60 gives
-// every Mob a LookControlComponent (Mob::reloadHardcodedClient 0xBFD62E0). Actor::
-// playAmbientSound (0xB3AFCC0) plays Actor::getAmbientSound (0xB3AFD60), the level sound event
+// every Mob a LookControlComponent. Actor::
+// playAmbientSound plays BDS's code, the level sound event
 // named by actor data 110, at attach point 3; a baby whose sound is ambient plays ambient.baby.
-// SendEventGoal::start (0xBFA0770) writes the spell colour to actor data 77.
+// BDS's code writes the spell colour to actor data 77.
 
 const (
 	// dataSpellColor is the actor data key of the spell particle colour.
 	dataSpellColor = 77
-	// attachAmbient is the attach point Actor::playAmbientSound plays at.
+	// attachAmbient is the attach point BDS's code plays at.
 	attachAmbient = 3
 	// damageRoar is the roar's damage cause.
 	damageRoar = 11
@@ -24,7 +24,7 @@ const (
 // HasLookControl implements behavior.Holder: every mob has a look control.
 func (m *Mob) HasLookControl() bool { return true }
 
-// AmbientSound implements behavior.Holder. The other sounds Actor::getAmbientSound picks
+// AmbientSound implements behavior.Holder. The other sounds BDS's code picks
 // (12, 492) for components Helix's mobs do not have yet are not chosen.
 func (m *Mob) AmbientSound() {
 	name, _ := m.stringData(state.DataAmbientEvent)

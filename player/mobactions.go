@@ -15,14 +15,13 @@ import (
 // sounds, minecraft:spawn_entity's items and entities, the game events mobs post, and the
 // Respiration their armour gives, as BDS 1.26.60 does them.
 
-// The teleport trail's numbers (TeleportComponent::teleport 0x7170A80).
+// The teleport trail's numbers.
 const (
 	teleportDirScale = 0.2
 	teleportCount    = int32(128)
 )
 
-// gameEventIDs are BDS 1.26.60's game event IDs by name (the GameEvent table, initializer
-// 0xCA80031).
+// gameEventIDs are BDS 1.26.60's game event IDs by name (the GameEvent table, initializer).
 var gameEventIDs = map[string]int32{
 	"block_activate": 1, "block_attach": 2, "block_change": 3, "block_close": 4, "block_deactivate": 5,
 	"block_destroy": 6, "block_detach": 7, "block_open": 8, "block_place": 9, "bounce": 10,
@@ -104,10 +103,10 @@ func (m *Mob) SpawnItem(o *mob.Mob, item string) bool {
 	return true
 }
 
-// SpawnEntity implements mob.SpawnHooks as BDS's ActorSpawnHelper (0xB33BD60): born puts
-// the newborn in the middle of the mob's block facing the mob's way (0xB33C350), spawned at
-// the mob with its rotation, summoned at the mob facing nowhere in particular (0xB33BFC0).
-// transformed is taken as spawned: its helper (0xB33CA80) was not read.
+// SpawnEntity implements mob.SpawnHooks as BDS's ActorSpawnHelper: born puts
+// the newborn in the middle of the mob's block facing the mob's way, spawned at
+// the mob with its rotation, summoned at the mob facing nowhere in particular.
+// transformed is taken as spawned: its helper was not read.
 func (m *Mob) SpawnEntity(o *mob.Mob, typ, event, method string) *mob.Mob {
 	r := m.entity.Region()
 	if r == nil {

@@ -12,13 +12,13 @@ import (
 
 // Pointed dripstone hurting and breaking, as BDS 1.26.60 does it. When it is time to fall the
 // drip package calls FallStalactite. A falling tip hurts the mobs in its box when it lands, by
-// FallingBlockActor's causeFallDamage (0xBD5DD80): floor(ceil(fallen - 1) * the count the tip
+// FallingBlockActor's causeFallDamage: floor(ceil(fallen - 1) * the count the tip
 // fell with), at most 40, cause Stalactite. A stalactite that lands breaks (PointedDripstone's
-// onLand 0xD4FEDA0): its item pops out, LevelEvent 2021, the block is gone, LevelEvent 1064.
-// Landing on a stalagmite's tip (its fall-on 0xD4FCE10) adds 2 to the fall and doubles its
-// damage, cause Stalagmite (the player's causeFallDamage 0xBD008B0: ceil(scale * (fallen - 3 -
+// onLand): its item pops out, LevelEvent 2021, the block is gone, LevelEvent 1064.
+// Landing on a stalagmite's tip (its fall-on) adds 2 to the fall and doubles its
+// damage, cause Stalagmite (the player's causeFallDamage: ceil(scale * (fallen - 3 -
 // jump boost))). A thrown trident faster than 0.6 breaks pointed dripstone it hits when
-// projectilescanbreakblocks is on (its onProjectileHit 0xD4FEFD0).
+// projectilescanbreakblocks is on (its onProjectileHit).
 const (
 	nameDripstone = "minecraft:pointed_dripstone"
 

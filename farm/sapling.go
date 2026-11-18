@@ -10,15 +10,15 @@ import (
 
 // Saplings growing into trees, from BDS 1.26.60's SaplingBlock:
 //
-//   - The random tick (0xD50DF70): with light 9 above, one in 7, a sapling whose age_bit is
-//     0 sets it (0xD50E7C0), and one already set grows.
-//   - Growing (0xD50E650, 0xD50F010): when the sapling has a 2x2 tree and stands in a 2x2
-//     of the same sapling (0xD50E330: the squares to +x+z, +x-z, -x+z, -x-z, in that order),
+//   - The random tick: with light 9 above, one in 7, a sapling whose age_bit is
+//     0 sets it, and one already set grows.
+//   - Growing: when the sapling has a 2x2 tree and stands in a 2x2
+//     of the same sapling (: the squares to +x+z, +x-z, -x+z, -x-z, in that order),
 //     the four become air and the 2x2 tree is placed at the square's lowest corner; else, when
 //     it has a beehive tree, 5 in 100 with a flower within 2 blocks on x and z at its own
-//     level (0xB656DA0's list), that tree; else its one-block tree. A tree that fails puts the
+//     level ('s list), that tree; else its one-block tree. A tree that fails puts the
 //     saplings back.
-//   - Bone meal (0xD50E140): a sapling with only a 2x2 tree takes no bone meal outside a
+//   - Bone meal: a sapling with only a 2x2 tree takes no bone meal outside a
 //     2x2; a creative player's grows at once; otherwise 45 in 100 it takes the age_bit step
 //     or grows, and the bone meal is used either way.
 //
@@ -67,7 +67,7 @@ var vanillaSaplings = [len(saplingNames)]Sapling{
 	{Mega: "minecraft:pale_oak_tree_feature"},
 }
 
-// beeFlowers are the blocks a beehive tree looks for (BDS's list at 0xB656DA0, the tulips by
+// beeFlowers are the blocks a beehive tree looks for (BDS's list, the tulips by
 // its tulip list).
 var beeFlowers = [...]string{
 	"minecraft:cherry_leaves", "minecraft:pink_petals", "minecraft:poppy", "minecraft:blue_orchid", "minecraft:allium",

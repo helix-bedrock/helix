@@ -25,7 +25,7 @@ type ItemEnv interface {
 	ItemOwner(a behavior.Actor) behavior.ID
 	// Items appends the item entities whose boxes touch b.
 	Items(r *world.Region, dst []behavior.Actor, b behavior.Box) []behavior.Actor
-	// SpecialMultiplier is BDS's Level::getSpecialMultiplier for r's dimension.
+	// SpecialMultiplier is BDS's code for r's dimension.
 	SpecialMultiplier(r *world.Region) float32
 }
 
@@ -44,8 +44,8 @@ type ItemHooks interface {
 	TakeItem(m *Mob, item behavior.ID)
 }
 
-// pickUpChance is what Actor::reload multiplies the special multiplier by for the spawn
-// roll of canPickupItems (0xB38E796, 1.26.60).
+// pickUpChance is what BDS's code multiplies the special multiplier by for the spawn
+// roll of canPickupItems.
 const pickUpChance = 0.55
 
 // The pick-up flags packed into an op.
@@ -76,7 +76,7 @@ func (m *Mob) buildItems() {
 	}
 }
 
-// rollPickUp is Actor::reload's spawn roll (0xB38E7B3, 1.26.60): once in the mob's life,
+// rollPickUp matches BDS's spawn roll: once in the mob's life,
 // with the level's thread random, saved as canPickupItems.
 func (m *Mob) rollPickUp() {
 	if m.canPickUpSet || m.v.r == nil {
@@ -280,8 +280,8 @@ const (
 
 // --- behavior.ItemBody ---
 
-// CanPickUpItem is Mob's own pick-up test (Actor::canPickupItem 0xB3C5000, true). Zombie's
-// override (no pick-up of one item while riding a chicken, 0xBD1B9F0) is not ported.
+// CanPickUpItem is Mob's own pick-up test (true). Zombie's
+// override (no pick-up of one item while riding a chicken) is not ported.
 func (m *Mob) CanPickUpItem(behavior.Item) bool { return true }
 
 // DropItem spawns the stack at the mob, at Apply while it thinks.
@@ -429,7 +429,7 @@ func (c *inventory) Count(it behavior.Item) int32 {
 	return n
 }
 
-// CanAdd reports an empty slot, or one the stack stacks onto that is not full (0xB4A5610).
+// CanAdd reports an empty slot, or one the stack stacks onto that is not full.
 func (c *inventory) CanAdd(it behavior.Item) bool {
 	for _, s := range c.slots {
 		if s.Empty() || c.rules.Stacks(s, it) && s.Count < c.rules.MaxStack(s) {
@@ -440,7 +440,7 @@ func (c *inventory) CanAdd(it behavior.Item) bool {
 }
 
 // Add fills the stacks it stacks onto in slot order, then the first empty slot takes the
-// rest (0xB4A5790).
+// rest.
 func (c *inventory) Add(it behavior.Item) (behavior.Item, bool) {
 	fit := false
 	for k := range c.slots {
@@ -474,7 +474,7 @@ func (c *inventory) Add(it behavior.Item) (behavior.Item, bool) {
 	return it, fit
 }
 
-// Take removes n of the kind from the slots in order (0x7066EF0).
+// Take removes n of the kind from the slots in order.
 func (c *inventory) Take(kind behavior.Item, n int32) {
 	for k := range c.slots {
 		if n <= 0 {

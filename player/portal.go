@@ -17,8 +17,8 @@ import (
 const nameEnderEye = "minecraft:ender_eye"
 
 // BDS 1.26.60's portal timing for players (PortalCooldownDurationComponent, the actor
-// portal tick sub_B39FF00, Player sub_BCC9950, setPlayerGameType sub_BCCDF90,
-// ServerPlayer::changeDimension sub_A1490F0).
+// portal tick, Player, setPlayerGameType,
+// BDS's code).
 const (
 	// playerPortalCooldown is the player's cooldown duration: standing in a portal
 	// keeps the cooldown one below it, and it runs down a tick at a time outside.
@@ -210,7 +210,7 @@ func clampWorld(v float32) float32 {
 	return float32(min(max(math.Trunc(float64(v)), -worldLimit), worldLimit))
 }
 
-// arriveAtPortal is BDS's PortalForcer::force at the end of a nether portal trip, once
+// arriveAtPortal is BDS's code at the end of a nether portal trip, once
 // the chunks around the target are loaded (or the wait ran out): the nearest recorded
 // portal, else a new one.
 func (p *Player) arriveAtPortal(r *world.Region, dim mcdb.Dimension, target mgl32.Vec3, along float32) bool {
@@ -245,7 +245,7 @@ func (p *Player) portalRand() *rand.Rand {
 	return p.portal.rng
 }
 
-// enterEndPortal sends the player through an end portal (sub_CAF0E00): into the End
+// enterEndPortal sends the player through an end portal: into the End
 // onto its arrival platform, or out of the End to its respawn point in the overworld.
 // BDS shows the credits on the way out; Helix does not yet.
 func (p *Player) enterEndPortal() {
@@ -318,11 +318,11 @@ func (p *Player) changeDimension(mv *dimMove) {
 }
 
 // arrive puts the player in the dimension of its move, as BDS 1.26.60's
-// PlayerDimensionTransferer does: ChangeDimension with a new loading screen
-// (sub_CDEA5D0), then the chunks of the new dimension around it; the dimension change
-// done action follows once the player is placed there (sub_CDEB1F0, see
-// finishArrival). BDS sends PlayStatus PlayerSpawn only on the first spawn
-// (sub_A13F8E0), never on a dimension change. It runs on the old region when it took
+// PlayerDimensionTransferer does: ChangeDimension with a new loading screen,
+// then the chunks of the new dimension around it; the dimension change
+// done action follows once the player is placed there (see
+// finishArrival). BDS sends PlayStatus PlayerSpawn only on the first spawn,
+// never on a dimension change. It runs on the old region when it took
 // the entity out.
 func (p *Player) arrive(mv *dimMove) {
 	z := &p.zone
@@ -367,16 +367,16 @@ func (p *Player) teleportFeetCause(feet mgl32.Vec3, rot world.Rotation, cause in
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
-		// A teleport always carries its cause: the client (1.26.60, sub_DC17774) rejects one
+		// A teleport always carries its cause: the client rejects one
 		// without and disconnects with BadPacket. BDS's dimension transfer builds it with
-		// cause and source 0 (sub_CDE8520 into sub_85B0F00).
+		// cause and source 0 (into).
 		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: cause}),
 	})
 	p.flush()
 }
 
 // lightPortal is flint and steel's portal lighting (FlintAndSteelItem useOn calls
-// PortalBlock::trySpawnPortal before setting fire): true if the fire at pos made a
+// BDS's code before setting fire): true if the fire at pos made a
 // portal instead.
 func (p *Player) lightPortal(r *world.Region, pos cube.Pos) bool {
 	if p.s.portals == nil {

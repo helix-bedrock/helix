@@ -13,9 +13,9 @@ import (
 )
 
 // Villages are saved as BDS 1.26.60 saves them: five level keys per village,
-// VILLAGE_<dimension>_<uuid>_ and then INFO (0xBEECA90), DWELLERS (0xBEEE570), POI
-// (0xBEEF2F0), PLAYERS (0xBEEDDE0) and RAID (0xBEEFF30, deleted while there is no raid).
-// The dwellers keep the village's UUID in their own save (DwellerComponent, 0x723F7E0).
+// VILLAGE_<dimension>_<uuid>_ and then INFO, DWELLERS, POI,
+// PLAYERS and RAID (deleted while there is no raid).
+// The dwellers keep the village's UUID in their own save (DwellerComponent).
 //
 // Only claimed POIs are saved, as in BDS: free ones are found again by the scans. Not
 // modelled, so saved as BDS's defaults: the village's MTick, PDTick, BDTime and GDTime (0),
@@ -42,7 +42,7 @@ const (
 const saveVersion = 1
 
 // The dweller roles, in BDS's order (DwellerRole; the role names are registered in that
-// order at 0x734EA00): DWELLERS holds one list per role.
+// order): DWELLERS holds one list per role.
 const (
 	roleInhabitant = iota
 	roleDefender
@@ -178,7 +178,7 @@ func poiTag(v *Village) map[string]any {
 	return map[string]any{"POI": list}
 }
 
-// poiInstanceTag is POIInstance::save (0xBEDE800).
+// poiInstanceTag matches BDS.
 func poiInstanceTag(p *POI) map[string]any {
 	return map[string]any{
 		"X": int32(p.Pos[0]), "Y": int32(p.Pos[1]), "Z": int32(p.Pos[2]), //nolint:gosec // world positions fit

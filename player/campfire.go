@@ -11,9 +11,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Campfires and soul campfires, from BDS 1.26.60: the block entity's tick (vtable 0xFBFEE70,
-// tick 0xD448180, cooking one slot 0xD448C20, load 0xD449070, save 0xD449C70), the block's use
-// (food goes on, flint and steel lights it, a shovel puts it out) and its entityInside (0xCB446B0:
+// Campfires and soul campfires, from BDS 1.26.60: the block entity's tick (
+// tick, cooking one slot, load, save), the block's use
+// (food goes on, flint and steel lights it, a shovel puts it out) and its entityInside (:
 // a lit campfire burns players and mobs). Going out and lighting are the fire package's.
 //
 // Not sent: the smoke and the particles over cooking food, which BDS adds through the level's
@@ -30,7 +30,7 @@ const (
 	campfireCookTicks = 600
 	// campfireCrackleOdds is the one in n chance each tick of the crackle sound.
 	campfireCrackleOdds = 50
-	// campfireDropDelay is the pick-up delay of cooked and thrown out food (Spawner::spawnItem).
+	// campfireDropDelay is the pick-up delay of cooked and thrown out food.
 	campfireDropDelay = 10
 	// campfireDamage and soulCampfireDamage are the fire damage a lit one deals each tick.
 	campfireDamage     = 1
@@ -292,7 +292,7 @@ func (s *Host) DropCampfireItems(r *world.Region, pos cube.Pos) {
 	}
 }
 
-// useCampfire is BDS's CampfireBlock::use: flint and steel or a Fire Aspect item lights an unlit
+// useCampfire is BDS's code: flint and steel or a Fire Aspect item lights an unlit
 // campfire, a shovel puts out a lit one (either wears the item by one), and food with a recipe
 // here goes in the first free slot, used up outside creative. Anything else, or nothing done,
 // leaves the click to the held item.
@@ -375,7 +375,7 @@ func (p *Player) frostWalking() bool {
 	return hasEnchant(p.inventory.armor[armorFeet], enchantFrostWalker)
 }
 
-// campfireHurt is BDS's CampfireBlock::entityInside for a player or mob: something burning
+// campfireHurt is BDS's code for a player or mob: something burning
 // lights an unlit campfire; a lit one deals its fire damage (1, a soul one 2) unless the
 // entity does not burn or wears Frost Walker boots, then sets it on fire for 8 seconds unless
 // it is wet. Dropped items are not hurt (BDS's category check).

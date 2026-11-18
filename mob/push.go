@@ -5,7 +5,7 @@ import (
 	"github.com/helix-bedrock/entity/state"
 )
 
-// Pushing: BDS's Mob::pushActors (entity's state.PushActors, 1.26.60 0xBFEE7F0) after each
+// Pushing: BDS's code (entity's state.PushActors) after each
 // mob's movement, and players pushing the mobs they walk into. It changes other mobs'
 // velocity, so it runs in Apply, which runs one mob at a time in runtime-ID order. Only
 // mobs are pushed so far: items, boats and minecarts keep their own push code, and a mob
@@ -35,7 +35,7 @@ func (m *Mob) pushActors() {
 	m.pushNear = m.pushNear[:0]
 }
 
-// touches reports a, grown by reach on x and z as Mob::pushActors grows the pusher's box,
+// touches reports a, grown by reach on x and z as BDS grows the pusher's box,
 // overlapping b.
 func touches(a, b behavior.Box, reach float32) bool {
 	return a.Min.X-reach < b.Max.X && a.Max.X+reach > b.Min.X &&

@@ -11,8 +11,8 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Beacons as BDS 1.26.60 runs them: BeaconBlockActor (vtable 0xFBFC5F0: tick 0xD433070,
-// load 0xD4368F0, constructor 0xD4324E0 with the effect tiers) and the payment of its screen
+// Beacons as BDS 1.26.60 runs them: BeaconBlockActor (tick,
+// load, constructor with the effect tiers) and the payment of its screen
 // (ScreenHandlerBeacon in 1.21.3's names). The research note is private.
 //
 // Every 80 ticks the beacon counts the full layers of beacon base blocks under it (up to 4),
@@ -48,7 +48,7 @@ var beaconBases = []string{
 	"minecraft:diamond_block", "minecraft:netherite_block",
 }
 
-// beaconPayments are the items the screen takes, BDS 1.26.60 isPaymentItem (0xD437310).
+// beaconPayments are the items the screen takes, BDS 1.26.60 isPaymentItem.
 var beaconPayments = []string{
 	"minecraft:iron_ingot", "minecraft:gold_ingot", "minecraft:emerald",
 	"minecraft:diamond", "minecraft:netherite_ingot",
@@ -268,7 +268,7 @@ type beaconPayment struct {
 	primary, secondary int32
 }
 
-// payBeacon is BDS 1.26.60's beacon payment action (0xCA037C0): an open beacon, a primary
+// payBeacon is BDS 1.26.60's beacon payment action: an open beacon, a primary
 // from 1 to 38 whose tier the layers reach, a secondary only with four layers, and an item
 // in the payment slot. The item must be consumed by the request's own actions. Nothing stops
 // a beacon whose effects are already chosen from being paid again for new ones.

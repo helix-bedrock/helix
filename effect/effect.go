@@ -62,8 +62,8 @@ func (l List) Clone() List {
 	return out
 }
 
-// Give adds e, or merges it into the effect already had by BDS's MobEffectInstance update
-// (0xCAB7840). It returns the effect as it now is and whether it was new.
+// Give adds e, or merges it into the effect already had by BDS's MobEffectInstance update.
+// It returns the effect as it now is and whether it was new.
 func (l *List) Give(e Instance) (Instance, bool) {
 	e.age, e.stored = 0, nil
 	i, found := l.index(e.ID)
@@ -166,10 +166,10 @@ const (
 	Restored
 )
 
-// Countdown counts the effect down one tick, as BDS's MobEffectInstance tick
-// (0xCAB7FD0): the stored effects count down too and go at 0; one that runs out gives way
+// Countdown counts the effect down one tick, as BDS's MobEffectInstance tick:
+// the stored effects count down too and go at 0; one that runs out gives way
 // to the first stored effect, if any. Restored is reported only when the level changed, as
-// BDS's effect system (0x76B5550) tells viewers only then.
+// BDS's effect system tells viewers only then.
 func (e *Instance) Countdown() Outcome {
 	e.stored = slices.DeleteFunc(e.stored, func(k Instance) bool {
 		return k.Duration != Infinite && k.Duration <= 1
@@ -201,8 +201,8 @@ func (e *Instance) Countdown() Outcome {
 // visibleMax is how many effects the visible effects actor data holds.
 const visibleMax = 8
 
-// Visible is the actor data (131) viewers draw the effects' particles from, as BDS's
-// 0xCABBC70: up to eight effects with particles in ID order, seven bits each (the ID and
+// Visible is the actor data (131) viewers draw the effects' particles from, as BDS's:
+// up to eight effects with particles in ID order, seven bits each (the ID and
 // the ambient bit).
 func (l List) Visible() int64 {
 	var v int64

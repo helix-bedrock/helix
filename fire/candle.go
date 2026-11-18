@@ -10,15 +10,15 @@ import (
 )
 
 // Candles and candle cakes lighting and going out, from BDS 1.26.60's AbstractCandleBlock
-// (CandleBlock vtable 0xFB9D380, CandleCakeBlock 0xFB9D7F8). canLight (0xCCF3250): not lit
-// and no water in the block's liquid layer. tryLight (0xCB45EC0, the cake's 0xCB481E0) sets
-// lit with the ignite sound at the block's corner; extinguish (0xCCF3350 then 0xCCF3580) clears
-// it with extinguish.candle there. Water reaching a lit one puts it out (neighborChanged
-// 0xCCF3010). Clicks, placing and eating are the player package's.
+// (CandleCakeBlock). canLight: not lit
+// and no water in the block's liquid layer. tryLight (the cake's) sets
+// lit with the ignite sound at the block's corner; extinguish (then) clears
+// it with extinguish.candle there. Water reaching a lit one puts it out (neighborChanged).
+// Clicks, placing and eating are the player package's.
 //
-// Not done: the smoke particles extinguish shows per candle (0xCCF7140) and the cake's
+// Not done: the smoke particles extinguish shows per candle and the cake's
 // particle when lit (LevelEvent through vfunc 2032), and a burning projectile lighting a candle
-// (slot 133, 0xCCF37D0); Helix's projectiles do not ask blocks yet.
+// (slot 133); Helix's projectiles do not ask blocks yet.
 
 // candleLit is the lit state of a candle or candle cake.
 const candleLit = "lit"

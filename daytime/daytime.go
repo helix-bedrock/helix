@@ -115,7 +115,7 @@ func SunAngle(time int32, cycle bool) float32 {
 
 // SkyDarken is how much the sky takes off sky light, 0 at noon and 11 at midnight, with rain
 // and thunder at their levels (0 to 1, see the weather package) dimming the day further, as
-// BDS's Dimension tick works it out (sub_CF18C60): rain and thunder each take off up to 5/16 of
+// BDS's Dimension tick works it out: rain and thunder each take off up to 5/16 of
 // the brightness. Pass 0 for both where there is no weather.
 func SkyDarken(time int32, cycle bool, rain, thunder float32) int32 {
 	a := SunAngle(time, cycle)

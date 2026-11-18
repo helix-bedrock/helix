@@ -16,7 +16,7 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Projectiles, from BDS 1.26.60's ProjectileSystem (0x7745da0), ProjectileComponent and the
+// Projectiles, from BDS 1.26.60's ProjectileSystem, ProjectileComponent and the
 // on hit subcomponents. What differs between them is read from each one's definition.
 const (
 	nameSnowball   = "minecraft:snowball"
@@ -52,7 +52,7 @@ const (
 	projectileTurn = 0.2
 	// projectileBounce is what is left of its speed, turned round, when it does no damage.
 	projectileBounce = -0.1
-	// pearlDamage is the fall damage of arriving by ender pearl, 0x714f4b0.
+	// pearlDamage is the fall damage of arriving by ender pearl,.
 	pearlDamage = 5
 	// pearlCooldown is how many ticks a player must wait between pearls.
 	pearlCooldown = 20
@@ -182,7 +182,7 @@ type ExplodeSpec struct {
 	ParticleEffect, SoundEffect               string
 }
 
-// explodeComponent is the minecraft:explode component, with BDS's defaults (0x7258540).
+// explodeComponent is the minecraft:explode component, with BDS's defaults.
 type explodeComponent struct {
 	Power           *float32 `json:"power"`
 	DamageScale     *float32 `json:"damage_scaling"`
@@ -292,13 +292,12 @@ type projectileBox struct {
 }
 
 // Defaults of the component when a definition does not say, read from its constructor
-// (0x7143370).
 const (
 	projectileInertia       = 0.99
 	projectileLiquidInertia = 0.6
-	// projectileSplashRange is its splash_range (ProjectileComponent +424).
+	// projectileSplashRange is its splash_range.
 	projectileSplashRange = 4
-	// cloudRadiusOnUse is spawn_aoe_cloud's default radius_on_use (0x714E6E0).
+	// cloudRadiusOnUse is spawn_aoe_cloud's default radius_on_use.
 	cloudRadiusOnUse = -1
 )
 
@@ -511,7 +510,7 @@ func (t *Projectile) Velocity() mgl32.Vec3 { return t.vel }
 // SetVelocity changes its speed.
 func (t *Projectile) SetVelocity(vel mgl32.Vec3) { t.vel = vel }
 
-// aim is BDS's shoot (0x71480f0): dir made one long, off by a gaussian on each axis, times
+// aim is BDS's shoot: dir made one long, off by a gaussian on each axis, times
 // the speed.
 func aim(dir mgl32.Vec3, speed, uncertainty float32) mgl32.Vec3 {
 	if dir.Len() < 0.001 {
@@ -895,7 +894,7 @@ func clampToBox(p, lo, hi mgl32.Vec3) mgl32.Vec3 {
 	return p
 }
 
-// insideBox is BDS's test of whether a stuck projectile's block still holds it (0x7745da0): the
+// insideBox is BDS's test of whether a stuck projectile's block still holds it: the
 // faces count, since that is where it hit.
 func insideBox(p, lo, hi mgl32.Vec3) bool {
 	for n := range 3 {
@@ -976,7 +975,7 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 		default:
 			t.hitPlayer(hit.player)
 		}
-		// BDS's Piercing (0xC9AF5C0 gives the arrow the level and level + 1 hits): it flies
+		// BDS's Piercing (gives the arrow the level and level + 1 hits): it flies
 		// on through the entity.
 		if t.pierce > 0 {
 			t.pierce--
@@ -1116,7 +1115,7 @@ func (t *Projectile) pickedUpBy(r *world.Region, e *world.Entity, p *Player) boo
 	return true
 }
 
-// projectileDamage is BDS's impact damage (0x714a880) on what it may damage: the base, its
+// projectileDamage is BDS's impact damage on what it may damage: the base, its
 // speed times the multiplier, the bow's Power, rounded up if the definition says, then a
 // critical hit's random extra.
 func projectileDamage(spec ProjectileSpec, speed float32, power int32, critical bool) float32 {
@@ -1218,11 +1217,11 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
 		// The client disconnects on a teleport without its cause (see teleportFeet). BDS's
-		// projectile teleport (sub_714F4B0) sends cause Projectile with the projectile's
+		// projectile teleport sends cause Projectile with the projectile's
 		// actor type as the source; that number is not looked up yet, so the source is 0.
 		TeleportData: protocol.Option(protocol.TeleportData{TeleportCause: packet.TeleportCauseProjectile}),
 	})
-	// BDS's projectile teleport (sub_714F4B0) plays the pearl's sound, LevelEvent 1032, where
+	// BDS's projectile teleport plays the pearl's sound, LevelEvent 1032, where
 	// the player left and where they arrived. Both go after the teleport, so the client hears
 	// the arrival where it now is; the player gets the arrival themselves, as the chunk they
 	// landed in may not be in their view yet.
@@ -1371,7 +1370,7 @@ func (p *Player) throwItem(held ItemStack) bool {
 	eyes, rot := p.entity.Position(), p.entity.Rotation()
 	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(aimRotation(rot, spec.AngleOffset)), spec.Power, p)
 	t.potion = held.Meta
-	// BDS's throwable items (0xC985510 and the like) play it at the drop attach point.
+	// BDS's throwable items (the like) play it at the drop attach point.
 	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventThrow, pos: p.AttachPos(AttachDrop), extra: -1, entity: "minecraft:player"}, nil)
 	if !p.creative() {
 		p.useHeld()
@@ -1379,7 +1378,7 @@ func (p *Player) throwItem(held ItemStack) bool {
 	return true
 }
 
-// bowPull is how far a bow is drawn after ticks, BDS's 0xc8d71c0: 0 to 1.
+// bowPull is how far a bow is drawn after ticks, BDS's code: 0 to 1.
 func bowPull(ticks int32) float32 {
 	s := float32(ticks) / bowPullSpan
 	return min((s*s+s+s)/3, 1)
@@ -1419,7 +1418,7 @@ func heldEnchant(s ItemStack, id int16) int32 {
 	return level
 }
 
-// releaseBow is letting go of a drawn bow, BDS's 0xc8d71c0: too short a draw does nothing;
+// releaseBow is letting go of a drawn bow, BDS's code: too short a draw does nothing;
 // else the arrow takes the draw's speed and the bow's enchantments, the bow wears, and one
 // arrow goes, unless the shooter has Infinity or is in creative.
 func (p *Player) releaseBow(held ItemStack, pulled int32) {
@@ -1449,7 +1448,7 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	if infinity || creative {
 		t.pickup = arrowPickupCreative
 	}
-	// BDS's bow (0xC8D71C0) plays it at the weapon attach point.
+	// BDS's bow plays it at the weapon attach point.
 	playSound(r, p.blockPos(), soundEvent{name: packet.SoundEventBow, pos: p.AttachPos(AttachWeapon), extra: -1, entity: "minecraft:player"}, nil)
 	if creative {
 		return
@@ -1476,7 +1475,7 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	p.flush()
 }
 
-// dispenseProjectile is a dispenser shooting what a dispenser shoots, 0xc8e4c50: from at,
+// dispenseProjectile is a dispenser shooting what a dispenser shoots,: from at,
 // along its face and a little up, with what the item's definition says. False if the item
 // is not one. Who shot it is no one, so an arrow may be picked up.
 func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.Vec3, item string) bool {

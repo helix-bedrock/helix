@@ -9,10 +9,10 @@ import (
 
 // Border blocks wall off their whole column, as BDS 1.26.60 keeps it: each chunk has a map
 // of its 256 columns (LevelChunk mBorderBlockMap), set when a border block is placed
-// (BorderBlock onPlace 0xCB7FCE0, server side only) and cleared when one is removed and no
-// other is left in the column (onRemove 0xCB7FD60, LevelChunk setBorder 0xCF91C40). The map
+// (BorderBlock onPlace, server side only) and cleared when one is removed and no
+// other is left in the column (onRemove, LevelChunk setBorder). The map
 // is stored as chunk tag 56 and sent after the biomes of LevelChunk, both as a count byte
-// and then the column indices, z*16+x, rising (0xCF996D0); the client walls the columns off
+// and then the column indices, z*16+x, rising; the client walls the columns off
 // from that alone. BDS sends no chunk again when the map changes, its server-side movement
 // checks the players; Helix leaves player movement to the client, so it sends the chunk
 // again to everyone who has it.

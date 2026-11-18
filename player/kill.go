@@ -48,7 +48,7 @@ func KillCreative(p *Player) bool {
 	return mode == GameModeCreative || mode == GameModeDefault && p.s.level.GameMode == GameModeCreative
 }
 
-// Kill is BDS's Actor::kill as /kill calls it: anything living takes a self destruct hurt
+// Kill is BDS's code as /kill calls it: anything living takes a self destruct hurt
 // no health survives (no hurt time, absorption or totem stops it), anything else is
 // removed. A player is killed on its own region; an EntityTarget must be on the caller's.
 func Kill(t command.Target) {

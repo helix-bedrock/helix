@@ -11,16 +11,16 @@ import (
 
 // Chorus plants and flowers, from BDS 1.26.60 (the research note is private):
 //
-//   - ChorusPlantBlock: connections 0xCB5B7A0 (each side joins a chorus plant or flower, the
-//     bottom also end stone; the same rule TheEndGenerator::decorationPostProcessChunk
-//     runs), survival 0xCB5AA90, neighbour change 0xCB5A9C0 (a tick 1 later when it
-//     cannot stay), its tick 0xCB5A870 (breaks with its drops when it still cannot stay).
-//   - ChorusFlowerBlock: survival 0xCB59C40 (end stone or a chorus plant under it, or air
+//   - ChorusPlantBlock: connections (each side joins a chorus plant or flower, the
+//     bottom also end stone; the same rule BDS's code
+//     runs), survival, neighbour change (a tick 1 later when it
+//     cannot stay), its tick (breaks with its drops when it still cannot stay).
+//   - ChorusFlowerBlock: survival (end stone or a chorus plant under it, or air
 //     under it and exactly one chorus plant beside it with air on the other sides), neighbour
-//     change 0xCB59B90 and tick 0xCB58A40 as the plant's but breaking with no drops, the
-//     growth on random ticks 0xCB58C40 (grown flowers placed by 0xCB59860 with LevelSound
-//     125, a dead one plays 126; the sides test is 0xCB59740), and a projectile breaking it
-//     with its drops under projectilescanbreakblocks (0xCB59F20).
+//     change and tick as the plant's but breaking with no drops, the
+//     growth on random ticks (grown flowers placed by with LevelSound
+//     125, a dead one plays 126; the sides test is), and a projectile breaking it
+//     with its drops under projectilescanbreakblocks.
 const (
 	chorusPlant  = "minecraft:chorus_plant"
 	chorusFlower = "minecraft:chorus_flower"
@@ -294,7 +294,7 @@ func (t *Ticker) chorusFall(r *world.Region, pos cube.Pos, block uint32) {
 	}, nil)
 }
 
-// ProjectileHitChorus is a projectile hitting the block at pos (BDS's 0xCB59F20): with
+// ProjectileHitChorus is a projectile hitting the block at pos (BDS's code): with
 // canBreak (the projectilescanbreakblocks game rule) a chorus flower breaks with its drops.
 // Runs: owner of the region.
 func (t *Ticker) ProjectileHitChorus(r *world.Region, pos cube.Pos, canBreak bool) {

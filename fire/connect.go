@@ -9,8 +9,8 @@ import (
 
 // Fire's connection states, which the client reads to draw flames on the sides of the
 // blocks around fire that floats beside them (on a log, under leaves). BDS 1.26.60 gives
-// fire the minecraft:connection trait with its own callback (registered at 0x5C20CE0, mask
-// 0x926: east, west, south, north and up; the callback 0xCAFFDF0): each state is 1 when the
+// fire the minecraft:connection trait with its own callback (registered, mask
+// 0x926: east, west, south, north and up; the callback): each state is 1 when the
 // block that way has flame odds above 0. The trait updates the states when fire is placed and
 // when a neighbour changes; the change is the same block type, so fire's onPlace does not run
 // again.

@@ -18,7 +18,7 @@ import (
 // breathable, burns_in_daylight, hurt_on_condition, despawn and the rest), run by the entity
 // library's state package once per tick while the mob thinks. What they do to the mob itself
 // happens at once; hurting it waits for Apply. A despawned mob is removed as BDS's
-// Actor::despawn: no death, no drops. Burning down is the engine's, shared with players
+// BDS's code: no death, no drops. Burning down is the engine's, shared with players
 // (FireTicks, SetFireTicks).
 
 // readStates builds the state components from the definition. A component whose JSON did not
@@ -196,8 +196,8 @@ func (s stateMob) CanSeeDaylight() bool {
 	return s.v.r != nil && s.rt.Env.SkyDarken(s.v.r) < 4 && s.canSeeSky(s.Eyes())
 }
 
-// InWaterOrRain is BDS's Actor::isInWaterOrRain (sub_B39B650): in water, or rain falling on
-// the block at the top of the mob's box (Weather::isRainingAt, which wants the biome's
+// InWaterOrRain is BDS's code: in water, or rain falling on
+// the block at the top of the mob's box (BDS's code, which wants the biome's
 // precipitation warm enough to be rain).
 func (s stateMob) InWaterOrRain() bool {
 	if s.InWater() {
@@ -248,8 +248,8 @@ func (s stateMob) SetAirSupply(air, maxAir int16) {
 	s.flagsChanged()
 }
 
-// Particles is ActorParticles::spawnParticlesInArea, which the server never sends: BDS
-// 1.26.60's taming (0x716FF50) and love only broadcast their actor events (7, 21) and the
+// Particles matches BDS, which the server never sends: BDS
+// 1.26.60's taming and love only broadcast their actor events (7, 21) and the
 // client draws the hearts from those.
 func (stateMob) Particles(int, int) {}
 
@@ -317,7 +317,7 @@ func (m *Mob) Interact(player behavior.Actor) (json.RawMessage, bool) {
 	return raw, true
 }
 
-// CanAttack is Actor::canAttack for the state components (minecraft:angry asks it before
+// CanAttack matches BDS for the state components (minecraft:angry asks it before
 // staying angry). It answered false for everything before, so an angry mob calmed down on
 // its first tick, and a spider re-angered by hurt_by_target flipped calm and angry every
 // tick, rebuilding its goals and leaping again in mid-air. A forced check (an anger a

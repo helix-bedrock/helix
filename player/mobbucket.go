@@ -15,16 +15,16 @@ import (
 
 // Buckets that hold a mob, powder snow, and milk, from BDS 1.26.60's BucketItem.
 //
-// Its mob table (0xFB618C8) names each mob bucket's mob and whether it is a water animal,
+// Its mob table names each mob bucket's mob and whether it is a water animal,
 // poured with water, or a land animal (the sulfur cube), poured alone. A water bucket takes
 // a water animal and an empty bucket the sulfur cube (PlayerInteractionSystem's bucketable
-// mapping, 0x73754F0); a baby sulfur cube stays (0xC9B2370, which also refuses one with a
+// mapping); a baby sulfur cube stays (which also refuses one with a
 // component not named here). The mob goes, its saved data goes in the bucket (less Motion,
 // FallDistance, OnGround, Air, HurtTime, PortalCooldown, ActiveEffects and TargetID), the
 // fill sound plays at it, and the held bucket becomes the full one; in creative the full one
 // is added to the inventory if it is not there, and the held bucket stays.
 //
-// Emptying (_emptyBucket, 0xC99EC80) spawns the mob from that data at the middle of the
+// Emptying (_emptyBucket) spawns the mob from that data at the middle of the
 // block's floor, then pours water for a water animal. Powder snow goes where its block may
 // be placed. Mobs are not saved by Helix yet, so the data is what Helix has of one: its
 // definition group stack and health, in BDS's keys. Not done: the display strings BDS adds
@@ -32,7 +32,7 @@ import (
 // have none yet), the bucket a fish achievement, and the empty sounds of mob buckets, which
 // are taken as bucket.empty.fish and bucket.empty.land_animal (not read where BDS plays them).
 //
-// Milk (useTimeDepleted, 0xC999F60) is drunk in 32 ticks like every bucket's use time; it
+// Milk (useTimeDepleted) is drunk in 32 ticks like every bucket's use time; it
 // clears every effect and, outside creative, leaves an empty bucket. While it is drunk the
 // eating event goes out as for food, which the client plays the drink sound for (taken to
 // be the same for milk as for food, not read).
@@ -260,7 +260,7 @@ func (p *Player) landTarget(r *world.Region, clicked cube.Pos, face int32) (cube
 	return pos, true
 }
 
-// spawnBucketMob is BDS's mob out of a bucket (0xC99A3F0): from the bucket's data if it has
+// spawnBucketMob is BDS's mob out of a bucket: from the bucket's data if it has
 // any, else a new one (with the table's event), at the middle of the block's floor.
 func (s *Host) spawnBucketMob(r *world.Region, b mobBucket, held ItemStack, pos cube.Pos) {
 	at := blockVec(pos).Add(mgl32.Vec3{0.5, 0, 0.5})

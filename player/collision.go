@@ -37,7 +37,7 @@ func (s *Host) boxesAt(r *world.Region, pos cube.Pos, b uint32) []registry.Box {
 }
 
 // boxesFor is boxesAt for an entity whose box is lo..hi. BDS asks scaffolding with the entity:
-// it has a box only for one wholly above it (0xD5100A0). Without one it has none.
+// it has a box only for one wholly above it. Without one it has none.
 func (s *Host) boxesFor(r *world.Region, pos cube.Pos, b uint32, lo, hi mgl32.Vec3) []registry.Box {
 	blocks := s.reg.Blocks
 	props := blocks.Properties(b)
@@ -57,8 +57,8 @@ func (s *Host) boxesFor(r *world.Region, pos cube.Pos, b uint32, lo, hi mgl32.Ve
 	return scaffoldingBox
 }
 
-// doorBoxes is DoorBlock's shape (0xCB180D0): the lower half holds the direction and open
-// state, the upper the hinge. As in BDS (0xCB17EC0), a half without its other half of the same
+// doorBoxes is DoorBlock's shape: the lower half holds the direction and open
+// state, the upper the hinge. As in BDS, a half without its other half of the same
 // door reads as a door with everything at zero.
 func (s *Host) doorBoxes(r *world.Region, pos cube.Pos, b uint32) []registry.Box {
 	blocks := s.reg.Blocks

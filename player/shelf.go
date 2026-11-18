@@ -9,9 +9,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Shelves as BDS 1.26.60 (Linux, IDA): ShelfBlock's use listener 0xD51F060 and its single
-// slot swap 0xD5224A0, ShelfBlockActor (type 59, saved as "Shelf") with its save 0xD3E4D70
-// and load 0xD3E49A0, and the drop on destroy 0xD522160.
+// Shelves as BDS 1.26.60 (Linux, BDS): ShelfBlock's use listener and its single
+// slot swap, ShelfBlockActor (type 59, saved as "Shelf") with its save
+// and load, and the drop on destroy.
 //
 // Built: a shelf that is not powered swaps the held item with the slot clicked on its front;
 // a powered one swaps its whole row with the hotbar (shelfrow.go). Not built: the

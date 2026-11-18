@@ -11,15 +11,15 @@ import (
 
 // Light follows BDS 1.26.60's SubChunkRelighter and LevelChunk height map:
 //
-//   - Each block has a light emission and a light dampening (its Block's +164 and +165
+//   - Each block has a light emission and a light dampening (its Block's and
 //     bytes, helix-data's light_emission and light_dampening). A cell counts the larger of
 //     its two layers.
 //   - Light entering a cell loses the cell's dampening, at least 1 (the relighter's
-//     absorption, sub_CF53410 and sub_CF53660), so it fades by one a block through air.
+//     absorption), so it fades by one a block through air.
 //   - Block light starts at each cell's emission.
 //   - Sky light is 15 from the top of the world down to the column's height: the cell
-//     above the highest block that dampens light on either layer or is a half slab
-//     (LevelChunk::_recalcHeight, sub_CF8F420). Below that it only spreads, so even
+//     above the highest block that dampens light on either layer or is a half slab.
+//     Below that it only spreads, so even
 //     straight down under leaves it loses at least one a block.
 //
 // Light is not saved: BDS works it out when a chunk loads, and so does Helix, on the

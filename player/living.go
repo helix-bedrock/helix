@@ -97,7 +97,7 @@ func (s *Host) tickHazardsFrom(r *world.Region, l Living, lo, hi, moved mgl32.Ve
 }
 
 // contactHurt deals contact damage for what the box touches. A berry bush hurts only what
-// moved more than a little this tick: for a player BDS's berry bush check (0xD4E0C70) reads
+// moved more than a little this tick: for a player BDS's berry bush check reads
 // PostTickPositionDeltaComponent, how far its last movement took it, not its velocity,
 // which the client keeps at 0 while stuck in the bush; mobs are taken the same way, not
 // checked. The client plays the bush's scratch sound (block.sweet_berry_bush.hurt) itself on

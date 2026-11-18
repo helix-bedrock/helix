@@ -30,9 +30,9 @@ const effectWeaving = 33
 // the blocks the mob is in.
 const insideShrink = 0.001
 
-// The block slowdown multipliers, per axis, of BDS 1.26.60's entity-inside systems: cobweb
-// (0x7889950), sweet berry bush (0x7841EE0) and powder snow (0x7889770), and the cobweb's
-// for a mob with Weaving (BlockMovementSlowdownMultiplierSystemImpl::weavingMob, 0x6F2BCF0).
+// The block slowdown multipliers, per axis, of BDS 1.26.60's entity-inside systems: cobweb,
+// sweet berry bush and powder snow, and the cobweb's
+// for a mob with Weaving.
 var (
 	slowWeb        = physics.Vec3{X: 0.25, Y: 0.05, Z: 0.25}
 	slowBerryBush  = physics.Vec3{X: 0.8, Y: 0.75, Z: 0.8}
@@ -72,7 +72,7 @@ func (m *Mob) beforeMove() {
 // liquids answers buoyant's liquid heights.
 type liquids struct{ v *view }
 
-// LiquidHeight is BlockUtils::getLiquidBlockHeight: the top of the water or lava in the
+// LiquidHeight matches BDS: the top of the water or lava in the
 // block at p, below p when it holds none.
 func (l liquids) LiquidHeight(p behavior.Pos) float32 {
 	b := l.v.liquid(p)
@@ -88,7 +88,7 @@ func (l liquids) LiquidHeight(p behavior.Pos) float32 {
 	return float32(p.Y) + 1 - float32(depth)/liquidLevels
 }
 
-// blockClimb is BDS 1.26.60's BlockClimberSystemImpl::_tick (0x6F45580) for a mob with
+// blockClimb is BDS 1.26.60's BDS's code for a mob with
 // minecraft:block_climber: the in and over scaffolding flags, and the in-ascending and
 // over-descending flags for powder snow it can stand on (scaffolding counts there only for
 // players), from the blocks under the box at its feet and one below. A mob with any of them

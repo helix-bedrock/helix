@@ -8,7 +8,7 @@ import (
 )
 
 // Copper's oxidation stages by name, as BDS 1.26.60's copper blocks hold them (CopperBlock's
-// data at +944: the chain of stages, the stage, waxed). Only what lightning needs is here:
+// data: the chain of stages, the stage, waxed). Only what lightning needs is here:
 // reading a block's stage and stepping it back one. Ageing, scraping with an axe and waxing are
 // not built.
 const (
@@ -67,7 +67,7 @@ func (s *Host) lessOxidized(name string) string {
 }
 
 // deoxidize steps the copper block at pos back one oxidation stage, keeping its states, as
-// BDS's sub_CB2C940 does (a door's two halves together). False if it is no copper that can.
+// BDS's code does (a door's two halves together). False if it is no copper that can.
 // Runs: owner of the region.
 func (s *Host) deoxidize(r *world.Region, pos cube.Pos) bool {
 	block, ok := r.Block(pos, 0)

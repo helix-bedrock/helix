@@ -8,7 +8,7 @@ import (
 )
 
 // Campfires going out and lighting, from BDS 1.26.60's CampfireBlock (tryLightFire,
-// tryDouseFire, onPlace and neighborChanged; vtable 0xFB9CF40). The block entity, its food
+// tryDouseFire, onPlace and neighborChanged;). The block entity, its food
 // and the damage it deals are the player package's.
 
 // CampfireWetFunc is a campfire at pos that has water in its own block: BDS's neighborChanged

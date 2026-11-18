@@ -3,13 +3,13 @@ package mob
 import "github.com/helix-bedrock/entity/behavior"
 
 // Sneaking, sprinting and the movement attribute's modifiers (ocelotattack's Prowler).
-// BDS 1.26.60's Actor::setSneaking (0xB3B3A70) sets actor flag 1; Mob::setSprinting
-// (0xBFE7360) sets flag 3 and adds or removes the "Sprinting speed boost" modifier
+// BDS 1.26.60's BDS's code sets actor flag 1; BDS's code
+// sets flag 3 and adds or removes the "Sprinting speed boost" modifier
 // (UUID D208FC00-42AA-4AAD-9276-D5446530DE43, 0.3, multiply total, on the current value) on
-// the movement attribute. The attribute's value is AttributeInstance's recalculation
-// (0xBC84800): additions, then multiply base on the sum, then each multiply total.
+// the movement attribute. The attribute's value is AttributeInstance's recalculation:
+// additions, then multiply base on the sum, then each multiply total.
 
-// flagSneaking is Actor::setSneaking's actor flag.
+// flagSneaking matches BDS's actor flag.
 const flagSneaking = 1
 
 // The attribute modifier operations BDS's recalculation knows.
@@ -19,7 +19,7 @@ const (
 	modMultiplyTotal
 )
 
-// sprintModifier is Mob::setSprinting's speed boost.
+// sprintModifier matches BDS's speed boost.
 var sprintModifier = attrModifier{id: "D208FC00-42AA-4AAD-9276-D5446530DE43", op: modMultiplyTotal, amount: 0.3}
 
 // attrModifier is an AttributeModifier on the current value of the movement attribute.

@@ -18,8 +18,7 @@ import (
 // the chunks, the POI table read per block state, and the mobs as dwellers. A dimension's
 // villages are read from the world when its manager is made, and saved every 600 ticks, as
 // BDS saves each village, and when the server closes. A dweller saves its village's UUID,
-// RewardPlayersOnFirstFounding and its preferred profession (DwellerComponent, 1.26.60
-// 0x723F7E0).
+// RewardPlayersOnFirstFounding and its preferred profession (DwellerComponent, 1.26.60).
 
 // villages is the Host's village system.
 type villages struct {
@@ -103,7 +102,7 @@ func (s *Host) saveVillages() {
 	})
 }
 
-// The dweller's own save keys (DwellerComponent::addAdditionalSaveData).
+// The dweller's own save keys.
 const (
 	dwellerKeyVillage    = "DwellingUniqueID"
 	dwellerKeyReward     = "RewardPlayersOnFirstFounding"

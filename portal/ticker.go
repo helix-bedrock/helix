@@ -35,7 +35,7 @@ func (t *Ticker) QueuedTick(r *world.Region, pos cube.Pos, block uint32) {
 	t.next.QueuedTick(r, pos, block)
 }
 
-// Placed is the fire block's onPlace (sub_CAFE9C0): fire placed in the overworld or the
+// Placed is the fire block's onPlace: fire placed in the overworld or the
 // Nether, by a player or by spreading, first tries to light a nether portal there; when
 // it does, the fire is gone and next is not told. Everything else goes to next.
 func (t *Ticker) Placed(r *world.Region, pos cube.Pos, block uint32, layer uint8) {

@@ -22,7 +22,7 @@ func (m *Mob) Alive() bool         { return !m.Dead() }
 func (m *Mob) Removed() bool       { return m.despawned }
 func (m *Mob) Pickable() bool      { return !m.Dead() }
 
-// Interacts is Actor::canInteractWithOtherEntitiesInGame, true for every
+// Interacts matches BDS, true for every
 // mob, dead or not.
 func (m *Mob) Interacts() bool { return true }
 func (m *Mob) IsMob() bool     { return true }
@@ -76,7 +76,7 @@ func (m *Mob) SetFlag(n int, on bool) {
 // SetPanicking implements behavior.Mob.
 func (m *Mob) SetPanicking(on bool) { m.panicking = on }
 
-// WalkTargetValue is Mob::getWalkTargetValue for the mob's C++ class (behavior.WalkTarget):
+// WalkTargetValue matches BDS for the mob's C++ class (behavior.WalkTarget):
 // how much random strolling, panic and the spawner like p. Runs: the mob's tick.
 func (m *Mob) WalkTargetValue(p behavior.Pos) float32 {
 	return behavior.WalkTarget(m.walk, &m.rt.Walk, goalWorld{&m.v}, p, m.FireImmune())
@@ -205,7 +205,7 @@ func (m *Mob) CanSee(a behavior.Actor) bool {
 	return goalWorld{&m.v}.ClearLine(m.Eyes(), a.Eyes())
 }
 
-// CanAttack is Actor::canAttack as far as the hookup goes: alive, not itself, and not a player
+// CanAttack matches BDS as far as the hookup goes: alive, not itself, and not a player
 // in creative or spectator.
 func (m *Mob) CanAttack(a behavior.Actor) bool {
 	if a == nil || !a.Alive() || a.ID() == m.id {
@@ -252,7 +252,7 @@ func (m *Mob) ActorEvent(id, _ int32) { m.do(op{kind: opActorEvent, n: id}) }
 // standProbe is how far under its box BDS looks for what a mob stands on.
 const standProbe = 0.2
 
-// StandingOn is Actor::getBlockPosCurrentlyStandingOn (BDS 1.26.60 0xB394740): the block
+// StandingOn matches BDS: the block
 // whose collision meets a flat box 0.2 under the mob's box, else the block the mob is in.
 // When several blocks meet it, BDS's choice was not read; the one nearest the mob's middle
 // is taken.
@@ -290,7 +290,7 @@ var (
 	_ definition.Tester = tester{}
 )
 
-// Teleport moves the mob as BDS's Actor::teleportTo: viewers get the move as a teleport
+// Teleport moves the mob as BDS's code: viewers get the move as a teleport
 // (TakeTeleport), so they snap the mob to its new place and rotation instead of walking it
 // there. A sleeping villager is laid in its bed this way.
 func (m *Mob) Teleport(p behavior.Vec3) {

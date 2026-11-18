@@ -6,8 +6,8 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Powered shelf rows, from BDS 1.26.60's shelf use listener (0xD51F060) and its row
-// builders (two shelves 0xD5236F0, three 0xD5234B0): clicking a powered shelf swaps its
+// Powered shelf rows, from BDS 1.26.60's shelf use listener and its row
+// builders (two shelves, three): clicking a powered shelf swaps its
 // whole row with the hotbar. The row is listed end, middle, start, and the list fills the
 // hotbar from the right: the last shelf takes slots 6 to 8, the one before it 3 to 5, the
 // first 0 to 2, so a lone shelf swaps with slots 6 to 8. Each hotbar slot swaps with the

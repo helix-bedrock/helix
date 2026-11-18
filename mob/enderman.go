@@ -5,15 +5,15 @@ import "github.com/helix-bedrock/entity/behavior"
 // The enderman: BDS 1.26.60 writes it as its own class (EnderMan). On top of its
 // components:
 //
-//   - newServerAiStep (0xBD3DBD0) hurts it by 1 drowning damage every tick it is in water or
+//   - newServerAiStep hurts it by 1 drowning damage every tick it is in water or
 //     rain, and lets go of a target a player made it angry at once that player is dead;
-//   - _hurt (0xBD3DFE0) teleports it at random 9 times in 10 when a hit would not kill it,
+//   - _hurt teleports it at random 9 times in 10 when a hit would not kill it,
 //     before the hit lands (even one the hurt time then ignores), and marks a player's hit;
-//   - hurtEffects (0xBD3DE70), which Mob::_hurt calls once the damage is dealt, teleports it
+//   - hurtEffects, which BDS's code calls once the damage is dealt, teleports it
 //     at random again when it lived through the hit.
 //
-// The random teleports are minecraft:teleport's (TeleportComponent::randomTeleport
-// 0x7171BE0), so a riding enderman, which has no teleport component, stays.
+// The random teleports are minecraft:teleport's (BDS's code),
+// so a riding enderman, which has no teleport component, stays.
 const (
 	endermanType       = "minecraft:enderman"
 	damageDrowning     = 9
@@ -40,7 +40,7 @@ func (m *Mob) endermanTick() {
 	}
 }
 
-// endermanHurt is EnderMan::_hurt before the damage: a player's hit marks it, and 9 times in
+// endermanHurt matches BDS before the damage: a player's hit marks it, and 9 times in
 // 10 a hit it would live through teleports it. Runs: whoever hurts the mob.
 func (m *Mob) endermanHurt(amount float32, attacker behavior.Actor) {
 	if m.typ != endermanType {
@@ -57,7 +57,7 @@ func (m *Mob) endermanHurt(amount float32, attacker behavior.Actor) {
 	}
 }
 
-// endermanHurtEffects is EnderMan::hurtEffects after damage was dealt: it teleports when it
+// endermanHurtEffects matches BDS after damage was dealt: it teleports when it
 // lived through the hit. Runs: whoever hurts the mob.
 func (m *Mob) endermanHurtEffects(dealt float32) {
 	if m.typ == endermanType && dealt > 0 && float32(m.Health()) > dealt {
@@ -76,8 +76,8 @@ func (m *Mob) randomTeleport() {
 // projectileTeleportTries is how many random spots TeleportComponent's projectile dodge tries.
 const projectileTeleportTries = 64
 
-// DodgeProjectile is TeleportComponent's dodge in ProjectileComponent::onHit (0x7144A50,
-// sub_7146920): a mob whose minecraft:teleport has teleports_on_projectile_hit tries up to 64
+// DodgeProjectile is TeleportComponent's dodge in BDS's code ():
+// a mob whose minecraft:teleport has teleports_on_projectile_hit tries up to 64
 // random teleports, and when one works the projectile's hit does nothing. The component's
 // filter at +8 is not read (vanilla writes none). Runs: the projectile's tick, owner of the
 // region.

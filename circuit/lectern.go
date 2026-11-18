@@ -6,9 +6,9 @@ import (
 	"github.com/helix-bedrock/world/cube"
 )
 
-// Lecterns as BDS 1.26.60's LecternBlock (vtable 0xFB7F208): the producer made on place (slot
-// 56, 0xCADD8E0: direction down, attached, 15 while powered_bit is set) and the pulse a page turn
-// gives (emitRedstonePulse queues a tick; the tick listener 0xCADC3C0 turns it on on a redstone
+// Lecterns as BDS 1.26.60's LecternBlock: the producer made on place (slot
+// 56,: direction down, attached, 15 while powered_bit is set) and the pulse a page turn
+// gives (emitRedstonePulse queues a tick; the tick listener turns it on on a redstone
 // tick and off on the next).
 const nameLectern = "minecraft:lectern"
 

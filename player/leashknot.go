@@ -16,19 +16,19 @@ import (
 	"github.com/helix-bedrock/world/mcdb"
 )
 
-// Leash knots on fences and walls, BDS 1.26.60's LeashKnot (a HangingActor, vtable
-// 0xFAF64D8). A player who uses a fence or wall while holding leashed mobs ties every one of them within its leash preset's
+// Leash knots on fences and walls, BDS 1.26.60's LeashKnot (a HangingActor,).
+// A player who uses a fence or wall while holding leashed mobs ties every one of them within its leash preset's
 // max distance of the fence's centre to the fence's knot, made if there is none
-// (LeashFenceKnotActor's bind 0xBFCBDD0, the fence's use 0xD29E7B0; any item, and the use
+// (LeashFenceKnotActor's bind, the fence's use; any item, and the use
 // counts only when a mob was tied), with the leashknot.place sound. The knot stands at the
-// block's x and z centre and its y + 0.25 (its setPos 0xBFCB250). Hitting or using it takes
-// it away with leashknot.break (0xBFCAE90), and every mob tied to it drops its lead. Every
-// 80 to 120 ticks it checks its fence is still there (HangingActor's tick 0xBFC44D0).
+// block's x and z centre and its y + 0.25 (its setPos). Hitting or using it takes
+// it away with leashknot.break, and every mob tied to it drops its lead. Every
+// 80 to 120 ticks it checks its fence is still there (HangingActor's tick).
 //
-// The blocks that take a knot are the ones BDS's block registration (0x5BC7DE0) gives a
+// The blocks that take a knot are the ones BDS's block registration gives a
 // BlockLeashableDescription: every fence and every wall (not fence gates), all with the offset
 // (0, 12, 0) in sixteenths, which puts the knot at the block's centre and y + 0.25 (12/16 - 0.5,
-// as the fence use 0xD29E7B0 turns it into a position).
+// as the fence use turns it into a position).
 
 const (
 	leashKnotID = "minecraft:leash_knot"

@@ -6,8 +6,8 @@ import (
 )
 
 // Allow and deny blocks decide where players may build, as BDS 1.26.60 checks it in
-// BlockSource::checkBlockPermissions (0xCE57920, using an item on a block) and
-// checkBlockDestroyPermissions (0xCE574C0, breaking): the column under the block is walked
+// BDS's code (using an item on a block) and
+// checkBlockDestroyPermissions (breaking): the column under the block is walked
 // down from it, and the first allow block found lets the player build there, the first deny
 // block stops it; with neither, the game mode decides. A column holding a border block is
 // closed to everyone, and so is everything above the world's top. A creative operator skips
@@ -18,7 +18,7 @@ const (
 )
 
 // worldBuilderBlocks are the blocks with BDS's RequiresWorldBuilder property (BlockType
-// properties bit 21, set where allow 0x5C150AE, deny 0x5C1530E and border 0x5C15C57 are
+// properties bit 21, set where allow, deny and border are
 // registered): only a creative operator breaks them.
 var worldBuilderBlocks = map[string]bool{allowBlockName: true, denyBlockName: true, "minecraft:border_block": true}
 
@@ -28,7 +28,7 @@ var worldBuilderBlocks = map[string]bool{allowBlockName: true, denyBlockName: tr
 type BlockPermissionFunc func(p *Player, pos cube.Pos, face int32, destroy bool) bool
 
 // vanillaBlockPermission is BDS's checkBlockPermissions and checkBlockDestroyPermissions,
-// without the deny particle: GameMode and Item::_checkUseOnPermissions ask for none.
+// without the deny particle: GameMode and BDS's code ask for none.
 func vanillaBlockPermission(p *Player, pos cube.Pos, face int32, destroy bool) bool {
 	r := p.entity.Region()
 	if r == nil {
@@ -73,7 +73,7 @@ func vanillaBlockPermission(p *Player, pos cube.Pos, face int32, destroy bool) b
 
 // adventureMay is what the game mode allows with no allow or deny block: anything outside
 // adventure mode. In adventure only a privileged builder may, or, as BDS's level setting
-// adventure mode overrides is on (LevelData+0x380, never off on a server), whoever holds an
+// adventure mode overrides is on (LevelData, never off on a server), whoever holds an
 // item whose can_place_on (use) or can_destroy (break) list names the block. The list
 // decides alone, even against the privileged builder.
 func (p *Player) adventureMay(name string, destroy bool) bool {
@@ -91,7 +91,7 @@ func (p *Player) adventureMay(name string, destroy bool) bool {
 }
 
 // ignoresDestroyPermission is BDS's getIgnoresDestroyPermissions: only an item frame holding
-// an item (ItemFrameBlock 0xCAEBEE0), so hitting the item out of it is not stopped.
+// an item (ItemFrameBlock), so hitting the item out of it is not stopped.
 func (s *Host) ignoresDestroyPermission(r *world.Region, pos cube.Pos, name string) bool {
 	if name != frameBlock && name != glowFrameBlock {
 		return false

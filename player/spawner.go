@@ -17,11 +17,11 @@ import (
 
 // Monster spawners and spawn eggs, as BDS 1.26.60.
 //
-// The spawner is BDS's BaseMobSpawner (vtable 0xFBC9728; constructor 0xCEAA280, tick
-// 0xCEAAB00, load 0xCEAB450, save 0xCEAC7E0, delay 0xCEAA8D0). Each tick of its chunk:
+// The spawner is BDS's BaseMobSpawner (; constructor, tick,
+// load, save, delay). Each tick of its chunk:
 //
-//   - Nothing happens unless a player who is not in creative or spectator (Player slot 37,
-//     0xBCFFF70) is within RequiredPlayerRange of the block's centre (a negative range
+//   - Nothing happens unless a player who is not in creative or spectator (Player slot 37,)
+//     is within RequiredPlayerRange of the block's centre (a negative range
 //     reaches everywhere), measured to the player's position (its eyes, as BDS keeps it),
 //     and the spawner has a mob (EntityIdentifier not empty).
 //   - Delay counts down. At 0 it tries SpawnCount times: a spot (x + (r1-r2)*SpawnRange +
@@ -29,15 +29,15 @@ import (
 //     block distance (|dx|+|dy|+|dz|) from the spawner is at most SpawnRange. When
 //     MaxNearbyEntities mobs of the type are already in the box SpawnRange*2 to the sides
 //     and 4 up and down of the spawner, the spawner only resets its delay. Else the mob is
-//     made with its natural spawn and surface flags (Spawner::spawnMob 0xCD8F8C0), which
+//     made with its natural spawn and surface flags, which
 //     runs its own spawn check (spawn.CheckSpawnRules: monsters need block light 0 and
 //     darkness, animals a walkable spot, as for natural spawning), added, and shown with
-//     LevelEvent 2004 at the spawner (data: ceil(width) + ceil(height)<<8, 0xCD594A0).
+//     LevelEvent 2004 at the spawner (data: ceil(width) + ceil(height)<<8).
 //   - After a spawn, or when the box was full, the delay resets (MinSpawnDelay plus
 //     randInt(MaxSpawnDelay-MinSpawnDelay)) and BlockEvent 1 tells clients.
 //
-// A spawn egg used on a spawner sets its mob (ActorPlacerItem::_useOn 0xC9C6D20 ->
-// MobSpawnerBlockActor::setMob) in any game mode, sends the block entity and uses up one
+// A spawn egg used on a spawner sets its mob (BDS's code ->
+// BDS's code) in any game mode, sends the block entity and uses up one
 // egg outside creative. Elsewhere it spawns its mob on the clicked face, turned toward the
 // player.
 //
@@ -48,7 +48,7 @@ import (
 // makes from two BlockType property bits Helix does not have: here a spot is free unless
 // its block is solid-blocking.
 
-// BaseMobSpawner's defaults (constructor 0xCEAA280).
+// BaseMobSpawner's defaults (constructor).
 const (
 	spawnerDelay        = 20
 	spawnerMinDelay     = 200
@@ -91,7 +91,7 @@ func (s *Host) newSpawner() *MobSpawner {
 	}
 }
 
-// loadSpawner reads a spawner as BaseMobSpawner::load does; a missing field keeps its default.
+// loadSpawner reads a spawner as BDS does; a missing field keeps its default.
 func (s *Host) loadSpawner(saved map[string]any) *MobSpawner {
 	m := s.newSpawner()
 	m.saved = maps.Clone(saved)
@@ -123,7 +123,7 @@ func (s *Host) loadSpawner(saved map[string]any) *MobSpawner {
 func (m *MobSpawner) Entity() string { return m.entity }
 
 // SetEntity sets the type the spawner makes and shows it to the players who have its chunk,
-// as MobSpawnerBlockActor::setMob. Runs: owner of its chunk.
+// as BDS. Runs: owner of its chunk.
 func (m *MobSpawner) SetEntity(r *world.Region, pos cube.Pos, typ string) {
 	m.entity = typ
 	r.SendBlockEntity(pos)
@@ -132,7 +132,7 @@ func (m *MobSpawner) SetEntity(r *world.Region, pos cube.Pos, typ string) {
 // BindBlockEntity keeps the chunk handle for saves.
 func (m *MobSpawner) BindBlockEntity(h world.ChunkHandle) { m.chunk = h }
 
-// SaveData is the spawner as BaseMobSpawner::save writes it, with the block entity fields.
+// SaveData is the spawner as BDS writes it, with the block entity fields.
 func (m *MobSpawner) SaveData(pos cube.Pos) map[string]any {
 	data := maps.Clone(m.saved)
 	if data == nil {
@@ -157,7 +157,7 @@ func (m *MobSpawner) SaveData(pos cube.Pos) map[string]any {
 // NetworkData is what the client gets: the same, so it draws the mob inside.
 func (m *MobSpawner) NetworkData(pos cube.Pos) map[string]any { return m.SaveData(pos) }
 
-// TickBlockEntity is BaseMobSpawner::tick (0xCEAAB00).
+// TickBlockEntity matches BDS.
 func (m *MobSpawner) TickBlockEntity(r *world.Region, pos cube.Pos) {
 	if m.entity == "" || !m.playerNear(r, pos) {
 		return
@@ -283,7 +283,7 @@ func (m *MobSpawner) spawnAt(r *world.Region, pos cube.Pos, at mgl32.Vec3) bool 
 	return true
 }
 
-// resetDelay is BaseMobSpawner::delay (0xCEAA8D0).
+// resetDelay matches BDS.
 func (m *MobSpawner) resetDelay(r *world.Region, pos cube.Pos) {
 	m.delay = m.minDelay
 	if m.maxDelay > m.minDelay {

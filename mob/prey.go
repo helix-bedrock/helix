@@ -3,7 +3,7 @@ package mob
 import "github.com/helix-bedrock/entity/behavior"
 
 // The hooks of eat_mob (behavior.MobEater, the frog) and drop_item_for (behavior.Gifter, the
-// cat). BDS 1.26.60's DropItemForGoal::tick (0x5524130) rolls the loot table with the level's
+// cat). BDS 1.26.60's BDS's code rolls the loot table with the level's
 // Random and the mob as the looting entity and spawns each item at the mob's position with
 // the goal's pickup delay.
 
@@ -17,7 +17,7 @@ type LootHooks interface {
 
 // ClockEnv is what an engine with a day clock implements on its Env.
 type ClockEnv interface {
-	// TimeOfDay is BDS's Dimension::getTimeOfDay, 0 to 1 with 0 at noon.
+	// TimeOfDay is BDS's code, 0 to 1 with 0 at noon.
 	TimeOfDay() float32
 }
 

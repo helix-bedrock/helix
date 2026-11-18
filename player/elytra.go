@@ -15,16 +15,16 @@ const (
 	armorChest = 1
 
 	// elytraWearTicks: every so many gliding ticks the elytra takes elytraWear, on the
-	// tick whose count is elytraWearTick past a whole number of them (0xBFE3F20).
+	// tick whose count is elytraWearTick past a whole number of them.
 	elytraWearTicks = 20
 	elytraWearTick  = 19
 	elytraWear      = 1
 	// glideStartRise is how far the player may have risen in its last movement and still
-	// start gliding (0xBCFB8B0).
+	// start gliding.
 	glideStartRise = 0.15
 
 	// A crash into a wall while gliding hurts (horizontal speed lost) * crashScale -
-	// crashFree; above crashBigDamage it makes the big fall sound (0x78715D0, 0x78731F0).
+	// crashFree; above crashBigDamage it makes the big fall sound.
 	crashScale     = 10
 	crashFree      = 3
 	crashBigDamage = 4
@@ -99,7 +99,7 @@ func (p *Player) sendOwnFlags() {
 	p.send(actorDataAt(p.runtimeID, protocol.EntityMetadata{protocol.EntityDataKeyFlags: p.actorFlags(), protocol.EntityDataKeyFlagsTwo: p.actorFlagsTwo()}, p.entity.Tick()))
 }
 
-// elytraFlies is BDS's isFlyEnabled (0xC922F90): an elytra flies until its damage
+// elytraFlies is BDS's isFlyEnabled: an elytra flies until its damage
 // reaches one below its max.
 func (p *Player) elytraFlies(s ItemStack) bool {
 	if s.Empty() || s.Name != nameElytra {
@@ -115,7 +115,7 @@ func (p *Player) elytraFlies(s ItemStack) bool {
 // chestElytra is the elytra the player wears, if it flies.
 func (p *Player) chestElytra() bool { return p.elytraFlies(p.inventory.armor[armorChest]) }
 
-// vanillaStartGlide is BDS's tryStartGliding (0xBCFB8B0) with the elytra its start intent
+// vanillaStartGlide is BDS's tryStartGliding with the elytra its start intent
 // asks for (ArmorFlyEnabled): not on the ground, not riding, not in water, not rising
 // glideStartRise or more in the last movement, and an elytra that flies in the chest slot.
 func vanillaStartGlide(p *Player) bool {
@@ -125,8 +125,8 @@ func vanillaStartGlide(p *Player) bool {
 	return p.chestElytra()
 }
 
-// vanillaGlideTick is BDS's gliding time (FallFlyTicks, 0x785DE00), the elytra's wear
-// (0xBFE3F20: one damage every 20 gliding ticks, through hurtAndBreak so Unbreaking
+// vanillaGlideTick is BDS's gliding time (FallFlyTicks), the elytra's wear
+// (: one damage every 20 gliding ticks, through hurtAndBreak so Unbreaking
 // counts) and its stop intent for what Helix knows: no elytra that flies, riding, in
 // water or on the ground ends gliding. The client stops on its own for the rest (jumping
 // again, landing in powder snow).
@@ -149,7 +149,7 @@ func vanillaGlideTick(p *Player) {
 	p.glide.ticks++
 }
 
-// vanillaGlideCrash is BDS's gliding collision damage (0x78715D0, 0x78731F0): the
+// vanillaGlideCrash is BDS's gliding collision damage: the
 // horizontal speed lost, times 10, less 3, as fly-into-wall damage, with the big fall
 // sound above 4 and the small one below. BDS takes the speed its glide simulation asked
 // for against what the move allowed; Helix takes the client's movement, so before is the

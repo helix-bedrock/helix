@@ -173,7 +173,7 @@ func (t *Ticker) loadPiston(saved map[string]any) *pistonEntity {
 	return e
 }
 
-// TickBlockEntity is BDS's piston tick (0xd3d5f00): the power read, the start or end
+// TickBlockEntity is BDS's piston tick: the power read, the start or end
 // of a move, then the arm's step. BDS reads the power and starts or ends a move only
 // on the tick after the circuits evaluate, when its counter has reached the interval;
 // the arm steps every tick. So a block a piston sets down is always in place for the
@@ -424,7 +424,7 @@ func (e *pistonEntity) walk(r *world.Region, pos, at cube.Pos, reached, move pis
 
 // spawnMoving breaks what is in the way and turns what moves into moving blocks, one
 // on from where they stood. Their block entities go with them. As BDS's move start
-// (0xD3D7A90, each block by 0xD3D4DD0) it takes the blocks one at a time, the one
+// (each block by) it takes the blocks one at a time, the one
 // farthest along the move first, so each goes into a place already emptied: the
 // moving block is set where it goes and the old place emptied, both telling their
 // neighbours (BDS's flag 3), so observers, wire and falling blocks next to either
@@ -442,7 +442,7 @@ func (e *pistonEntity) spawnMoving(r *world.Region, pos cube.Pos, move pistonFac
 	}
 }
 
-// sortAlong puts the blocks farthest along move first (BDS's sort 0xD3D4C50), which is
+// sortAlong puts the blocks farthest along move first (BDS's sort), which is
 // also the order BDS sets them down in.
 func sortAlong(l []cube.Pos, pos cube.Pos, move pistonFacing) {
 	step := pos.Side(pistonFaces[move])
