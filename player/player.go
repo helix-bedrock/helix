@@ -79,6 +79,8 @@ type Player struct {
 	viewer *world.Viewer
 	// mobDebugState is the mobs the player watches with /mobdebug (mobdebug.go).
 	mobDebugState mobDebug
+	// tpsShow is the live tick rate readout of /tps live (tps.go).
+	tpsShow tpsLive
 	// dim is the dimension the player is in; moving is the move to another dimension
 	// waiting for the region to take the entity out, and removed hands its last place
 	// to leave.

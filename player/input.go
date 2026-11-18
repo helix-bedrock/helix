@@ -117,6 +117,7 @@ func (p *Player) handleInput(*world.Entity) {
 	}
 	p.runQueued()
 	p.mobDebugTick()
+	p.tpsLiveTick()
 	p.saveLinked()
 	if p.entity != nil {
 		p.tickPortal()
