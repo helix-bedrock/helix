@@ -24,6 +24,9 @@ import (
 // dataLeashHolder is the actor data key with the leash holder's unique ID, -1 for none.
 const dataLeashHolder = 37
 
+// actorEventBabyEat is the actor event a fed baby sends (ActorEvent 60, 0x744B350).
+const actorEventBabyEat = 60
+
 // SavedState is the age and breeding state a mob saves, BDS's AgeableComponent ("Age",
 // "GrowthPaused", load 0x7444D80) and BreedableComponent ("InLove", "LoveCause",
 // "BreedCooldown", load 0x7372E40) fields. Has* are false when the component was not there.
@@ -156,7 +159,11 @@ func (m *Mob) Feed(player behavior.Actor, h state.Hand) (result string, ok bool)
 	}
 	if a := m.states.Ageable; a != nil {
 		if i := a.Feed(&m.stateEnv, player, h); i >= 0 {
-			m.SetFlag(behavior.FlagBaby, a.Age() < 0)
+			// BDS's feed (1.26.60 0x744B350) only moves the age and sends baby_eat, from
+			// which the client plays the eating sound and particles. The baby flag stays:
+			// the next ageable tick grows the mob up and fires grow_up, which takes off the
+			// baby component groups (scale included).
+			m.do(op{kind: opActorEvent, n: actorEventBabyEat})
 			return orResult(a.Config().FeedItems[i].Result, a.Config().TransformToItem), true
 		}
 	}
