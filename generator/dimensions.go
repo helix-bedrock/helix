@@ -28,10 +28,26 @@ type Nether struct {
 var (
 	_ world.ColumnGenerator = (*Nether)(nil)
 	_ world.MobGenerator    = (*Nether)(nil)
+	_ world.MobRestorer     = (*Nether)(nil)
 )
 
 // TakeMobs is world.MobGenerator's: the mobs the chunk's structures placed.
 func (n *Nether) TakeMobs(pos mcdb.ChunkPos) []world.GeneratedMob { return n.mobs.take(pos) }
+
+// RestoreMobs is world.MobRestorer's: it generates the chunk again for its mobs.
+func (n *Nether) RestoreMobs(pos mcdb.ChunkPos) {
+	if n.mobs.has(pos) {
+		return
+	}
+	wc, ok := n.pool.Get().(*nether.Chunk)
+	if !ok {
+		wc = new(nether.Chunk)
+	}
+	defer n.pool.Put(wc)
+	n.cache.Generate(pos[0], pos[1], wc)
+	n.mobs.put(pos, wc.Entities)
+	wc.BlockEntities, wc.Entities = wc.BlockEntities[:0], wc.Entities[:0]
+}
 
 // NewNether builds the vanilla Nether for seed over the server's own blocks and biomes.
 func NewNether(reg *registry.Registry, seed int64) (*Nether, error) {

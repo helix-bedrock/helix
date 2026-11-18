@@ -14,10 +14,12 @@ import (
 // change, move or drop structure mobs. Runs: owner of the region.
 type StructureMobFunc func(s *Host, r *world.Region, m world.GeneratedMob) *Mob
 
-// vanillaStructureMob spawns the mob as BDS's structure pieces do (1.26.60):
-// with its spawn event, persistent, whether or not
-// mobs may spawn naturally.
+// vanillaStructureMob spawns the mob as BDS's structure pieces do (1.26.60): with its spawn
+// event and persistent, only while the doMobSpawning game rule is on.
 func vanillaStructureMob(s *Host, r *world.Region, m world.GeneratedMob) *Mob {
+	if !s.level.DoMobSpawning {
+		return nil
+	}
 	method := definition.InitSpawned
 	if m.Event != "" {
 		method = definition.InitEvent

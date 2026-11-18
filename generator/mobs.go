@@ -11,8 +11,8 @@ import (
 // mobStash holds the mobs worldgen placed in generated chunks until the server
 // takes them on the chunk's first tick (world.MobGenerator). A chunk generated
 // but never ticked keeps its entry until it is ticked in this run; a chunk
-// saved before its first tick and loaded after a restart has lost its mobs.
-// It is safe for use by many goroutines at once.
+// saved before its first tick and loaded after a restart is generated again
+// for its mobs (world.MobRestorer). It is safe for use by many goroutines at once.
 type mobStash struct{ m sync.Map }
 
 // put keeps the mobs of the chunk at pos, replacing what it had: a chunk
@@ -31,6 +31,12 @@ func (s *mobStash) put(pos mcdb.ChunkPos, spawns []structure.EntitySpawn) {
 		}
 	}
 	s.m.Store(pos, mobs)
+}
+
+// has reports whether the mobs of the chunk at pos are still kept.
+func (s *mobStash) has(pos mcdb.ChunkPos) bool {
+	_, ok := s.m.Load(pos)
+	return ok
 }
 
 // take returns and forgets the mobs of the chunk at pos.

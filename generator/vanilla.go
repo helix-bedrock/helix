@@ -41,11 +41,27 @@ var (
 	_ world.SpawnFinder     = (*Vanilla)(nil)
 	_ world.Spawner         = (*Vanilla)(nil)
 	_ world.MobGenerator    = (*Vanilla)(nil)
+	_ world.MobRestorer     = (*Vanilla)(nil)
 )
 
 // TakeMobs is world.MobGenerator's: the villagers, golems, animals, pillagers and
 // other mobs the chunk's structures placed.
 func (v *Vanilla) TakeMobs(pos mcdb.ChunkPos) []world.GeneratedMob { return v.mobs.take(pos) }
+
+// RestoreMobs is world.MobRestorer's: it generates the chunk again for its mobs.
+func (v *Vanilla) RestoreMobs(pos mcdb.ChunkPos) {
+	if v.mobs.has(pos) {
+		return
+	}
+	wc, ok := v.pool.Get().(*overworld.Chunk)
+	if !ok {
+		wc = new(overworld.Chunk)
+	}
+	defer v.pool.Put(wc)
+	v.cache.Generate(pos[0], pos[1], wc)
+	v.mobs.put(pos, wc.Entities)
+	wc.BlockEntities, wc.Entities, wc.Ticks = wc.BlockEntities[:0], wc.Entities[:0], wc.Ticks[:0]
+}
 
 // NewVanilla builds the vanilla overworld for seed over the server's own
 // blocks and biomes: worldgen places the registry's state IDs, so a block a

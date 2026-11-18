@@ -543,6 +543,9 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 		}
 	} else {
 		col.Chunk.ReplaceBiomes(d.resolveBiome)
+		if col.Finalisation == chunk.FinalisationNeedsPopulation {
+			d.restoreMobs(pos)
+		}
 	}
 	settle := d.settleChunk(pos, col)
 	entities := make([]chunk.BlockEntity, 0, len(col.BlockEntities))

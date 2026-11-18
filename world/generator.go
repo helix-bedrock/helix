@@ -55,6 +55,28 @@ type MobGenerator interface {
 	TakeMobs(pos mcdb.ChunkPos) []GeneratedMob
 }
 
+// MobRestorer is a MobGenerator that can work out a chunk's mobs again. RestoreMobs
+// readies for TakeMobs the mobs of a chunk that was saved before its first tick, whose mobs
+// were lost when the server stopped. It is called on worker goroutines, many at once.
+type MobRestorer interface {
+	RestoreMobs(pos mcdb.ChunkPos)
+}
+
+// restoreMobs asks the generator for the mobs of a saved chunk that has not had its first
+// tick, recovering a panic in it so one bad chunk does not stop the chunk loading.
+func (d *Dimension) restoreMobs(pos mcdb.ChunkPos) {
+	g, ok := d.conf.Generator.(MobRestorer)
+	if !ok {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			d.log.Error("restore chunk mobs", "pos", pos, "panic", r)
+		}
+	}()
+	g.RestoreMobs(pos)
+}
+
 // GeneratedMobs takes the mobs the dimension's generator placed in the chunk at
 // pos (see MobGenerator); nil when it places none. Runs: anywhere.
 func (d *Dimension) GeneratedMobs(pos mcdb.ChunkPos) []GeneratedMob {
