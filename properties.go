@@ -38,7 +38,7 @@ level-name=%s
 # The world's folder in worlds/, and the name of a new world.
 
 level-seed=
-# The seed of a new world, a number. Empty means a random one. An existing world keeps its own.
+# The seed of a new world: a number, or text that is hashed into one. Empty means a random one. An existing world keeps its own.
 
 level-type=
 # How chunks the world has not saved are made: vanilla (Minecraft's own terrain), flat, void,
@@ -101,16 +101,10 @@ func (c *Config) setProperty(key, value string) error {
 	case "level-name":
 		c.LevelName = value
 	case "level-seed":
-		if value == "" {
-			c.Seed = nil
-			return nil
+		c.Seed = nil
+		if seed, ok := SeedFromText(value); ok {
+			c.Seed = &seed
 		}
-		seed, perr := strconv.ParseInt(value, 10, 64)
-		if perr != nil {
-			// BDS turns a text seed into a number; how is not read yet.
-			return fmt.Errorf("level-seed %q: only number seeds are supported so far", value)
-		}
-		c.Seed = &seed
 	case "level-type":
 		c.WorldType = value
 	case "level-type-options":

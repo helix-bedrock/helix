@@ -97,6 +97,7 @@ func (s *Server) openWorld() error {
 // first weather times.
 func (s *Server) newLevel(ldat *leveldat.Data) {
 	ldat.LevelName = s.conf.LevelName
+	ldat.RandomSeed = randomSeed()
 	if s.conf.Seed != nil {
 		ldat.RandomSeed = *s.conf.Seed
 	}
