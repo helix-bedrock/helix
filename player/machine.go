@@ -731,7 +731,7 @@ func (d dispense) click() {
 }
 
 // dispenseSpecial runs what a dispenser does with an item that has a behaviour of its
-// own: buckets, carts, bone meal, fireworks and projectiles. False if the item has none
+// own: buckets, carts, bone meal, armour (dispensearmour.go), fireworks and projectiles. False if the item has none
 // here, so it is thrown out.
 func (s *Host) dispenseSpecial(d dispense) bool {
 	r, c, it := d.r, d.c, d.c.items[d.slot]
@@ -743,6 +743,7 @@ func (s *Host) dispenseSpecial(d dispense) bool {
 		click = true
 	case it.Name == nameBoneMeal:
 		s.dispenseBoneMeal(r, c, d.slot, d.front, d.at)
+	case s.dispenseArmour(d):
 	case s.dispenseFirework(r, d.pos, d.face, d.at, it), s.dispenseProjectile(r, d.pos, d.at, d.dir, it.Name):
 		d.takeOne()
 	default:
