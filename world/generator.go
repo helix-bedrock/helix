@@ -41,6 +41,11 @@ type GeneratedMob struct {
 	Persistent bool
 	// Source names what placed it ("jigsaw" for village pieces, "structure").
 	Source string
+	// OneIn, when above 0, makes this only a possible spot, spawned by a 1 in
+	// OneIn chance if the blocks there allow it (a mineshaft's chest carts).
+	OneIn int32
+	// LootTable is the loot table of a container entity, empty for none.
+	LootTable string
 }
 
 // MobGenerator is a Generator whose chunks hold mobs. TakeMobs returns the

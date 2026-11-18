@@ -27,6 +27,7 @@ func (s *mobStash) put(pos mcdb.ChunkPos, spawns []structure.EntitySpawn) {
 			Identifier: e.Identifier, Event: e.Event,
 			X: float32(e.X), Y: float32(e.Y), Z: float32(e.Z), Yaw: e.Yaw,
 			Persistent: e.Persistent, Source: e.Source,
+			OneIn: e.OneIn, LootTable: e.LootTable,
 		}
 	}
 	s.m.Store(pos, mobs)

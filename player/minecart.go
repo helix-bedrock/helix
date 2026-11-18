@@ -976,6 +976,7 @@ func (m *Minecart) Break(r *world.Region, drops bool) {
 	}
 	pos := m.entity.Position()
 	if m.chest != nil {
+		m.unpackLoot()
 		size := m.chest.halfSize()
 		m.s.spillSlots(r, m.chest.items[:size], pos, false, cartDropDelay)
 		clear(m.chest.items[:size])
@@ -1080,6 +1081,7 @@ func (p *Player) openCart(m *Minecart) {
 	if r == nil || w.open || m.gone || m.chest == nil || p.dead() || !p.abilities.Flag(AbilityOpenContainers) || m.entity.Region() != r {
 		return
 	}
+	m.unpackLoot()
 	o := windowOpening{
 		kind: m.chest.Kind(), window: m.spec.opens, pos: floorPos(m.entity.Position()), entity: m.entity.UniqueID(),
 		inv: m.chest.Inventory(r), cart: m,
@@ -1249,7 +1251,11 @@ func (s *Host) cartsAt(r *world.Region, pos cube.Pos, skip *Chest, fn func(c *Ch
 			continue
 		}
 		mLo, mHi := cartBox(e.Position())
-		if overlaps(lo, hi, mLo, mHi) && fn(m.chest) {
+		if !overlaps(lo, hi, mLo, mHi) {
+			continue
+		}
+		m.unpackLoot()
+		if fn(m.chest) {
 			return true
 		}
 	}

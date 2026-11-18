@@ -48,6 +48,11 @@ func (c *Chest) unpackLoot() {
 	delete(c.saved, lootTableTag)
 	delete(c.saved, lootTableSeedTag)
 	c.chunk.Changed()
+	c.rollLoot(table, seed)
+}
+
+// rollLoot rolls a loot table into these slots; a seed of 0 draws a random one.
+func (c *Chest) rollLoot(table string, seed int32) {
 	s := c.s
 	if s.entityLoot == nil || !s.entityLoot.Has(table) {
 		return

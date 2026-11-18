@@ -36,10 +36,12 @@ func vanillaStructureMob(s *Host, r *world.Region, m world.GeneratedMob) *Mob {
 // spawnStructureMobs spawns the mobs the generator placed in the chunk at pos, BDS's
 // structure postProcessMobsAt, which runs as the chunk is finished.
 func (s *Host) spawnStructureMobs(r *world.Region, pos mcdb.ChunkPos) {
-	if s.mobs == nil {
-		return
-	}
 	for _, m := range r.Dimension().GeneratedMobs(pos) {
-		s.game.sys.StructureMob(s, r, m)
+		switch {
+		case IsCartItem(m.Identifier):
+			s.game.sys.StructureCart(s, r, m)
+		case s.mobs != nil:
+			s.game.sys.StructureMob(s, r, m)
+		}
 	}
 }

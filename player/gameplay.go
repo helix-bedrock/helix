@@ -111,6 +111,9 @@ type Systems struct {
 	PickUp   PickUpFunc
 	// StructureMob spawns a mob a generated structure placed, on its chunk's first tick.
 	StructureMob StructureMobFunc
+	// StructureCart spawns a minecart a generated structure may place, on its chunk's
+	// first tick.
+	StructureCart StructureCartFunc
 	// ItemLifetime is how many ticks old items vanish at, from the start. It
 	// can change while running with Host.SetItemLifetime.
 	ItemLifetime int32
@@ -468,6 +471,7 @@ func vanillaGameplay(s *Setup) error {
 	sys.DropItem = vanillaDropItem
 	sys.PickUp = vanillaPickUp
 	sys.StructureMob = vanillaStructureMob
+	sys.StructureCart = vanillaStructureCart
 	sys.ItemLifetime = itemLifetime
 	sys.MoveFlags = vanillaMoveFlags
 	sys.Jump = vanillaJump
