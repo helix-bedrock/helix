@@ -156,15 +156,22 @@ func (c *AreaEffectCloud) config(uid int64, rid uint64, pos mgl32.Vec3) world.En
 	}
 }
 
-// metadata is its actor data, as BDS syncs it.
+// cloudFlags are the actor flags BDS sends a cloud with: has collision and fire immune.
+const cloudFlags = int64(1)<<protocol.EntityDataFlagHasCollision | int64(1)<<protocol.EntityDataFlagFireImmune
+
+// metadata is its actor data, as BDS sends it: every actor's defaults, then its own.
 func (c *AreaEffectCloud) metadata() protocol.EntityMetadata {
-	return protocol.EntityMetadata{
-		protocol.EntityDataKeyEffectColor:  int32(c.colour), //nolint:gosec // ARGB, as BDS sends it
-		protocol.EntityDataKeyAuxValueData: c.potion, protocol.EntityDataKeyDataRadius: c.radius,
-		protocol.EntityDataKeyDataParticle: c.particle, protocol.EntityDataKeyDataDuration: c.duration,
-		protocol.EntityDataKeyDataChangeRate: c.perTick, protocol.EntityDataKeyDataChangeOnPickup: c.changeOnPickup,
-		protocol.EntityDataKeyDataPickupCount: c.pickupCount,
-	}
+	m := actorDefaults()
+	m[protocol.EntityDataKeyFlags] = cloudFlags
+	m[protocol.EntityDataKeyEffectColor] = int32(c.colour) //nolint:gosec // ARGB, as BDS sends it
+	m[protocol.EntityDataKeyAuxValueData] = c.potion
+	m[protocol.EntityDataKeyDataRadius] = c.radius
+	m[protocol.EntityDataKeyDataParticle] = c.particle
+	m[protocol.EntityDataKeyDataDuration] = c.duration
+	m[protocol.EntityDataKeyDataChangeRate] = c.perTick
+	m[protocol.EntityDataKeyDataChangeOnPickup] = c.changeOnPickup
+	m[protocol.EntityDataKeyDataPickupCount] = c.pickupCount
+	return m
 }
 
 func (c *AreaEffectCloud) spawnPackets(e *world.Entity) []packet.Packet {
