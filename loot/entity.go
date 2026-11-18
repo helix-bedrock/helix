@@ -3,10 +3,12 @@ package loot
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"math"
 	"strings"
 
 	"github.com/helix-bedrock/helix-data/data"
+	"github.com/helix-bedrock/helix-data/data/files"
 )
 
 // Entity loot tables: what mobs drop when they die and what they spawn wearing, as BDS
@@ -89,7 +91,9 @@ type EntityTables struct {
 	tables map[string]*table
 }
 
-// NewEntityTables reads BDS 1.26.60's entity loot tables from helix-data.
+// NewEntityTables reads BDS 1.26.60's entity loot tables from helix-data, and its
+// container tables (loot_tables/chests/...), which generated chests, barrels and pots
+// roll when first opened.
 func NewEntityTables() (*EntityTables, error) {
 	raw, err := data.EntityLoot()
 	if err != nil {
@@ -103,7 +107,34 @@ func NewEntityTables() (*EntityTables, error) {
 		}
 		t.tables[name] = &tb
 	}
+	if err := t.readContainerTables(); err != nil {
+		return nil, fmt.Errorf("loot: %w", err)
+	}
 	return t, nil
+}
+
+// containerTables is where helix-data keeps BDS's container loot tables, under the
+// path a container names after "loot_tables/".
+const containerTables = "vanilla/loot_tables/chests"
+
+// readContainerTables adds every container table, keyed as worldgen saves them
+// ("loot_tables/chests/village/village_plains_house.json").
+func (t *EntityTables) readContainerTables() error {
+	return fs.WalkDir(files.Files(), containerTables, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".json") {
+			return err
+		}
+		raw, err := fs.ReadFile(files.Files(), path)
+		if err != nil {
+			return err
+		}
+		var tb table
+		if err := json.Unmarshal(raw, &tb); err != nil {
+			return fmt.Errorf("table %s: %w", path, err)
+		}
+		t.tables[strings.TrimPrefix(path, "vanilla/")] = &tb
+		return nil
+	})
 }
 
 // Has reports a table by path.

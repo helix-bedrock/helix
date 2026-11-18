@@ -680,6 +680,9 @@ func (c *Chest) BlockEntityRemoved(r *world.Region, pos cube.Pos) {
 	if c.furnace != nil {
 		c.furnaceBroken(r, pos)
 	}
+	// A generated container broken unopened spills its loot, as BDS rolls the table
+	// before dropping the contents.
+	c.unpackLoot()
 	items := c.items[:]
 	if g := c.s.game; !c.ender && g.chestSpillEv.Has() {
 		e := ChestSpillEvent{Region: r, Chest: c, Pos: pos, Items: slices.Clone(items)}
@@ -1015,6 +1018,7 @@ func (p *Player) openChest(r *world.Region, c *Chest, pos cube.Pos) {
 		return
 	}
 	lead, _ := c.halves(r)
+	c.unpackHalves(r)
 	o := p.chestOpening(r, c, pos)
 	p.showWindow(r, &o)
 	lead.addViewer(r, p)
