@@ -83,6 +83,12 @@ func (p *Player) sendJoin(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot wo
 	return p.sendNow()
 }
 
+// baseGameVersion is the world's base game version in StartGame: "*", any version, as a BDS
+// world's level.dat has by default. The client reads behaviour from it: a version of 1.21.5 or
+// later swaps a lingering cloud's even disc of particles for the newer emitter
+// (AreaEffectCloud's tick, 0xC07FE50), so sending the protocol version looked unlike BDS.
+const baseGameVersion = "*"
+
 // startGame is the player's StartGame: who and where it is, and the world it joins.
 func (p *Player) startGame(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot world.Rotation) *packet.StartGame {
 	s, lv := p.s, p.s.level
@@ -96,7 +102,7 @@ func (p *Player) startGame(spawn mgl32.Vec3, worldSpawn protocol.BlockPos, rot w
 		Pitch: rot.Pitch, Yaw: rot.Yaw,
 		WorldSeed: lv.Seed, Generator: lv.Generator, WorldGameMode: lv.GameMode, Difficulty: lv.Difficulty, WorldSpawn: worldSpawn,
 		AchievementsDisabled: true, MultiPlayerGame: true, LANBroadcastEnabled: true, CommandsEnabled: true,
-		PlayerPermissions: packet.PermissionLevelMember, BaseGameVersion: protocol.CurrentVersion,
+		PlayerPermissions: packet.PermissionLevelMember, BaseGameVersion: baseGameVersion,
 		WorldName: lv.Name, PlayerMovementSettings: protocol.PlayerMovementSettings{RewindHistorySize: 40, ServerAuthoritativeBlockBreaking: true},
 		MultiPlayerCorrelationID: uuid.NewString(), ServerAuthoritativeInventory: true, GameVersion: protocol.CurrentVersion,
 		UseBlockNetworkIDHashes: true, ChatRestrictionLevel: 0, Blocks: s.reg.Blocks.Definitions(),
