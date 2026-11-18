@@ -2,14 +2,16 @@ package player
 
 // particleTypeID is the ParticleType number of a particle name as entity definitions write it
 // ("mobspellambient", "dragonbreath"), and false for a name BDS does not know. The names are
-// BDS 1.26.60's ParticleType reflection table (0xF4172B0), in enum order from "none" at 0.
+// BDS 1.26.60's ParticleType reflection table (0xF4172B0), in enum order from "none" at 0,
+// with the one value after portal that the table leaves unnamed (mobportal): BDS's cloud
+// sends mobspellambient as 35 (0xC07F480) and its tick checks dragonbreath as 49 (0xC07FE50).
 // Runs: anywhere; it is read while definitions load.
 func particleTypeID(name string) (int32, bool) {
 	names := [...]string{
 		"none", "bubble", "bubblemanual", "crit", "blockforcefield", "smoke", "explode", "evaporation",
 		"flame", "candleflame", "lava", "largesmoke", "reddust", "risingborderdust", "iconcrack",
 		"snowballpoof", "largeexplode", "hugeexplosion", "breezewindexplosion", "mobflame", "heart",
-		"terrain", "townaura", "portal", "watersplash", "watersplashmanual", "waterwake", "dripwater",
+		"terrain", "townaura", "portal", "", "watersplash", "watersplashmanual", "waterwake", "dripwater",
 		"driplava", "driphoney", "stalactitedripwater", "stalactitedriplava", "fallingdust", "mobspell",
 		"mobspellambient", "mobspellinstantaneous", "ink", "slime", "rainsplash", "villagerangry",
 		"villagerhappy", "enchantingtable", "trackingemitter", "note", "witchspell", "carrotboost",
@@ -25,7 +27,7 @@ func particleTypeID(name string) (int32, bool) {
 		"iceballbreak",
 	}
 	for i, n := range names {
-		if n == name {
+		if n == name && n != "" {
 			return int32(i), true //nolint:gosec // under 100 names
 		}
 	}

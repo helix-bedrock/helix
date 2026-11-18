@@ -112,6 +112,8 @@ github.com/helix-bedrock/protocol v0.0.0-20261114213740-60c91f2876c2 h1:UH9xv5O5
 github.com/helix-bedrock/protocol v0.0.0-20261114213740-60c91f2876c2/go.mod h1:7uEwDr3AXskn3a6zfs+6e+zXH51WVJX+dfUgOyC1TWE=
 github.com/helix-bedrock/protocol v0.0.0-20261118010236-7371e7dee4c3 h1:LYc8DLdwbx4dd7MxJlPTs7kmJ0YjgUGYgwibHK+S28A=
 github.com/helix-bedrock/protocol v0.0.0-20261118010236-7371e7dee4c3/go.mod h1:7uEwDr3AXskn3a6zfs+6e+zXH51WVJX+dfUgOyC1TWE=
+github.com/helix-bedrock/protocol v0.0.0-20261118013509-e7815c66be22 h1:zkNu8y1G9wQgVjuXoQzUHSXY+4JPDvDy1XDeZmHToYo=
+github.com/helix-bedrock/protocol v0.0.0-20261118013509-e7815c66be22/go.mod h1:7uEwDr3AXskn3a6zfs+6e+zXH51WVJX+dfUgOyC1TWE=
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24 h1:LfqBsExOquDKBnujD/ZXu8tlLKW6WKtV4gPW4siyCw8=
 github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24/go.mod h1:yQ1PGHcnA4woFMDY+OWLn49Rwp81/oZzcceMTNYCRms=
 github.com/helix-bedrock/redstone v0.0.0-20261110223138-b95004f72d10 h1:vWYgr0UyPulMmaDLMoFb2JQ4bqV9jG8OlvYyGSHtxWo=
