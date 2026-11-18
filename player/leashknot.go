@@ -55,7 +55,7 @@ func isLeashFence(name string) bool {
 func (k *LeashKnot) config(uid int64, rid uint64, pos mgl32.Vec3) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: uid, RuntimeID: rid, Pos: pos,
-		Owner: k, Spawn: k.spawnPackets, Input: k.tick, Save: k.saveEntity,
+		Owner: k, Actor: true, Spawn: k.spawnPackets, Input: k.tick, Save: k.saveEntity,
 	}
 }
 

@@ -201,7 +201,7 @@ type lastPlace struct {
 // another dimension or, when the player leaves, hands back where it was.
 func (p *Player) entityConfig(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
-		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: pos, Rot: rot, Viewer: p.viewer, Owner: p,
+		UniqueID: p.uniqueID, RuntimeID: p.runtimeID, Pos: pos, Rot: rot, Viewer: p.viewer, Owner: p, Actor: true,
 		Spawn: p.spawnPackets, Move: p.movePacket, Think: p.think, Input: p.handleInput,
 		Removed: p.entityRemoved,
 	}

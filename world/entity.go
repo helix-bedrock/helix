@@ -93,6 +93,11 @@ type EntityConfig struct {
 	// Owner is what the entity belongs to, for whoever finds it with
 	// [Region.AppendEntitiesIn].
 	Owner any
+	// Actor puts the entity in the lists [Region.AppendActorsIn] reads, besides the full
+	// ones: set it for the entities area searches for living things want (players, mobs),
+	// so those searches skip the items, clouds and projectiles around them. It is read when
+	// the entity is added.
+	Actor bool
 	// Spawn returns the packets that show the entity to a player seeing it
 	// for the first time. Built once per tick and shared by every player. In a
 	// crowded region players are shown entities in parallel, so Spawn, SpawnFor,
@@ -341,7 +346,7 @@ func (e *Entity) Apply(m Movement) bool {
 	if c != e.chunk {
 		r.unindex(e)
 		e.chunk = c
-		r.byChunk[c] = append(r.byChunk[c], e)
+		r.indexChunk(e)
 		if e.conf.Viewer == nil && !r.owns(c) {
 			r.leaving = append(r.leaving, e)
 		}
@@ -401,7 +406,7 @@ func (r *Region) addEntity(e *Entity) {
 func (r *Region) insertEntity(e *Entity) {
 	i, _ := slices.BinarySearchFunc(r.entities, e, byRuntimeID)
 	r.entities = slices.Insert(r.entities, i, e)
-	r.byChunk[e.chunk] = append(r.byChunk[e.chunk], e)
+	r.indexChunk(e)
 	if e.known != nil {
 		j, _ := slices.BinarySearchFunc(r.players, e, byRuntimeID)
 		r.players = slices.Insert(r.players, j, e)
@@ -423,12 +428,29 @@ func byRuntimeID(a, b *Entity) int { return cmp.Compare(a.conf.RuntimeID, b.conf
 
 // unindex takes e out of the chunk index.
 func (r *Region) unindex(e *Entity) {
-	list := slices.DeleteFunc(r.byChunk[e.chunk], func(o *Entity) bool { return o == e })
+	dropFrom(r.byChunk, e.chunk, e)
+	if e.conf.Actor {
+		dropFrom(r.actorsByChunk, e.chunk, e)
+	}
+}
+
+// indexChunk puts e in the lists of its chunk.
+func (r *Region) indexChunk(e *Entity) {
+	r.byChunk[e.chunk] = append(r.byChunk[e.chunk], e)
+	if e.conf.Actor {
+		r.actorsByChunk[e.chunk] = append(r.actorsByChunk[e.chunk], e)
+	}
+}
+
+// dropFrom takes e out of the chunk's list in lists, deleting the chunk's entry when that
+// empties it.
+func dropFrom(lists map[mcdb.ChunkPos][]*Entity, pos mcdb.ChunkPos, e *Entity) {
+	list := slices.DeleteFunc(lists[pos], func(o *Entity) bool { return o == e })
 	if len(list) == 0 {
-		delete(r.byChunk, e.chunk)
+		delete(lists, pos)
 		return
 	}
-	r.byChunk[e.chunk] = list
+	lists[pos] = list
 }
 
 // handOff gives the entities that moved into another region's section this
@@ -756,6 +778,19 @@ func (r *Region) AppendEntitiesIn(dst []*Entity, minX, minZ, maxX, maxZ float32)
 	for x := lo[0]; x <= hi[0]; x++ {
 		for z := lo[1]; z <= hi[1]; z++ {
 			dst = append(dst, r.byChunk[mcdb.ChunkPos{x, z}]...)
+		}
+	}
+	return dst
+}
+
+// AppendActorsIn is AppendEntitiesIn for the entities added with EntityConfig.Actor alone,
+// in the same order, so a search for living things near thousands of items or clouds
+// walks only the living. Runs: owner, or a phase that runs entities in parallel.
+func (r *Region) AppendActorsIn(dst []*Entity, minX, minZ, maxX, maxZ float32) []*Entity {
+	lo, hi := chunkOf(mgl32.Vec3{minX, 0, minZ}), chunkOf(mgl32.Vec3{maxX, 0, maxZ})
+	for x := lo[0]; x <= hi[0]; x++ {
+		for z := lo[1]; z <= hi[1]; z++ {
+			dst = append(dst, r.actorsByChunk[mcdb.ChunkPos{x, z}]...)
 		}
 	}
 	return dst

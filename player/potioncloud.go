@@ -2,7 +2,6 @@ package player
 
 import (
 	"maps"
-	"math"
 	"math/rand/v2"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -99,6 +98,8 @@ type AreaEffectCloud struct {
 	// victims holds the players touched, by unique ID, until the tick of its life they may
 	// be touched again.
 	victims map[int64]int64
+	// found is touch's list of the players and mobs around it, kept to reuse.
+	found []*world.Entity
 }
 
 // Entity returns its entity.
@@ -223,21 +224,16 @@ func (c *AreaEffectCloud) touch(r *world.Region, e *world.Entity, age int64) {
 	pos := e.Position()
 	lo := mgl32.Vec3{pos[0] - radius, pos[1] - radius/2, pos[2] - radius}
 	hi := mgl32.Vec3{pos[0] + radius, pos[1] + radius/2, pos[2] + radius}
-	takers := cloudTakersOf(r)
-	clo, chi := cloudChunkOf(lo), cloudChunkOf(hi)
-	for x := clo[0]; x <= chi[0]; x++ {
-		for z := clo[1]; z <= chi[1]; z++ {
-			if !c.touchChunk(e, takers.in(r, mcdb.ChunkPos{x, z}), lo, hi, pos, radius, age) {
-				return
-			}
-		}
-	}
+	c.found = r.AppendActorsIn(c.found[:0], lo[0], lo[2], hi[0], hi[2])
+	c.touchFound(e, lo, hi, pos, radius, age)
+	clear(c.found)
 }
 
-// touchChunk is touch for the players and mobs in one chunk, in the order the chunk holds
-// them. False if the pass ends: it passed the owner it may not touch, or it is used up.
-func (c *AreaEffectCloud) touchChunk(e *world.Entity, found []*world.Entity, lo, hi, pos mgl32.Vec3, radius float32, age int64) bool {
-	for _, o := range found {
+// touchFound is touch for the players and mobs found around it (AppendActorsIn: the
+// living alone, so thousands of clouds in one place never walk each other). It stops at
+// the owner it may not touch, or once it is used up.
+func (c *AreaEffectCloud) touchFound(e *world.Entity, lo, hi, pos mgl32.Vec3, radius float32, age int64) {
+	for _, o := range c.found {
 		target, ok := effectTakerOf(o)
 		if !ok {
 			continue
@@ -248,7 +244,7 @@ func (c *AreaEffectCloud) touchChunk(e *world.Entity, found []*world.Entity, lo,
 		}
 		uid := o.UniqueID()
 		if !c.affectOwner && uid == c.owner {
-			return false
+			return
 		}
 		if _, touched := c.victims[uid]; touched {
 			continue
@@ -259,84 +255,9 @@ func (c *AreaEffectCloud) touchChunk(e *world.Entity, found []*world.Entity, lo,
 		c.victims[uid] = age + int64(c.reapplication)
 		c.affect(target)
 		if !c.used(e, age) {
-			return false
+			return
 		}
 	}
-	return true
-}
-
-// cloudTakers is what every cloud in a region shares on a tick: per chunk, only the entities
-// that can take effects (players and mobs), in the chunk's own order. A cloud looking at
-// its chunks then never walks other clouds, so thousands of clouds in one place cost each
-// chunk one walk a tick instead of one per cloud. Runs: owner of the region.
-type cloudTakers struct {
-	tick    int64
-	byChunk map[mcdb.ChunkPos]*cloudTakerList
-}
-
-// cloudTakerList is one chunk's effect takers, made on tick.
-type cloudTakerList struct {
-	tick int64
-	list []*world.Entity
-	all  []*world.Entity
-}
-
-// cloudTakersMaxChunks is how many chunks' lists a region keeps before a new tick drops them
-// all, so a region whose clouds have moved on does not hold on to old ones.
-const cloudTakersMaxChunks = 256
-
-// cloudTakersKeep is how many ticks a chunk's list stays once no cloud asks for it: a cloud
-// looks every cloudEvery ticks.
-const cloudTakersKeep = 2 * cloudEvery
-
-type cloudTakersKey struct{}
-
-// cloudChunkOf is the chunk a point is in.
-func cloudChunkOf(p mgl32.Vec3) mcdb.ChunkPos {
-	return world.ChunkPos(int32(math.Floor(float64(p[0]))), int32(math.Floor(float64(p[2]))))
-}
-
-// cloudTakersOf is the region's shared lists, cleared of old chunks on a new tick.
-func cloudTakersOf(r *world.Region) *cloudTakers {
-	t, _ := r.Local(cloudTakersKey{}, func() any { return &cloudTakers{byChunk: map[mcdb.ChunkPos]*cloudTakerList{}} }).(*cloudTakers)
-	if now := r.CurrentTick(); t.tick != now {
-		t.tick = now
-		if len(t.byChunk) > cloudTakersMaxChunks {
-			clear(t.byChunk)
-		}
-		// A chunk no cloud asked about for a while lets go of its players and mobs.
-		for at, l := range t.byChunk {
-			if now-l.tick > cloudTakersKeep {
-				delete(t.byChunk, at)
-			}
-		}
-	}
-	return t
-}
-
-// in is the chunk's effect takers this tick, walked once a tick whoever asks first. A
-// player or mob that a cloud's effect changes this tick stays in the list, as the chunk's
-// own list would.
-func (t *cloudTakers) in(r *world.Region, at mcdb.ChunkPos) []*world.Entity {
-	l, ok := t.byChunk[at]
-	if !ok {
-		l = &cloudTakerList{tick: -1}
-		t.byChunk[at] = l
-	}
-	if l.tick == t.tick {
-		return l.list
-	}
-	l.tick = t.tick
-	x, z := float32(at[0])*16, float32(at[1])*16
-	l.all = r.AppendEntitiesIn(l.all[:0], x, z, x+15, z+15)
-	l.list = l.list[:0]
-	for _, o := range l.all {
-		if _, takes := o.Owner().(effectTaker); takes {
-			l.list = append(l.list, o)
-		}
-	}
-	clear(l.all)
-	return l.list
 }
 
 // affect gives target the cloud's effects: instant ones at the cloud's scale, the others

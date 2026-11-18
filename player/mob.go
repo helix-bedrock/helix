@@ -167,7 +167,7 @@ func (o *Mob) add(d *world.Dimension) {
 func (o *Mob) config(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: int64(o.m.ID()), RuntimeID: o.m.RuntimeID(), Pos: pos, Rot: rot,
-		Owner: o, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply, Save: o.saveEntity,
+		Owner: o, Actor: true, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply, Save: o.saveEntity,
 	}
 }
 
@@ -717,7 +717,7 @@ func (s *Host) Entities(r *world.Region, dst []behavior.Actor, self behavior.ID,
 	sc := s.scratch()
 	defer sc.done()
 	// Look a little wider than b: entity positions are their feet or eyes, not their box.
-	sc.list = r.AppendEntitiesIn(sc.list, b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
+	sc.list = r.AppendActorsIn(sc.list, b.Min.X-2, b.Min.Z-2, b.Max.X+2, b.Max.Z+2)
 	for _, e := range sc.list {
 		a := actorOf(e)
 		if a == nil || a.ID() == self {

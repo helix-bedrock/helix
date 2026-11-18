@@ -121,6 +121,9 @@ type Region struct {
 	// who sees an entity walks only the players, however many entities the region holds.
 	players []*Entity
 	byChunk map[mcdb.ChunkPos][]*Entity
+	// actorsByChunk are the entities of byChunk added with EntityConfig.Actor, in the same
+	// order.
+	actorsByChunk map[mcdb.ChunkPos][]*Entity
 	// leaving are the entities that moved out of the region's sections this
 	// tick, handed off at its end.
 	leaving []*Entity
