@@ -175,7 +175,7 @@ func (e *Entity) EachSeer(fn func(player *Entity)) {
 	if r == nil {
 		return
 	}
-	for _, p := range r.entities {
+	for _, p := range r.players {
 		if _, ok := p.known[e]; ok {
 			fn(p)
 		}
@@ -402,6 +402,21 @@ func (r *Region) insertEntity(e *Entity) {
 	i, _ := slices.BinarySearchFunc(r.entities, e, byRuntimeID)
 	r.entities = slices.Insert(r.entities, i, e)
 	r.byChunk[e.chunk] = append(r.byChunk[e.chunk], e)
+	if e.known != nil {
+		j, _ := slices.BinarySearchFunc(r.players, e, byRuntimeID)
+		r.players = slices.Insert(r.players, j, e)
+	}
+}
+
+// syncPlayers rebuilds players from entities, after entities were taken out of it.
+func (r *Region) syncPlayers() {
+	clear(r.players)
+	r.players = r.players[:0]
+	for _, e := range r.entities {
+		if e.known != nil {
+			r.players = append(r.players, e)
+		}
+	}
 }
 
 func byRuntimeID(a, b *Entity) int { return cmp.Compare(a.conf.RuntimeID, b.conf.RuntimeID) }
@@ -427,6 +442,9 @@ func (r *Region) handOff() {
 		}
 		r.unindex(e)
 		r.entities = slices.DeleteFunc(r.entities, func(o *Entity) bool { return o == e })
+		if e.known != nil {
+			r.syncPlayers()
+		}
 		r.d.mu.Lock()
 		e.region = nil
 		r.d.mu.Unlock()
@@ -460,6 +478,7 @@ func (r *Region) unloadChunkEntities(pos mcdb.ChunkPos) {
 		return
 	}
 	r.entities = slices.DeleteFunc(r.entities, func(e *Entity) bool { return slices.Contains(out, e) })
+	r.syncPlayers()
 	for _, e := range out {
 		r.removeEntity(e)
 		r.d.mu.Lock()
@@ -499,6 +518,7 @@ func (r *Region) tickEntities() {
 			}
 			return rem
 		})
+		r.syncPlayers()
 	}
 	r.thinkers = r.thinkers[:0]
 	for _, e := range r.entities {
@@ -543,7 +563,7 @@ func (r *Region) removeEntity(e *Entity) {
 	e.gone = true
 	r.unindex(e)
 	pk := &packet.RemoveActor{EntityUniqueID: e.conf.UniqueID}
-	for _, p := range r.entities {
+	for _, p := range r.players {
 		if _, ok := p.known[e]; ok {
 			delete(p.known, e)
 			p.conf.Viewer.sendEntity(pk)
@@ -722,6 +742,11 @@ func (r *Region) fanOut(i int) {
 // AppendEntities appends every entity in this region to dst, so a caller reusing dst
 // allocates nothing. Runs: owner.
 func (r *Region) AppendEntities(dst []*Entity) []*Entity { return append(dst, r.entities...) }
+
+// AppendPlayers appends the players' entities in this region (those with a Viewer) to dst,
+// in runtime ID order, without walking the region's other entities. Runs: owner, or a
+// phase that runs entities in parallel (the list changes only between phases).
+func (r *Region) AppendPlayers(dst []*Entity) []*Entity { return append(dst, r.players...) }
 
 // AppendEntitiesIn appends the entities in this region standing in the chunks
 // the area touches to dst, so a caller reusing dst allocates nothing. The

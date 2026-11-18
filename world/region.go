@@ -116,7 +116,11 @@ type Region struct {
 	awaiting     map[mcdb.ChunkPos][]func(*Region)
 	viewers      []*Viewer
 	entities     []*Entity // ordered by runtime ID
-	byChunk      map[mcdb.ChunkPos][]*Entity
+	// players are the entities of entities that are shown others (players), in the same
+	// order: kept up to date as entities come and go (insertEntity, syncPlayers), so finding
+	// who sees an entity walks only the players, however many entities the region holds.
+	players []*Entity
+	byChunk map[mcdb.ChunkPos][]*Entity
 	// leaving are the entities that moved out of the region's sections this
 	// tick, handed off at its end.
 	leaving []*Entity

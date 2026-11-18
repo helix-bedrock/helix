@@ -736,7 +736,7 @@ func (s *Host) Entities(r *world.Region, dst []behavior.Actor, self behavior.ID,
 func (s *Host) Players(r *world.Region, dst []behavior.Actor) []behavior.Actor {
 	sc := s.scratch()
 	defer sc.done()
-	sc.list = r.AppendEntities(sc.list)
+	sc.list = r.AppendPlayers(sc.list)
 	for _, e := range sc.list {
 		if p, ok := e.Owner().(*Player); ok && p.entity != nil {
 			dst = append(dst, playerActor{p})

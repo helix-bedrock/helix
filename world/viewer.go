@@ -317,6 +317,7 @@ func (r *Region) moveViewer(v *Viewer, centre mcdb.ChunkPos) {
 		e = r.entities[i]
 		r.entities = slices.Delete(r.entities, i, i+1)
 		r.unindex(e)
+		r.syncPlayers()
 	}
 	d := r.d
 	d.mu.Lock()

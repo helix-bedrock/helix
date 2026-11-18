@@ -366,6 +366,7 @@ func (d *Dimension) split(r *Region) {
 			n.insertEntity(e)
 			return true
 		})
+		r.syncPlayers()
 		r.inMu.Lock()
 		r.in = slices.DeleteFunc(r.in, func(e entry) bool {
 			if e.every {
