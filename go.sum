@@ -102,6 +102,8 @@ github.com/helix-bedrock/helix-data v0.0.0-20261117214205-44da73b42d8b h1:VvrZKm
 github.com/helix-bedrock/helix-data v0.0.0-20261117214205-44da73b42d8b/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261117215547-bc709cf2ff2b h1:6Cc9WpjY3ujws3BvFSyiA0UN/mktfyJpiRATAt0qoeo=
 github.com/helix-bedrock/helix-data v0.0.0-20261117215547-bc709cf2ff2b/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
+github.com/helix-bedrock/helix-data v0.0.0-20261119173654-1c592be62d85 h1:79Hw1/1MNVMwc9afmi0LZ/hH+DjcE2vIxQGFQP36Ups=
+github.com/helix-bedrock/helix-data v0.0.0-20261119173654-1c592be62d85/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41 h1:XTa1sWqYUCqhxDdAGL9+vldnHfNIR5/VascyZWb9qYg=
 github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41/go.mod h1:VnXHxKcm+E0FTmpjyXwTMPweBUqZ/QNDRABUVjSwRRE=
 github.com/helix-bedrock/protocol v0.0.0-20261114051721-6bc95f374de8 h1:N3d5ULGXEgGL7c7NbsixUceprlTlUNSom2Pt5CMomO0=
@@ -154,6 +156,8 @@ github.com/helix-bedrock/worldgen v0.0.0-20261118232058-d8017f99aaa3 h1:haKH9cZI
 github.com/helix-bedrock/worldgen v0.0.0-20261118232058-d8017f99aaa3/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
 github.com/helix-bedrock/worldgen v0.0.0-20261118234614-c63cd620e9e5 h1:OmjUVldRaIeqE4LQ6yBjHIN8kXymSjQleo3pYMWspUE=
 github.com/helix-bedrock/worldgen v0.0.0-20261118234614-c63cd620e9e5/go.mod h1:N5NL2yMcNWkp78LhFQR4t6c/lBbP9WdMSHIn81tNz3c=
+github.com/helix-bedrock/worldgen v0.0.0-20261119173732-ebd2b62f0442 h1:tSnw5dA8/slKMoVxlyajOPrajpED8FXqP3Qqcr3+C70=
+github.com/helix-bedrock/worldgen v0.0.0-20261119173732-ebd2b62f0442/go.mod h1:RtesvsUqitfOAhb7FuhwbwaKOmiR2f8IyPym6EHdN0A=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
 github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
