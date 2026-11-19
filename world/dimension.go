@@ -563,7 +563,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities)
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })

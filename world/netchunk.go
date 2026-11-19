@@ -25,14 +25,21 @@ type NetChunk struct {
 
 // netSub is one sub chunk as SubChunk answers it.
 type netSub struct {
-	payload []byte
-	hmType  byte
-	hm      protocol.HeightMap
+	payload    []byte
+	hmType     byte
+	renderType byte
+	hm         protocol.HeightMap
+	// render is the render height map, only where it differs from hm: most
+	// sections have no water in them.
+	render *protocol.HeightMap
 }
+
+// columnHeights is a height for each column of a chunk, indexed by x | z<<4.
+type columnHeights [256]int16
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
@@ -45,7 +52,12 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		SubChunkLimit: protocol.Option(int32(count)), RawPayload: payload,
 	}
 	nc.size = len(payload)
-	heights := c.HeightMap()
+	var heights, render columnHeights
+	for col := range heights {
+		x, z := col&15, col>>4
+		heights[col] = light.columnTop(c, x, z, lightStopsSky)
+		render[col] = light.columnTop(c, x, z, lightStopsRender)
+	}
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
 	for i := range subs {
@@ -61,20 +73,37 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 			}
 		}
 		nc.size += len(s.payload)
-		s.hmType, s.hm = subHeightMap(heights, int(c.SubY(int16(i)))) //nolint:gosec // few sections
+		base := int(c.SubY(int16(i))) //nolint:gosec // few sections
+		s.hmType, s.hm = subHeightMap(&heights, base)
+		s.setRender(&render, base)
 	}
 	return nc
+}
+
+// setRender sets the render height map of the section starting at Y base, as
+// BDS sends it: "all copied" when it has data equal to the height map.
+func (s *netSub) setRender(render *columnHeights, base int) {
+	kind, hm := subHeightMap(render, base)
+	s.renderType = kind
+	if kind != protocol.HeightMapDataHasData {
+		return
+	}
+	if s.hmType == protocol.HeightMapDataHasData && hm == s.hm {
+		s.renderType = protocol.HeightMapDataAllCopied
+		return
+	}
+	s.render = &hm
 }
 
 // subHeightMap is the client's height map of the section starting at Y
 // base: each column's height relative to it, -1 below and 16 above, and
 // one of the "all too low/high" types when every column agrees.
-func subHeightMap(heights chunk.HeightMap, base int) (byte, protocol.HeightMap) {
+func subHeightMap(heights *columnHeights, base int) (byte, protocol.HeightMap) {
 	var hm protocol.HeightMap
 	low, high := true, true
-	for z := range uint8(16) {
-		for x := range uint8(16) {
-			rel := int(heights.At(x, z)) - base
+	for z := range 16 {
+		for x := range 16 {
+			rel := int(heights[x|z<<4]) - base
 			switch {
 			case rel < 0:
 				rel, high = -1, false
@@ -114,14 +143,14 @@ func (nc *NetChunk) entry(off protocol.SubChunkOffset, y int32) protocol.SubChun
 		return e
 	}
 	s := &nc.subs[i]
-	// BDS answers Success for every sub chunk, air ones included. The
-	// render height map repeats an "all too high/low" type and is "all
-	// copied" from the height map when that has data.
+	// BDS answers Success for every sub chunk, air ones included.
 	e.Result, e.RawPayload = protocol.SubChunkResultSuccess, protocol.Option(s.payload)
-	e.HeightMapType, e.RenderHeightMapType = s.hmType, s.hmType
+	e.HeightMapType, e.RenderHeightMapType = s.hmType, s.renderType
 	if s.hmType == protocol.HeightMapDataHasData {
 		e.HeightMapData = protocol.Option(s.hm)
-		e.RenderHeightMapType = protocol.HeightMapDataAllCopied
+	}
+	if s.render != nil {
+		e.RenderHeightMapData = protocol.Option(*s.render)
 	}
 	return e
 }

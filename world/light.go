@@ -72,18 +72,21 @@ func (l RegistryLight) StopsSky(block uint32) bool {
 	return p.LightDampening != 0 || p.HalfSlab
 }
 
-// Packed light facts of a block: dampening, emission and whether it stops the sky.
+// Packed light facts of a block: dampening, emission, whether it stops the sky, and
+// whether it ends the column the client renders, which water does not.
 const (
-	lightDampMask  = 0x0f
-	lightEmitShift = 4
-	lightStopsSky  = 1 << 8
+	lightDampMask    = 0x0f
+	lightEmitShift   = 4
+	lightStopsSky    = 1 << 8
+	lightStopsRender = 1 << 9
 )
 
 // lightTable is the light facts of every block, packed, read on every light step.
 type lightTable struct {
-	rules LightRules
-	info  []uint16
-	sky   bool
+	rules  LightRules
+	blocks *registry.Blocks
+	info   []uint16
+	sky    bool
 }
 
 func newLightTable(conf Config) *lightTable {
@@ -91,9 +94,9 @@ func newLightTable(conf Config) *lightTable {
 	if rules == nil {
 		rules = RegistryLight{Blocks: conf.Blocks}
 	}
-	t := &lightTable{rules: rules, info: make([]uint16, conf.Blocks.Count())}
+	t := &lightTable{rules: rules, blocks: conf.Blocks, info: make([]uint16, conf.Blocks.Count())}
 	for id := range t.info {
-		t.info[id] = packLight(rules, uint32(id)) //nolint:gosec // registry IDs fit
+		t.info[id] = t.pack(uint32(id)) //nolint:gosec // registry IDs fit
 	}
 	switch conf.Sky {
 	case SkyOn:
@@ -104,10 +107,13 @@ func newLightTable(conf Config) *lightTable {
 	return t
 }
 
-func packLight(rules LightRules, block uint32) uint16 {
-	v := uint16(min(rules.Dampening(block), MaxLight)) | uint16(min(rules.Emission(block), MaxLight))<<lightEmitShift
-	if rules.StopsSky(block) {
+func (t *lightTable) pack(block uint32) uint16 {
+	v := uint16(min(t.rules.Dampening(block), MaxLight)) | uint16(min(t.rules.Emission(block), MaxLight))<<lightEmitShift
+	if t.rules.StopsSky(block) {
 		v |= lightStopsSky
+		if t.blocks.Properties(block).Material != registry.MaterialWater {
+			v |= lightStopsRender
+		}
 	}
 	return v
 }
@@ -117,7 +123,7 @@ func (t *lightTable) of(block uint32) uint16 {
 	if int(block) < len(t.info) {
 		return t.info[block]
 	}
-	return packLight(t.rules, block)
+	return t.pack(block)
 }
 
 // cell is the packed facts of a cell from both its layers.
@@ -490,8 +496,14 @@ func (r *Region) flushLight() {
 // columnHeight is BDS's height of the column x, z of c: above the highest cell that
 // stops the sky.
 func (r *Region) columnHeight(c *Chunk, x, z int) int16 {
-	subs := c.col.Chunk.Sub()
-	t := r.d.light
+	return r.d.light.columnTop(c.col.Chunk, x, z, lightStopsSky)
+}
+
+// columnTop is the height just above the highest cell of the column x, z whose blocks
+// have one of the packed facts in stop, or the bottom of the world if none has.
+func (t *lightTable) columnTop(c *chunk.Chunk, x, z int, stop uint16) int16 {
+	subs := c.Sub()
+	bottom := int16(c.Range()[0]) //nolint:gosec // world heights fit
 	for i := len(subs) - 1; i >= 0; i-- {
 		if subs[i].Empty() {
 			continue
@@ -502,12 +514,12 @@ func (r *Region) columnHeight(c *Chunk, x, z int) int16 {
 			if len(layers) > 1 {
 				v |= t.of(layers[1].At(byte(x), byte(y), byte(z))) //nolint:gosec // 0 to 15
 			}
-			if v&lightStopsSky != 0 {
-				return int16(i<<4+y+1) + int16(r.d.r[0]) //nolint:gosec // world heights fit
+			if v&stop != 0 {
+				return int16(i<<4+y+1) + bottom //nolint:gosec // world heights fit
 			}
 		}
 	}
-	return int16(r.d.r[0]) //nolint:gosec // world heights fit
+	return bottom
 }
 
 // relight takes the light of kind away from the changed cells and everything lit
