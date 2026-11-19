@@ -394,10 +394,10 @@ func (m *Mob) dropExperience(r *world.Region) {
 // eyes with the projectile's offset, toward the middle of the target's box, starting a
 // block out toward it; with gravity the pitch is the lower of the two that reach it at
 // that speed (45 degrees up when none does). power above 0 replaces the projectile's own.
-// The arrow's aux value (a stray's slowness arrow) is not carried yet. The mob is the
+// An arrow takes the shooter's aux_val (a stray's slowness arrow, a bogged's poison). The mob is the
 // arrow's owner (passed through until the arrow leaves its box, shown to clients) but not
 // yet its attacker: no kill credit or death message.
-func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power float32, sound int) {
+func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, aux int32, power float32, sound int) {
 	r := m.entity.Region()
 	if r == nil || m.gone {
 		return
@@ -441,6 +441,9 @@ func (m *Mob) Shoot(_ *mob.Mob, target behavior.ID, def string, _ int32, power f
 	}
 	if pr := m.s.SpawnProjectile(r.Dimension(), spec, start, dir, speed, nil); pr != nil {
 		pr.shooter, pr.separated = m, false
+		if def == nameArrow && aux > 0 && aux <= math.MaxUint8 {
+			pr.aux = uint8(aux)
+		}
 	}
 	if sound != behavior.NoSound {
 		m.Sound(m.m, sound, m.m.Eyes())

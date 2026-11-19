@@ -96,6 +96,7 @@ const (
 	projectileKeyPickup   = "pickup"
 	projectileKeyStuckAt  = "stuckAt"
 	projectileKeyPotion   = "PotionId"
+	projectileKeyAux      = "auxValue"
 )
 
 // arrowPickup says who may pick up a stuck arrow.
@@ -172,6 +173,9 @@ type ProjectileSpec struct {
 	// GrantXP leaves experience worth XPMin up to XPMax less one where it hits (grant_xp).
 	GrantXP      bool
 	XPMin, XPMax int32
+	// ArrowEffect gives what it hits the effects of its potion, the arrow's aux value less
+	// one (arrow_effect); ArrowEffectOnBlocking also when a shield stops it.
+	ArrowEffect, ArrowEffectOnBlocking bool
 }
 
 // ExplodeSpec is a definition's minecraft:explode component.
@@ -274,9 +278,12 @@ type projectileComponent struct {
 			AffectOwner *bool    `json:"affect_owner"`
 			Particle    string   `json:"particle"`
 		} `json:"spawn_aoe_cloud"`
-		WindBurst *struct{}       `json:"wind_burst_on_hit"`
-		GrantXP   json.RawMessage `json:"grant_xp"`
-		Particle  *struct {
+		WindBurst *struct{} `json:"wind_burst_on_hit"`
+		Arrow     *struct {
+			OnBlocking bool `json:"apply_effect_to_blocking_targets"`
+		} `json:"arrow_effect"`
+		GrantXP  json.RawMessage `json:"grant_xp"`
+		Particle *struct {
 			Type     string `json:"particle_type"`
 			Count    int32  `json:"num_particles"`
 			OnEntity bool   `json:"on_entity_hit"`
@@ -397,6 +404,9 @@ func parseProjectileSpec(id, group string, definition []byte) (ProjectileSpec, e
 		}
 		s.GrantXP, s.XPMin, s.XPMax = true, lo, hi
 	}
+	if a := c.OnHit.Arrow; a != nil {
+		s.ArrowEffect, s.ArrowEffectOnBlocking = true, a.OnBlocking
+	}
 	if c.OnHit.WindBurst != nil {
 		s.WindBurst = true
 		var ex explodeComponent
@@ -481,6 +491,9 @@ type Projectile struct {
 	trident *tridentState
 	// potion is a thrown potion's ID, the item's meta.
 	potion int16
+	// aux is an arrow's aux value, the arrow item's meta: its potion's ID plus one, 0 for a
+	// plain arrow. BDS keeps it as actor data 36 and saves it as auxValue.
+	aux uint8
 
 	// moves is what those who see it were last told of its movement.
 	moves actorMoves
@@ -563,6 +576,8 @@ func (t *Projectile) spawnPackets(e *world.Entity) []packet.Packet {
 	}
 	if t.isPotion() {
 		meta[protocol.EntityDataKeyAuxValueData] = t.potion
+	} else if t.spec.ID == nameArrow {
+		meta[protocol.EntityDataKeyAuxValueData] = t.aux
 	}
 	return []packet.Packet{&packet.AddActor{
 		EntityUniqueID: e.UniqueID(), EntityRuntimeID: e.RuntimeID(), EntityType: t.spec.ID,
@@ -975,6 +990,7 @@ func (t *Projectile) apply(r *world.Region, e *world.Entity, hit projectileHit, 
 		default:
 			t.hitPlayer(hit.player)
 		}
+		t.arrowEffects(e, hit)
 		// BDS's Piercing (gives the arrow the level and level + 1 hits): it flies
 		// on through the entity.
 		if t.pierce > 0 {
@@ -1104,7 +1120,8 @@ func (t *Projectile) pickedUpBy(r *world.Region, e *world.Entity, p *Player) boo
 	default:
 		item := t.item
 		if item.Empty() {
-			item = ItemStack{Name: nameArrow, Count: 1}
+			// BDS's pickup item: an arrow with the arrow's aux, so a tipped one stays tipped.
+			item = ItemStack{Name: nameArrow, Meta: int16(t.aux), Count: 1}
 		}
 		if left := p.Give(t.s.freshStack(item)); !left.Empty() {
 			return false
@@ -1257,6 +1274,8 @@ func (t *Projectile) saveEntity(e *world.Entity) (chunk.Entity, bool) {
 	t.saveTrident(data)
 	if t.isPotion() {
 		data[projectileKeyPotion] = t.potion
+	} else if t.spec.ID == nameArrow {
+		data[projectileKeyAux] = t.aux
 	}
 	data[projectileKeyStuckAt] = []int32{int32(t.stuckAt[0]), int32(t.stuckAt[1]), int32(t.stuckAt[2])} //nolint:gosec // block positions fit
 	return chunk.Entity{ID: e.UniqueID(), Data: data}, true
@@ -1307,6 +1326,9 @@ func (s *Host) loadProjectile(r *world.Region, at mcdb.ChunkPos, saved chunk.Ent
 	t.loadTrident(saved.Data)
 	if v, isShort := saved.Data[projectileKeyPotion].(int16); isShort {
 		t.potion = v
+	}
+	if v, isByte := saved.Data[projectileKeyAux].(uint8); isByte {
+		t.aux = v
 	}
 	t.entity = r.AddLoadedEntity(at, t.config(saved.ID, s.runtimeIDs.Add(1), mgl32.Vec3{pos[0], pos[1], pos[2]}, t.rot))
 	return true
@@ -1398,6 +1420,23 @@ func (inv *playerItems) arrowSlot() (int, bool) {
 	return 0, false
 }
 
+// arrowAt is the stack arrowSlot names.
+func (inv *playerItems) arrowAt(slot int) ItemStack {
+	if slot < 0 {
+		return inv.offhand[0]
+	}
+	return inv.main[slot]
+}
+
+// arrowAux is the aux value an arrow shot from s carries: its meta, which for a tipped
+// arrow is its potion's ID plus one, as BDS's arrow item gives the arrow it makes.
+func arrowAux(s ItemStack) uint8 {
+	if s.Meta < 0 || s.Meta > math.MaxUint8 {
+		return 0
+	}
+	return uint8(s.Meta)
+}
+
 // mayDrawBow is BDS's rule: anyone in creative, with Infinity, or with arrows.
 func (p *Player) mayDrawBow(held ItemStack) bool {
 	if p.creative() || heldEnchant(held, enchantInfinity) > 0 {
@@ -1443,6 +1482,9 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 	eyes, rot := p.entity.Position(), p.entity.Rotation()
 	t := p.s.SpawnProjectile(r.Dimension(), spec, projectileEyes(spec, eyes, rot), lookDirection(rot), spec.Power*pull, p)
 	t.critical = pull == 1
+	if hasArrow {
+		t.aux = arrowAux(p.inventory.arrowAt(slot))
+	}
 	t.power = heldEnchant(held, enchantPower)
 	t.punch = float32(heldEnchant(held, enchantPunch)) * punchPerLevel
 	if infinity || creative {
@@ -1478,7 +1520,8 @@ func (p *Player) releaseBow(held ItemStack, pulled int32) {
 // dispenseProjectile is a dispenser shooting what a dispenser shoots,: from at,
 // along its face and a little up, with what the item's definition says. False if the item
 // is not one. Who shot it is no one, so an arrow may be picked up.
-func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.Vec3, item string) bool {
+func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.Vec3, it ItemStack) bool {
+	item := it.Name
 	id := throwable(item)
 	if item == nameArrow {
 		id = nameArrow
@@ -1491,7 +1534,10 @@ func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.V
 	if !ok {
 		return false
 	}
-	s.SpawnProjectile(r.Dimension(), spec, at, dir.Add(mgl32.Vec3{0, dispenseLift, 0}), spec.Power, nil)
+	t := s.SpawnProjectile(r.Dimension(), spec, at, dir.Add(mgl32.Vec3{0, dispenseLift, 0}), spec.Power, nil)
+	if id == nameArrow {
+		t.aux = arrowAux(it)
+	}
 	levelEvent(r, pos, at, levelEventDispenseProjectile, dispenseProjectilePitch)
 	return true
 }

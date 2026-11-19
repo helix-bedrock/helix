@@ -744,7 +744,7 @@ func (s *Host) dispenseSpecial(d dispense) bool {
 	case it.Name == nameBoneMeal:
 		s.dispenseBoneMeal(r, c, d.slot, d.front, d.at)
 	case s.dispenseArmour(d):
-	case s.dispenseFirework(r, d.pos, d.face, d.at, it), s.dispenseProjectile(r, d.pos, d.at, d.dir, it.Name):
+	case s.dispenseFirework(r, d.pos, d.face, d.at, it), s.dispenseProjectile(r, d.pos, d.at, d.dir, it):
 		d.takeOne()
 	default:
 		return false
