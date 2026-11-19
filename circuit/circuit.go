@@ -266,6 +266,8 @@ type Ticker struct {
 	weather *weather.Weather
 	// entityPush is how pistons move entities. Set before any player joins.
 	entityPush EntityPushFunc
+	// stuckIn finds entities stuck in a moving block. Set before any player joins.
+	stuckIn StuckInFunc
 	// powerTNT is what power reaching a TNT block does.
 	powerTNT func(r *world.Region, pos cube.Pos)
 	// powerDripleaf is what power reaching a big dripleaf does.

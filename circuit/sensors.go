@@ -62,6 +62,14 @@ type EntityPushFunc func(r *world.Region, e *world.Entity, by mgl32.Vec3)
 // it pistons only change the entity's position.
 func (t *Ticker) SetEntityPush(fn EntityPushFunc) { t.entityPush = fn }
 
+// StuckInFunc returns the block an entity is stuck in (an arrow or trident in a block), and
+// false if it is not stuck in one. Runs: owner of the entity's region.
+type StuckInFunc func(e *world.Entity) (cube.Pos, bool)
+
+// SetStuckIn sets how pistons find entities stuck in the blocks they move, which go along
+// with their block. Call it before any player joins.
+func (t *Ticker) SetStuckIn(fn StuckInFunc) { t.stuckIn = fn }
+
 // observerFace is the way an observer looks.
 func observerFace(states map[string]any) redstone.Face {
 	v, _ := states[stateFacingNamed].(string)

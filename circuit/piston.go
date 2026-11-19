@@ -255,26 +255,30 @@ func (e *pistonEntity) pushEntities(r *world.Region, pos cube.Pos, dir pistonFac
 	}
 	front := pos.Side(pistonFaces[dir])
 	step := mgl32.Vec3{float32(front[0] - pos[0]), float32(front[1] - pos[1]), float32(front[2] - pos[2])}
-	travel, gone := step, e.progress
+	travel, gone, moved := step, e.progress, e.progress-e.last
 	if !expanding {
-		travel, gone = step.Mul(-1), 1-e.progress
+		travel, gone, moved = step.Mul(-1), 1-e.progress, e.last-e.progress
 	}
 	c := e.t.circuitOf(r)
 	if expanding {
-		e.pushOutOf(c, pos, travel, gone, false)
+		e.pushOutOf(c, pos, travel, gone, 0, false)
 	}
 	for _, at := range e.attached {
-		e.pushOutOf(c, at, travel, gone, true)
+		e.pushOutOf(c, at, travel, gone, moved, true)
 	}
 }
 
 // pushOutOf moves entities out of a block that started at base and has gone this far
-// along travel. A block, unlike the arm, also takes along what rides on it.
-func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.Vec3, gone float32, carries bool) {
+// along travel, moved of it this tick. A block, unlike the arm, also takes along what rides
+// on it and what is stuck in it.
+func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.Vec3, gone, moved float32, carries bool) {
 	lo := mgl32.Vec3{float32(base[0]), float32(base[1]), float32(base[2])}.Add(travel.Mul(gone))
 	hi := lo.Add(mgl32.Vec3{1, 1, 1})
 	c.found = c.r.AppendEntitiesIn(c.found[:0], lo[0]-plateReach, lo[2]-plateReach, hi[0]+plateReach, hi[2]+plateReach)
 	for _, o := range c.found {
+		if carries && e.carriesStuck(c.r, o, base, travel.Mul(moved)) {
+			continue
+		}
 		eLo, eHi, _, ok := e.t.entityBox(o)
 		if !ok {
 			continue
@@ -300,6 +304,23 @@ func (e *pistonEntity) pushOutOf(c *regionCircuit, base cube.Pos, travel mgl32.V
 		}
 		e.moveEntity(c.r, o, by)
 	}
+}
+
+// carriesStuck moves an entity stuck in the block that started at base along with it, as
+// BDS's moving block moves every actor in its box: an arrow or trident in a pushed or
+// pulled block goes with it instead of falling. True if o was stuck in that block.
+func (e *pistonEntity) carriesStuck(r *world.Region, o *world.Entity, base cube.Pos, by mgl32.Vec3) bool {
+	if e.t.stuckIn == nil {
+		return false
+	}
+	at, stuck := e.t.stuckIn(o)
+	if !stuck || at != base {
+		return false
+	}
+	if by != (mgl32.Vec3{}) {
+		e.moveEntity(r, o, by)
+	}
+	return true
 }
 
 // moveEntity moves an entity through the engine's hook, which knows how each kind moves.

@@ -576,6 +576,10 @@ func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl32.Vec3) {
 		}
 		return
 	}
+	if t, ok := e.Owner().(*Projectile); ok && t.stuck && !t.gone {
+		t.pistonCarry(e, by)
+		return
+	}
 	p, isPlayer := e.Owner().(*Player)
 	if !isPlayer {
 		e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()})

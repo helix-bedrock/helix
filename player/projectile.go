@@ -476,6 +476,10 @@ type Projectile struct {
 	stuck           bool
 	stuckAt         cube.Pos
 	shake           int32
+	// carried is how far a piston has moved it with its block since it left stuckAt, and
+	// carriedAt the stuckTicks of the last move; its block is moving until carried adds up.
+	carried   mgl32.Vec3
+	carriedAt int32
 
 	// critical, power, punch and pickup are from the bow that shot it.
 	critical bool
@@ -1052,6 +1056,7 @@ func (t *Projectile) remove(e *world.Entity) {
 func (t *Projectile) stickIn(e *world.Entity, hit projectileHit) {
 	t.vel = mgl32.Vec3{}
 	t.stuck, t.stuckAt, t.stuckTicks, t.shake, t.critical = true, hit.block, 0, t.spec.ShakeTicks, false
+	t.carried = mgl32.Vec3{}
 	t.stuckMoveDue = true
 	// BDS's on ground flag is what stuck is; its moves carry it to the client.
 	e.Apply(world.Movement{Pos: hit.pos, Rot: t.rot, OnGround: true, Tick: e.Tick()})
@@ -1062,8 +1067,14 @@ func (t *Projectile) stickIn(e *world.Entity, hit projectileHit) {
 // gone after projectileLife, and a player touching it may pick it up.
 func (t *Projectile) tickStuck(r *world.Region, e *world.Entity) {
 	pos := e.Position()
+	if t.carrying() {
+		t.stuckTicks++
+		return
+	}
+	t.settleCarry()
 	if !t.heldBy(r, pos) {
 		t.stuck, t.stuckTicks = false, 0
+		t.carried = mgl32.Vec3{}
 		e.Apply(world.Movement{Pos: pos, Rot: t.rot, Tick: e.Tick()})
 		return
 	}
@@ -1086,6 +1097,47 @@ func (t *Projectile) tickStuck(r *world.Region, e *world.Entity) {
 			return
 		}
 	}
+}
+
+// carryWaitTicks is how long after a piston last moved it a stuck one still counts its block
+// as moving: the piston sets the block down on the tick after its last move, and the piston
+// and the projectile tick in either order within a tick.
+const carryWaitTicks = 2
+
+// StuckIn is the block a stuck arrow or trident is in, which pistons move it with. Runs:
+// owner of the entity's region.
+func (s *Host) StuckIn(e *world.Entity) (cube.Pos, bool) {
+	t, ok := e.Owner().(*Projectile)
+	if !ok || t.gone || !t.stuck {
+		return cube.Pos{}, false
+	}
+	return t.stuckAt, true
+}
+
+// pistonCarry moves a stuck one along with the block it is in, which a piston is moving.
+// While its block moves it stays stuck: BDS moves it with the block instead of letting it
+// fall. Once the block is set down it is stuck in the block's new place (settleCarry).
+func (t *Projectile) pistonCarry(e *world.Entity, by mgl32.Vec3) {
+	t.carried = t.carried.Add(by)
+	t.carriedAt = t.stuckTicks
+	e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: t.rot, OnGround: true, Tick: e.Tick()})
+}
+
+// carrying reports whether a piston is still moving its block.
+func (t *Projectile) carrying() bool {
+	return t.carried != (mgl32.Vec3{}) && t.stuckTicks-t.carriedAt < carryWaitTicks
+}
+
+// settleCarry moves stuckAt to where its block went, rounded to whole blocks, and forgets the
+// carry; the held check then decides, as for any stuck one (a block broken mid-move is gone).
+func (t *Projectile) settleCarry() {
+	if t.carried == (mgl32.Vec3{}) || t.carrying() {
+		return
+	}
+	for n := range 3 {
+		t.stuckAt[n] += int(math.Round(float64(t.carried[n])))
+	}
+	t.carried = mgl32.Vec3{}
 }
 
 // arrowTouchReach is how far around a player's box it picks up arrows.

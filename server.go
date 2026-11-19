@@ -430,6 +430,7 @@ func (s *Server) hookCircuits(host *player.Host) {
 	c.SetEntityBox(host.EntityBox)
 	c.SetPlateBox(host.PlateBox, host.IsArrow)
 	c.SetEntityPush(host.PistonPush)
+	c.SetStuckIn(host.StuckIn)
 	c.SetCartBox(host.CartBox)
 	c.SetPowerTNT(host.PowerTNT)
 	host.SetCircuitHooks(player.CircuitHooks{
