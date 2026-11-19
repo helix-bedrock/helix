@@ -715,3 +715,14 @@ func (t *Ticker) armNeighbour(r *world.Region, pos cube.Pos, block uint32) {
 func (t *Ticker) pistonFront(block uint32) redstone.Face {
 	return redstone.Face(pistonFaces[t.facingOf(block)]) //nolint:gosec // faces fit
 }
+
+// PistonProgress is how far out the arm of the piston whose block entity is be is, 0
+// to 1: what BDS moves the arm's collision boxes by. ok is false when be is not a
+// piston's.
+func PistonProgress(be world.BlockEntity) (progress float32, ok bool) {
+	e, ok := be.(*pistonEntity)
+	if !ok {
+		return 0, false
+	}
+	return e.progress, true
+}
