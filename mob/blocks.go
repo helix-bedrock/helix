@@ -96,6 +96,8 @@ func (b *Blocks) fill(id uint32) {
 		SoulSand: name == "soul_sand", PowderSnow: name == "powder_snow",
 		Climbable: props.Climbable, StopsDescent: name == "scaffolding",
 		LowJump: name == "honey_block", Restitution: restitution(name),
+		// BDS's stand-on slowdown is slime's and honey's; the inside rules are honey's.
+		StandSlow: name == "slime" || name == "honey_block", Honey: name == "honey_block",
 	}
 
 	b.goals[id] = behavior.Block{
