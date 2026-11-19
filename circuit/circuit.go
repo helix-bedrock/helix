@@ -877,7 +877,14 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 			comp.SetAttach(true)
 			comp.SetAllowUp(true)
 		}
-	case kindNote, kindTNT, kindBell, kindDripleaf:
+	case kindNote:
+		// As in BDS, a note block passes power on like the solid block it is, so dust
+		// on top turns off a torch on its side; the lamp has the same setting.
+		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
+			comp.SetAllowUp(true)
+			comp.SetSideInput(true)
+		}
+	case kindTNT, kindBell, kindDripleaf:
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetAllowUp(true)
 		}
