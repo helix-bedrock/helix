@@ -322,6 +322,7 @@ func (i *ItemActor) tick(e *world.Entity) {
 	}
 	if !st.rest {
 		i.place(r, e, st.pos, st.hitY)
+		i.itemStickyBlocks(r, e.Position(), st.inWater)
 	}
 	if i.onGround {
 		// An item on a big dripleaf tips it, moving or at rest, as any actor standing on one does.
@@ -476,7 +477,12 @@ func (i *ItemActor) moveAndDrag(r *world.Region, e *world.Entity) {
 func (i *ItemActor) place(r *world.Region, e *world.Entity, pos mgl32.Vec3, hitY bool) {
 	onGround := hitY && i.vel[1] < 0
 	if hitY {
+		fall := i.vel[1]
 		i.vel[1] = 0
+		// The bounce is added after the speed into the block is stopped, as for mobs.
+		if up, ok := i.s.itemBounce(r, pos.Sub(mgl32.Vec3{0, itemHalfSize, 0}), fall); ok {
+			i.vel[1] = up
+		}
 	}
 	i.onGround = onGround
 	if !e.Apply(world.Movement{Pos: pos, Rot: e.Rotation(), OnGround: onGround, Tick: e.Tick()}) {
