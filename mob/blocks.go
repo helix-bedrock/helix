@@ -209,6 +209,10 @@ func restitution(name string) float32 {
 	if name == "slime" {
 		return 1
 	}
+	if name == "honey_block" {
+		// BDS's honey bounciness: -1, no bounce at all.
+		return -1
+	}
 	if strings.HasSuffix(name, "_bed") || name == "bed" {
 		return 0.66
 	}

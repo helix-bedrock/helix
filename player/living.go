@@ -267,11 +267,13 @@ func (m *Mob) thinkHazards(r *world.Region) {
 func (m *Mob) hasFamily(f string) bool { return slices.Contains(m.m.Families(), f) }
 
 // landed is BDS's landing for an entity that is not a player (the player's goes through
-// Systems.Fall and FallDamage, which share these rules): damage ceil(distance - 3), a big or
-// small fall sound when it hurts, then the fall or land sound of the block below. A mob's
-// damage sensor decides whether the fall hurts (chickens, cats). Jump Boost and blocks that
-// change the fall are not counted: mobs have no effects yet.
+// Systems.Fall and FallDamage, which share these rules): slime or honey changes the distance,
+// then damage ceil(distance - 3), a big or small fall sound when it hurts, then the fall or
+// land sound of the block below. A mob's damage sensor decides whether the fall hurts
+// (chickens, cats). Jump Boost and the other blocks that change the fall are not counted:
+// mobs have no effects yet.
 func (s *Host) landed(r *world.Region, l Living, feet mgl32.Vec3, distance float32, typ string) {
+	distance = s.fallOnDistance(r, feet, distance)
 	damage := float32(math.Ceil(float64(distance-s.Tuning(TuneFallFree)))) * s.Tuning(TuneFallDamageScale)
 	if !s.fallHurts() {
 		damage = 0

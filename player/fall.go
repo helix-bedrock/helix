@@ -75,6 +75,7 @@ func vanillaFall(p *Player, m *MoveInfo) {
 	default:
 		p.move.fall = 0
 	}
+	p.honeySlidePlayer(m)
 }
 
 // fallHurts reports whether the falldamage game rule lets falls hurt; a level without
@@ -87,8 +88,8 @@ func (s *Host) fallHurts() bool {
 // vanillaFallDamage is BDS's landing (the block's fall-on, then the
 // player's causeFallDamage): damage ceil(distance - 3 - jump boost level),
 // a big or small fall sound when it hurts, then the fall or land sound of
-// the block below. Blocks that change the fall (slime, hay, beds) are not
-// ported yet.
+// the block below. Slime and honey change the distance first (fallOnDistance); hay and
+// beds are not ported yet.
 func vanillaFallDamage(p *Player, distance float32) {
 	r := p.entity.Region()
 	if r == nil {
@@ -100,6 +101,7 @@ func vanillaFallDamage(p *Player, distance float32) {
 	}
 	feet := p.entity.Position().Sub(mgl32.Vec3{0, eyeHeight, 0})
 	pos := vecPos(feet)
+	distance = p.s.fallOnDistance(r, feet, distance)
 	scale, cause := float32(1), DamageFall
 	if p.s.onStalagmiteTip(r, pos) {
 		distance += stalagmiteExtraFall
