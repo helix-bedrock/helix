@@ -199,13 +199,12 @@ func (e *pistonEntity) TickBlockEntity(r *world.Region, pos cube.Pos) {
 		e.readPower(strength)
 		e.settle()
 		if e.newState != e.state {
+			// BDS sends the piston only when its state changes, before the arm steps;
+			// the client moves the arm on its own from there. Sent on every tick, the
+			// client's arm and its collision are reset to a step behind. change sends it.
 			if !e.change(r, pos, block, dir) {
 				return
 			}
-			// BDS sends the piston only when its state changes, before the arm steps;
-			// the client moves the arm on its own from there. Sent on every tick, the
-			// client's arm and its collision are reset to a step behind.
-			r.SendBlockEntity(pos)
 		}
 	}
 	e.step()
@@ -324,6 +323,11 @@ func (e *pistonEntity) change(r *world.Region, pos cube.Pos, block uint32, dir p
 			e.attached, e.breaks = e.attached[:0], e.breaks[:0]
 			return false
 		}
+		// The client moves the attached blocks itself when it hears of the move,
+		// skipping a plain arm but not a sticky one, so it must hear before the arm
+		// is set where the first block stood. BDS's block changes reach the client
+		// after the piston; Helix's go at once, so the piston goes first here.
+		r.SendBlockEntity(pos)
 		e.spawnMoving(r, pos, dir, true)
 		arm := t.armOf(block)
 		if r.SetBlock(front, 0, arm) {
@@ -342,6 +346,7 @@ func (e *pistonEntity) change(r *world.Region, pos cube.Pos, block uint32, dir p
 				e.attached, e.breaks = e.attached[:0], e.breaks[:0]
 			}
 		}
+		r.SendBlockEntity(pos)
 	case pistonExpanded, pistonRetracted:
 		move := dir
 		if e.newState == pistonRetracted {
@@ -349,6 +354,7 @@ func (e *pistonEntity) change(r *world.Region, pos cube.Pos, block uint32, dir p
 		}
 		e.finish(r, move)
 		e.state = e.newState
+		r.SendBlockEntity(pos)
 	}
 	return true
 }
