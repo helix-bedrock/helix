@@ -755,8 +755,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 		}
 	case kindLamp:
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
-			// A lamp does not pass power on to dust beside it: in BDS a torch under a
-			// lamp next to the dust on the torch's own block just turns off, no loop.
+			comp.SetSideInput(true)
 			comp.SetFromCapacitor(false)
 		}
 	case kindRepeater:
@@ -880,7 +879,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 		}
 	case kindNote:
 		// As in BDS, a note block passes power on like the solid block it is, so dust
-		// on top turns off a torch on its side.
+		// on top turns off a torch on its side; the lamp has the same setting.
 		if comp := c.sys.Create(p, redstone.KindConsumer, redstone.Down); comp != nil {
 			comp.SetAllowUp(true)
 			comp.SetSideInput(true)
