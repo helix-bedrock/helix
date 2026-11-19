@@ -55,8 +55,9 @@ func (t *Ticker) HitTarget(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow 
 	if !ok || t.kind(block) != kindTarget {
 		return false
 	}
-	comp := t.circuitOf(r).sys.Create(toPos(pos), redstone.KindProducer, redstone.NoFace)
-	if comp != nil {
+	c, p := t.circuitOf(r), toPos(pos)
+	c.sys.Remove(p)
+	if comp := c.sys.Create(p, redstone.KindProducer, redstone.NoFace); comp != nil {
 		comp.SetStrength(targetSignal(pos, hit))
 		comp.SetAllowUp(true)
 	}
@@ -70,9 +71,17 @@ func (t *Ticker) HitTarget(r *world.Region, pos cube.Pos, hit mgl32.Vec3, arrow 
 	return true
 }
 
-// targetTick turns a target off when its wait is over.
+// targetTick makes a target an ordinary conducting block again when its wait is over.
 func (t *Ticker) targetTick(r *world.Region, pos cube.Pos) {
-	if comp := t.circuitOf(r).sys.Component(toPos(pos), redstone.KindProducer); comp != nil {
-		comp.SetStrength(0)
+	c, p := t.circuitOf(r), toPos(pos)
+	c.sys.Remove(p)
+	targetConducts(c, p)
+}
+
+// targetConducts makes the target at p what BDS has while it is not hit: a block that
+// carries power on like any solid block, which wire joins from every side.
+func targetConducts(c *regionCircuit, p redstone.Pos) {
+	if comp := c.sys.Create(p, redstone.KindPowered, redstone.NoFace); comp != nil {
+		comp.SetAnyDirection(true)
 	}
 }

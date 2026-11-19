@@ -202,7 +202,10 @@ func componentKind(k kind) redstone.Kind {
 		return redstone.KindRepeater
 	case kindComparator:
 		return redstone.KindComparator
-	case kindBlock, kindLever, kindButton, kindPlate, kindTarget, kindTrapped, kindDaylight, kindHook, kindJukebox,
+	case kindTarget:
+		// Until a hit makes it a producer for a while.
+		return redstone.KindPowered
+	case kindBlock, kindLever, kindButton, kindPlate, kindTrapped, kindDaylight, kindHook, kindJukebox,
 		kindRod, kindLectern, kindSculk:
 		return redstone.KindProducer
 	case kindObserver:
@@ -861,8 +864,7 @@ func (t *Ticker) setup(c *regionCircuit, pos cube.Pos, block uint32, load bool) 
 		}
 		t.ensureDaylight(c.r, pos)
 	case kindTarget:
-		// BDS's has no direction and nothing else set until it is hit.
-		c.sys.Create(p, redstone.KindProducer, redstone.NoFace)
+		targetConducts(c, p)
 	case kindTrapped, kindJukebox:
 		if comp := c.sys.Create(p, redstone.KindProducer, redstone.Down); comp != nil {
 			comp.SetAttach(true)
