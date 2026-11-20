@@ -36,6 +36,8 @@ type windowState struct {
 	// window is.
 	trader *Mob
 	horse  *Mob
+	// openTicks is how many server ticks the window has been open, up to takeOpenTicks.
+	openTicks int32
 }
 
 // nextID moves to the next window ID.
@@ -131,6 +133,7 @@ func (p *Player) showWindowThen(r *world.Region, o *windowOpening, after func())
 	w := &p.window
 	w.nextID()
 	w.open, w.kind, w.inv, w.pos, w.cart, w.boat = true, o.kind, o.inv, o.pos, o.cart, o.boat
+	w.openTicks = 0
 	if r != nil {
 		w.dim = r.Dimension()
 	}
