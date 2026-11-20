@@ -23,8 +23,10 @@ const (
 	// aimKeep is how many of the latest input rotations an attack may match: the attack packet
 	// and the input that turned toward the target do not always arrive in order.
 	aimKeep = 3
-	// aimGrow is how far the box is grown on every side for crosshair players.
-	aimGrow = 0.5
+	// aimGrow is how far the box is grown on every side for crosshair players: the crosshair ray
+	// from the camera and the one from the eyes differ a little. Kept small so a cheat that
+	// grows hitboxes gains little; how far the target moved is added on top (attackBox).
+	aimGrow = 0.2
 	// aimCone is the widest angle, in degrees, from the look to the nearest point of the box for
 	// touch players: past what any field of view shows.
 	aimCone = 80
@@ -143,4 +145,51 @@ func rayHitsBox(origin, dir, lo, hi mgl32.Vec3) bool {
 		}
 	}
 	return tFar >= 0
+}
+
+// Reach and hitbox: Helix's own rules, beyond BDS (BDS takes 6.7 blocks to the target's
+// position). A cheat client grows every hitbox or its own reach; the server measures from the
+// eyes to the target's real box, stretched back along the target's last movement for lag.
+
+const (
+	// attackReach is vanilla's survival attack reach, attackReachSlack what lag adds to it, and
+	// attackReachCreative the reach in creative.
+	attackReach         = 3
+	attackReachSlack    = 0.5
+	attackReachCreative = 6.5
+	// attackLagTicks is how many ticks of the target's movement its box is stretched back by:
+	// the attacker saw it where it was that long ago.
+	attackLagTicks = 4
+)
+
+// attackBox is the box an attack on e may hit: its real box, stretched back along its last
+// movement by attackLagTicks.
+func attackBox(e *world.Entity, lo, hi mgl32.Vec3) (mgl32.Vec3, mgl32.Vec3) {
+	o, ok := e.Owner().(*Player)
+	if !ok {
+		return lo, hi
+	}
+	back := o.move.moved.Mul(-attackLagTicks)
+	if back.Len() > attackReach {
+		back = back.Normalize().Mul(attackReach)
+	}
+	for i := range 3 {
+		if back[i] < 0 {
+			lo[i] += back[i]
+		} else {
+			hi[i] += back[i]
+		}
+	}
+	return lo, hi
+}
+
+// inAttackReach reports whether the box lo..hi is within the player's attack reach of its eyes.
+func (p *Player) inAttackReach(lo, hi mgl32.Vec3) bool {
+	eyes := p.entity.Position()
+	nearest := mgl32.Vec3{clamp32(eyes[0], lo[0], hi[0]), clamp32(eyes[1], lo[1], hi[1]), clamp32(eyes[2], lo[2], hi[2])}
+	limit := float32(attackReach + attackReachSlack)
+	if p.creative() {
+		limit = attackReachCreative
+	}
+	return nearest.Sub(eyes).Len() <= limit
 }

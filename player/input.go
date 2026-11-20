@@ -277,6 +277,11 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	if p.vehicle != nil {
 		pos = p.seatPosition()
 	}
+	if p.vehicle == nil && p.entity != nil {
+		if r := p.entity.Region(); r != nil {
+			pos = p.phaseCheck(r, from, pos, pk)
+		}
+	}
 	p.s.handlers.movement(p, world.Movement{
 		Pos: pos, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},
 		OnGround: collided, Tick: pk.Tick,
