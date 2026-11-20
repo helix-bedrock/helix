@@ -645,7 +645,7 @@ func (r *Region) encode(c *Chunk) {
 	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
 	border := c.col.Extra[borderTag]
 	d.pool.do(pos, prioView, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities, d.light, d.hide)
+		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities, d.light, d.hiding())
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
 		}

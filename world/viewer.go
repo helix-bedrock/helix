@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -80,6 +81,8 @@ type Viewer struct {
 	// under netMu (subhide.go).
 	eye    mgl32.Vec3
 	eyeSet bool
+	// seeAll lets the player past the anti X-ray (seeall.go).
+	seeAll atomic.Bool
 	// visGrid marks the sub chunks the player may see, from the last walk (subvis.go), around visAt
 	// within visReach chunks: where, when and with how many chunks it ran, and its reused queue.
 	// Under netMu.

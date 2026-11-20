@@ -61,6 +61,9 @@ func (NoHiding) Disguise(uint32) (uint32, bool) { return 0, false }
 // air otherwise; and the overworld's bedrock, shown as deepslate.
 type OreHiding struct {
 	Blocks *registry.Blocks
+	// Hide are more blocks to hide, by name ("minecraft:..."): shown as stone when solid, air
+	// otherwise. Show are blocks never hidden, by name, over every other rule.
+	Hide, Show map[string]bool
 	// Dim is the dimension: bedrock is hidden in the overworld only, where it is the floor
 	// under the caves, not the Nether's roof.
 	Dim mcdb.Dimension
@@ -79,13 +82,16 @@ const (
 // netherrack, a base or cave block as stone or air, and bedrock as deepslate.
 func (h OreHiding) Disguise(block uint32) (uint32, bool) {
 	name := h.Blocks.Name(block)
+	if h.Show[name] {
+		return 0, false
+	}
 	if name == nameBedrock {
 		if h.Dim != mcdb.Overworld {
 			return 0, false
 		}
 		return h.Blocks.Block(coverDeepslate)
 	}
-	if baseBlock(name) || caveBlocks[name] {
+	if baseBlock(name) || caveBlocks[name] || h.Hide[name] {
 		// A solid one goes out as stone, the rest (chests, anvils, spawners) as air.
 		if occluder(h.Blocks.Properties(block)) {
 			return h.Blocks.Block(coverStone)
@@ -150,6 +156,17 @@ func (t *hideTable) isLiquid(block uint32) bool {
 	return int(block) < len(t.liquid) && t.liquid[block]
 }
 
+// hiding returns the dimension's hiding table: the rules SetHiding last set.
+func (d *Dimension) hiding() *hideTable { return d.hide.Load() }
+
+// SetHiding replaces the dimension's anti X-ray rules (Config.Hiding): nil for OreHiding,
+// NoHiding to turn it off. Chunks encoded from now on follow them; what clients were already
+// sent stays until those chunks change or are sent again. Runs: anywhere.
+func (d *Dimension) SetHiding(rules BlockHiding) {
+	d.hide.Store(newHideTable(d.conf, rules, d.r))
+	d.cache.clear()
+}
+
 // noCover marks a block shown as it is.
 const noCover = ^uint32(0)
 
@@ -169,8 +186,7 @@ type hideTable struct {
 	fakeBlock []uint32
 }
 
-func newHideTable(conf Config, r cube.Range) *hideTable {
-	rules := conf.Hiding
+func newHideTable(conf Config, rules BlockHiding, r cube.Range) *hideTable {
 	if rules == nil {
 		rules = OreHiding{Blocks: conf.Blocks, Dim: conf.Dim}
 	}
@@ -185,7 +201,7 @@ func newHideTable(conf Config, r cube.Range) *hideTable {
 		t.occludes[id] = occluder(conf.Blocks.Properties(b))
 		t.liquid[id] = liquidNames[conf.Blocks.Name(b)]
 	}
-	if _, off := rules.(NoHiding); !off {
+	if _, off := rules.(NoHiding); !off && !conf.NoSubHiding {
 		t.fake, t.fakeBlock = newFakeSubs(conf, r)
 	}
 	return t
@@ -372,7 +388,7 @@ func (t *hideTable) covered(c *chunk.Chunk, x int, y int16, z int) bool {
 // hideAround sends the cover of every disguised block next to pos that the block just placed there
 // sealed on every side: nobody can see it any more, so no client keeps the real one.
 func (r *Region) hideAround(pos cube.Pos, old, block uint32) {
-	t := r.d.hide
+	t := r.d.hiding()
 	if t == nil || !t.any || t.occluding(old) || !t.occluding(block) {
 		return
 	}
@@ -404,7 +420,7 @@ func (r *Region) forgetShown(p cube.Pos) {
 
 // sealedAt reports whether every block touching the block at p is a loaded opaque full block.
 func (r *Region) sealedAt(p cube.Pos) bool {
-	t := r.d.hide
+	t := r.d.hiding()
 	for f := cube.FaceDown; f <= cube.FaceEast; f++ {
 		if b, ok := r.Block(p.Side(f), 0); !ok || !t.occluding(b) {
 			return false
@@ -416,7 +432,7 @@ func (r *Region) sealedAt(p cube.Pos) bool {
 // notePlaced lists a disguised block just set at pos on its chunk, for players who can see it to
 // be sent it (RevealNear): the UpdateBlock of it reaches only those shown it already.
 func (r *Region) notePlaced(pos cube.Pos, block uint32) {
-	t := r.d.hide
+	t := r.d.hiding()
 	if t == nil || !t.any || t.coverOf(block) == noCover {
 		return
 	}
@@ -429,7 +445,7 @@ func (r *Region) notePlaced(pos cube.Pos, block uint32) {
 // them: players near them are sent the real ones (RevealNear), and the chunk's next encode
 // lists them itself.
 func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
-	t := r.d.hide
+	t := r.d.hiding()
 	if t == nil || !t.any || !t.occluding(old) || t.occluding(block) {
 		return
 	}
@@ -460,6 +476,8 @@ type revealState struct {
 	fake, real uint64
 	// dry has a bit for each sub chunk sent without its water and lava (subDry).
 	dry uint64
+	// all is set once a player who sees everything was sent its hidden blocks (seeall.go).
+	all bool
 }
 
 // RevealNear sends the player what it is near enough to see: the real blocks of the disguised
@@ -467,8 +485,12 @@ type revealState struct {
 // that chunk, and the real sub chunks of the underground ones within the sub chunk reveal radius
 // (subhide.go). Runs: the viewer's region, with eye the player's position.
 func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
-	t := r.d.hide
+	t := r.d.hiding()
 	if t == nil || (!t.any && t.fake == nil) {
+		return
+	}
+	if v.seeAll.Load() {
+		v.revealAll(r)
 		return
 	}
 	at := blockAt(eye)
@@ -536,7 +558,7 @@ func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 // or far, so an X-ray sees stone there again; one still in sight stays, at any distance. The
 // player is sent the real ones again when it can see them. Under netMu.
 func (v *Viewer) rehideOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
-	t := r.d.hide
+	t := r.d.hiding()
 	eyeAt := blockAt(eye)
 	for _, st := range v.reveal {
 		for p, seen := range st.done {
@@ -574,7 +596,7 @@ func blockCentre(p cube.Pos) mgl32.Vec3 {
 // that were not sent yet.
 func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
 	r2 := float32(radius * radius)
-	t := r.d.hide
+	t := r.d.hiding()
 	eyeAt := blockAt(eye)
 	for _, p := range list {
 		if blockCentre(p).Sub(eye).LenSqr() > r2 && !v.visibleSub(chunkAt(p), int32(p[1]>>4)) { //nolint:gosec // block Y fits
@@ -652,8 +674,8 @@ func (v *Viewer) shownReal(p cube.Pos) bool {
 // client: it is not near and was not shown the real block, so the change would give it away
 // (a furnace lighting, a chest opening, a block entity). Under netMu.
 func (r *Region) hiddenChange(v *Viewer, pk packet.Packet) bool {
-	t := r.d.hide
-	if t == nil || !t.any {
+	t := r.d.hiding()
+	if t == nil || !t.any || v.seeAll.Load() {
 		return false
 	}
 	var at protocol.BlockPos

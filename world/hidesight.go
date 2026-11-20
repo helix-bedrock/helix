@@ -26,7 +26,7 @@ var sightCorners = [5][2]float32{{0, 0}, {-sightCorner, -sightCorner}, {-sightCo
 
 // seesBlock reports whether eye has a clear line to an open face of the block at p.
 func (r *Region) seesBlock(eye mgl32.Vec3, p cube.Pos) bool {
-	t := r.d.hide
+	t := r.d.hiding()
 	centre := blockCentre(p)
 	for f := cube.FaceDown; f <= cube.FaceEast; f++ {
 		axis, sign := faceAxis(f)
@@ -71,7 +71,7 @@ func faceAxis(f cube.Face) (int, float32) {
 // clearRay walks the blocks from from to to, which lies in target, and reports whether it gets
 // to target without crossing an opaque full block or one not loaded.
 func (r *Region) clearRay(from, to mgl32.Vec3, target cube.Pos) bool {
-	t := r.d.hide
+	t := r.d.hiding()
 	dir := to.Sub(from)
 	at := blockAt(from)
 	var step [3]int

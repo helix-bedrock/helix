@@ -86,9 +86,9 @@ func (v *Viewer) SetEye(pos mgl32.Vec3) {
 // solid one while it is underground and far. Under netMu.
 func (v *Viewer) subEntry(pos mcdb.ChunkPos, nc *NetChunk, off protocol.SubChunkOffset, y int32) protocol.SubChunkEntry {
 	e := nc.entry(off, y)
-	t := v.d.hide
+	t := v.d.hiding()
 	i := y - nc.bottom
-	if e.Result != protocol.SubChunkResultSuccess || t == nil || t.fake == nil || !v.eyeSet ||
+	if e.Result != protocol.SubChunkResultSuccess || t == nil || t.fake == nil || !v.eyeSet || v.seeAll.Load() ||
 		int(i) >= len(t.fake) || nc.underground&(1<<i) == 0 {
 		return e
 	}
@@ -178,6 +178,10 @@ const (
 	subDry
 	// subLiquids sends only the water and lava of one sent dry, once the player is near.
 	subLiquids
+	// subAll sends all of it with nothing disguised, to a player who sees everything (seeall.go).
+	subAll
+	// subDisguised sends only its disguised blocks, as they are, to such a player.
+	subDisguised
 )
 
 // appendSub adds to out sub chunk index i of the chunk at pos, which the client has as nc, as
@@ -199,12 +203,16 @@ func (v *Viewer) appendSub(r *Region, pos mcdb.ChunkPos, nc *NetChunk, i int32, 
 // sight to show), its second layer (water in blocks), and the block entity data of the blocks not
 // disguised; dry, its liquids as air and no second layer; liquids, only those.
 func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32, mode subMode) []packet.Packet {
-	t := r.d.hide
+	t := r.d.hiding()
 	subs := c.col.Chunk.Sub()
-	if int(i) >= len(subs) || int(i) >= len(t.fakeBlock) {
+	if i < 0 || int(i) >= len(subs) {
 		return out
 	}
-	sub, fake := subs[i], t.fakeBlock[i]
+	sub, fake := subs[i], noCover
+	if int(i) < len(t.fakeBlock) {
+		fake = t.fakeBlock[i]
+	}
+	real := mode == subAll || mode == subDisguised
 	blocks := r.d.conf.Blocks
 	air := blocks.Air()
 	pk := &packet.UpdateSubChunkBlocks{Position: protocol.BlockPos{c.pos[0] << 4, y << 4, c.pos[1] << 4}}
@@ -213,24 +221,28 @@ func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32, mode
 			for bx := range byte(16) {
 				at := protocol.BlockPos{c.pos[0]<<4 | int32(bx), y<<4 + int32(by), c.pos[1]<<4 | int32(bz)}
 				b := sub.Block(bx, by, bz, 0)
-				if cover := t.coverOf(b); cover != noCover {
+				cover := t.coverOf(b)
+				if cover != noCover && !real {
 					b = cover
 				}
 				liquid := t.isLiquid(b)
 				switch {
+				case mode == subDisguised && cover == noCover:
 				case mode == subLiquids && !liquid:
 				case mode == subDry && liquid:
 					pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(air), Flags: UpdateBlockFlags})
 				case b != fake:
 					pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(b), Flags: UpdateBlockFlags})
 				}
-				if w := sub.Block(bx, by, bz, 1); w != air && mode != subDry {
+				if w := sub.Block(bx, by, bz, 1); w != air && mode != subDry && mode != subDisguised {
 					pk.Extra = append(pk.Extra, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(w), Flags: UpdateBlockFlags})
 				}
 			}
 		}
 	}
-	out = append(out, pk)
+	if len(pk.Blocks)+len(pk.Extra) > 0 {
+		out = append(out, pk)
+	}
 	if mode == subLiquids {
 		return out
 	}
@@ -238,7 +250,7 @@ func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32, mode
 		if int32(p[1]>>4) != y { //nolint:gosec // block Y fits
 			continue
 		}
-		if b, ok := r.Block(p, 0); ok && t.coverOf(b) == noCover {
+		if b, ok := r.Block(p, 0); ok && (real || t.coverOf(b) == noCover) {
 			out = r.appendBlockEntity(out, p)
 		}
 	}
@@ -259,7 +271,7 @@ func (st *revealState) forgetIn(subs uint64) {
 // pos: an entity there is not shown, as the client could not see it (Region.visibility). Runs:
 // anywhere.
 func (v *Viewer) hidesEntityAt(pos mgl32.Vec3) bool {
-	if v.d.hide == nil || v.d.hide.fake == nil {
+	if v.d.hiding().fake == nil || v.seeAll.Load() {
 		return false
 	}
 	b := blockAt(pos)
@@ -282,7 +294,7 @@ func (v *Viewer) hidesEntityAt(pos mgl32.Vec3) bool {
 // it is not sent, the real sub chunk carries it when revealed. Under netMu.
 func (v *Viewer) hiddenUpdate(pos mcdb.ChunkPos, pk packet.Packet) bool {
 	u, ok := pk.(*packet.UpdateBlock)
-	if !ok {
+	if !ok || v.seeAll.Load() {
 		return false
 	}
 	st := v.reveal[pos]
@@ -298,7 +310,7 @@ func (v *Viewer) hiddenUpdate(pos mcdb.ChunkPos, pk packet.Packet) bool {
 	if st.dry&bit != 0 {
 		// Sent dry: its liquids, and the water in blocks, wait until the player is near.
 		b, ok := v.d.conf.Blocks.HashToRuntimeID(u.NewBlockRuntimeID)
-		return u.Layer != 0 || ok && v.d.hide.isLiquid(b)
+		return u.Layer != 0 || ok && v.d.hiding().isLiquid(b)
 	}
 	return st.fake&bit != 0 && st.real&bit == 0
 }

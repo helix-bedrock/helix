@@ -94,7 +94,7 @@ func readNetLayer(buf *bytes.Buffer) (netLayer, bool) {
 // differ from its solid stand-in, and its second layer, as block updates, in mode (appendSubBlocks). Its ores and base
 // blocks are disguised in nc already; its block entity data is not sent.
 func (r *Region) appendNetSubBlocks(out []packet.Packet, nc *NetChunk, i, y int32, mode subMode) []packet.Packet {
-	t := r.d.hide
+	t := r.d.hiding()
 	if i < 0 || int(i) >= len(nc.subs) || int(i) >= len(t.fakeBlock) {
 		return out
 	}
@@ -128,5 +128,5 @@ func (r *Region) appendNetSubBlocks(out []packet.Packet, nc *NetChunk, i, y int3
 // liquidHash reports whether the block of hash h is water or lava.
 func (r *Region) liquidHash(h uint32) bool {
 	b, ok := r.d.conf.Blocks.HashToRuntimeID(h)
-	return ok && r.d.hide.isLiquid(b)
+	return ok && r.d.hiding().isLiquid(b)
 }
