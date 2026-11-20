@@ -117,9 +117,8 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 	return st
 }
 
-// revealSubs announces again the chunks around eye with a solid sub chunk now within the sub
-// chunk reveal radius, from their latest network form, so the client asks for them and gets the
-// real ones. Runs: the viewer's region, under netMu; the announcements go in out.
+// revealSubs sends the client the real sub chunks, from their chunk's latest network form, of the
+// solid ones it was answered that are now within the sub chunk reveal radius of eye. Runs: the viewer's region, under netMu; the announcements go in out.
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	radius := r.d.subRevealRadius()
 	reach := int32(radius+15) >> 4 //nolint:gosec // small
@@ -154,11 +153,37 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 				cur, encodedNow = r.encodeNow(c), true
 			}
 			v.nets[pos] = cur
-			v.reveal[pos] = &revealState{net: cur, real: st.real | want}
-			out = append(out, cur.level)
+			st.net, st.real, st.fake = cur, st.real|want, st.fake&^want
+			st.forgetIn(want)
+			out = append(out, v.subChunksOf(r, cur, want))
 		}
 	}
 	return out
+}
+
+// subChunksOf is a SubChunk packet with the sub chunks of nc marked in want, sent to the client
+// without it asking: announcing the chunk again would make it drop and redraw every sub chunk of
+// it, which flickers.
+func (v *Viewer) subChunksOf(r *Region, nc *NetChunk, want uint64) *packet.SubChunk {
+	pk := &packet.SubChunk{Dimension: int32(r.d.conf.Dim), Position: protocol.SubChunkPos{nc.pos[0], 0, nc.pos[1]}}
+	for i := range int32(maxHiddenSubs) {
+		if want&(1<<i) == 0 {
+			continue
+		}
+		y := nc.bottom + i
+		pk.SubChunkEntries = append(pk.SubChunkEntries, nc.entry(protocol.SubChunkOffset{0, int8(y), 0}, y)) //nolint:gosec // sub chunk Y fits int8
+	}
+	return pk
+}
+
+// forgetIn takes off done the ores in the sub chunks marked in subs: they were just sent from a
+// network chunk that disguises them.
+func (st *revealState) forgetIn(subs uint64) {
+	for p := range st.done {
+		if i := int32(p[1]>>4) - st.net.bottom; i >= 0 && i < maxHiddenSubs && subs&(1<<i) != 0 { //nolint:gosec // block Y fits
+			delete(st.done, p)
+		}
+	}
 }
 
 // hiddenUpdate reports whether pk changes a block in a sub chunk the client was answered solid:
