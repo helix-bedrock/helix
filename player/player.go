@@ -119,7 +119,11 @@ type Player struct {
 	// modifiers changed, so they go back when the effects go.
 	effectValued, effectMaxed uint32
 	brk                       breakState
-	move                      moveState
+	// attackCredits are the attacks the player may still make, one earned per server tick.
+	attackCredits int32
+	// placeCredits are the items the player may still use on blocks, one earned per server tick.
+	placeCredits int32
+	move         moveState
 	// steps tracks walking for vibrations, warden the shriekers' warnings (sculk.go).
 	steps  vibrationSteps
 	warden wardenTracker

@@ -201,7 +201,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 		return
 	}
 	to := p.entity.Position()
-	m := MoveInfo{From: from, To: to, OnGround: collided && to[1] <= from[1]}
+	m := MoveInfo{From: from, To: to, OnGround: collided && to[1] <= from[1] && p.groundUnder(r, to)}
 	feet := vecPos(to.Sub(mgl32.Vec3{0, eyeHeight, 0}))
 	eyes := vecPos(to)
 	m.HeadInWater = p.water(r, eyes)

@@ -20,6 +20,16 @@ const (
 	attackRangeCreative = 12
 	// attackScan is how far around the player its target is looked for.
 	attackScan = 13
+	// attackCreditMax is how many attacks a player may bank, one earned per server tick:
+	// Helix's own rule, beyond BDS. 20 a second is faster than anyone clicks, and the bank
+	// covers inputs arriving together after lag, but a client hitting several entities in one
+	// tick (kill aura's multi mode, "hits per attack") or clicking faster than the tick rate
+	// loses the extra hits.
+	attackCreditMax = 4
+	// placeCreditMax is the same for items used on blocks (placing, crystals, anchors,
+	// rails, flint and steel): one per server tick, a bank of 4. Holding the button places
+	// far slower; fast place and crystal or anchor auras lose the extra uses.
+	placeCreditMax = 4
 	// critMultiplier is what a critical hit multiplies damage by.
 	critMultiplier = 1.5
 	// strengthMultiplier and strengthAdd are Strength, once per level.
@@ -84,8 +94,14 @@ func loadCombat() (*combatTable, error) {
 // handleUseOnEntity is BDS's use on actor transaction, with its checks in order.
 // Interacting with entities is not built yet.
 func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
-	if p.dead() || p.entity == nil {
+	if p.dead() || p.entity == nil || !p.seesEntityID(d.TargetEntityRuntimeID) {
 		return
+	}
+	if d.ActionType == protocol.UseItemOnEntityActionAttack {
+		if p.attackCredits <= 0 {
+			return
+		}
+		p.attackCredits--
 	}
 	if p.useOnCart(d) || p.useOnBoat(d) || p.useOnCushion(d) || p.useOnPainting(d) || p.useOnEndCrystal(d) || p.useOnKnot(d) || p.useOnMob(d) || p.useOnProjectile(d) {
 		return

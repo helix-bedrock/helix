@@ -100,6 +100,9 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickShield()
 	p.tickSleep()
 	p.reseat()
+	p.brk.credits = min(p.brk.credits+1, breakCreditMax)
+	p.attackCredits = min(p.attackCredits+1, attackCreditMax)
+	p.placeCredits = min(p.placeCredits+1, placeCreditMax)
 	// The packets the think step took, so its handlers saw the same ones.
 	run := p.batch
 	if !p.thought {

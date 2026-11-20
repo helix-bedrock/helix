@@ -80,7 +80,12 @@ func (p *Player) handleClickBlock(d *protocol.UseItemTransactionData) {
 		return
 	}
 	first := d.TriggerType != protocol.TriggerTypeSimulationTick
-	if !p.useItemOn(toCube(d.BlockPosition), d.BlockFace, d.ClickedPosition, first) {
+	pos := toCube(d.BlockPosition)
+	var r *world.Region
+	if p.entity != nil {
+		r = p.entity.Region()
+	}
+	if r == nil || !p.seesBlock(r, pos, d.ClickedPosition) || !p.useItemOn(pos, d.BlockFace, d.ClickedPosition, first) {
 		// The client took what it predicted from its hand; the server kept it, so the slot
 		// goes back too or the client shows it gone until the inventory is next sent.
 		if held := p.inventory.Held(); held.Count > 0 {
@@ -110,7 +115,9 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 		p.lastUse = useNothing
 	}
 	target, ok := r.Block(clicked, 0)
-	if !ok || !p.inReach(clicked) {
+	// A vanilla client only clicks blocks its aim hits, never air: a click on air is a
+	// client placing against nothing (air place, scaffold). Helix's own rule, beyond BDS.
+	if !ok || target == p.s.reg.Blocks.Air() || !p.inReach(clicked) {
 		return false
 	}
 	g, held := p.s.game, p.inventory.Held()
@@ -152,10 +159,17 @@ func (p *Player) useItemOn(clicked cube.Pos, face int32, click mgl32.Vec3, first
 // blocks, else a block item's target, check, state and placing. False if nothing
 // was placed.
 func (p *Player) useHeldOn(r *world.Region, clicked cube.Pos, face int32, click mgl32.Vec3, held ItemStack) bool {
-	if used, ok := p.useSpecialOn(r, clicked, face, click, held); ok {
-		return used
+	if p.placeCredits <= 0 {
+		return false
 	}
-	return p.placeHeld(r, clicked, face, click, held)
+	used, ok := p.useSpecialOn(r, clicked, face, click, held)
+	if !ok {
+		used = p.placeHeld(r, clicked, face, click, held)
+	}
+	if used {
+		p.placeCredits--
+	}
+	return used
 }
 
 // useSpecialOn runs the use on a block of an item that is not simply placed: fire,
