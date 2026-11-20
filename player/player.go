@@ -123,7 +123,9 @@ type Player struct {
 	attackCredits int32
 	// placeCredits are the items the player may still use on blocks, one earned per server tick.
 	placeCredits int32
-	move         moveState
+	// aim is the player's latest look directions, for the aim check.
+	aim  aimState
+	move moveState
 	// steps tracks walking for vibrations, warden the shriekers' warnings (sculk.go).
 	steps  vibrationSteps
 	warden wardenTracker

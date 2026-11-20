@@ -41,9 +41,10 @@ func (p *Player) seesEntity(r *world.Region, lo, hi mgl32.Vec3) bool {
 	return p.seesBox(r, p.entity.Position(), lo, hi, cube.Pos{math.MinInt32, 0, 0})
 }
 
-// seesEntityID reports whether the player can see the entity with runtime ID id. An entity not
-// found nearby, or without a box, is left to the handlers that look it up.
-func (p *Player) seesEntityID(id uint64) bool {
+// seesEntityID reports whether the player can see the entity with runtime ID id, and for an
+// attack whether it looked at it (aim.go). An entity not found nearby, or without a box, is left
+// to the handlers that look it up.
+func (p *Player) seesEntityID(id uint64, attack bool) bool {
 	r := p.entity.Region()
 	if r == nil {
 		return false
@@ -61,7 +62,10 @@ func (p *Player) seesEntityID(id uint64) bool {
 			return true
 		}
 		lo, hi, ok := b.BlastBox()
-		return !ok || p.seesEntity(r, lo, hi)
+		if !ok {
+			return true
+		}
+		return p.seesEntity(r, lo, hi) && (!attack || p.aimsAt(lo, hi))
 	}
 	return true
 }

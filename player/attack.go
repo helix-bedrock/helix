@@ -94,7 +94,7 @@ func loadCombat() (*combatTable, error) {
 // handleUseOnEntity is BDS's use on actor transaction, with its checks in order.
 // Interacting with entities is not built yet.
 func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
-	if p.dead() || p.entity == nil || !p.seesEntityID(d.TargetEntityRuntimeID) {
+	if p.dead() || p.entity == nil || !p.seesEntityID(d.TargetEntityRuntimeID, d.ActionType == protocol.UseItemOnEntityActionAttack) {
 		return
 	}
 	if d.ActionType == protocol.UseItemOnEntityActionAttack {
