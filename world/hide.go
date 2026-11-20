@@ -145,11 +145,11 @@ func (t *hideTable) occluding(b uint32) bool {
 // with every disguised block as its cover, and the disguised blocks that may be seen (a face
 // not sealed within the chunk, or on the chunk's side), which players near them are sent as
 // they are. c is only read.
-func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos) (*chunk.Chunk, []cube.Pos) {
+func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, sky *columnHeights) (*chunk.Chunk, []cube.Pos) {
 	if t == nil || !t.any {
 		return c, nil
 	}
-	s := hideScan{t: t, src: c, out: c, pos: pos}
+	s := hideScan{t: t, src: c, out: c, pos: pos, sky: sky}
 	for i, sub := range c.Sub() {
 		if sub.Empty() {
 			continue
@@ -174,6 +174,8 @@ type hideScan struct {
 	src *chunk.Chunk
 	out *chunk.Chunk
 	pos mcdb.ChunkPos
+	// sky is the chunk's render height in each column: air at or above it is under open sky.
+	sky *columnHeights
 	// ores marks the palette indices of the sub chunk being scanned that are disguised.
 	ores []bool
 	near []cube.Pos
@@ -221,12 +223,50 @@ func (s *hideScan) scanSub(storage *chunk.PalettedStorage, base int16) {
 	}
 }
 
+// underSky reports whether a face of the block at x, y, z of the chunk touches air under open
+// sky: a block next to it, in the chunk, that is not opaque and full and has nothing above it
+// that stops the view.
+func (s *hideScan) underSky(x uint8, y int16, z uint8) bool {
+	if s.sky == nil {
+		return false
+	}
+	r := s.src.Range()
+	ix, iz := int(x), int(z)
+	for f := cube.FaceDown; f <= cube.FaceEast; f++ {
+		nx, ny, nz := ix, y, iz
+		switch f {
+		case cube.FaceDown:
+			ny--
+		case cube.FaceUp:
+			ny++
+		case cube.FaceNorth:
+			nz--
+		case cube.FaceSouth:
+			nz++
+		case cube.FaceWest:
+			nx--
+		case cube.FaceEast:
+			nx++
+		}
+		if nx < 0 || nx > 15 || nz < 0 || nz > 15 || int(ny) < r[0] || int(ny) > r[1] {
+			continue
+		}
+		if ny < s.sky[nx|nz<<4] || s.t.occluding(s.src.Block(uint8(nx), ny, uint8(nz), 0)) { //nolint:gosec // 0..15
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 // hide disguises the ore at cell of the sub chunk starting at Y base, and lists it if a face of
 // it may be open.
 func (s *hideScan) hide(cell int, base int16) {
 	x, z, y := uint8(cell>>8), uint8(cell>>4&15), base+int16(cell&15) //nolint:gosec // cell < 4096
 	cover := s.t.coverOf(s.src.Block(x, y, z, 0))
-	if cover == noCover {
+	if cover == noCover || s.underSky(x, y, z) {
+		// An ore on a ravine wall or a hillside: anyone can see it from afar, so it goes
+		// out as it is.
 		return
 	}
 	if !s.t.sealed(s.src, x, y, z) {

@@ -66,7 +66,7 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		render[col] = light.columnTop(c, x, z, lightStopsRender)
 	}
 	// Heights come from the real blocks; clients are sent the disguised ones (hide.go).
-	shown, near := hide.apply(c, pos)
+	shown, near := hide.apply(c, pos, &render)
 	nc.near = near
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
