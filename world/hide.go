@@ -2,6 +2,7 @@ package world
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -223,7 +224,8 @@ func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 		if !ok || t.coverOf(b) == noCover {
 			continue
 		}
-		if c, ok := r.chunks[chunkAt(n)]; ok {
+		// A piston going back and forth next to an ore opens it again and again: list it once.
+		if c, ok := r.chunks[chunkAt(n)]; ok && !slices.Contains(c.opened, n) {
 			c.opened = append(c.opened, n)
 		}
 	}
