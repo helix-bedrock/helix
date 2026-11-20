@@ -127,7 +127,6 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 // SubChunk packet it did not ask for may be dropped. Runs: the viewer's region, under netMu; the
 // packets go in out.
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
-	v.walkVisible(r, eye)
 	for pos, st := range v.reveal {
 		nc := v.nets[pos]
 		if st.fake|st.dry == 0 || nc == nil || st.net != nc {

@@ -35,11 +35,6 @@ const rehideSlack = 8
 // chunks around it may have arrived meanwhile.
 const revealEvery = 10
 
-// maxSightChecks caps the line of sight checks (hidesight.go) a player costs a tick, for ores not
-// shown yet. Ores past the cap are checked on the next tick, so a crowd in a big cave cannot make a
-// tick long.
-const maxSightChecks = 48
-
 // BlockHiding says which blocks clients are shown as something else.
 type BlockHiding interface {
 	// Disguise returns the block a client is shown in place of block until it is near enough
@@ -228,7 +223,7 @@ func (t *hideTable) occluding(b uint32) bool {
 // with every disguised block as its cover, and the disguised blocks that may be seen (a face
 // not sealed within the chunk, or on the chunk's side), which players near them are sent as
 // they are. c is only read.
-func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, sky *columnHeights) (*chunk.Chunk, []cube.Pos) {
+func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, sky *columnHeights) (*chunk.Chunk, []hiddenBlock) {
 	if t == nil || !t.any {
 		return c, nil
 	}
@@ -261,7 +256,13 @@ type hideScan struct {
 	sky *columnHeights
 	// ores marks the palette indices of the sub chunk being scanned that are disguised.
 	ores []bool
-	near []cube.Pos
+	near []hiddenBlock
+}
+
+// hiddenBlock is a disguised block that may be seen and its real block.
+type hiddenBlock struct {
+	pos   cube.Pos
+	block uint32
 }
 
 // markOres marks which entries of palette p are disguised, false if none is: most sub chunks
@@ -346,14 +347,15 @@ func (s *hideScan) underSky(x uint8, y int16, z uint8) bool {
 // it may be open.
 func (s *hideScan) hide(cell int, base int16) {
 	x, z, y := uint8(cell>>8), uint8(cell>>4&15), base+int16(cell&15) //nolint:gosec // cell < 4096
-	cover := s.t.coverOf(s.src.Block(x, y, z, 0))
+	real := s.src.Block(x, y, z, 0)
+	cover := s.t.coverOf(real)
 	if cover == noCover || s.underSky(x, y, z) {
 		// An ore on a ravine wall or a hillside: anyone can see it from afar, so it goes
 		// out as it is.
 		return
 	}
 	if !s.t.sealed(s.src, x, y, z) {
-		s.near = append(s.near, cube.Pos{int(s.pos[0])<<4 | int(x), int(y), int(s.pos[1])<<4 | int(z)})
+		s.near = append(s.near, hiddenBlock{pos: cube.Pos{int(s.pos[0])<<4 | int(x), int(y), int(s.pos[1])<<4 | int(z)}, block: real})
 	}
 	if s.out == s.src {
 		s.out = s.src.Snapshot()
@@ -464,10 +466,7 @@ func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 // and the block's chunk version when it last saw each.
 type revealState struct {
 	net  *NetChunk
-	done map[cube.Pos]sightMark
-	// unseen are the blocks found out of sight, with where the player was and its chunk's
-	// version then: they are not checked again until either changes.
-	unseen map[cube.Pos]sightMark
+	done map[cube.Pos]struct{}
 	// fake and real have a bit for each sub chunk index answered solid and as it is
 	// (subhide.go).
 	fake, real uint64
@@ -499,7 +498,6 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 		return
 	}
 	v.revealAt, v.revealTick = at, now
-	v.sightLeft = maxSightChecks
 	v.eye, v.eyeSet = eye, true
 	for pos, st := range v.reveal {
 		if v.nets[pos] != st.net {
@@ -507,6 +505,7 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 		}
 	}
 	out := v.revealOut[:0]
+	v.walkVisible(r, eye)
 	if t.fake != nil {
 		out = v.revealSubs(r, eye, out)
 	}
@@ -519,17 +518,14 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 		out[i] = nil
 	}
 	v.revealOut = out[:0]
-	if v.sightLeft <= 0 {
-		// Out of sight checks: the rest are done on the next tick, moved or not.
-		v.revealTick = now - revealEvery
-	}
 }
 
-// revealOres adds to out the real blocks of the disguised blocks with an open face within the
-// reveal radius of eye that the client was not sent yet. Under netMu.
+// revealOres adds to out the real blocks of the disguised blocks with a face that may be open in
+// the sub chunks the player may see (subvis.go), however far, that the client was not sent yet.
+// Which blocks may be seen is worked out once, when a chunk is encoded, so they show as soon as
+// the chunk and its view arrive, with no check per player. Under netMu.
 func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	radius := r.d.revealRadius()
-	// Near ores, and those in the sub chunks the player may see however far (subvis.go).
 	reach := max(int32(radius+15)>>4, v.visReach) //nolint:gosec // small
 	centre := chunkAt(blockAt(eye))
 	for dx := -reach; dx <= reach; dx++ {
@@ -540,9 +536,24 @@ func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 				continue
 			}
 			st := v.revealOf(pos, nc)
-			out = v.revealList(r, st, nc.near, eye, radius, out)
-			if c, ok := r.chunks[pos]; ok {
-				out = v.revealList(r, st, c.opened, eye, radius, out)
+			c, loaded := r.chunks[pos]
+			for _, h := range nc.near {
+				if loaded {
+					// The live block: the chunk may have changed since it was encoded.
+					b, ok := r.Block(h.pos, 0)
+					if !ok {
+						continue
+					}
+					h.block = b
+				}
+				out = v.revealOne(r, st, h, out)
+			}
+			if loaded {
+				for _, p := range c.opened {
+					if b, ok := r.Block(p, 0); ok {
+						out = v.revealOne(r, st, hiddenBlock{pos: p, block: b}, out)
+					}
+				}
 			}
 		}
 	}
@@ -554,58 +565,33 @@ func blockCentre(p cube.Pos) mgl32.Vec3 {
 	return mgl32.Vec3{float32(p[0]) + 0.5, float32(p[1]) + 0.5, float32(p[2]) + 0.5}
 }
 
-// revealList adds to out the real blocks of the disguised blocks in list within radius of eye
-// that were not sent yet.
-func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
-	r2 := float32(radius * radius)
-	t := r.d.hiding()
-	eyeAt := blockAt(eye)
-	for _, p := range list {
-		if blockCentre(p).Sub(eye).LenSqr() > r2 && !v.visibleSub(chunkAt(p), int32(p[1]>>4)) { //nolint:gosec // block Y fits
-			continue
-		}
-		if _, ok := st.done[p]; ok {
-			continue
-		}
-		if i := int32(p[1]>>4) - st.net.bottom; i >= 0 && i < maxHiddenSubs && st.fake&(1<<i) != 0 { //nolint:gosec // block Y fits
-			continue // the client has its sub chunk as solid stone: revealed with it (subhide.go)
-		}
-		b, ok := r.Block(p, 0)
-		if !ok {
-			continue
-		}
-		if t.coverOf(b) != noCover {
-			mark := sightMark{eye: eyeAt, version: r.chunkVersion(p)}
-			if m, ok := st.unseen[p]; ok && m == mark {
-				continue // not seen from here, and nothing changed since
-			}
-			if v.sightLeft <= 0 {
-				continue // out of checks: the next tick
-			}
-			if !v.nowSees(r, eye, p) {
-				if st.unseen == nil {
-					st.unseen = map[cube.Pos]sightMark{}
-				}
-				st.unseen[p] = mark
-				continue
-			}
-			delete(st.unseen, p)
-		}
-		if st.done == nil {
-			st.done = map[cube.Pos]sightMark{}
-		}
-		st.done[p] = sightMark{eye: eyeAt, version: r.chunkVersion(p)}
-		if t.coverOf(b) == noCover {
-			continue
-		}
-		out = append(out, &packet.UpdateBlock{
-			Position:          protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
-			NewBlockRuntimeID: r.d.conf.Blocks.Hash(b),
-			Flags:             UpdateBlockFlags,
-		})
-		out = r.appendBlockEntity(out, p)
+// revealOne adds to out the real block h, a disguised block that may be seen, if its sub chunk
+// is in the player's view and the client was not sent it yet. Under netMu.
+func (v *Viewer) revealOne(r *Region, st *revealState, h hiddenBlock, out []packet.Packet) []packet.Packet {
+	p := h.pos
+	sy := int32(p[1] >> 4) //nolint:gosec // block Y fits
+	if !v.visibleSub(chunkAt(p), sy) {
+		return out
 	}
-	return out
+	if _, ok := st.done[p]; ok {
+		return out
+	}
+	if i := sy - st.net.bottom; i >= 0 && i < maxHiddenSubs && st.fake&(1<<i) != 0 {
+		return out // the client has its sub chunk as solid stone: revealed with it (subhide.go)
+	}
+	if st.done == nil {
+		st.done = map[cube.Pos]struct{}{}
+	}
+	st.done[p] = struct{}{}
+	if r.d.hiding().coverOf(h.block) == noCover {
+		return out
+	}
+	out = append(out, &packet.UpdateBlock{
+		Position:          protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
+		NewBlockRuntimeID: r.d.conf.Blocks.Hash(h.block),
+		Flags:             UpdateBlockFlags,
+	})
+	return r.appendBlockEntity(out, p)
 }
 
 // appendBlockEntity adds the block entity data of the block at p to out, if it has any: the
@@ -669,27 +655,6 @@ func (r *Region) hiddenChange(v *Viewer, pk packet.Packet) bool {
 	// went out as it is); only those far away are kept from them.
 	near := float32(r.d.revealRadius() + rehideSlack)
 	return !v.eyeSet || blockCentre(p).Sub(v.eye).LenSqr() > near*near
-}
-
-// nowSees is seesBlock for an ore not shown yet, paid from the tick's sight checks.
-func (v *Viewer) nowSees(r *Region, eye mgl32.Vec3, p cube.Pos) bool {
-	v.sightLeft--
-	return r.seesBlock(eye, p)
-}
-
-// sightMark is where a player was, and the version of a block's chunk, when the block was found
-// out of its sight.
-type sightMark struct {
-	eye     cube.Pos
-	version uint64
-}
-
-// chunkVersion is the version of the loaded chunk holding p, 0 if it is not loaded here.
-func (r *Region) chunkVersion(p cube.Pos) uint64 {
-	if c, ok := r.chunks[chunkAt(p)]; ok {
-		return c.version
-	}
-	return 0
 }
 
 // revealRadius is Config.RevealRadius, or DefaultRevealRadius.

@@ -13,7 +13,8 @@ import (
 // network chunk keeps, for every sub chunk, which pairs of its six faces are joined through
 // cells that are not opaque full blocks (worked out once, when it is encoded). From the sub chunk
 // the player is in, a walk goes from sub chunk to sub chunk through joined faces, as Java Edition
-// culls caves but without its rule against turning back: what Java misses it does not draw, while
+// culls caves but without its rule against turning back, and entering a sub chunk again by each
+// other face: what Java misses it does not draw, while
 // a client here would be shown a wall of stone, so every sub chunk joined to the player's within
 // reach counts as in view.
 
@@ -24,8 +25,8 @@ const (
 	// visEvery is how many ticks a player staying in one sub chunk waits between walks: chunks
 	// arrive and blocks change meanwhile.
 	visEvery = 20
-	// maxVisNodes bounds one walk.
-	maxVisNodes = 16384
+	// maxVisNodes bounds one walk: each sub chunk of the grid is entered at most once by each face.
+	maxVisNodes = 1 << 17
 	// subCells is the number of blocks in a sub chunk.
 	subCells = 4096
 )
@@ -154,7 +155,7 @@ func (v *Viewer) walkVisible(r *Region, eye mgl32.Vec3) {
 	if i < 0 {
 		return
 	}
-	v.visGrid[i] = true
+	v.visGrid[i] = visStart
 	queue := append(v.visQueue[:0], visNode{at: start, from: -1})
 	for head := 0; head < len(queue) && len(queue) < maxVisNodes; head++ {
 		n := queue[head]
@@ -169,13 +170,16 @@ func (v *Viewer) walkVisible(r *Region, eye mgl32.Vec3) {
 			s := faceStep[d]
 			next := subKey{n.at[0] + s[0], n.at[1] + s[1], n.at[2] + s[2]}
 			j := v.visIndex(next)
-			if j < 0 || v.visGrid[j] {
+			in := uint8(1) << (d ^ 1)
+			// A sub chunk is walked on from each face it is entered by: the open cells behind one
+			// face may not reach those behind another, so the first way in is not the only one.
+			if j < 0 || v.visGrid[j]&(in|visStart) != 0 {
 				continue
 			}
 			if _, has := v.nets[mcdb.ChunkPos{next[0], next[2]}]; !has {
 				continue
 			}
-			v.visGrid[j] = true
+			v.visGrid[j] |= in
 			queue = append(queue, visNode{at: next, from: d ^ 1, dirs: n.dirs | 1<<d})
 		}
 	}
@@ -191,6 +195,10 @@ func (v *Viewer) visIndex(k subKey) int {
 	}
 	return int((dx*side+dz)*v.visHeight + dy)
 }
+
+// visStart marks the walk's first sub chunk in visGrid, left by every face; bits 0 to 5 are the
+// faces a sub chunk was entered by.
+const visStart = 1 << faceCount
 
 // maxVisChunks bounds how far, in chunks, the walk goes from the player.
 const maxVisChunks = 8
@@ -216,7 +224,7 @@ func (v *Viewer) linksOf(r *Region, at subKey) (uint64, bool) {
 // visibleSub reports whether the walk reached sub chunk y of the chunk at pos. Under netMu.
 func (v *Viewer) visibleSub(pos mcdb.ChunkPos, y int32) bool {
 	if i := v.visIndex(subKey{pos[0], y, pos[1]}); i >= 0 && i < len(v.visGrid) {
-		return v.visGrid[i]
+		return v.visGrid[i] != 0
 	}
 	return false
 }

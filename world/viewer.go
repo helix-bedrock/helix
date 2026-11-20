@@ -86,7 +86,7 @@ type Viewer struct {
 	// visGrid marks the sub chunks the player may see, from the last walk (subvis.go), around visAt
 	// within visReach chunks: where, when and with how many chunks it ran, and its reused queue.
 	// Under netMu.
-	visGrid              []bool
+	visGrid              []uint8
 	visAt                subKey
 	visReach             int32
 	visBottom, visHeight int32

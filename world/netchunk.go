@@ -21,9 +21,9 @@ type NetChunk struct {
 	bottom int32 // absolute sub chunk Y of section 0
 	level  *packet.LevelChunk
 	subs   []netSub
-	// near are its disguised blocks with a face that may be open, sent as they are to the
-	// players near them (hide.go).
-	near []cube.Pos
+	// near are its disguised blocks with a face that may be open, with their real blocks, worked
+	// out once at encode: sent as they are to the players who may see them (hide.go).
+	near []hiddenBlock
 	// underground has a bit for each sub chunk under the render height in every column
 	// (subhide.go).
 	underground uint64
