@@ -21,9 +21,10 @@ type NetChunk struct {
 	bottom int32 // absolute sub chunk Y of section 0
 	level  *packet.LevelChunk
 	subs   []netSub
-	// edges are the disguisable blocks on the chunk's sides (hide.go).
-	edges []hiddenEdge
-	size  int
+	// near are its disguised blocks with a face that may be open, sent as they are to the
+	// players near them (hide.go).
+	near []cube.Pos
+	size int
 }
 
 // netSub is one sub chunk as SubChunk answers it.
@@ -42,7 +43,7 @@ type columnHeights [256]int16
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable, hide *hideTable, show []cube.Pos) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable, hide *hideTable) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
@@ -61,9 +62,9 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		heights[col] = light.columnTop(c, x, z, lightStopsSky)
 		render[col] = light.columnTop(c, x, z, lightStopsRender)
 	}
-	// Heights come from the real blocks; the client is sent the disguised ones (hide.go).
-	shown, edges := hide.apply(c, pos, show)
-	nc.edges = edges
+	// Heights come from the real blocks; clients are sent the disguised ones (hide.go).
+	shown, near := hide.apply(c, pos)
+	nc.near = near
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
 	for i := range subs {

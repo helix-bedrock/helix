@@ -8,6 +8,7 @@ import (
 
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -65,6 +66,11 @@ type Viewer struct {
 	planCentre             mcdb.ChunkPos
 	planRadius             int32
 	planned                bool
+	// reveal is what the client was sent of each chunk's disguised blocks, under netMu;
+	// revealAt and revealTick are where and when the last reveal scan ran (hide.go).
+	reveal     map[mcdb.ChunkPos]*revealState
+	revealAt   cube.Pos
+	revealTick int64
 }
 
 // AddViewer adds a player's zones in a region of their own, which merges

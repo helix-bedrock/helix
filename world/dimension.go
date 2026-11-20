@@ -115,6 +115,9 @@ type Config struct {
 	// Hiding says which buried blocks clients are shown as something else, Helix's anti X-ray
 	// (hide.go). If nil, OreHiding; NoHiding shows every block. Read when the dimension is made.
 	Hiding BlockHiding
+	// RevealRadius is how close, in blocks, a player must be to a disguised block with an open
+	// face to be sent the real one; 0 means DefaultRevealRadius.
+	RevealRadius int32
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
@@ -230,8 +233,9 @@ type Chunk struct {
 	// staleNet is set when the network form being encoded was started before a border
 	// switch: it is encoded again when it comes back.
 	staleNet bool
-	// edges are the disguisable blocks on its sides as last encoded (hide.go).
-	edges []hiddenEdge
+	// opened are disguised blocks a change opened a face of while it was loaded, sent as they are
+	// to players near them (hide.go).
+	opened []cube.Pos
 	// version counts changes, so a stale encode is recognised.
 	version uint64
 	// ticks and randomTicks are the chunk's tick queues; ticksDirty means
@@ -570,7 +574,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hide, nil)
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hide)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })

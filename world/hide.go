@@ -1,26 +1,39 @@
 package world
 
 import (
-	"slices"
+	"math"
 	"strings"
 
+	"github.com/go-gl/mathgl/mgl32"
+
 	"github.com/helix-bedrock/helix/registry"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
 // Anti X-ray: Helix's own, beyond BDS. The client is sent every block of every chunk it sees,
-// so an X-ray cheat can show it the ores deep in the ground. A block the hiding rules disguise
-// (ores, by default) goes out as its cover (stone, deepslate or netherrack) while every face
-// of it touches an opaque full block: nobody could see it anyway. When a block next to one
-// changes, the real block is sent, so mining into a vein or opening a cave shows it. The
-// world itself is never changed, only what the client is told.
+// so an X-ray cheat can show it every ore under the ground, on cave walls as much as in solid
+// rock. Every block the hiding rules disguise (ores, by default) goes out in the shared chunk
+// as its cover (stone, deepslate or netherrack). Each player is then sent the real ones it
+// could see: those with a face not sealed by an opaque full block, within the reveal radius
+// of it (Viewer.RevealNear). The ones sealed in rock are sent when a block next to them stops
+// covering them. The world itself is never changed, only what clients are told.
 
-// BlockHiding says what clients are shown of buried blocks.
+// DefaultRevealRadius is how close, in blocks, a player must be to a disguised block with an
+// open face to be sent the real one.
+const DefaultRevealRadius = 16
+
+// revealEvery is how many ticks a player standing in one block waits between reveal scans: the
+// chunks around it may have arrived meanwhile.
+const revealEvery = 10
+
+// BlockHiding says which blocks clients are shown as something else.
 type BlockHiding interface {
-	// Disguise returns the block a client is shown in place of block while no face of it
-	// is open, false for a block shown as it is.
+	// Disguise returns the block a client is shown in place of block until it is near enough
+	// to see it, false for a block shown as it is.
 	Disguise(block uint32) (uint32, bool)
 }
 
@@ -109,35 +122,16 @@ func (t *hideTable) occluding(b uint32) bool {
 	return int(b) < len(t.occludes) && t.occludes[b]
 }
 
-// hiddenEdge is a disguised block on the chunk's side, buried within the chunk: whether it is
-// seen depends on the chunk next to it, which the encoder does not have. shown is set once it
-// went out as it is.
-type hiddenEdge struct {
-	pos   cube.Pos
-	shown bool
-}
-
-// burial is how buried a block is.
-type burial uint8
-
-const (
-	// open is a block with a face the client may see.
-	open burial = iota
-	// buried is a block covered on every face.
-	buried
-	// edgeBuried is a block covered within the chunk, with a face on the chunk's side.
-	edgeBuried
-)
-
-// apply returns c as the client is shown it: c itself when nothing is hidden, else a snapshot
-// with the buried blocks disguised, and the disguisable blocks on the chunk's sides. Those in
-// show, which the chunk next door leaves open, go out as they are. c is only read.
-func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, show []cube.Pos) (*chunk.Chunk, []hiddenEdge) {
+// apply returns c as clients are shown it: c itself when nothing is disguised, else a snapshot
+// with every disguised block as its cover, and the disguised blocks that may be seen (a face
+// not sealed within the chunk, or on the chunk's side), which players near them are sent as
+// they are. c is only read.
+func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos) (*chunk.Chunk, []cube.Pos) {
 	if t == nil || !t.any {
 		return c, nil
 	}
 	out := c
-	var edges []hiddenEdge
+	var near []cube.Pos
 	for i, sub := range c.Sub() {
 		if sub.Empty() || !t.mayHide(sub) {
 			continue
@@ -150,17 +144,8 @@ func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, show []cube.Pos) (*
 					if cover == noCover {
 						continue
 					}
-					kind := t.burial(c, x, base+y, z)
-					if kind == open {
-						continue
-					}
-					if kind == edgeBuried {
-						at := cube.Pos{int(pos[0])<<4 | int(x), int(base + y), int(pos[1])<<4 | int(z)}
-						shown := slices.Contains(show, at)
-						edges = append(edges, hiddenEdge{pos: at, shown: shown})
-						if shown {
-							continue
-						}
+					if !t.sealed(c, x, base+y, z) {
+						near = append(near, cube.Pos{int(pos[0])<<4 | int(x), int(base + y), int(pos[1])<<4 | int(z)})
 					}
 					if out == c {
 						out = c.Snapshot()
@@ -170,7 +155,12 @@ func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, show []cube.Pos) (*
 			}
 		}
 	}
-	return out, edges
+	if out != c {
+		// Setting a block leaves the old one in the palette: without this the client would
+		// still be told which ores a sub chunk holds. Compact skips the sub chunks out shares.
+		out.Compact()
+	}
+	return out, near
 }
 
 // mayHide reports whether the sub chunk's first layer holds any block that may be disguised.
@@ -188,32 +178,30 @@ func (t *hideTable) mayHide(sub *chunk.SubChunk) bool {
 	return false
 }
 
-// burial reports how buried the block at x, y, z of c is. A face on the chunk's side counts
-// as covered and makes it edgeBuried: the region checks the chunk next door (shownEdges).
-func (t *hideTable) burial(c *chunk.Chunk, x uint8, y int16, z uint8) burial {
-	ix, iz := int(x), int(z)
-	if !t.covered(c, ix-1, y, iz) || !t.covered(c, ix+1, y, iz) || !t.covered(c, ix, y, iz-1) ||
-		!t.covered(c, ix, y, iz+1) || !t.covered(c, ix, y-1, iz) || !t.covered(c, ix, y+1, iz) {
-		return open
-	}
+// sealed reports whether every face of the block at x, y, z of c touches an opaque full block of
+// c: a face on the chunk's side is not, as the chunk next door is not known here.
+func (t *hideTable) sealed(c *chunk.Chunk, x uint8, y int16, z uint8) bool {
 	if x == 0 || x == 15 || z == 0 || z == 15 {
-		return edgeBuried
+		return false
 	}
-	return buried
+	ix, iz := int(x), int(z)
+	return t.covered(c, ix-1, y, iz) && t.covered(c, ix+1, y, iz) && t.covered(c, ix, y, iz-1) &&
+		t.covered(c, ix, y, iz+1) && t.covered(c, ix, y-1, iz) && t.covered(c, ix, y+1, iz)
 }
 
-// covered reports whether the cell at x, y, z of c, which may be just outside it, hides a face
-// next to it. Cells outside the chunk count as covering.
+// covered reports whether the cell at x, y, z of c hides a face next to it. Cells above or below
+// the world count as covering.
 func (t *hideTable) covered(c *chunk.Chunk, x int, y int16, z int) bool {
 	r := c.Range()
-	if x < 0 || x > 15 || z < 0 || z > 15 || int(y) < r[0] || int(y) > r[1] {
+	if int(y) < r[0] || int(y) > r[1] {
 		return true
 	}
 	return t.occluding(c.Block(uint8(x), y, uint8(z), 0)) //nolint:gosec // 0..15
 }
 
-// revealAround sends the real blocks next to pos that clients may have been shown disguised,
-// once the block at pos stopped covering them.
+// revealAround notes the disguised blocks next to pos once the block at pos stopped covering
+// them: players near them are sent the real ones (RevealNear), and the chunk's next encode
+// lists them itself.
 func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 	t := r.d.hide
 	if t == nil || !t.any || !t.occluding(old) || t.occluding(block) {
@@ -225,83 +213,104 @@ func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 		if !ok || t.coverOf(b) == noCover {
 			continue
 		}
-		r.updateBlock(n, 0, b)
-		if at := chunkAt(n); at != chunkAt(pos) {
-			// The chunk next door still hides it from those who get that chunk later.
-			if o, ok := r.chunks[at]; ok {
-				r.reencode(o)
+		if c, ok := r.chunks[chunkAt(n)]; ok {
+			c.opened = append(c.opened, n)
+		}
+	}
+}
+
+// revealState is what a player was sent of one chunk's disguised blocks: net is the network
+// chunk the client has, done the blocks it was sent as they are since.
+type revealState struct {
+	net  *NetChunk
+	done map[cube.Pos]struct{}
+}
+
+// RevealNear sends the player the real blocks of the disguised blocks with an open face within
+// the reveal radius of eye, in the chunks its client has, each once while the client keeps
+// that chunk. Runs: the viewer's region, with eye the player's position.
+func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
+	t := r.d.hide
+	if t == nil || !t.any {
+		return
+	}
+	at := blockAt(eye)
+	now := r.CurrentTick()
+	if at == v.revealAt && now-v.revealTick < revealEvery {
+		return
+	}
+	v.revealAt, v.revealTick = at, now
+	radius := r.d.revealRadius()
+	reach := int32(radius+15) >> 4 //nolint:gosec // small
+	centre := chunkAt(at)
+	v.netMu.Lock()
+	defer v.netMu.Unlock()
+	if v.reveal == nil {
+		v.reveal = map[mcdb.ChunkPos]*revealState{}
+	}
+	for pos, st := range v.reveal {
+		if v.nets[pos] != st.net {
+			delete(v.reveal, pos)
+		}
+	}
+	for dx := -reach; dx <= reach; dx++ {
+		for dz := -reach; dz <= reach; dz++ {
+			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
+			nc, ok := v.nets[pos]
+			if !ok {
+				continue
+			}
+			st := v.reveal[pos]
+			if st == nil {
+				st = &revealState{net: nc}
+				v.reveal[pos] = st
+			}
+			v.revealList(r, st, nc.near, eye, radius)
+			if c, ok := r.chunks[pos]; ok {
+				v.revealList(r, st, c.opened, eye, radius)
 			}
 		}
 	}
 }
 
-// edgeExposed reports whether a face of the block at pos that crosses into the next chunk
-// touches a loaded block that does not cover it.
-func (r *Region) edgeExposed(pos cube.Pos) bool {
-	home := chunkAt(pos)
-	for f := cube.FaceNorth; f <= cube.FaceEast; f++ {
-		n := pos.Side(f)
-		if chunkAt(n) == home {
+// revealList sends the real blocks of the disguised blocks in list within radius of eye that
+// were not sent yet.
+func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int) {
+	r2 := float32(radius * radius)
+	t := r.d.hide
+	for _, p := range list {
+		centre := mgl32.Vec3{float32(p[0]) + 0.5, float32(p[1]) + 0.5, float32(p[2]) + 0.5}
+		if centre.Sub(eye).LenSqr() > r2 {
 			continue
 		}
-		if b, ok := r.Block(n, 0); ok && !r.d.hide.occluding(b) {
-			return true
-		}
-	}
-	return false
-}
-
-// shownEdges returns the disguisable blocks on c's sides that the chunks next to it leave open,
-// for its next encode to send as they are.
-func (r *Region) shownEdges(c *Chunk) []cube.Pos {
-	var show []cube.Pos
-	for _, e := range c.edges {
-		if r.edgeExposed(e.pos) {
-			show = append(show, e.pos)
-		}
-	}
-	return show
-}
-
-// revealEdges sends the real blocks of c's disguised side blocks that the chunks next to it now
-// leave open, and encodes c again so later viewers get them too: a chunk encoded before its
-// neighbour loaded hid them all.
-func (r *Region) revealEdges(c *Chunk) {
-	found := false
-	for i := range c.edges {
-		e := &c.edges[i]
-		if e.shown || !r.edgeExposed(e.pos) {
+		if _, ok := st.done[p]; ok {
 			continue
 		}
-		if b, ok := r.Block(e.pos, 0); ok {
-			r.updateBlock(e.pos, 0, b)
+		if st.done == nil {
+			st.done = map[cube.Pos]struct{}{}
 		}
-		e.shown, found = true, true
-	}
-	if found {
-		r.reencode(c)
+		st.done[p] = struct{}{}
+		b, ok := r.Block(p, 0)
+		if !ok || t.coverOf(b) == noCover {
+			continue
+		}
+		v.send(&packet.UpdateBlock{
+			Position:          protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
+			NewBlockRuntimeID: r.d.conf.Blocks.Hash(b),
+			Flags:             UpdateBlockFlags,
+		})
 	}
 }
 
-// revealNeighbours runs revealEdges for the chunk at pos, which just arrived, and the loaded
-// chunks next to it.
-func (r *Region) revealNeighbours(pos mcdb.ChunkPos) {
-	if r.d.hide == nil || !r.d.hide.any {
-		return
+// revealRadius is Config.RevealRadius, or DefaultRevealRadius.
+func (d *Dimension) revealRadius() int {
+	if d.conf.RevealRadius > 0 {
+		return int(d.conf.RevealRadius)
 	}
-	near := [...]mcdb.ChunkPos{pos, {pos[0] - 1, pos[1]}, {pos[0] + 1, pos[1]}, {pos[0], pos[1] - 1}, {pos[0], pos[1] + 1}}
-	for _, n := range near {
-		if c, ok := r.chunks[n]; ok && len(c.edges) > 0 {
-			r.revealEdges(c)
-		}
-	}
+	return DefaultRevealRadius
 }
 
-// reencode encodes c again without sending it to anyone: the next viewers get the new form.
-func (r *Region) reencode(c *Chunk) {
-	if c.encoding {
-		c.staleNet = true
-		return
-	}
-	r.encode(c)
+// blockAt is the block a position is in.
+func blockAt(v mgl32.Vec3) cube.Pos {
+	return cube.Pos{int(math.Floor(float64(v[0]))), int(math.Floor(float64(v[1]))), int(math.Floor(float64(v[2])))}
 }

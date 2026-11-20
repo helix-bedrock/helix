@@ -140,6 +140,11 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickUILeftovers()
 	p.tickMaps()
 	p.s.checkVoid(p.entity)
+	if p.viewer != nil && p.entity != nil {
+		if r := p.entity.Region(); r != nil {
+			p.viewer.RevealNear(r, p.entity.Position())
+		}
+	}
 	p.publishState()
 }
 
