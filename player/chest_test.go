@@ -312,6 +312,8 @@ func TestChestAPI(t *testing.T) {
 		}
 		// As OpenChest leaves it; the test player has no connection to send on.
 		p.window.open, p.window.inv, p.window.kind, p.window.pos = true, c.Inventory(r), c.Kind(), at
+		// As a player who has had the window open a while (steal.go).
+		p.window.openTicks, p.takeCredits = takeOpenTicks, takeCreditMax
 		c.addViewer(r, p)
 		if len(c.Viewers(r)) != 1 {
 			t.Error("no viewer")
