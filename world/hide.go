@@ -56,7 +56,8 @@ type NoHiding struct{}
 // Disguise shows block as it is.
 func (NoHiding) Disguise(uint32) (uint32, bool) { return 0, false }
 
-// OreHiding is the default: every ore and ancient debris, shown as the stone it sits in.
+// OreHiding is the default: every ore and ancient debris, shown as the stone it sits in, and every
+// block that gives a base away (baseBlocks), shown as stone or air.
 type OreHiding struct{ Blocks *registry.Blocks }
 
 const (
@@ -72,6 +73,13 @@ const (
 // debris as netherrack.
 func (h OreHiding) Disguise(block uint32) (uint32, bool) {
 	name := h.Blocks.Name(block)
+	if baseBlock(name) {
+		// A solid one goes out as stone, the rest (chests, anvils, spawners) as air.
+		if occluder(h.Blocks.Properties(block)) {
+			return h.Blocks.Block(coverStone)
+		}
+		return h.Blocks.Air(), true
+	}
 	if name != nameAncientDebris && !strings.HasSuffix(name, "_ore") {
 		return 0, false
 	}
@@ -83,6 +91,25 @@ func (h OreHiding) Disguise(block uint32) (uint32, bool) {
 		cover = coverNetherrack
 	}
 	return h.Blocks.Block(cover)
+}
+
+// baseBlocks are the blocks that give a base away: storage, workstations and spawners. They are
+// hidden like ores, so an X-ray cannot find bases.
+var baseBlocks = map[string]bool{
+	"minecraft:chest": true, "minecraft:trapped_chest": true, "minecraft:ender_chest": true,
+	"minecraft:barrel": true, "minecraft:hopper": true, "minecraft:dropper": true,
+	"minecraft:dispenser": true, "minecraft:crafter": true,
+	"minecraft:furnace": true, "minecraft:lit_furnace": true, "minecraft:blast_furnace": true,
+	"minecraft:lit_blast_furnace": true, "minecraft:smoker": true, "minecraft:lit_smoker": true,
+	"minecraft:anvil": true, "minecraft:chipped_anvil": true, "minecraft:damaged_anvil": true,
+	"minecraft:crafting_table": true, "minecraft:enchanting_table": true,
+	"minecraft:brewing_stand": true, "minecraft:beacon": true, "minecraft:lectern": true,
+	"minecraft:mob_spawner": true, "minecraft:trial_spawner": true,
+}
+
+// baseBlock reports whether the block named name gives a base away.
+func baseBlock(name string) bool {
+	return baseBlocks[name] || strings.HasSuffix(name, "shulker_box")
 }
 
 // noCover marks a block shown as it is.
@@ -343,6 +370,18 @@ func (r *Region) sealedAt(p cube.Pos) bool {
 	return true
 }
 
+// notePlaced lists a disguised block just set at pos on its chunk, for players who can see it to
+// be sent it (RevealNear): the UpdateBlock of it reaches only those shown it already.
+func (r *Region) notePlaced(pos cube.Pos, block uint32) {
+	t := r.d.hide
+	if t == nil || !t.any || t.coverOf(block) == noCover {
+		return
+	}
+	if c, ok := r.chunks[chunkAt(pos)]; ok && !slices.Contains(c.opened, pos) {
+		c.opened = append(c.opened, pos)
+	}
+}
+
 // revealAround notes the disguised blocks next to pos once the block at pos stopped covering
 // them: players near them are sent the real ones (RevealNear), and the chunk's next encode
 // lists them itself.
@@ -505,8 +544,72 @@ func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl
 			NewBlockRuntimeID: r.d.conf.Blocks.Hash(b),
 			Flags:             UpdateBlockFlags,
 		})
+		out = r.appendBlockEntity(out, p)
 	}
 	return out
+}
+
+// appendBlockEntity adds the block entity data of the block at p to out, if it has any: the
+// network chunk left it out while the block was disguised.
+func (r *Region) appendBlockEntity(out []packet.Packet, p cube.Pos) []packet.Packet {
+	c, ok := r.chunks[chunkAt(p)]
+	if !ok {
+		return out
+	}
+	be, ok := c.blockEntities[p]
+	if !ok {
+		return out
+	}
+	return append(out, &packet.BlockActorData{
+		Position: protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
+		NBTData:  be.NetworkData(p),
+	})
+}
+
+// shownReal reports whether the client was sent the block at p as it is by a reveal. Under netMu.
+func (v *Viewer) shownReal(p cube.Pos) bool {
+	st := v.reveal[chunkAt(p)]
+	if st == nil {
+		return false
+	}
+	_, ok := st.done[p]
+	return ok
+}
+
+// hiddenChange reports whether pk, a change to a block that is disguised, must not reach v's
+// client: it is not near and was not shown the real block, so the change would give it away
+// (a furnace lighting, a chest opening, a block entity). Under netMu.
+func (r *Region) hiddenChange(v *Viewer, pk packet.Packet) bool {
+	t := r.d.hide
+	if t == nil || !t.any {
+		return false
+	}
+	var at protocol.BlockPos
+	var block uint32
+	switch pk := pk.(type) {
+	case *packet.UpdateBlock:
+		b, ok := r.d.conf.Blocks.HashToRuntimeID(pk.NewBlockRuntimeID)
+		if !ok || pk.Layer != 0 {
+			return false
+		}
+		at, block = pk.Position, b
+	case *packet.BlockActorData:
+		at = pk.Position
+		block, _ = r.Block(cube.Pos{int(at[0]), int(at[1]), int(at[2])}, 0)
+	case *packet.BlockEvent:
+		at = pk.Position
+		block, _ = r.Block(cube.Pos{int(at[0]), int(at[1]), int(at[2])}, 0)
+	default:
+		return false
+	}
+	p := cube.Pos{int(at[0]), int(at[1]), int(at[2])}
+	if t.coverOf(block) == noCover || v.shownReal(p) {
+		return false
+	}
+	// A player near it gets every change, as it would see it (an ore or chest open to the sky
+	// went out as it is); only those far away are kept from them.
+	near := float32(r.d.revealRadius() + rehideSlack)
+	return !v.eyeSet || blockCentre(p).Sub(v.eye).LenSqr() > near*near
 }
 
 // nowSees is seesBlock for an ore not shown yet, paid from the tick's sight checks.

@@ -95,7 +95,7 @@ func (r *Region) packetsFor(v *Viewer) []packet.Packet {
 		if _, ok := v.nets[c.chunk]; ok {
 			if c.net != nil {
 				v.nets[c.chunk] = c.net
-			} else if v.hiddenUpdate(c.chunk, c.pk) {
+			} else if v.hiddenUpdate(c.chunk, c.pk) || r.hiddenChange(v, c.pk) {
 				continue
 			}
 			list = append(list, c.pk)

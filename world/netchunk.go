@@ -74,7 +74,7 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		s := &nc.subs[i]
 		s.payload = chunk.EncodeSubChunk(shown, chunk.NetworkHashEncoding, i)
 		for _, be := range entities {
-			if int(c.SubY(int16(i))) != be.Pos[1]&^15 { //nolint:gosec // few sections
+			if int(c.SubY(int16(i))) != be.Pos[1]&^15 || disguised(c, shown, be.Pos) { //nolint:gosec // few sections
 				continue
 			}
 			// A compound that cannot be encoded is left out; the block still shows.
@@ -177,4 +177,14 @@ func (nc *NetChunk) entry(off protocol.SubChunkOffset, y int32) protocol.SubChun
 		e.RenderHeightMapData = protocol.Option(*s.render)
 	}
 	return e
+}
+
+// disguised reports whether the block at pos goes out as something else in shown, the chunk c as
+// clients are sent it: its block entity data would give it away (hide.go).
+func disguised(c, shown *chunk.Chunk, pos cube.Pos) bool {
+	if shown == c {
+		return false
+	}
+	x, y, z := uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15) //nolint:gosec // masked, world heights fit
+	return shown.Block(x, y, z, 0) != c.Block(x, y, z, 0)
 }
