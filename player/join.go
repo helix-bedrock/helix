@@ -274,8 +274,12 @@ func (p *Player) readLoop(done <-chan struct{}) {
 				go p.spawnWhenReady(done)
 			}
 		case *packet.SubChunkRequest:
-			p.send(p.currentViewer().SubChunks(pk))
-			p.flush()
+			if resp := p.currentViewer().SubChunks(pk); resp != nil {
+				p.send(resp)
+				p.flush()
+			} else {
+				s.log.Debug("Sub chunk request ignored", "name", p.name, "offsets", len(pk.Offsets))
+			}
 		case *packet.SetLocalPlayerAsInitialised:
 			p.initialised.Store(true)
 			s.log.Info("Player spawned", "name", p.name)

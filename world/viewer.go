@@ -50,6 +50,10 @@ type Viewer struct {
 	// chunk requests; read on the player's network goroutine.
 	netMu sync.Mutex
 	nets  map[mcdb.ChunkPos]*NetChunk
+	// subAsks is how many more sub chunks the client may ask for, earned at subAskRate up to
+	// subAskBank since subAsksAt; under netMu (SubChunks).
+	subAsks   float64
+	subAsksAt time.Time
 
 	// Owned by the viewer's region. lastRadius is -1 until the first Move
 	// was seen.
@@ -150,13 +154,39 @@ func (v *Viewer) send(pk packet.Packet) {
 	}
 }
 
-// SubChunks answers the client's request for sub chunks of chunks it was
-// sent. Called on the player's network goroutine.
+const (
+	// subAskRate is how many sub chunks a second a client may ask for, and subAskBank how many it
+	// may ask for at once: a whole view of 32 chunks is about 100,000, which a joining client asks
+	// for over a few seconds.
+	subAskRate = 16384
+	subAskBank = 1 << 17
+	// maxUnknownSubAsks is how many sub chunks of chunks the client was not sent one request may
+	// ask for. A vanilla client asks only for chunks it was sent; a few may have just left its
+	// view.
+	maxUnknownSubAsks = 64
+)
+
+// SubChunks answers the client's request for sub chunks of chunks it was sent, or returns nil
+// to ignore it. Beyond BDS (Helix's own rule against floods): a request asking for more than
+// maxUnknownSubAsks sub chunks of chunks the client was not sent (another dimension included),
+// or for more than the client has earned at subAskRate, is ignored without building an answer.
+// Called on the player's network goroutine.
 func (v *Viewer) SubChunks(pk *packet.SubChunkRequest) *packet.SubChunk {
-	resp := &packet.SubChunk{Dimension: pk.Dimension, Position: pk.Position}
-	resp.SubChunkEntries = make([]protocol.SubChunkEntry, 0, len(pk.Offsets))
 	v.netMu.Lock()
 	defer v.netMu.Unlock()
+	now := time.Now()
+	if v.subAsksAt.IsZero() {
+		v.subAsks = subAskBank
+	} else {
+		v.subAsks = min(v.subAsks+now.Sub(v.subAsksAt).Seconds()*subAskRate, subAskBank)
+	}
+	v.subAsksAt = now
+	if float64(len(pk.Offsets)) > v.subAsks || v.unknownSubAsks(pk) > maxUnknownSubAsks {
+		return nil
+	}
+	v.subAsks -= float64(len(pk.Offsets))
+	resp := &packet.SubChunk{Dimension: pk.Dimension, Position: pk.Position}
+	resp.SubChunkEntries = make([]protocol.SubChunkEntry, 0, len(pk.Offsets))
 	for _, off := range pk.Offsets {
 		if pk.Dimension != int32(v.d.conf.Dim) {
 			resp.SubChunkEntries = append(resp.SubChunkEntries, protocol.SubChunkEntry{Offset: off, Result: protocol.SubChunkResultInvalidDimension})
@@ -171,6 +201,23 @@ func (v *Viewer) SubChunks(pk *packet.SubChunkRequest) *packet.SubChunk {
 		resp.SubChunkEntries = append(resp.SubChunkEntries, v.subEntry(pos, nc, off, pk.Position[1]+int32(off[1])))
 	}
 	return resp
+}
+
+// unknownSubAsks counts the sub chunks pk asks for of chunks the client was not sent, stopping
+// past maxUnknownSubAsks. Under netMu.
+func (v *Viewer) unknownSubAsks(pk *packet.SubChunkRequest) int {
+	if pk.Dimension != int32(v.d.conf.Dim) {
+		return len(pk.Offsets)
+	}
+	n := 0
+	for _, off := range pk.Offsets {
+		if _, ok := v.nets[mcdb.ChunkPos{pk.Position[0] + int32(off[0]), pk.Position[2] + int32(off[2])}]; !ok {
+			if n++; n > maxUnknownSubAsks {
+				break
+			}
+		}
+	}
+	return n
 }
 
 // updateViewer runs every tick on the viewer's region; false once the
