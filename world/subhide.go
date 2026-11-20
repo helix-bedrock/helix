@@ -124,6 +124,7 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 	radius := r.d.subRevealRadius()
 	reach := int32(radius+15) >> 4 //nolint:gosec // small
 	centre := chunkAt(blockAt(eye))
+	encodedNow := false
 	for dx := -reach; dx <= reach; dx++ {
 		for dz := -reach; dz <= reach; dz++ {
 			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
@@ -143,7 +144,14 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 			}
 			cur := r.netChunk(pos)
 			if cur == nil {
-				continue // being encoded: next scan
+				c, ok := r.chunks[pos]
+				if !ok || encodedNow {
+					continue // next scan
+				}
+				// A chunk that changes every tick never keeps a worker's encode (it is stale by
+				// the time it comes back), and the player would walk into stone that is not
+				// there: encode it here, one a scan.
+				cur, encodedNow = r.encodeNow(c), true
 			}
 			v.nets[pos] = cur
 			v.reveal[pos] = &revealState{net: cur, real: st.real | want}
@@ -198,4 +206,16 @@ func (d *Dimension) subRevealRadius() int {
 		return int(d.conf.SubRevealRadius)
 	}
 	return DefaultSubRevealRadius
+}
+
+// encodeNow encodes c on the tick and keeps the result as its network form, which is current
+// until the chunk changes again. An encode still on a worker is checked as usual when it is
+// back.
+func (r *Region) encodeNow(c *Chunk) *NetChunk {
+	d := r.d
+	nc := encodeNetChunk(c.pos, d.conf.Dim, c.col.Chunk.Snapshot(), d.netBorderOf(c.col.Extra[borderTag]),
+		c.networkBlockEntities(), d.light, d.hide)
+	c.net = nc
+	d.publish(c.pos, nc)
+	return nc
 }
