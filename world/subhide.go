@@ -90,8 +90,13 @@ func (v *Viewer) subEntry(pos mcdb.ChunkPos, nc *NetChunk, off protocol.SubChunk
 	e := nc.entry(off, y)
 	t := v.d.hiding()
 	i := y - nc.bottom
-	if e.Result == protocol.SubChunkResultSuccess && t != nil && (t.any || t.fake != nil) && !v.seeAll.Load() {
-		v.revealOf(pos, nc).answered = time.Now()
+	if e.Result == protocol.SubChunkResultSuccess && t != nil && (t.any || t.fake != nil) && !v.seeAll.Load() && i >= 0 && i < maxHiddenSubs {
+		// The first answer of each sub chunk only: a client asking again must not hold the
+		// chunk's reveals back for ever.
+		if st := v.revealOf(pos, nc); st.asked&(1<<i) == 0 {
+			st.asked |= 1 << i
+			st.answered = time.Now()
+		}
 	}
 	if e.Result != protocol.SubChunkResultSuccess || t == nil || t.fake == nil || !v.eyeSet || v.seeAll.Load() ||
 		int(i) >= len(t.fake) || nc.underground&(1<<i) == 0 {
@@ -133,6 +138,41 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 // that reach it first are overwritten by the stand-in or the disguised blocks, which then stay.
 const revealSettle = time.Second
 
+// revealAgain is how long after a stand-in sub chunk is revealed it is sent once more.
+const revealAgain = 3 * time.Second
+
+// revealAgainSubs sends once more the stand-in sub chunks of the chunk at pos revealed
+// revealAgain ago, as the client has them now (full, or dry while it waits for its liquids), then
+// the ores in them the player was shown, which the resend disguised again.
+func (v *Viewer) revealAgainSubs(r *Region, pos mcdb.ChunkPos, nc *NetChunk, st *revealState, out []packet.Packet) []packet.Packet {
+	again := st.again
+	st.again = 0
+	for i := range int32(maxHiddenSubs) {
+		bit := uint64(1) << i
+		if again&bit == 0 || st.fake&bit != 0 {
+			continue
+		}
+		mode := subFull
+		if st.dry&bit != 0 {
+			mode = subDry
+		}
+		out = v.appendSub(r, pos, nc, i, mode, out)
+	}
+	// The resend disguised the ores it covers: show again those the player was shown.
+	for p := range st.done {
+		if i := int32(p[1]>>4) - nc.bottom; i >= 0 && i < maxHiddenSubs && again&(1<<i) != 0 { //nolint:gosec // block Y fits
+			if b, ok := r.Block(p, 0); ok && r.d.hiding().coverOf(b) != noCover {
+				out = append(out, &packet.UpdateBlock{
+					Position:          protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
+					NewBlockRuntimeID: r.d.conf.Blocks.Hash(b),
+					Flags:             UpdateBlockFlags,
+				})
+			}
+		}
+	}
+	return out
+}
+
 // settling reports whether a sub chunk of the chunk was answered within revealSettle.
 func (st *revealState) settling() bool {
 	return !st.answered.IsZero() && time.Since(st.answered) < revealSettle
@@ -147,7 +187,13 @@ func (st *revealState) settling() bool {
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	for pos, st := range v.reveal {
 		nc := v.nets[pos]
-		if st.fake|st.dry == 0 || nc == nil || st.settling() {
+		if nc == nil || st.settling() {
+			continue
+		}
+		if st.again != 0 && time.Since(st.revealedAt) >= revealAgain {
+			out = v.revealAgainSubs(r, pos, nc, st, out)
+		}
+		if st.fake|st.dry == 0 {
 			continue
 		}
 		var full, dry, wet uint64
@@ -169,6 +215,8 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 		st.real, st.fake = st.real|full|dry, st.fake&^(full|dry)
 		st.dry = st.dry&^wet | dry
 		st.forgetIn(full | dry)
+		st.again |= full | dry
+		st.revealedAt = time.Now()
 		for i := range int32(maxHiddenSubs) {
 			bit := uint64(1) << i
 			switch {

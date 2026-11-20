@@ -477,8 +477,14 @@ type revealState struct {
 	// unseen are the blocks a ray did not reach, with where the player was and the block's
 	// chunk version then: not tried again until either changes.
 	unseen map[cube.Pos]sightMark
-	// answered is when a sub chunk of the chunk was last answered to the client (subEntry).
+	// asked has a bit for each sub chunk answered to the client, answered when the last first
+	// answer was (subEntry).
+	asked    uint64
 	answered time.Time
+	// again has a bit for each stand-in sub chunk revealed at revealedAt, sent once more
+	// revealAgain later in case the client had not built it yet and lost the updates.
+	again      uint64
+	revealedAt time.Time
 	// all is set once a player who sees everything was sent its hidden blocks (seeall.go).
 	all bool
 }
