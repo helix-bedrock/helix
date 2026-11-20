@@ -503,7 +503,7 @@ func vanillaPlace(pl *Placement) bool {
 	playSound(r, pl.Pos, p.s.blockSound(packet.SoundEventPlace, blockCenter(pl.Pos), pl.Block), nil)
 	p.s.postBlockGameEvent(r, gameEventBlockPlace, pl.Pos, p, pl.Block, true)
 	if p.s.reg.Blocks.Name(pl.Block) == nameRespawnAnchor {
-		p.anchorReady(r, pl.Pos)
+		p.anchorPlaced(r, pl.Pos)
 	}
 	if !p.creative() {
 		p.useHeld()
@@ -554,6 +554,7 @@ func (p *Player) selectSlot(slot, networkID int32) bool {
 	if slot < 0 || slot >= hotbarSize {
 		return false
 	}
+	p.noteHeld(uint8(slot))        //nolint:gosec // checked above
 	p.inventory.held = uint8(slot) //nolint:gosec // checked above
 	p.sendEquipment()
 	held := p.inventory.Held()

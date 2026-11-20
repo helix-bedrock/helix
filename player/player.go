@@ -128,6 +128,8 @@ type Player struct {
 	aim aimState
 	// anchor is the respawn anchor the player last placed or used (anchorpace.go).
 	anchor anchorPace
+	// heldAt is the world tick the player last changed its held hotbar slot (anchorpace.go).
+	heldAt int64
 	// takeCredits pay for taking items out of containers (steal.go).
 	takeCredits int32
 	// pastBuf is reused for a target's earlier positions.
