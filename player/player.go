@@ -126,6 +126,8 @@ type Player struct {
 	placeCredits int32
 	// aim is the player's latest look directions, for the aim check.
 	aim aimState
+	// anchor is the respawn anchor the player last placed or used (anchorpace.go).
+	anchor anchorPace
 	// takeCredits pay for taking items out of containers (steal.go).
 	takeCredits int32
 	// pastBuf is reused for a target's earlier positions.

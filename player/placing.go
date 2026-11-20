@@ -502,6 +502,9 @@ func vanillaPlace(pl *Placement) bool {
 	}
 	playSound(r, pl.Pos, p.s.blockSound(packet.SoundEventPlace, blockCenter(pl.Pos), pl.Block), nil)
 	p.s.postBlockGameEvent(r, gameEventBlockPlace, pl.Pos, p, pl.Block, true)
+	if p.s.reg.Blocks.Name(pl.Block) == nameRespawnAnchor {
+		p.anchorReady(r, pl.Pos)
+	}
 	if !p.creative() {
 		p.useHeld()
 	}
