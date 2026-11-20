@@ -25,7 +25,7 @@ const (
 	aimKeep = 3
 	// aimGrow is how far the box is grown on every side for crosshair players: the crosshair ray
 	// from the camera and the one from the eyes differ a little. Kept small so a cheat that
-	// grows hitboxes gains little; how far the target moved is added on top (attackBox).
+	// grows hitboxes gains little; lag is allowed for by where the target was (attackFits).
 	aimGrow = 0.2
 	// aimCone is the widest angle, in degrees, from the look to the nearest point of the box for
 	// touch players: past what any field of view shows.
@@ -149,38 +149,44 @@ func rayHitsBox(origin, dir, lo, hi mgl32.Vec3) bool {
 
 // Reach and hitbox: Helix's own rules, beyond BDS (BDS takes 6.7 blocks to the target's
 // position). A cheat client grows every hitbox or its own reach; the server measures from the
-// eyes to the target's real box, stretched back along the target's last movement for lag.
+// eyes to the target's real box. Lag: the attacker saw the target where it was its round trip
+// (plus the client's smoothing) ago, so the attack counts if it fits any place the target was in
+// that time (world.Entity.AppendPast). The attacker's own look needs no allowance: its rotation
+// comes in the same inputs as its attack.
 
 const (
-	// attackReach is vanilla's survival attack reach, attackReachSlack what lag adds to it, and
-	// attackReachCreative the reach in creative.
+	// attackReach is vanilla's survival attack reach, attackReachSlack what float rounding and
+	// smoothing add to it, and attackReachCreative the reach in creative.
 	attackReach         = 3
 	attackReachSlack    = 0.5
 	attackReachCreative = 6.5
-	// attackLagTicks is how many ticks of the target's movement its box is stretched back by:
-	// the attacker saw it where it was that long ago.
-	attackLagTicks = 4
+	// attackSmoothTicks is how many ticks behind a client shows other entities, on top of its
+	// round trip.
+	attackSmoothTicks = 3
 )
 
-// attackBox is the box an attack on e may hit: its real box, stretched back along its last
-// movement by attackLagTicks.
-func attackBox(e *world.Entity, lo, hi mgl32.Vec3) (mgl32.Vec3, mgl32.Vec3) {
-	o, ok := e.Owner().(*Player)
-	if !ok {
-		return lo, hi
-	}
-	back := o.move.moved.Mul(-attackLagTicks)
-	if back.Len() > attackReach {
-		back = back.Normalize().Mul(attackReach)
-	}
-	for i := range 3 {
-		if back[i] < 0 {
-			lo[i] += back[i]
-		} else {
-			hi[i] += back[i]
+// attackFits reports whether an attack on e, whose box is lo..hi now, reaches and aims at it
+// and sees it, where it is or where the player saw it in the last round trip.
+func (p *Player) attackFits(r *world.Region, e *world.Entity, lo, hi mgl32.Vec3) bool {
+	now := e.Position()
+	p.pastBuf = e.AppendPast(p.pastBuf[:0], r.CurrentTick()-p.lagTicks())
+	for _, at := range p.pastBuf {
+		off := at.Sub(now)
+		if blo, bhi := lo.Add(off), hi.Add(off); p.inAttackReach(blo, bhi) && p.aimsAt(blo, bhi) && p.seesEntity(r, blo, bhi) {
+			return true
 		}
 	}
-	return lo, hi
+	return false
+}
+
+// lagTicks is how many ticks behind the player sees other entities: its round trip and the
+// client's smoothing, all that is kept if the connection measures no round trip.
+func (p *Player) lagTicks() int64 {
+	rtt := p.conn.Latency()
+	if rtt <= 0 {
+		return world.PastMoves
+	}
+	return min(int64((rtt+world.TickDuration-1)/world.TickDuration)+attackSmoothTicks, world.PastMoves)
 }
 
 // inAttackReach reports whether the box lo..hi is within the player's attack reach of its eyes.

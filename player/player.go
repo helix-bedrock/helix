@@ -18,6 +18,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/effect"
 	"github.com/helix-bedrock/helix/network"
@@ -124,8 +125,10 @@ type Player struct {
 	// placeCredits are the items the player may still use on blocks, one earned per server tick.
 	placeCredits int32
 	// aim is the player's latest look directions, for the aim check.
-	aim  aimState
-	move moveState
+	aim aimState
+	// pastBuf is reused for a target's earlier positions.
+	pastBuf []mgl32.Vec3
+	move    moveState
 	// steps tracks walking for vibrations, warden the shriekers' warnings (sculk.go).
 	steps  vibrationSteps
 	warden wardenTracker

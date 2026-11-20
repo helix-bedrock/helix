@@ -65,14 +65,10 @@ func (p *Player) seesEntityID(id uint64, attack bool) bool {
 		if !ok {
 			return true
 		}
-		if !p.seesEntity(r, lo, hi) {
-			return false
+		if attack {
+			return p.attackFits(r, e, lo, hi)
 		}
-		if !attack {
-			return true
-		}
-		lo, hi = attackBox(e, lo, hi)
-		return p.inAttackReach(lo, hi) && p.aimsAt(lo, hi)
+		return p.seesEntity(r, lo, hi)
 	}
 	return true
 }

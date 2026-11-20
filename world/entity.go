@@ -45,6 +45,8 @@ type Entity struct {
 	box    actorBox
 	actors *actorList
 	slot   int
+	// past are its earlier positions (AppendPast).
+	past pastMoves
 	// frozen is set for this tick when the entity's chunk is not ticking: it neither thinks
 	// nor takes input (tickEntities).
 	frozen bool
@@ -354,6 +356,9 @@ func (e *Entity) Apply(m Movement) bool {
 	c := chunkOf(m.Pos)
 	if c != e.chunk && e.conf.Viewer == nil && !r.canEnter(c) {
 		return false
+	}
+	if m.Pos != e.pos {
+		e.past.keep(e.pos, r.CurrentTick())
 	}
 	if m.Pos != e.pos || m.Rot != e.rot || m.OnGround != e.onGround {
 		e.moved = true
