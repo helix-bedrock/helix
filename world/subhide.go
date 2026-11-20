@@ -113,10 +113,13 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 		v.reveal = map[mcdb.ChunkPos]*revealState{}
 	}
 	st := v.reveal[pos]
-	if st == nil || st.net != nc {
-		st = &revealState{net: nc}
+	if st == nil {
+		st = &revealState{}
 		v.reveal[pos] = st
 	}
+	// A newer form of a chunk the client keeps (a block changed in it) keeps what it was sent;
+	// a chunk sent anew starts afresh (Viewer.deliver).
+	st.net = nc
 	return st
 }
 
@@ -129,7 +132,7 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	for pos, st := range v.reveal {
 		nc := v.nets[pos]
-		if st.fake|st.dry == 0 || nc == nil || st.net != nc {
+		if st.fake|st.dry == 0 || nc == nil {
 			continue
 		}
 		var full, dry, wet uint64
@@ -278,7 +281,7 @@ func (v *Viewer) hidesEntityAt(pos mgl32.Vec3) bool {
 	v.netMu.Lock()
 	defer v.netMu.Unlock()
 	st, nc := v.reveal[at], v.nets[at]
-	if st == nil || nc == nil || st.net != nc {
+	if st == nil || nc == nil {
 		return false
 	}
 	i := int32(b[1]>>4) - nc.bottom //nolint:gosec // block Y fits
@@ -298,7 +301,7 @@ func (v *Viewer) hiddenUpdate(pos mcdb.ChunkPos, pk packet.Packet) bool {
 	}
 	st := v.reveal[pos]
 	nc := v.nets[pos]
-	if st == nil || nc == nil || st.net != nc {
+	if st == nil || nc == nil {
 		return false
 	}
 	i := u.Position[1]>>4 - nc.bottom

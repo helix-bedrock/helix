@@ -260,6 +260,7 @@ func (r *Region) rezone(v *Viewer, centre mcdb.ChunkPos, radius, sim int32) {
 				r.d.unwant(pos, v)
 			}
 			delete(v.nets, pos)
+			delete(v.reveal, pos)
 		}
 	}
 	v.netMu.Unlock()
@@ -446,6 +447,8 @@ func (v *Viewer) SetRaw(fn func(b []byte) bool) {
 func (v *Viewer) deliver(nc *NetChunk) {
 	v.netMu.Lock()
 	v.nets[nc.pos] = nc
+	// Sent anew: the client drops what it had of the chunk and asks for its sub chunks again.
+	delete(v.reveal, nc.pos)
 	v.netMu.Unlock()
 	v.send(nc.level)
 }

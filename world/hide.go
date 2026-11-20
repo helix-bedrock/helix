@@ -499,11 +499,6 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 	}
 	v.revealAt, v.revealTick = at, now
 	v.eye, v.eyeSet = eye, true
-	for pos, st := range v.reveal {
-		if v.nets[pos] != st.net {
-			delete(v.reveal, pos)
-		}
-	}
 	out := v.revealOut[:0]
 	v.walkVisible(r, eye)
 	if t.fake != nil {

@@ -95,6 +95,11 @@ func (r *Region) packetsFor(v *Viewer) []packet.Packet {
 		if _, ok := v.nets[c.chunk]; ok {
 			if c.net != nil {
 				v.nets[c.chunk] = c.net
+				// The client keeps what it was sent of the chunk and gets the change: what it
+				// has as stone or dry stays so (subhide.go).
+				if st := v.reveal[c.chunk]; st != nil {
+					st.net = c.net
+				}
 			} else if v.hiddenUpdate(c.chunk, c.pk) || r.hiddenChange(v, c.pk) {
 				continue
 			}
