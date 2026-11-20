@@ -112,6 +112,9 @@ type Config struct {
 	// own; 0 means one per core besides the region's (DefaultParallelHelpers) and below 0
 	// keeps every region on one core.
 	ParallelHelpers int
+	// Hiding says which buried blocks clients are shown as something else, Helix's anti X-ray
+	// (hide.go). If nil, OreHiding; NoHiding shows every block. Read when the dimension is made.
+	Hiding BlockHiding
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
@@ -147,6 +150,7 @@ type Dimension struct {
 	pool     *pool
 	cache    *netCache
 	light    *lightTable
+	hide     *hideTable
 	sched    *Scheduler
 	ownSched bool
 
@@ -287,6 +291,7 @@ func New(conf Config) (*Dimension, error) {
 		viewers: map[*Viewer]struct{}{},
 	}
 	d.light = newLightTable(conf)
+	d.hide = newHideTable(conf)
 	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
 		return nil, err
 	}
@@ -563,7 +568,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light)
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hide)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })

@@ -39,7 +39,7 @@ type columnHeights [256]int16
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable, hide *hideTable) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
@@ -58,11 +58,13 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		heights[col] = light.columnTop(c, x, z, lightStopsSky)
 		render[col] = light.columnTop(c, x, z, lightStopsRender)
 	}
+	// Heights come from the real blocks; the client is sent the disguised ones (hide.go).
+	shown := hide.apply(c)
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
 	for i := range subs {
 		s := &nc.subs[i]
-		s.payload = chunk.EncodeSubChunk(c, chunk.NetworkHashEncoding, i)
+		s.payload = chunk.EncodeSubChunk(shown, chunk.NetworkHashEncoding, i)
 		for _, be := range entities {
 			if int(c.SubY(int16(i))) != be.Pos[1]&^15 { //nolint:gosec // few sections
 				continue
