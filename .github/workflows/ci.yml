@@ -21,7 +21,7 @@ jobs:
         go: [oldstable, stable]
         os: [ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         if: hashFiles('go.mod') != ''
         with:
@@ -40,7 +40,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         if: hashFiles('go.mod') != ''
         with:
@@ -54,7 +54,7 @@ jobs:
     name: go.mod tidy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         if: hashFiles('go.mod') != ''
         with:
