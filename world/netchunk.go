@@ -24,7 +24,10 @@ type NetChunk struct {
 	// near are its disguised blocks with a face that may be open, sent as they are to the
 	// players near them (hide.go).
 	near []cube.Pos
-	size int
+	// underground has a bit for each sub chunk under the render height in every column
+	// (subhide.go).
+	underground uint64
+	size        int
 }
 
 // netSub is one sub chunk as SubChunk answers it.
@@ -83,8 +86,22 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		base := int(c.SubY(int16(i))) //nolint:gosec // few sections
 		s.hmType, s.hm = subHeightMap(&heights, base)
 		s.setRender(&render, base)
+		if i < maxHiddenSubs && underground(&render, base) {
+			nc.underground |= 1 << i
+		}
 	}
 	return nc
+}
+
+// underground reports whether the section starting at Y base is covered in every column: the
+// render height (just above the highest block that stops it) is above the section's top.
+func underground(render *columnHeights, base int) bool {
+	for _, h := range render {
+		if int(h) <= base+16 {
+			return false
+		}
+	}
+	return true
 }
 
 // setRender sets the render height map of the section starting at Y base, as

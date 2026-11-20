@@ -118,6 +118,9 @@ type Config struct {
 	// RevealRadius is how close, in blocks, a player must be to a disguised block with an open
 	// face to be sent the real one; 0 means DefaultRevealRadius.
 	RevealRadius int32
+	// SubRevealRadius is how close, in blocks, a player must be to an underground sub chunk to be
+	// sent the real one (subhide.go); 0 means DefaultSubRevealRadius.
+	SubRevealRadius int32
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
@@ -297,7 +300,7 @@ func New(conf Config) (*Dimension, error) {
 		viewers: map[*Viewer]struct{}{},
 	}
 	d.light = newLightTable(conf)
-	d.hide = newHideTable(conf)
+	d.hide = newHideTable(conf, r)
 	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
 		return nil, err
 	}

@@ -82,9 +82,12 @@ type hideTable struct {
 	// occludes marks the opaque full blocks, which hide what is behind them.
 	occludes []bool
 	any      bool
+	// fake is the solid sub chunk sent for each sub chunk index while it is hidden, nil when
+	// sub chunks are never hidden (subhide.go).
+	fake [][]byte
 }
 
-func newHideTable(conf Config) *hideTable {
+func newHideTable(conf Config, r cube.Range) *hideTable {
 	rules := conf.Hiding
 	if rules == nil {
 		rules = OreHiding{Blocks: conf.Blocks}
@@ -98,6 +101,9 @@ func newHideTable(conf Config) *hideTable {
 			t.cover[id], t.any = c, true
 		}
 		t.occludes[id] = occluder(conf.Blocks.Properties(b))
+	}
+	if _, off := rules.(NoHiding); !off {
+		t.fake = newFakeSubs(conf, r)
 	}
 	return t
 }
@@ -224,14 +230,18 @@ func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 type revealState struct {
 	net  *NetChunk
 	done map[cube.Pos]struct{}
+	// fake and real have a bit for each sub chunk index answered solid and as it is
+	// (subhide.go).
+	fake, real uint64
 }
 
-// RevealNear sends the player the real blocks of the disguised blocks with an open face within
-// the reveal radius of eye, in the chunks its client has, each once while the client keeps
-// that chunk. Runs: the viewer's region, with eye the player's position.
+// RevealNear sends the player what it is near enough to see: the real blocks of the disguised
+// blocks with an open face within the reveal radius of eye, each once while its client keeps
+// that chunk, and the real sub chunks of the underground ones within the sub chunk reveal radius
+// (subhide.go). Runs: the viewer's region, with eye the player's position.
 func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 	t := r.d.hide
-	if t == nil || !t.any {
+	if t == nil || (!t.any && t.fake == nil) {
 		return
 	}
 	at := blockAt(eye)
@@ -240,19 +250,34 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 		return
 	}
 	v.revealAt, v.revealTick = at, now
-	radius := r.d.revealRadius()
-	reach := int32(radius+15) >> 4 //nolint:gosec // small
-	centre := chunkAt(at)
 	v.netMu.Lock()
-	defer v.netMu.Unlock()
-	if v.reveal == nil {
-		v.reveal = map[mcdb.ChunkPos]*revealState{}
-	}
+	v.eye, v.eyeSet = eye, true
 	for pos, st := range v.reveal {
 		if v.nets[pos] != st.net {
 			delete(v.reveal, pos)
 		}
 	}
+	out := v.revealOut[:0]
+	if t.fake != nil {
+		out = v.revealSubs(r, eye, out)
+	}
+	if t.any {
+		out = v.revealOres(r, eye, out)
+	}
+	v.netMu.Unlock()
+	for i, pk := range out {
+		v.send(pk)
+		out[i] = nil
+	}
+	v.revealOut = out[:0]
+}
+
+// revealOres adds to out the real blocks of the disguised blocks with an open face within the
+// reveal radius of eye that the client was not sent yet. Under netMu.
+func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
+	radius := r.d.revealRadius()
+	reach := int32(radius+15) >> 4 //nolint:gosec // small
+	centre := chunkAt(blockAt(eye))
 	for dx := -reach; dx <= reach; dx++ {
 		for dz := -reach; dz <= reach; dz++ {
 			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
@@ -260,22 +285,19 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 			if !ok {
 				continue
 			}
-			st := v.reveal[pos]
-			if st == nil {
-				st = &revealState{net: nc}
-				v.reveal[pos] = st
-			}
-			v.revealList(r, st, nc.near, eye, radius)
+			st := v.revealOf(pos, nc)
+			out = v.revealList(r, st, nc.near, eye, radius, out)
 			if c, ok := r.chunks[pos]; ok {
-				v.revealList(r, st, c.opened, eye, radius)
+				out = v.revealList(r, st, c.opened, eye, radius, out)
 			}
 		}
 	}
+	return out
 }
 
-// revealList sends the real blocks of the disguised blocks in list within radius of eye that
-// were not sent yet.
-func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int) {
+// revealList adds to out the real blocks of the disguised blocks in list within radius of eye
+// that were not sent yet.
+func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
 	r2 := float32(radius * radius)
 	t := r.d.hide
 	for _, p := range list {
@@ -294,12 +316,13 @@ func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl
 		if !ok || t.coverOf(b) == noCover {
 			continue
 		}
-		v.send(&packet.UpdateBlock{
+		out = append(out, &packet.UpdateBlock{
 			Position:          protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
 			NewBlockRuntimeID: r.d.conf.Blocks.Hash(b),
 			Flags:             UpdateBlockFlags,
 		})
 	}
+	return out
 }
 
 // revealRadius is Config.RevealRadius, or DefaultRevealRadius.

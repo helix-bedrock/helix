@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/cube"
@@ -71,6 +72,12 @@ type Viewer struct {
 	reveal     map[mcdb.ChunkPos]*revealState
 	revealAt   cube.Pos
 	revealTick int64
+	// revealOut is RevealNear's reused packet list.
+	revealOut []packet.Packet
+	// eye is where the player is, once eyeSet, for which sub chunks it is sent as they are;
+	// under netMu (subhide.go).
+	eye    mgl32.Vec3
+	eyeSet bool
 }
 
 // AddViewer adds a player's zones in a region of their own, which merges
@@ -146,7 +153,7 @@ func (v *Viewer) SubChunks(pk *packet.SubChunkRequest) *packet.SubChunk {
 			resp.SubChunkEntries = append(resp.SubChunkEntries, protocol.SubChunkEntry{Offset: off, Result: protocol.SubChunkResultChunkNotFound})
 			continue
 		}
-		resp.SubChunkEntries = append(resp.SubChunkEntries, nc.entry(off, pk.Position[1]+int32(off[1])))
+		resp.SubChunkEntries = append(resp.SubChunkEntries, v.subEntry(pos, nc, off, pk.Position[1]+int32(off[1])))
 	}
 	return resp
 }
