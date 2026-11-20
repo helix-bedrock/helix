@@ -347,12 +347,18 @@ func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl
 		if _, ok := st.done[p]; ok {
 			continue
 		}
+		b, ok := r.Block(p, 0)
+		if !ok {
+			continue
+		}
+		if t.coverOf(b) != noCover && !r.seesBlock(eye, p) {
+			continue // out of sight: tried again on the next scan
+		}
 		if st.done == nil {
 			st.done = map[cube.Pos]struct{}{}
 		}
 		st.done[p] = struct{}{}
-		b, ok := r.Block(p, 0)
-		if !ok || t.coverOf(b) == noCover {
+		if t.coverOf(b) == noCover {
 			continue
 		}
 		out = append(out, &packet.UpdateBlock{
