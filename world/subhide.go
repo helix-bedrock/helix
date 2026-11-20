@@ -144,17 +144,23 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 			continue
 		}
 		c, loaded := r.chunks[pos]
+		// Past the simulation distance only its network form is here: read back from that.
+		latest := nc
 		if !loaded {
-			// Only its network form is here (past the simulation distance): far enough that
-			// the client redrawing it is hardly seen.
-			out = v.announce(r, pos, out)
-			continue
+			if cur := r.netChunk(pos); cur != nil {
+				latest = cur
+			}
 		}
 		st.real, st.fake = st.real|want, st.fake&^want
 		st.forgetIn(want)
 		for i := range int32(maxHiddenSubs) {
-			if want&(1<<i) != 0 {
+			if want&(1<<i) == 0 {
+				continue
+			}
+			if loaded {
 				out = r.appendSubBlocks(out, c, i, nc.bottom+i)
+			} else {
+				out = r.appendNetSubBlocks(out, latest, i, nc.bottom+i)
 			}
 		}
 	}

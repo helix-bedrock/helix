@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/mcdb"
 )
@@ -13,9 +12,10 @@ import (
 // sent as it is when the player could see it, across a big cave or through a cave mouth. Each
 // network chunk keeps, for every sub chunk, which pairs of its six faces are joined through
 // cells that are not opaque full blocks (worked out once, when it is encoded). From the sub chunk
-// the player is in, a walk goes from sub chunk to sub chunk through joined faces, never back
-// towards where it came from, as Java Edition culls caves: every sub chunk it reaches may be in
-// view.
+// the player is in, a walk goes from sub chunk to sub chunk through joined faces, as Java Edition
+// culls caves but without its rule against turning back: what Java misses it does not draw, while
+// a client here would be shown a wall of stone, so every sub chunk joined to the player's within
+// reach counts as in view.
 
 const (
 	// allLinks joins every face with every other: a sub chunk of air.
@@ -163,7 +163,7 @@ func (v *Viewer) walkVisible(r *Region, eye mgl32.Vec3) {
 			continue
 		}
 		for d := range int8(faceCount) {
-			if n.dirs&(1<<(d^1)) != 0 || n.from >= 0 && links&(1<<(int(n.from)*faceCount+int(d))) == 0 {
+			if n.from >= 0 && links&(1<<(int(n.from)*faceCount+int(d))) == 0 {
 				continue
 			}
 			s := faceStep[d]
@@ -219,23 +219,4 @@ func (v *Viewer) visibleSub(pos mcdb.ChunkPos, y int32) bool {
 		return v.visGrid[i]
 	}
 	return false
-}
-
-// announce adds to out the chunk at pos announced again from its latest network form, for a
-// chunk the region does not hold: the client asks for its sub chunks again, and is answered the
-// visible ones as they are. Under netMu.
-func (v *Viewer) announce(r *Region, pos mcdb.ChunkPos, out []packet.Packet) []packet.Packet {
-	nc := r.netChunk(pos)
-	if nc == nil {
-		return out
-	}
-	v.nets[pos] = nc
-	return append(out, nc.level)
-}
-
-func abs32(v int32) int32 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
