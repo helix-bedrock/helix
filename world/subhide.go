@@ -1,6 +1,8 @@
 package world
 
 import (
+	"time"
+
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
@@ -88,6 +90,9 @@ func (v *Viewer) subEntry(pos mcdb.ChunkPos, nc *NetChunk, off protocol.SubChunk
 	e := nc.entry(off, y)
 	t := v.d.hiding()
 	i := y - nc.bottom
+	if e.Result == protocol.SubChunkResultSuccess && t != nil && (t.any || t.fake != nil) && !v.seeAll.Load() {
+		v.revealOf(pos, nc).answered = time.Now()
+	}
 	if e.Result != protocol.SubChunkResultSuccess || t == nil || t.fake == nil || !v.eyeSet || v.seeAll.Load() ||
 		int(i) >= len(t.fake) || nc.underground&(1<<i) == 0 {
 		return e
@@ -123,6 +128,16 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 	return st
 }
 
+// revealSettle is how long after a sub chunk of a chunk was answered its blocks wait before being
+// revealed: the client builds sub chunks it is answered in the background, and block updates
+// that reach it first are overwritten by the stand-in or the disguised blocks, which then stay.
+const revealSettle = time.Second
+
+// settling reports whether a sub chunk of the chunk was answered within revealSettle.
+func (st *revealState) settling() bool {
+	return !st.answered.IsZero() && time.Since(st.answered) < revealSettle
+}
+
 // revealSubs sends the client, as block updates, the real blocks of the solid stand-in sub chunks
 // it was answered that are now within the sub chunk reveal radius of eye or in its view
 // (walkVisible). Block updates are
@@ -132,7 +147,7 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	for pos, st := range v.reveal {
 		nc := v.nets[pos]
-		if st.fake|st.dry == 0 || nc == nil {
+		if st.fake|st.dry == 0 || nc == nil || st.settling() {
 			continue
 		}
 		var full, dry, wet uint64
