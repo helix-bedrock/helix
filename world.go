@@ -178,6 +178,9 @@ func (s *Server) openOverworld(typeName string, gt generator.Type, seed int64, f
 	conf.Log, conf.Dim, conf.Store = s.log.With("part", "world"), mcdb.Overworld, s.worldStore
 	conf.Blocks, conf.Biomes, conf.SimulationDistance = s.reg.Blocks, s.reg.Biomes, s.conf.TickDistance
 	conf.EntityViewRadius2 = s.conf.EntityViewRadius2
+	if s.conf.NoAntiXray {
+		conf.Hiding, conf.NoSubHiding = world.NoHiding{}, true
+	}
 	conf.Scheduler, conf.RandomTickSpeed = s.ticker, randomTickSpeed
 	if shield, ok := s.reg.Items.ByName("minecraft:shield"); ok {
 		conf.ShieldID = int32(shield.ID)

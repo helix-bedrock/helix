@@ -219,6 +219,9 @@ func occluder(props registry.Properties) bool {
 		props.LightDampening >= MaxLight
 }
 
+// on reports whether anything is hidden: blocks disguised or sub chunks stood in for.
+func (t *hideTable) on() bool { return t != nil && (t.any || t.fake != nil) }
+
 func (t *hideTable) coverOf(b uint32) uint32 {
 	if int(b) < len(t.cover) {
 		return t.cover[b]
@@ -506,7 +509,7 @@ type revealState struct {
 // (subhide.go). Runs: the viewer's region, with eye the player's position.
 func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 	t := r.d.hiding()
-	if t == nil || (!t.any && t.fake == nil) {
+	if !t.on() {
 		return
 	}
 	if v.seeAll.Load() {

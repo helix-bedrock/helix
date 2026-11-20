@@ -79,6 +79,9 @@ func fakeCover(dim mcdb.Dimension, base int16) string {
 // SetEye tells the viewer where the player is, for which sub chunks it is sent as they are.
 // Runs: anywhere.
 func (v *Viewer) SetEye(pos mgl32.Vec3) {
+	if !v.d.hiding().on() {
+		return
+	}
 	v.netMu.Lock()
 	v.eye, v.eyeSet = pos, true
 	v.netMu.Unlock()
@@ -375,7 +378,7 @@ func (v *Viewer) hidesEntityAt(pos mgl32.Vec3) bool {
 // it is not sent, the real sub chunk carries it when revealed. Under netMu.
 func (v *Viewer) hiddenUpdate(pos mcdb.ChunkPos, pk packet.Packet) bool {
 	u, ok := pk.(*packet.UpdateBlock)
-	if !ok || v.seeAll.Load() {
+	if !ok || v.seeAll.Load() || !v.d.hiding().on() {
 		return false
 	}
 	st := v.reveal[pos]

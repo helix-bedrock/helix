@@ -89,6 +89,10 @@ type Config struct {
 	// players see other players and entities, whatever the view and tick
 	// distances; see world.Config.EntityViewRadius2.
 	EntityViewRadius2 int32
+	// NoAntiXray turns the anti X-ray off in every dimension (world.NoHiding, no stand-in sub
+	// chunks): chunks are encoded and sent as they are, with none of its work. server.properties'
+	// anti-xray=false.
+	NoAntiXray bool
 	// TickCores is how many goroutines tick the world's regions, shared by
 	// every dimension. 0 means one per CPU; 1 ticks regions one after
 	// another in a fixed order, for debugging and exact reproduction.
