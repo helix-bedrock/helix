@@ -138,17 +138,29 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 // that reach it first are overwritten by the stand-in or the disguised blocks, which then stay.
 const revealSettle = time.Second
 
-// revealAgain is how long after a stand-in sub chunk is revealed it is sent again, each time: a
+// revealAgainFirst and revealAgainLast are how long after a stand-in sub chunk is revealed it is sent again, each time: a
 // client busy building many chunks may take longer than the first.
-var revealAgain = [...]time.Duration{3 * time.Second, 10 * time.Second}
+const (
+	revealAgainFirst = 3 * time.Second
+	revealAgainLast  = 10 * time.Second
+	revealRounds     = 2
+)
+
+// revealAgainAfter is how long after the reveal resend round n goes out.
+func revealAgainAfter(n int) time.Duration {
+	if n == 0 {
+		return revealAgainFirst
+	}
+	return revealAgainLast
+}
 
 // revealAgainSubs sends again the stand-in sub chunks of the chunk at pos revealed
-// revealAgain[st.rounds] ago, as the client has them now (full, or dry while it waits for its liquids), then
+// revealAgainAfter(st.rounds) after it was, as the client has them now (full, or dry while it waits for its liquids), then
 // the ores in them the player was shown, which the resend disguised again.
 func (v *Viewer) revealAgainSubs(r *Region, pos mcdb.ChunkPos, nc *NetChunk, st *revealState, out []packet.Packet) []packet.Packet {
 	again := st.again
 	st.rounds++
-	if st.rounds >= len(revealAgain) {
+	if st.rounds >= revealRounds {
 		st.again = 0
 	}
 	for i := range int32(maxHiddenSubs) {
@@ -194,7 +206,7 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 		if nc == nil || st.settling() {
 			continue
 		}
-		if st.again != 0 && st.rounds < len(revealAgain) && time.Since(st.revealedAt) >= revealAgain[st.rounds] {
+		if st.again != 0 && st.rounds < revealRounds && time.Since(st.revealedAt) >= revealAgainAfter(st.rounds) {
 			out = v.revealAgainSubs(r, pos, nc, st, out)
 		}
 		if st.fake|st.dry == 0 {
