@@ -28,20 +28,23 @@ const (
 )
 
 // newFakeSubs returns the solid sub chunk a client far away is answered for each sub chunk
-// index of a dimension with range r, nil if a cover block is missing.
-func newFakeSubs(conf Config, r cube.Range) [][]byte {
+// index of a dimension with range r, and the block each is made of; nil if a cover block is
+// missing.
+func newFakeSubs(conf Config, r cube.Range) ([][]byte, []uint32) {
 	blocks := conf.Blocks
 	c := chunk.New(blocks, r)
 	n := len(c.Sub())
 	if n > maxHiddenSubs {
-		return nil
+		return nil, nil
 	}
+	covers := make([]uint32, n)
 	for i := range n {
 		base := c.SubY(int16(i)) //nolint:gosec // few sections
 		cover, ok := blocks.Block(fakeCover(conf.Dim, base))
 		if !ok {
-			return nil
+			return nil, nil
 		}
+		covers[i] = cover
 		for y := range int16(16) {
 			for z := range uint8(16) {
 				for x := range uint8(16) {
@@ -55,7 +58,7 @@ func newFakeSubs(conf Config, r cube.Range) [][]byte {
 	for i := range n {
 		fake[i] = chunk.EncodeSubChunk(c, chunk.NetworkHashEncoding, i)
 	}
-	return fake
+	return fake, covers
 }
 
 // fakeCover is the block a hidden sub chunk starting at Y base is made of.
@@ -117,13 +120,15 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 	return st
 }
 
-// revealSubs sends the client the real sub chunks, from their chunk's latest network form, of the
-// solid ones it was answered that are now within the sub chunk reveal radius of eye. Runs: the viewer's region, under netMu; the announcements go in out.
+// revealSubs sends the client, as block updates, the real blocks of the solid stand-in sub chunks
+// it was answered that are now within the sub chunk reveal radius of eye. Block updates are
+// applied by every client; a chunk announced again is redrawn whole, which flickers, and a
+// SubChunk packet it did not ask for may be dropped. Runs: the viewer's region, under netMu; the
+// packets go in out.
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	radius := r.d.subRevealRadius()
 	reach := int32(radius+15) >> 4 //nolint:gosec // small
 	centre := chunkAt(blockAt(eye))
-	encodedNow := false
 	for dx := -reach; dx <= reach; dx++ {
 		for dz := -reach; dz <= reach; dz++ {
 			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
@@ -138,52 +143,95 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 					want |= 1 << i
 				}
 			}
-			if want == 0 {
+			c, loaded := r.chunks[pos]
+			if want == 0 || !loaded {
 				continue
 			}
-			cur := r.netChunk(pos)
-			if cur == nil {
-				c, ok := r.chunks[pos]
-				if !ok || encodedNow {
-					continue // next scan
-				}
-				// A chunk that changes every tick never keeps a worker's encode (it is stale by
-				// the time it comes back), and the player would walk into stone that is not
-				// there: encode it here, one a scan.
-				cur, encodedNow = r.encodeNow(c), true
-			}
-			v.nets[pos] = cur
-			st.net, st.real, st.fake = cur, st.real|want, st.fake&^want
+			st.real, st.fake = st.real|want, st.fake&^want
 			st.forgetIn(want)
-			out = append(out, v.subChunksOf(r, cur, want))
+			for i := range int32(maxHiddenSubs) {
+				if want&(1<<i) != 0 {
+					out = r.appendSubBlocks(out, c, i, nc.bottom+i)
+				}
+			}
 		}
 	}
 	return out
 }
 
-// subChunksOf is a SubChunk packet with the sub chunks of nc marked in want, sent to the client
-// without it asking: announcing the chunk again would make it drop and redraw every sub chunk of
-// it, which flickers.
-func (v *Viewer) subChunksOf(r *Region, nc *NetChunk, want uint64) *packet.SubChunk {
-	pk := &packet.SubChunk{Dimension: int32(r.d.conf.Dim), Position: protocol.SubChunkPos{nc.pos[0], 0, nc.pos[1]}}
-	for i := range int32(maxHiddenSubs) {
-		if want&(1<<i) == 0 {
+// appendSubBlocks adds to out the blocks of sub chunk index i of c, at sub chunk Y y, that differ
+// from its solid stand-in (ores and base blocks still disguised, for the line of sight to show),
+// its second layer (water in blocks), and the block entity data of the blocks not disguised.
+func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32) []packet.Packet {
+	t := r.d.hide
+	subs := c.col.Chunk.Sub()
+	if int(i) >= len(subs) || int(i) >= len(t.fakeBlock) {
+		return out
+	}
+	sub, fake := subs[i], t.fakeBlock[i]
+	blocks := r.d.conf.Blocks
+	air := blocks.Air()
+	pk := &packet.UpdateSubChunkBlocks{Position: protocol.BlockPos{c.pos[0] << 4, y << 4, c.pos[1] << 4}}
+	for by := range byte(16) {
+		for bz := range byte(16) {
+			for bx := range byte(16) {
+				at := protocol.BlockPos{c.pos[0]<<4 | int32(bx), y<<4 + int32(by), c.pos[1]<<4 | int32(bz)}
+				b := sub.Block(bx, by, bz, 0)
+				if cover := t.coverOf(b); cover != noCover {
+					b = cover
+				}
+				if b != fake {
+					pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(b), Flags: UpdateBlockFlags})
+				}
+				if w := sub.Block(bx, by, bz, 1); w != air {
+					pk.Extra = append(pk.Extra, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(w), Flags: UpdateBlockFlags})
+				}
+			}
+		}
+	}
+	out = append(out, pk)
+	for p := range c.blockEntities {
+		if int32(p[1]>>4) != y { //nolint:gosec // block Y fits
 			continue
 		}
-		y := nc.bottom + i
-		pk.SubChunkEntries = append(pk.SubChunkEntries, nc.entry(protocol.SubChunkOffset{0, int8(y), 0}, y)) //nolint:gosec // sub chunk Y fits int8
+		if b, ok := r.Block(p, 0); ok && t.coverOf(b) == noCover {
+			out = r.appendBlockEntity(out, p)
+		}
 	}
-	return pk
+	return out
 }
 
-// forgetIn takes off done the ores in the sub chunks marked in subs: they were just sent from a
-// network chunk that disguises them.
+// forgetIn takes off done the blocks in the sub chunks marked in subs: they were just sent
+// disguised.
 func (st *revealState) forgetIn(subs uint64) {
 	for p := range st.done {
 		if i := int32(p[1]>>4) - st.net.bottom; i >= 0 && i < maxHiddenSubs && subs&(1<<i) != 0 { //nolint:gosec // block Y fits
 			delete(st.done, p)
 		}
 	}
+}
+
+// hidesEntityAt reports whether the client has only the solid stand-in of the sub chunk holding
+// pos: an entity there is not shown, as the client could not see it (Region.visibility). Runs:
+// anywhere.
+func (v *Viewer) hidesEntityAt(pos mgl32.Vec3) bool {
+	if v.d.hide == nil || v.d.hide.fake == nil {
+		return false
+	}
+	b := blockAt(pos)
+	at := chunkAt(b)
+	v.netMu.Lock()
+	defer v.netMu.Unlock()
+	st, nc := v.reveal[at], v.nets[at]
+	if st == nil || nc == nil || st.net != nc {
+		return false
+	}
+	i := int32(b[1]>>4) - nc.bottom //nolint:gosec // block Y fits
+	if i < 0 || i >= maxHiddenSubs {
+		return false
+	}
+	bit := uint64(1) << i
+	return st.fake&bit != 0 && st.real&bit == 0
 }
 
 // hiddenUpdate reports whether pk changes a block in a sub chunk the client was answered solid:
@@ -231,16 +279,4 @@ func (d *Dimension) subRevealRadius() int {
 		return int(d.conf.SubRevealRadius)
 	}
 	return DefaultSubRevealRadius
-}
-
-// encodeNow encodes c on the tick and keeps the result as its network form, which is current
-// until the chunk changes again. An encode still on a worker is checked as usual when it is
-// back.
-func (r *Region) encodeNow(c *Chunk) *NetChunk {
-	d := r.d
-	nc := encodeNetChunk(c.pos, d.conf.Dim, c.col.Chunk.Snapshot(), d.netBorderOf(c.col.Extra[borderTag]),
-		c.networkBlockEntities(), d.light, d.hide)
-	c.net = nc
-	d.publish(c.pos, nc)
-	return nc
 }

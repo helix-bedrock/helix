@@ -125,6 +125,8 @@ type hideTable struct {
 	// fake is the solid sub chunk sent for each sub chunk index while it is hidden, nil when
 	// sub chunks are never hidden (subhide.go).
 	fake [][]byte
+	// fakeBlock is the block each of them is made of.
+	fakeBlock []uint32
 }
 
 func newHideTable(conf Config, r cube.Range) *hideTable {
@@ -143,7 +145,7 @@ func newHideTable(conf Config, r cube.Range) *hideTable {
 		t.occludes[id] = occluder(conf.Blocks.Properties(b))
 	}
 	if _, off := rules.(NoHiding); !off {
-		t.fake = newFakeSubs(conf, r)
+		t.fake, t.fakeBlock = newFakeSubs(conf, r)
 	}
 	return t
 }
