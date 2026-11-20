@@ -91,9 +91,9 @@ func readNetLayer(buf *bytes.Buffer) (netLayer, bool) {
 }
 
 // appendNetSubBlocks adds to out the blocks of sub chunk index i of nc, at sub chunk Y y, that
-// differ from its solid stand-in, and its second layer, as block updates. Its ores and base
+// differ from its solid stand-in, and its second layer, as block updates, in mode (appendSubBlocks). Its ores and base
 // blocks are disguised in nc already; its block entity data is not sent.
-func (r *Region) appendNetSubBlocks(out []packet.Packet, nc *NetChunk, i, y int32) []packet.Packet {
+func (r *Region) appendNetSubBlocks(out []packet.Packet, nc *NetChunk, i, y int32, mode subMode) []packet.Packet {
 	t := r.d.hide
 	if i < 0 || int(i) >= len(nc.subs) || int(i) >= len(t.fakeBlock) {
 		return out
@@ -107,14 +107,26 @@ func (r *Region) appendNetSubBlocks(out []packet.Packet, nc *NetChunk, i, y int3
 	pk := &packet.UpdateSubChunkBlocks{Position: protocol.BlockPos{nc.pos[0] << 4, y << 4, nc.pos[1] << 4}}
 	for cell := range subCells {
 		at := protocol.BlockPos{nc.pos[0]<<4 | int32(cell>>8), y<<4 + int32(cell&15), nc.pos[1]<<4 | int32(cell>>4&15)} //nolint:gosec // cell < 4096
-		if h := layers[0].at(cell); h != fake {
+		h := layers[0].at(cell)
+		liquid := r.liquidHash(h)
+		switch {
+		case mode == subLiquids && !liquid:
+		case mode == subDry && liquid:
+			pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: air, Flags: UpdateBlockFlags})
+		case h != fake:
 			pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: h, Flags: UpdateBlockFlags})
 		}
-		if len(layers) > 1 {
+		if len(layers) > 1 && mode != subDry {
 			if h := layers[1].at(cell); h != air {
 				pk.Extra = append(pk.Extra, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: h, Flags: UpdateBlockFlags})
 			}
 		}
 	}
 	return append(out, pk)
+}
+
+// liquidHash reports whether the block of hash h is water or lava.
+func (r *Region) liquidHash(h uint32) bool {
+	b, ok := r.d.conf.Blocks.HashToRuntimeID(h)
+	return ok && r.d.hide.isLiquid(b)
 }

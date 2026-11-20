@@ -56,9 +56,15 @@ type NoHiding struct{}
 // Disguise shows block as it is.
 func (NoHiding) Disguise(uint32) (uint32, bool) { return 0, false }
 
-// OreHiding is the default: every ore and ancient debris, shown as the stone it sits in, and every
-// block that gives a base away (baseBlocks), shown as stone or air.
-type OreHiding struct{ Blocks *registry.Blocks }
+// OreHiding is the default: every ore and ancient debris, shown as the stone it sits in; every
+// block that gives a base away (baseBlocks) or a cave (caveBlocks), shown as stone when solid and
+// air otherwise; and the overworld's bedrock, shown as deepslate.
+type OreHiding struct {
+	Blocks *registry.Blocks
+	// Dim is the dimension: bedrock is hidden in the overworld only, where it is the floor
+	// under the caves, not the Nether's roof.
+	Dim mcdb.Dimension
+}
 
 const (
 	nameAncientDebris = "minecraft:ancient_debris"
@@ -69,11 +75,17 @@ const (
 	coverNetherrack   = "minecraft:netherrack"
 )
 
-// Disguise shows an ore as stone, a deepslate ore as deepslate and a Nether ore or ancient
-// debris as netherrack.
+// Disguise shows an ore as stone, a deepslate ore as deepslate, a Nether ore or ancient debris as
+// netherrack, a base or cave block as stone or air, and bedrock as deepslate.
 func (h OreHiding) Disguise(block uint32) (uint32, bool) {
 	name := h.Blocks.Name(block)
-	if baseBlock(name) {
+	if name == nameBedrock {
+		if h.Dim != mcdb.Overworld {
+			return 0, false
+		}
+		return h.Blocks.Block(coverDeepslate)
+	}
+	if baseBlock(name) || caveBlocks[name] {
 		// A solid one goes out as stone, the rest (chests, anvils, spawners) as air.
 		if occluder(h.Blocks.Properties(block)) {
 			return h.Blocks.Block(coverStone)
@@ -107,9 +119,35 @@ var baseBlocks = map[string]bool{
 	"minecraft:mob_spawner": true, "minecraft:trial_spawner": true,
 }
 
+// caveBlocks are the blocks that show where caves, mineshafts and geodes are: hidden like ores,
+// so an X-ray sees no rails, cobwebs, torches, lichen or amethyst through the rock.
+var caveBlocks = map[string]bool{
+	"minecraft:rail": true, "minecraft:golden_rail": true, "minecraft:detector_rail": true,
+	"minecraft:activator_rail": true, "minecraft:web": true, "minecraft:torch": true,
+	"minecraft:soul_torch": true, "minecraft:redstone_torch": true, "minecraft:unlit_redstone_torch": true,
+	"minecraft:glow_lichen": true, "minecraft:cave_vines": true, "minecraft:cave_vines_body_with_berries": true,
+	"minecraft:cave_vines_head_with_berries": true, "minecraft:amethyst_block": true,
+	"minecraft:budding_amethyst": true, "minecraft:small_amethyst_bud": true,
+	"minecraft:medium_amethyst_bud": true, "minecraft:large_amethyst_bud": true,
+	"minecraft:amethyst_cluster": true, "minecraft:calcite": true, "minecraft:smooth_basalt": true,
+}
+
+// nameBedrock is hidden in the overworld only (OreHiding.Disguise).
+const nameBedrock = "minecraft:bedrock"
+
+// liquidNames are the blocks a cave sub chunk seen from afar is sent without (subhide.go).
+var liquidNames = map[string]bool{
+	"minecraft:water": true, "minecraft:flowing_water": true, "minecraft:lava": true, "minecraft:flowing_lava": true,
+}
+
 // baseBlock reports whether the block named name gives a base away.
 func baseBlock(name string) bool {
 	return baseBlocks[name] || strings.HasSuffix(name, "shulker_box")
+}
+
+// isLiquid reports whether block is water or lava.
+func (t *hideTable) isLiquid(block uint32) bool {
+	return int(block) < len(t.liquid) && t.liquid[block]
 }
 
 // noCover marks a block shown as it is.
@@ -121,7 +159,9 @@ type hideTable struct {
 	cover []uint32
 	// occludes marks the opaque full blocks, which hide what is behind them.
 	occludes []bool
-	any      bool
+	// liquid marks water and lava, left out of cave sub chunks seen from afar (subhide.go).
+	liquid []bool
+	any    bool
 	// fake is the solid sub chunk sent for each sub chunk index while it is hidden, nil when
 	// sub chunks are never hidden (subhide.go).
 	fake [][]byte
@@ -132,10 +172,10 @@ type hideTable struct {
 func newHideTable(conf Config, r cube.Range) *hideTable {
 	rules := conf.Hiding
 	if rules == nil {
-		rules = OreHiding{Blocks: conf.Blocks}
+		rules = OreHiding{Blocks: conf.Blocks, Dim: conf.Dim}
 	}
 	n := conf.Blocks.Count()
-	t := &hideTable{cover: make([]uint32, n), occludes: make([]bool, n)}
+	t := &hideTable{cover: make([]uint32, n), occludes: make([]bool, n), liquid: make([]bool, n)}
 	for id := range n {
 		b := uint32(id) //nolint:gosec // registry IDs fit
 		t.cover[id] = noCover
@@ -143,6 +183,7 @@ func newHideTable(conf Config, r cube.Range) *hideTable {
 			t.cover[id], t.any = c, true
 		}
 		t.occludes[id] = occluder(conf.Blocks.Properties(b))
+		t.liquid[id] = liquidNames[conf.Blocks.Name(b)]
 	}
 	if _, off := rules.(NoHiding); !off {
 		t.fake, t.fakeBlock = newFakeSubs(conf, r)
@@ -417,6 +458,8 @@ type revealState struct {
 	// fake and real have a bit for each sub chunk index answered solid and as it is
 	// (subhide.go).
 	fake, real uint64
+	// dry has a bit for each sub chunk sent without its water and lava (subDry).
+	dry uint64
 }
 
 // RevealNear sends the player what it is near enough to see: the real blocks of the disguised

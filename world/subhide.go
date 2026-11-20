@@ -97,7 +97,7 @@ func (v *Viewer) subEntry(pos mcdb.ChunkPos, nc *NetChunk, off protocol.SubChunk
 	if st.real&bit != 0 {
 		return e
 	}
-	if v.d.subNear(v.eye, pos, y) || v.visibleSub(pos, y) {
+	if v.d.subNear(v.eye, pos, y) {
 		st.real |= bit
 		return e
 	}
@@ -130,47 +130,75 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 	v.walkVisible(r, eye)
 	for pos, st := range v.reveal {
 		nc := v.nets[pos]
-		if st.fake == 0 || nc == nil || st.net != nc {
+		if st.fake|st.dry == 0 || nc == nil || st.net != nc {
 			continue
 		}
-		var want uint64
+		var full, dry, wet uint64
 		for i := range int32(maxHiddenSubs) {
-			y := nc.bottom + i
-			if st.fake&(1<<i) != 0 && (r.d.subNear(eye, pos, y) || v.visibleSub(pos, y)) {
-				want |= 1 << i
+			bit, y := uint64(1)<<i, nc.bottom+i
+			near := r.d.subNear(eye, pos, y)
+			switch {
+			case st.fake&bit != 0 && near:
+				full |= bit
+			case st.fake&bit != 0 && v.visibleSub(pos, y):
+				dry |= bit
+			case st.dry&bit != 0 && near:
+				wet |= bit
 			}
 		}
-		if want == 0 {
+		if full|dry|wet == 0 {
 			continue
 		}
-		c, loaded := r.chunks[pos]
-		// Past the simulation distance only its network form is here: read back from that.
-		latest := nc
-		if !loaded {
-			if cur := r.netChunk(pos); cur != nil {
-				latest = cur
-			}
-		}
-		st.real, st.fake = st.real|want, st.fake&^want
-		st.forgetIn(want)
+		st.real, st.fake = st.real|full|dry, st.fake&^(full|dry)
+		st.dry = st.dry&^wet | dry
+		st.forgetIn(full | dry)
 		for i := range int32(maxHiddenSubs) {
-			if want&(1<<i) == 0 {
-				continue
-			}
-			if loaded {
-				out = r.appendSubBlocks(out, c, i, nc.bottom+i)
-			} else {
-				out = r.appendNetSubBlocks(out, latest, i, nc.bottom+i)
+			bit := uint64(1) << i
+			switch {
+			case full&bit != 0:
+				out = v.appendSub(r, pos, nc, i, subFull, out)
+			case dry&bit != 0:
+				out = v.appendSub(r, pos, nc, i, subDry, out)
+			case wet&bit != 0:
+				out = v.appendSub(r, pos, nc, i, subLiquids, out)
 			}
 		}
 	}
 	return out
 }
 
-// appendSubBlocks adds to out the blocks of sub chunk index i of c, at sub chunk Y y, that differ
-// from its solid stand-in (ores and base blocks still disguised, for the line of sight to show),
-// its second layer (water in blocks), and the block entity data of the blocks not disguised.
-func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32) []packet.Packet {
+// subMode is what of a hidden sub chunk is sent.
+type subMode uint8
+
+const (
+	// subFull sends all of it.
+	subFull subMode = iota
+	// subDry sends it without its water and lava: a cave seen from afar, whose liquids an X-ray
+	// would see through the rock.
+	subDry
+	// subLiquids sends only the water and lava of one sent dry, once the player is near.
+	subLiquids
+)
+
+// appendSub adds to out sub chunk index i of the chunk at pos, which the client has as nc, as
+// block updates in mode: read live when the region holds the chunk, else back from its latest
+// network form (past the simulation distance).
+func (v *Viewer) appendSub(r *Region, pos mcdb.ChunkPos, nc *NetChunk, i int32, mode subMode, out []packet.Packet) []packet.Packet {
+	y := nc.bottom + i
+	if c, ok := r.chunks[pos]; ok {
+		return r.appendSubBlocks(out, c, i, y, mode)
+	}
+	if cur := r.netChunk(pos); cur != nil {
+		nc = cur
+	}
+	return r.appendNetSubBlocks(out, nc, i, y, mode)
+}
+
+// appendSubBlocks adds to out the blocks of sub chunk index i of c, at sub chunk Y y, in mode: those
+// that differ from its solid stand-in (ores and base blocks still disguised, for the line of
+// sight to show), its second layer (water in blocks), and the block entity data of the blocks not
+// disguised; dry, its liquids as air and no second layer; liquids, only those.
+func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32, mode subMode) []packet.Packet {
 	t := r.d.hide
 	subs := c.col.Chunk.Sub()
 	if int(i) >= len(subs) || int(i) >= len(t.fakeBlock) {
@@ -188,16 +216,24 @@ func (r *Region) appendSubBlocks(out []packet.Packet, c *Chunk, i, y int32) []pa
 				if cover := t.coverOf(b); cover != noCover {
 					b = cover
 				}
-				if b != fake {
+				liquid := t.isLiquid(b)
+				switch {
+				case mode == subLiquids && !liquid:
+				case mode == subDry && liquid:
+					pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(air), Flags: UpdateBlockFlags})
+				case b != fake:
 					pk.Blocks = append(pk.Blocks, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(b), Flags: UpdateBlockFlags})
 				}
-				if w := sub.Block(bx, by, bz, 1); w != air {
+				if w := sub.Block(bx, by, bz, 1); w != air && mode != subDry {
 					pk.Extra = append(pk.Extra, protocol.BlockChangeEntry{BlockPos: at, BlockRuntimeID: blocks.Hash(w), Flags: UpdateBlockFlags})
 				}
 			}
 		}
 	}
 	out = append(out, pk)
+	if mode == subLiquids {
+		return out
+	}
 	for p := range c.blockEntities {
 		if int32(p[1]>>4) != y { //nolint:gosec // block Y fits
 			continue
@@ -259,6 +295,11 @@ func (v *Viewer) hiddenUpdate(pos mcdb.ChunkPos, pk packet.Packet) bool {
 		return false
 	}
 	bit := uint64(1) << i
+	if st.dry&bit != 0 {
+		// Sent dry: its liquids, and the water in blocks, wait until the player is near.
+		b, ok := v.d.conf.Blocks.HashToRuntimeID(u.NewBlockRuntimeID)
+		return u.Layer != 0 || ok && v.d.hide.isLiquid(b)
+	}
 	return st.fake&bit != 0 && st.real&bit == 0
 }
 
