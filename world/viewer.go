@@ -75,8 +75,8 @@ type Viewer struct {
 	revealTick int64
 	// revealOut is RevealNear's reused packet list.
 	revealOut []packet.Packet
-	// sightLeft and hideLeft are the line of sight checks left this scan (hide.go).
-	sightLeft, hideLeft int
+	// sightLeft is the line of sight checks left this scan (hide.go).
+	sightLeft int
 	// eye is where the player is, once eyeSet, for which sub chunks it is sent as they are;
 	// under netMu (subhide.go).
 	eye    mgl32.Vec3

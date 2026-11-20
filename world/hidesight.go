@@ -34,7 +34,9 @@ func (r *Region) seesBlock(eye mgl32.Vec3, p cube.Pos) bool {
 		if (eye[axis]-centre[axis])*sign <= 0.5 {
 			continue
 		}
-		if b, ok := r.Block(p.Side(f), 0); !ok || t.occluding(b) {
+		// A side in a chunk this region does not hold counts as open: better an ore shown
+		// than one a player looking at it cannot see.
+		if b, ok := r.Block(p.Side(f), 0); ok && t.occluding(b) {
 			continue
 		}
 		u, w := (axis+1)%3, (axis+2)%3
@@ -69,7 +71,7 @@ func faceAxis(f cube.Face) (int, float32) {
 }
 
 // clearRay walks the blocks from from to to, which lies in target, and reports whether it gets
-// to target without crossing an opaque full block or one not loaded.
+// to target without crossing an opaque full block.
 func (r *Region) clearRay(from, to mgl32.Vec3, target cube.Pos) bool {
 	t := r.d.hiding()
 	dir := to.Sub(from)
@@ -110,8 +112,8 @@ func (r *Region) clearRay(from, to mgl32.Vec3, target cube.Pos) bool {
 		if at == target {
 			return true
 		}
-		b, ok := r.Block(at, 0)
-		if !ok || t.occluding(b) {
+		// Blocks of chunks this region does not hold do not block the ray.
+		if b, ok := r.Block(at, 0); ok && t.occluding(b) {
 			return false
 		}
 	}
