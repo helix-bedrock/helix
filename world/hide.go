@@ -485,6 +485,8 @@ type revealState struct {
 	// revealAgain later in case the client had not built it yet and lost the updates.
 	again      uint64
 	revealedAt time.Time
+	// rounds is how many of revealAgain's resends again has had.
+	rounds int
 	// all is set once a player who sees everything was sent its hidden blocks (seeall.go).
 	all bool
 }

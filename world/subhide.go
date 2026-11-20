@@ -138,15 +138,19 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 // that reach it first are overwritten by the stand-in or the disguised blocks, which then stay.
 const revealSettle = time.Second
 
-// revealAgain is how long after a stand-in sub chunk is revealed it is sent once more.
-const revealAgain = 3 * time.Second
+// revealAgain is how long after a stand-in sub chunk is revealed it is sent again, each time: a
+// client busy building many chunks may take longer than the first.
+var revealAgain = [...]time.Duration{3 * time.Second, 10 * time.Second}
 
-// revealAgainSubs sends once more the stand-in sub chunks of the chunk at pos revealed
-// revealAgain ago, as the client has them now (full, or dry while it waits for its liquids), then
+// revealAgainSubs sends again the stand-in sub chunks of the chunk at pos revealed
+// revealAgain[st.rounds] ago, as the client has them now (full, or dry while it waits for its liquids), then
 // the ores in them the player was shown, which the resend disguised again.
 func (v *Viewer) revealAgainSubs(r *Region, pos mcdb.ChunkPos, nc *NetChunk, st *revealState, out []packet.Packet) []packet.Packet {
 	again := st.again
-	st.again = 0
+	st.rounds++
+	if st.rounds >= len(revealAgain) {
+		st.again = 0
+	}
 	for i := range int32(maxHiddenSubs) {
 		bit := uint64(1) << i
 		if again&bit == 0 || st.fake&bit != 0 {
@@ -190,7 +194,7 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 		if nc == nil || st.settling() {
 			continue
 		}
-		if st.again != 0 && time.Since(st.revealedAt) >= revealAgain {
+		if st.again != 0 && st.rounds < len(revealAgain) && time.Since(st.revealedAt) >= revealAgain[st.rounds] {
 			out = v.revealAgainSubs(r, pos, nc, st, out)
 		}
 		if st.fake|st.dry == 0 {
@@ -216,7 +220,7 @@ func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 		st.dry = st.dry&^wet | dry
 		st.forgetIn(full | dry)
 		st.again |= full | dry
-		st.revealedAt = time.Now()
+		st.revealedAt, st.rounds = time.Now(), 0
 		for i := range int32(maxHiddenSubs) {
 			bit := uint64(1) << i
 			switch {
