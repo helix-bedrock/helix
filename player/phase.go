@@ -41,13 +41,22 @@ func (p *Player) phaseCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 	d := to.Sub(from)
 	lo, hi := p.phaseBox(from)
 	if d.Len() <= phaseFar {
+		// A move the sweep reached within phaseSlack still ends where the sweep reached, not
+		// where the client said: else a cheat creeps into a wall phaseSlack at a time, and once
+		// inside a block's box that box no longer stops it.
 		got, ok := p.s.sweepMove(r, lo, hi, d, 0)
-		if !ok || reached(got, d) {
+		if !ok {
 			return to
 		}
+		if reached(got, d) {
+			return from.Add(got)
+		}
 		stepped, ok := p.s.sweepMove(r, lo, hi, d, phaseStep)
-		if !ok || reached(stepped, d) {
+		if !ok {
 			return to
+		}
+		if reached(stepped, d) {
+			return from.Add(stepped)
 		}
 		if flatDist(stepped, d) < flatDist(got, d) {
 			got = stepped
@@ -61,7 +70,8 @@ func (p *Player) phaseCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 func (p *Player) phaseBox(eyes mgl32.Vec3) (lo, hi mgl32.Vec3) {
 	height := float32(playerHeight)
 	switch {
-	case p.Moving(MoveSwimming) || p.Moving(MoveGliding) || p.Moving(MoveCrawling):
+	// Swimming counts only in water: a cheat claims it anywhere to fit under blocks.
+	case p.Moving(MoveSwimming) && p.move.inWater, p.Moving(MoveGliding), p.Moving(MoveCrawling):
 		height = phaseLowHeight
 	case p.Moving(MoveSneaking):
 		height = phaseSneakHeight
