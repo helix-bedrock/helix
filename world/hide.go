@@ -1,11 +1,13 @@
 package world
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/helix-bedrock/helix/registry"
 	"github.com/helix-bedrock/world/chunk"
 	"github.com/helix-bedrock/world/cube"
+	"github.com/helix-bedrock/world/mcdb"
 )
 
 // Anti X-ray: Helix's own, beyond BDS. The client is sent every block of every chunk it sees,
@@ -107,13 +109,35 @@ func (t *hideTable) occluding(b uint32) bool {
 	return int(b) < len(t.occludes) && t.occludes[b]
 }
 
+// hiddenEdge is a disguised block on the chunk's side, buried within the chunk: whether it is
+// seen depends on the chunk next to it, which the encoder does not have. shown is set once it
+// went out as it is.
+type hiddenEdge struct {
+	pos   cube.Pos
+	shown bool
+}
+
+// burial is how buried a block is.
+type burial uint8
+
+const (
+	// open is a block with a face the client may see.
+	open burial = iota
+	// buried is a block covered on every face.
+	buried
+	// edgeBuried is a block covered within the chunk, with a face on the chunk's side.
+	edgeBuried
+)
+
 // apply returns c as the client is shown it: c itself when nothing is hidden, else a snapshot
-// with the buried blocks disguised. c is only read.
-func (t *hideTable) apply(c *chunk.Chunk) *chunk.Chunk {
+// with the buried blocks disguised, and the disguisable blocks on the chunk's sides. Those in
+// show, which the chunk next door leaves open, go out as they are. c is only read.
+func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos, show []cube.Pos) (*chunk.Chunk, []hiddenEdge) {
 	if t == nil || !t.any {
-		return c
+		return c, nil
 	}
 	out := c
+	var edges []hiddenEdge
 	for i, sub := range c.Sub() {
 		if sub.Empty() || !t.mayHide(sub) {
 			continue
@@ -123,8 +147,20 @@ func (t *hideTable) apply(c *chunk.Chunk) *chunk.Chunk {
 			for z := range uint8(16) {
 				for x := range uint8(16) {
 					cover := t.coverOf(sub.Block(x, uint8(y), z, 0)) //nolint:gosec // 0..15
-					if cover == noCover || !t.buried(c, x, base+y, z) {
+					if cover == noCover {
 						continue
+					}
+					kind := t.burial(c, x, base+y, z)
+					if kind == open {
+						continue
+					}
+					if kind == edgeBuried {
+						at := cube.Pos{int(pos[0])<<4 | int(x), int(base + y), int(pos[1])<<4 | int(z)}
+						shown := slices.Contains(show, at)
+						edges = append(edges, hiddenEdge{pos: at, shown: shown})
+						if shown {
+							continue
+						}
 					}
 					if out == c {
 						out = c.Snapshot()
@@ -134,7 +170,7 @@ func (t *hideTable) apply(c *chunk.Chunk) *chunk.Chunk {
 			}
 		}
 	}
-	return out
+	return out, edges
 }
 
 // mayHide reports whether the sub chunk's first layer holds any block that may be disguised.
@@ -152,13 +188,18 @@ func (t *hideTable) mayHide(sub *chunk.SubChunk) bool {
 	return false
 }
 
-// buried reports whether every face of the block at x, y, z of c touches an opaque full block.
-// A face on the chunk's side counts as covered: the chunk next to it is not known here, and a
-// block revealed by a change is sent anyway.
-func (t *hideTable) buried(c *chunk.Chunk, x uint8, y int16, z uint8) bool {
+// burial reports how buried the block at x, y, z of c is. A face on the chunk's side counts
+// as covered and makes it edgeBuried: the region checks the chunk next door (shownEdges).
+func (t *hideTable) burial(c *chunk.Chunk, x uint8, y int16, z uint8) burial {
 	ix, iz := int(x), int(z)
-	return t.covered(c, ix-1, y, iz) && t.covered(c, ix+1, y, iz) && t.covered(c, ix, y, iz-1) &&
-		t.covered(c, ix, y, iz+1) && t.covered(c, ix, y-1, iz) && t.covered(c, ix, y+1, iz)
+	if !t.covered(c, ix-1, y, iz) || !t.covered(c, ix+1, y, iz) || !t.covered(c, ix, y, iz-1) ||
+		!t.covered(c, ix, y, iz+1) || !t.covered(c, ix, y-1, iz) || !t.covered(c, ix, y+1, iz) {
+		return open
+	}
+	if x == 0 || x == 15 || z == 0 || z == 15 {
+		return edgeBuried
+	}
+	return buried
 }
 
 // covered reports whether the cell at x, y, z of c, which may be just outside it, hides a face
@@ -185,5 +226,82 @@ func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 			continue
 		}
 		r.updateBlock(n, 0, b)
+		if at := chunkAt(n); at != chunkAt(pos) {
+			// The chunk next door still hides it from those who get that chunk later.
+			if o, ok := r.chunks[at]; ok {
+				r.reencode(o)
+			}
+		}
 	}
+}
+
+// edgeExposed reports whether a face of the block at pos that crosses into the next chunk
+// touches a loaded block that does not cover it.
+func (r *Region) edgeExposed(pos cube.Pos) bool {
+	home := chunkAt(pos)
+	for f := cube.FaceNorth; f <= cube.FaceEast; f++ {
+		n := pos.Side(f)
+		if chunkAt(n) == home {
+			continue
+		}
+		if b, ok := r.Block(n, 0); ok && !r.d.hide.occluding(b) {
+			return true
+		}
+	}
+	return false
+}
+
+// shownEdges returns the disguisable blocks on c's sides that the chunks next to it leave open,
+// for its next encode to send as they are.
+func (r *Region) shownEdges(c *Chunk) []cube.Pos {
+	var show []cube.Pos
+	for _, e := range c.edges {
+		if r.edgeExposed(e.pos) {
+			show = append(show, e.pos)
+		}
+	}
+	return show
+}
+
+// revealEdges sends the real blocks of c's disguised side blocks that the chunks next to it now
+// leave open, and encodes c again so later viewers get them too: a chunk encoded before its
+// neighbour loaded hid them all.
+func (r *Region) revealEdges(c *Chunk) {
+	found := false
+	for i := range c.edges {
+		e := &c.edges[i]
+		if e.shown || !r.edgeExposed(e.pos) {
+			continue
+		}
+		if b, ok := r.Block(e.pos, 0); ok {
+			r.updateBlock(e.pos, 0, b)
+		}
+		e.shown, found = true, true
+	}
+	if found {
+		r.reencode(c)
+	}
+}
+
+// revealNeighbours runs revealEdges for the chunk at pos, which just arrived, and the loaded
+// chunks next to it.
+func (r *Region) revealNeighbours(pos mcdb.ChunkPos) {
+	if r.d.hide == nil || !r.d.hide.any {
+		return
+	}
+	near := [...]mcdb.ChunkPos{pos, {pos[0] - 1, pos[1]}, {pos[0] + 1, pos[1]}, {pos[0], pos[1] - 1}, {pos[0], pos[1] + 1}}
+	for _, n := range near {
+		if c, ok := r.chunks[n]; ok && len(c.edges) > 0 {
+			r.revealEdges(c)
+		}
+	}
+}
+
+// reencode encodes c again without sending it to anyone: the next viewers get the new form.
+func (r *Region) reencode(c *Chunk) {
+	if c.encoding {
+		c.staleNet = true
+		return
+	}
+	r.encode(c)
 }

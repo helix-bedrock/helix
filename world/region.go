@@ -573,9 +573,14 @@ func (r *Region) arrive(pos mcdb.ChunkPos, col *chunk.Column, nc *NetChunk, disc
 	r.loadTicks(c, col)
 	col.ScheduledBlocks, col.RandomTicks = nil, nil
 	r.chunks[pos] = c
+	if nc != nil {
+		c.edges = nc.edges
+	}
 	r.joinLight(c)
 	c.savedLive = r.loadEntities(c)
 	r.loadBlockEntities(c, live)
+	// After the block entities: it may encode the chunk again.
+	r.revealNeighbours(pos)
 	if fns, ok := r.awaiting[pos]; ok {
 		delete(r.awaiting, pos)
 		for _, fn := range fns {
@@ -642,8 +647,9 @@ func (r *Region) encode(c *Chunk) {
 	d, pos := r.d, c.pos
 	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
 	border := c.col.Extra[borderTag]
+	show := r.shownEdges(c)
 	d.pool.do(pos, prioView, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities, d.light, d.hide)
+		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities, d.light, d.hide, show)
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
 		}
@@ -660,7 +666,7 @@ func (r *Region) encoded(c *Chunk, nc *NetChunk, version uint64) {
 		c.staleNet = false
 		r.encode(c) // changed again: encode the newer state
 	default:
-		c.encoding, c.net = false, nc
+		c.encoding, c.net, c.edges = false, nc, nc.edges
 		r.d.publish(c.pos, nc)
 		if c.resendNet {
 			c.resendNet = false

@@ -230,6 +230,8 @@ type Chunk struct {
 	// staleNet is set when the network form being encoded was started before a border
 	// switch: it is encoded again when it comes back.
 	staleNet bool
+	// edges are the disguisable blocks on its sides as last encoded (hide.go).
+	edges []hiddenEdge
 	// version counts changes, so a stale encode is recognised.
 	version uint64
 	// ticks and randomTicks are the chunk's tick queues; ticksDirty means
@@ -568,7 +570,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hide)
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hide, nil)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })

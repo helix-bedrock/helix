@@ -5,6 +5,7 @@ import (
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
+	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -20,7 +21,9 @@ type NetChunk struct {
 	bottom int32 // absolute sub chunk Y of section 0
 	level  *packet.LevelChunk
 	subs   []netSub
-	size   int
+	// edges are the disguisable blocks on the chunk's sides (hide.go).
+	edges []hiddenEdge
+	size  int
 }
 
 // netSub is one sub chunk as SubChunk answers it.
@@ -39,7 +42,7 @@ type columnHeights [256]int16
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable, hide *hideTable) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable, hide *hideTable, show []cube.Pos) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
@@ -59,7 +62,8 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		render[col] = light.columnTop(c, x, z, lightStopsRender)
 	}
 	// Heights come from the real blocks; the client is sent the disguised ones (hide.go).
-	shown := hide.apply(c)
+	shown, edges := hide.apply(c, pos, show)
+	nc.edges = edges
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
 	for i := range subs {
