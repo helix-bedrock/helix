@@ -35,6 +35,14 @@ const rehideSlack = 8
 // chunks around it may have arrived meanwhile.
 const revealEvery = 10
 
+// maxSightChecks and maxHideChecks cap the line of sight checks (hidesight.go) a player costs a
+// tick: for ores not shown yet and for ores shown that may have gone out of sight. Ores past the
+// cap are checked on the next tick, so a crowd in a big cave cannot make a tick long.
+const (
+	maxSightChecks = 48
+	maxHideChecks  = 32
+)
+
 // BlockHiding says which blocks clients are shown as something else.
 type BlockHiding interface {
 	// Disguise returns the block a client is shown in place of block until it is near enough
@@ -141,52 +149,93 @@ func (t *hideTable) apply(c *chunk.Chunk, pos mcdb.ChunkPos) (*chunk.Chunk, []cu
 	if t == nil || !t.any {
 		return c, nil
 	}
-	out := c
-	var near []cube.Pos
+	s := hideScan{t: t, src: c, out: c, pos: pos}
 	for i, sub := range c.Sub() {
-		if sub.Empty() || !t.mayHide(sub) {
+		if sub.Empty() {
 			continue
 		}
-		base := c.SubY(int16(i)) //nolint:gosec // few sections
-		for y := range int16(16) {
-			for z := range uint8(16) {
-				for x := range uint8(16) {
-					cover := t.coverOf(sub.Block(x, uint8(y), z, 0)) //nolint:gosec // 0..15
-					if cover == noCover {
-						continue
-					}
-					if !t.sealed(c, x, base+y, z) {
-						near = append(near, cube.Pos{int(pos[0])<<4 | int(x), int(base + y), int(pos[1])<<4 | int(z)})
-					}
-					if out == c {
-						out = c.Snapshot()
-					}
-					out.SetBlock(x, base+y, z, 0, cover)
-				}
-			}
+		layers := sub.Layers()
+		if len(layers) == 0 || !s.markOres(layers[0].Palette()) {
+			continue
 		}
+		s.scanSub(layers[0], c.SubY(int16(i))) //nolint:gosec // few sections
 	}
-	if out != c {
+	if s.out != c {
 		// Setting a block leaves the old one in the palette: without this the client would
 		// still be told which ores a sub chunk holds. Compact skips the sub chunks out shares.
-		out.Compact()
+		s.out.Compact()
 	}
-	return out, near
+	return s.out, s.near
 }
 
-// mayHide reports whether the sub chunk's first layer holds any block that may be disguised.
-func (t *hideTable) mayHide(sub *chunk.SubChunk) bool {
-	layers := sub.Layers()
-	if len(layers) == 0 {
-		return false
-	}
-	p := layers[0].Palette()
+// hideScan is one apply: the chunk read, the copy written and the open ores found.
+type hideScan struct {
+	t   *hideTable
+	src *chunk.Chunk
+	out *chunk.Chunk
+	pos mcdb.ChunkPos
+	// ores marks the palette indices of the sub chunk being scanned that are disguised.
+	ores []bool
+	near []cube.Pos
+}
+
+// markOres marks which entries of palette p are disguised, false if none is: most sub chunks
+// are skipped without looking at a block.
+func (s *hideScan) markOres(p *chunk.Palette) bool {
+	s.ores = slices.Grow(s.ores[:0], p.Len())[:p.Len()]
+	found := false
 	for i := range p.Len() {
-		if t.coverOf(p.Value(uint16(i))) != noCover { //nolint:gosec // palettes are small
-			return true
+		ore := s.t.coverOf(p.Value(uint16(i))) != noCover //nolint:gosec // palettes are small
+		s.ores[i] = ore
+		found = found || ore
+	}
+	return found
+}
+
+// scanSub disguises the ores of the sub chunk starting at Y base, whose first layer is storage,
+// reading its packed indices directly: each word holds 32/bits indices from its low bits up, cell
+// x<<8 | z<<4 | y.
+func (s *hideScan) scanSub(storage *chunk.PalettedStorage, base int16) {
+	bits, words := storage.Raw()
+	if bits == 0 {
+		// One block fills it, an ore (markOres found one).
+		for cell := range 4096 {
+			s.hide(cell, base)
+		}
+		return
+	}
+	per := 32 / bits
+	mask := uint32(1)<<bits - 1
+	cell := 0
+	for _, w := range words {
+		for range per {
+			if cell == 4096 {
+				return
+			}
+			if idx := int(w & mask); idx < len(s.ores) && s.ores[idx] {
+				s.hide(cell, base)
+			}
+			w >>= bits
+			cell++
 		}
 	}
-	return false
+}
+
+// hide disguises the ore at cell of the sub chunk starting at Y base, and lists it if a face of
+// it may be open.
+func (s *hideScan) hide(cell int, base int16) {
+	x, z, y := uint8(cell>>8), uint8(cell>>4&15), base+int16(cell&15) //nolint:gosec // cell < 4096
+	cover := s.t.coverOf(s.src.Block(x, y, z, 0))
+	if cover == noCover {
+		return
+	}
+	if !s.t.sealed(s.src, x, y, z) {
+		s.near = append(s.near, cube.Pos{int(s.pos[0])<<4 | int(x), int(y), int(s.pos[1])<<4 | int(z)})
+	}
+	if s.out == s.src {
+		s.out = s.src.Snapshot()
+	}
+	s.out.SetBlock(x, y, z, 0, cover)
 }
 
 // sealed reports whether every face of the block at x, y, z of c touches an opaque full block of
@@ -300,6 +349,7 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 		return
 	}
 	v.revealAt, v.revealTick = at, now
+	v.sightLeft, v.hideLeft = maxSightChecks, maxHideChecks
 	v.netMu.Lock()
 	v.eye, v.eyeSet = eye, true
 	for pos, st := range v.reveal {
@@ -320,6 +370,10 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 		out[i] = nil
 	}
 	v.revealOut = out[:0]
+	if v.sightLeft <= 0 || v.hideLeft <= 0 {
+		// Out of sight checks: the rest are done on the next tick, moved or not.
+		v.revealTick = now - revealEvery
+	}
 }
 
 // revealOres adds to out the real blocks of the disguised blocks with an open face within the
@@ -355,7 +409,7 @@ func (v *Viewer) rehideOres(r *Region, eye mgl32.Vec3, radius int, out []packet.
 	t := r.d.hide
 	for _, st := range v.reveal {
 		for p := range st.done {
-			if blockCentre(p).Sub(eye).LenSqr() <= r2 && r.seesBlock(eye, p) {
+			if blockCentre(p).Sub(eye).LenSqr() <= r2 && (v.hideLeft <= 0 || v.stillSees(r, eye, p)) {
 				continue
 			}
 			delete(st.done, p)
@@ -396,7 +450,7 @@ func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl
 		if !ok {
 			continue
 		}
-		if t.coverOf(b) != noCover && !r.seesBlock(eye, p) {
+		if t.coverOf(b) != noCover && (v.sightLeft <= 0 || !v.nowSees(r, eye, p)) {
 			continue // out of sight: tried again on the next scan
 		}
 		if st.done == nil {
@@ -413,6 +467,19 @@ func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl
 		})
 	}
 	return out
+}
+
+// nowSees is seesBlock for an ore not shown yet, paid from the tick's sight checks.
+func (v *Viewer) nowSees(r *Region, eye mgl32.Vec3, p cube.Pos) bool {
+	v.sightLeft--
+	return r.seesBlock(eye, p)
+}
+
+// stillSees is seesBlock for an ore already shown, paid from the tick's checks for hiding: past
+// them, a shown ore is kept as it is until the next tick.
+func (v *Viewer) stillSees(r *Region, eye mgl32.Vec3, p cube.Pos) bool {
+	v.hideLeft--
+	return r.seesBlock(eye, p)
 }
 
 // revealRadius is Config.RevealRadius, or DefaultRevealRadius.
