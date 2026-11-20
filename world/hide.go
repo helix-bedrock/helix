@@ -26,6 +26,10 @@ import (
 // open face to be sent the real one.
 const DefaultRevealRadius = 16
 
+// rehideSlack is how much farther than the reveal radius a player must go from a disguised block
+// it was sent as it is to be sent its cover again: a player at the edge does not see it flicker.
+const rehideSlack = 8
+
 // revealEvery is how many ticks a player standing in one block waits between reveal scans: the
 // chunks around it may have arrived meanwhile.
 const revealEvery = 10
@@ -278,6 +282,7 @@ func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 	radius := r.d.revealRadius()
 	reach := int32(radius+15) >> 4 //nolint:gosec // small
 	centre := chunkAt(blockAt(eye))
+	out = v.rehideOres(r, eye, radius+rehideSlack, out)
 	for dx := -reach; dx <= reach; dx++ {
 		for dz := -reach; dz <= reach; dz++ {
 			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
@@ -295,14 +300,46 @@ func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 	return out
 }
 
+// rehideOres adds to out the covers of the disguised blocks the client was sent as they are that
+// are now farther than radius from eye, so an X-ray far away sees stone there again; the player
+// is sent the real ones again when it comes back. Under netMu.
+func (v *Viewer) rehideOres(r *Region, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
+	r2 := float32(radius * radius)
+	t := r.d.hide
+	for _, st := range v.reveal {
+		for p := range st.done {
+			if blockCentre(p).Sub(eye).LenSqr() <= r2 {
+				continue
+			}
+			delete(st.done, p)
+			b, ok := r.Block(p, 0)
+			if !ok {
+				continue
+			}
+			if cover := t.coverOf(b); cover != noCover {
+				out = append(out, &packet.UpdateBlock{
+					Position:          protocol.BlockPos{int32(p[0]), int32(p[1]), int32(p[2])}, //nolint:gosec // block coordinates fit int32
+					NewBlockRuntimeID: r.d.conf.Blocks.Hash(cover),
+					Flags:             UpdateBlockFlags,
+				})
+			}
+		}
+	}
+	return out
+}
+
+// blockCentre is the centre of the block at p.
+func blockCentre(p cube.Pos) mgl32.Vec3 {
+	return mgl32.Vec3{float32(p[0]) + 0.5, float32(p[1]) + 0.5, float32(p[2]) + 0.5}
+}
+
 // revealList adds to out the real blocks of the disguised blocks in list within radius of eye
 // that were not sent yet.
 func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
 	r2 := float32(radius * radius)
 	t := r.d.hide
 	for _, p := range list {
-		centre := mgl32.Vec3{float32(p[0]) + 0.5, float32(p[1]) + 0.5, float32(p[2]) + 0.5}
-		if centre.Sub(eye).LenSqr() > r2 {
+		if blockCentre(p).Sub(eye).LenSqr() > r2 {
 			continue
 		}
 		if _, ok := st.done[p]; ok {
