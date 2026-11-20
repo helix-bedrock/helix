@@ -286,6 +286,7 @@ func (r *Region) set(c *Chunk, pos cube.Pos, layer uint8, block uint32) {
 	r.updateBlock(pos, layer, block)
 	if layer == 0 {
 		r.revealAround(pos, old, block)
+		r.hideAround(pos, old, block)
 	}
 	c.dirty, c.net = true, nil
 	c.version++

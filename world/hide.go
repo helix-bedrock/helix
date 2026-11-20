@@ -210,6 +210,50 @@ func (t *hideTable) covered(c *chunk.Chunk, x int, y int16, z int) bool {
 	return t.occluding(c.Block(uint8(x), y, uint8(z), 0)) //nolint:gosec // 0..15
 }
 
+// hideAround sends the cover of every disguised block next to pos that the block just placed there
+// sealed on every side: nobody can see it any more, so no client keeps the real one.
+func (r *Region) hideAround(pos cube.Pos, old, block uint32) {
+	t := r.d.hide
+	if t == nil || !t.any || t.occluding(old) || !t.occluding(block) {
+		return
+	}
+	for f := cube.FaceDown; f <= cube.FaceEast; f++ {
+		n := pos.Side(f)
+		b, ok := r.Block(n, 0)
+		if !ok {
+			continue
+		}
+		if cover := t.coverOf(b); cover != noCover && r.sealedAt(n) {
+			r.updateBlock(n, 0, cover)
+			r.forgetShown(n)
+		}
+	}
+}
+
+// forgetShown takes p off what every player of the region was sent as it is, so it is revealed
+// again when it opens.
+func (r *Region) forgetShown(p cube.Pos) {
+	at := chunkAt(p)
+	for _, v := range r.viewers {
+		v.netMu.Lock()
+		if st := v.reveal[at]; st != nil {
+			delete(st.done, p)
+		}
+		v.netMu.Unlock()
+	}
+}
+
+// sealedAt reports whether every block touching the block at p is a loaded opaque full block.
+func (r *Region) sealedAt(p cube.Pos) bool {
+	t := r.d.hide
+	for f := cube.FaceDown; f <= cube.FaceEast; f++ {
+		if b, ok := r.Block(p.Side(f), 0); !ok || !t.occluding(b) {
+			return false
+		}
+	}
+	return true
+}
+
 // revealAround notes the disguised blocks next to pos once the block at pos stopped covering
 // them: players near them are sent the real ones (RevealNear), and the chunk's next encode
 // lists them itself.
@@ -303,14 +347,15 @@ func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 }
 
 // rehideOres adds to out the covers of the disguised blocks the client was sent as they are that
-// are now farther than radius from eye, so an X-ray far away sees stone there again; the player
-// is sent the real ones again when it comes back. Under netMu.
+// are now farther than radius from eye or out of its sight (a wall in between, a block placed
+// over the open face), so an X-ray sees stone there again; the player is sent the real ones again
+// when it can see them. Under netMu.
 func (v *Viewer) rehideOres(r *Region, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
 	r2 := float32(radius * radius)
 	t := r.d.hide
 	for _, st := range v.reveal {
 		for p := range st.done {
-			if blockCentre(p).Sub(eye).LenSqr() <= r2 {
+			if blockCentre(p).Sub(eye).LenSqr() <= r2 && r.seesBlock(eye, p) {
 				continue
 			}
 			delete(st.done, p)
