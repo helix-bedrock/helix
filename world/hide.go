@@ -20,10 +20,19 @@ import (
 // Anti X-ray: Helix's own, beyond BDS. The client is sent every block of every chunk it sees,
 // so an X-ray cheat can show it every ore under the ground, on cave walls as much as in solid
 // rock. Every block the hiding rules disguise (ores, by default) goes out in the shared chunk
-// as its cover (stone, deepslate or netherrack). Each player is then sent the real ones it
-// could see: those with a face not sealed by an opaque full block, within the reveal radius
-// of it (Viewer.RevealNear). The ones sealed in rock are sent when a block next to them stops
-// covering them. The world itself is never changed, only what clients are told.
+// as its cover (stone, deepslate or netherrack). Each player is then sent the real ones it can
+// see: those with a face not sealed by an opaque full block, in a sub chunk it may see
+// (subvis.go), that a ray from its eye reaches (hidesight.go; Viewer.RevealNear). The ones
+// sealed in rock are sent when a block next to them stops covering them. Far underground sub
+// chunks it cannot see go out as solid stone (subhide.go). The world itself is never changed,
+// only what clients are told.
+//
+// What it does not stop: a player is sent, as they are, the blocks it can see, so an X-ray still
+// shows those, and, once a stand-in sub chunk is revealed, the cave and blocks around what it
+// sees (ores stay disguised until a ray reaches them). A shown ore also stays shown until it is
+// sealed or its chunk is sent again, so walking past a cave reveals its ores for good. This hides
+// most ores, far more than BDS or a plain server, which send every one; it does not make X-ray
+// useless, and it is not meant to: the client must be sent what it can see.
 
 // DefaultRevealRadius is how close, in blocks, a player must be to a disguised block with an
 // open face to be sent the real one.
