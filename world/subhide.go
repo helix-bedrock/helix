@@ -97,7 +97,7 @@ func (v *Viewer) subEntry(pos mcdb.ChunkPos, nc *NetChunk, off protocol.SubChunk
 	if st.real&bit != 0 {
 		return e
 	}
-	if v.d.subNear(v.eye, pos, y) {
+	if v.d.subNear(v.eye, pos, y) || v.visibleSub(pos, y) {
 		st.real |= bit
 		return e
 	}
@@ -121,38 +121,40 @@ func (v *Viewer) revealOf(pos mcdb.ChunkPos, nc *NetChunk) *revealState {
 }
 
 // revealSubs sends the client, as block updates, the real blocks of the solid stand-in sub chunks
-// it was answered that are now within the sub chunk reveal radius of eye. Block updates are
+// it was answered that are now within the sub chunk reveal radius of eye or in its view
+// (walkVisible). Block updates are
 // applied by every client; a chunk announced again is redrawn whole, which flickers, and a
 // SubChunk packet it did not ask for may be dropped. Runs: the viewer's region, under netMu; the
 // packets go in out.
 func (v *Viewer) revealSubs(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
-	radius := r.d.subRevealRadius()
-	reach := int32(radius+15) >> 4 //nolint:gosec // small
-	centre := chunkAt(blockAt(eye))
-	for dx := -reach; dx <= reach; dx++ {
-		for dz := -reach; dz <= reach; dz++ {
-			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
-			nc, ok := v.nets[pos]
-			st := v.reveal[pos]
-			if !ok || st == nil || st.net != nc || st.fake == 0 {
-				continue
+	v.walkVisible(r, eye)
+	for pos, st := range v.reveal {
+		nc := v.nets[pos]
+		if st.fake == 0 || nc == nil || st.net != nc {
+			continue
+		}
+		var want uint64
+		for i := range int32(maxHiddenSubs) {
+			y := nc.bottom + i
+			if st.fake&(1<<i) != 0 && (r.d.subNear(eye, pos, y) || v.visibleSub(pos, y)) {
+				want |= 1 << i
 			}
-			var want uint64
-			for i := range int32(maxHiddenSubs) {
-				if st.fake&(1<<i) != 0 && r.d.subNear(eye, pos, nc.bottom+i) {
-					want |= 1 << i
-				}
-			}
-			c, loaded := r.chunks[pos]
-			if want == 0 || !loaded {
-				continue
-			}
-			st.real, st.fake = st.real|want, st.fake&^want
-			st.forgetIn(want)
-			for i := range int32(maxHiddenSubs) {
-				if want&(1<<i) != 0 {
-					out = r.appendSubBlocks(out, c, i, nc.bottom+i)
-				}
+		}
+		if want == 0 {
+			continue
+		}
+		c, loaded := r.chunks[pos]
+		if !loaded {
+			// Only its network form is here (past the simulation distance): far enough that
+			// the client redrawing it is hardly seen.
+			out = v.announce(r, pos, out)
+			continue
+		}
+		st.real, st.fake = st.real|want, st.fake&^want
+		st.forgetIn(want)
+		for i := range int32(maxHiddenSubs) {
+			if want&(1<<i) != 0 {
+				out = r.appendSubBlocks(out, c, i, nc.bottom+i)
 			}
 		}
 	}

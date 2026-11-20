@@ -80,6 +80,16 @@ type Viewer struct {
 	// under netMu (subhide.go).
 	eye    mgl32.Vec3
 	eyeSet bool
+	// visGrid marks the sub chunks the player may see, from the last walk (subvis.go), around visAt
+	// within visReach chunks: where, when and with how many chunks it ran, and its reused queue.
+	// Under netMu.
+	visGrid              []bool
+	visAt                subKey
+	visReach             int32
+	visBottom, visHeight int32
+	visNets              int
+	visTick              int64
+	visQueue             []visNode
 }
 
 // AddViewer adds a player's zones in a region of their own, which merges

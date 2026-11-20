@@ -406,10 +406,14 @@ func (r *Region) revealAround(pos cube.Pos, old, block uint32) {
 }
 
 // revealState is what a player was sent of one chunk's disguised blocks: net is the network
-// chunk the client has, done the blocks it was sent as they are since.
+// chunk the client has, done the blocks it was sent as they are since, with where the player was
+// and the block's chunk version when it last saw each.
 type revealState struct {
 	net  *NetChunk
-	done map[cube.Pos]struct{}
+	done map[cube.Pos]sightMark
+	// unseen are the blocks found out of sight, with where the player was and its chunk's
+	// version then: they are not checked again until either changes.
+	unseen map[cube.Pos]sightMark
 	// fake and real have a bit for each sub chunk index answered solid and as it is
 	// (subhide.go).
 	fake, real uint64
@@ -426,12 +430,14 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 	}
 	at := blockAt(eye)
 	now := r.CurrentTick()
-	if at == v.revealAt && now-v.revealTick < revealEvery {
+	v.netMu.Lock()
+	if at == v.revealAt && now-v.revealTick < revealEvery && v.visNets == len(v.nets) {
+		// Unmoved, and no chunk arrived for the walk of what it sees (subvis.go).
+		v.netMu.Unlock()
 		return
 	}
 	v.revealAt, v.revealTick = at, now
 	v.sightLeft, v.hideLeft = maxSightChecks, maxHideChecks
-	v.netMu.Lock()
 	v.eye, v.eyeSet = eye, true
 	for pos, st := range v.reveal {
 		if v.nets[pos] != st.net {
@@ -461,9 +467,10 @@ func (v *Viewer) RevealNear(r *Region, eye mgl32.Vec3) {
 // reveal radius of eye that the client was not sent yet. Under netMu.
 func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	radius := r.d.revealRadius()
-	reach := int32(radius+15) >> 4 //nolint:gosec // small
+	// Near ores, and those in the sub chunks the player may see however far (subvis.go).
+	reach := max(int32(radius+15)>>4, v.visReach) //nolint:gosec // small
 	centre := chunkAt(blockAt(eye))
-	out = v.rehideOres(r, eye, radius+rehideSlack, out)
+	out = v.rehideOres(r, eye, out)
 	for dx := -reach; dx <= reach; dx++ {
 		for dz := -reach; dz <= reach; dz++ {
 			pos := mcdb.ChunkPos{centre[0] + dx, centre[1] + dz}
@@ -482,15 +489,20 @@ func (v *Viewer) revealOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []pa
 }
 
 // rehideOres adds to out the covers of the disguised blocks the client was sent as they are that
-// are now farther than radius from eye or out of its sight (a wall in between, a block placed
-// over the open face), so an X-ray sees stone there again; the player is sent the real ones again
-// when it can see them. Under netMu.
-func (v *Viewer) rehideOres(r *Region, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
-	r2 := float32(radius * radius)
+// are now out of its sight (a wall in between, a block placed over the open face), however near
+// or far, so an X-ray sees stone there again; one still in sight stays, at any distance. The
+// player is sent the real ones again when it can see them. Under netMu.
+func (v *Viewer) rehideOres(r *Region, eye mgl32.Vec3, out []packet.Packet) []packet.Packet {
 	t := r.d.hide
+	eyeAt := blockAt(eye)
 	for _, st := range v.reveal {
-		for p := range st.done {
-			if blockCentre(p).Sub(eye).LenSqr() <= r2 && (v.hideLeft <= 0 || v.stillSees(r, eye, p)) {
+		for p, seen := range st.done {
+			mark := sightMark{eye: eyeAt, version: r.chunkVersion(p)}
+			if seen == mark || v.hideLeft <= 0 {
+				continue // seen from here, and nothing changed since; or out of checks
+			}
+			if v.stillSees(r, eye, p) {
+				st.done[p] = mark
 				continue
 			}
 			delete(st.done, p)
@@ -520,8 +532,9 @@ func blockCentre(p cube.Pos) mgl32.Vec3 {
 func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl32.Vec3, radius int, out []packet.Packet) []packet.Packet {
 	r2 := float32(radius * radius)
 	t := r.d.hide
+	eyeAt := blockAt(eye)
 	for _, p := range list {
-		if blockCentre(p).Sub(eye).LenSqr() > r2 {
+		if blockCentre(p).Sub(eye).LenSqr() > r2 && !v.visibleSub(chunkAt(p), int32(p[1]>>4)) { //nolint:gosec // block Y fits
 			continue
 		}
 		if _, ok := st.done[p]; ok {
@@ -531,13 +544,27 @@ func (v *Viewer) revealList(r *Region, st *revealState, list []cube.Pos, eye mgl
 		if !ok {
 			continue
 		}
-		if t.coverOf(b) != noCover && (v.sightLeft <= 0 || !v.nowSees(r, eye, p)) {
-			continue // out of sight: tried again on the next scan
+		if t.coverOf(b) != noCover {
+			mark := sightMark{eye: eyeAt, version: r.chunkVersion(p)}
+			if m, ok := st.unseen[p]; ok && m == mark {
+				continue // not seen from here, and nothing changed since
+			}
+			if v.sightLeft <= 0 {
+				continue // out of checks: the next tick
+			}
+			if !v.nowSees(r, eye, p) {
+				if st.unseen == nil {
+					st.unseen = map[cube.Pos]sightMark{}
+				}
+				st.unseen[p] = mark
+				continue
+			}
+			delete(st.unseen, p)
 		}
 		if st.done == nil {
-			st.done = map[cube.Pos]struct{}{}
+			st.done = map[cube.Pos]sightMark{}
 		}
-		st.done[p] = struct{}{}
+		st.done[p] = sightMark{eye: eyeAt, version: r.chunkVersion(p)}
 		if t.coverOf(b) == noCover {
 			continue
 		}
@@ -625,6 +652,21 @@ func (v *Viewer) nowSees(r *Region, eye mgl32.Vec3, p cube.Pos) bool {
 func (v *Viewer) stillSees(r *Region, eye mgl32.Vec3, p cube.Pos) bool {
 	v.hideLeft--
 	return r.seesBlock(eye, p)
+}
+
+// sightMark is where a player was, and the version of a block's chunk, when the block was found
+// out of its sight.
+type sightMark struct {
+	eye     cube.Pos
+	version uint64
+}
+
+// chunkVersion is the version of the loaded chunk holding p, 0 if it is not loaded here.
+func (r *Region) chunkVersion(p cube.Pos) uint64 {
+	if c, ok := r.chunks[chunkAt(p)]; ok {
+		return c.version
+	}
+	return 0
 }
 
 // revealRadius is Config.RevealRadius, or DefaultRevealRadius.

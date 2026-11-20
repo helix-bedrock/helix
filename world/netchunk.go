@@ -27,7 +27,10 @@ type NetChunk struct {
 	// underground has a bit for each sub chunk under the render height in every column
 	// (subhide.go).
 	underground uint64
-	size        int
+	// links has, for each sub chunk, which pairs of its faces are joined through open cells
+	// (subvis.go).
+	links []uint64
+	size  int
 }
 
 // netSub is one sub chunk as SubChunk answers it.
@@ -88,6 +91,12 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		s.setRender(&render, base)
 		if i < maxHiddenSubs && underground(&render, base) {
 			nc.underground |= 1 << i
+		}
+		if hide != nil && hide.fake != nil {
+			if nc.links == nil {
+				nc.links = make([]uint64, len(subs))
+			}
+			nc.links[i] = hide.subLinks(subs[i])
 		}
 	}
 	return nc

@@ -18,7 +18,7 @@ const (
 	// sightCorner is how far from a face's centre, along each of its sides, the corner rays aim.
 	sightCorner = 0.4
 	// maxSightSteps bounds the blocks a ray crosses.
-	maxSightSteps = 64
+	maxSightSteps = 400
 )
 
 // sightCorners are the five spots on a face the rays aim at, as offsets along its two sides.
