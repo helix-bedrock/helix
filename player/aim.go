@@ -14,6 +14,10 @@ import (
 // inputs. Mouse and gamepad players hit what is under the crosshair, so the look must pass
 // through the target's box (grown for lag and third person); touch players tap anywhere on
 // screen, so the target only has to be in front of them.
+//
+// Fake look: kill aura that turns only the rotation it sends, not the client's camera, sends an
+// input that disagrees with itself. Such an input's rotation never counts for an attack (see
+// lookAgrees).
 
 const (
 	// aimKeep is how many of the latest input rotations an attack may match: the attack packet
@@ -24,21 +28,66 @@ const (
 	// aimCone is the widest angle, in degrees, from the look to the nearest point of the box for
 	// touch players: past what any field of view shows.
 	aimCone = 80
+	// aimAgree is the most, in degrees, a crosshair player's interact rotation may differ from its
+	// rotation: the client sends the same angles unless a server camera or VR moves one.
+	aimAgree = 2
+	// aimCamera is the least |cos| between the look and the camera's forward direction: first
+	// person and third person behind look the same way, third person in front the opposite way.
+	aimCamera = 0.9
 )
 
 // aimState is the player's latest input rotations and how it inputs.
 type aimState struct {
 	rots [aimKeep]world.Rotation
-	next int
-	mode uint32
+	// agrees is whether each kept rotation came from an input that agreed with itself.
+	agrees [aimKeep]bool
+	next   int
+	mode   uint32
+	// faking is whether the last input disagreed, so the log notes only the change.
+	faking bool
 }
 
-// record keeps the rotation and input mode of one input.
-func (a *aimState) record(rot world.Rotation, mode uint32) {
-	a.rots[a.next] = rot
+// recordAim keeps the rotation, input mode and agreement of one input.
+func (p *Player) recordAim(pk *packet.PlayerAuthInput) {
+	a := &p.aim
+	a.mode = pk.InputMode
+	agrees := lookAgrees(pk)
+	a.rots[a.next] = world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw}
+	a.agrees[a.next] = agrees
 	a.next = (a.next + 1) % aimKeep
-	a.mode = mode
+	if agrees == a.faking {
+		a.faking = !agrees
+		if !agrees {
+			p.s.log.Debug("look disagrees with itself", "name", p.name, "pitch", pk.Pitch, "yaw", pk.Yaw,
+				"interact pitch", pk.InteractPitch, "interact yaw", pk.InteractYaw, "camera", pk.CameraOrientation, "mode", pk.InputMode)
+		}
+	}
 }
+
+// lookAgrees reports whether an input's rotation agrees with the rest of it: a real pitch, the
+// interact rotation for crosshair players (touch players may interact along a tap's own line),
+// and the camera's direction when the client sent one.
+func lookAgrees(pk *packet.PlayerAuthInput) bool {
+	if !finite32(pk.Pitch) || !finite32(pk.Yaw) || pk.Pitch < -90 || pk.Pitch > 90 {
+		return false
+	}
+	if pk.InputMode == packet.InputModeMouse || pk.InputMode == packet.InputModeGamePad {
+		if absf(pk.Pitch-pk.InteractPitch) > aimAgree || absf(wrapDegrees(pk.Yaw-pk.InteractYaw)) > aimAgree {
+			return false
+		}
+	}
+	cam := pk.CameraOrientation
+	if l := cam.Len(); l > 0.5 && finite32(l) {
+		if absf(lookDirection(world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw}).Dot(cam.Mul(1/l))) < aimCamera {
+			return false
+		}
+	}
+	return true
+}
+
+func finite32(v float32) bool { return !math.IsNaN(float64(v)) && !math.IsInf(float64(v), 0) }
+
+func absf(v float32) float32 { return float32(math.Abs(float64(v))) }
 
 // aimsAt reports whether the player looked at the box lo..hi in one of its latest inputs.
 func (p *Player) aimsAt(lo, hi mgl32.Vec3) bool {
@@ -54,7 +103,10 @@ func (p *Player) aimsAt(lo, hi mgl32.Vec3) bool {
 	nearest := mgl32.Vec3{clamp32(eyes[0], lo[0], hi[0]), clamp32(eyes[1], lo[1], hi[1]), clamp32(eyes[2], lo[2], hi[2])}
 	to := nearest.Sub(eyes).Normalize()
 	minCos := float32(math.Cos(aimCone * math.Pi / 180))
-	for _, rot := range p.aim.rots {
+	for i, rot := range p.aim.rots {
+		if !p.aim.agrees[i] {
+			continue
+		}
 		dir := lookDirection(rot)
 		if crosshair && rayHitsBox(eyes, dir, lo, hi) {
 			return true

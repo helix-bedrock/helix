@@ -218,7 +218,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		// Sent before the client took the teleport: it would put the player back.
 		return
 	}
-	p.aim.record(world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw}, pk.InputMode)
+	p.recordAim(pk)
 	sys := p.s.game.sys
 	if req, ok := pk.ItemStackRequest.Value(); ok && pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
 		// The client sends some requests (the held tool's mine block action) inside its
