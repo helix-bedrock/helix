@@ -6,6 +6,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/helix-bedrock/helix/world"
+	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -45,6 +46,9 @@ type aimState struct {
 	agrees [aimKeep]bool
 	next   int
 	mode   uint32
+	// touch is whether the player's login says it plays by touch; checked is whether that is
+	// known yet.
+	touch, checked bool
 	// faking is whether the last input disagreed, so the log notes only the change.
 	faking bool
 }
@@ -52,8 +56,8 @@ type aimState struct {
 // recordAim keeps the rotation, input mode and agreement of one input.
 func (p *Player) recordAim(pk *packet.PlayerAuthInput) {
 	a := &p.aim
-	a.mode = pk.InputMode
-	agrees := lookAgrees(pk)
+	a.mode = p.inputMode(pk.InputMode)
+	agrees := p.lookAgrees(pk)
 	a.rots[a.next] = world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw}
 	a.agrees[a.next] = agrees
 	a.next = (a.next + 1) % aimKeep
@@ -66,14 +70,35 @@ func (p *Player) recordAim(pk *packet.PlayerAuthInput) {
 	}
 }
 
+// inputMode is the input mode the aim check uses for an input that says mode. Input-mode lock:
+// Helix's own rule, beyond BDS. Touch gets the lenient aim rules, and cheat clients claim touch in
+// every input while playing with a mouse. Touch counts only for a player whose login says it plays
+// by touch (its input mode, or a phone or tablet); anyone else is held to the crosshair rules.
+func (p *Player) inputMode(mode uint32) uint32 {
+	a := &p.aim
+	if !a.checked && p.conn != nil {
+		a.checked = true
+		c := p.conn.Client()
+		a.touch = c.CurrentInputMode == packet.InputModeTouch || c.DefaultInputMode == packet.InputModeTouch ||
+			c.DeviceOS == protocol.DeviceAndroid || c.DeviceOS == protocol.DeviceIOS || c.DeviceOS == protocol.DeviceFireOS
+	}
+	if mode == packet.InputModeTouch && !a.touch {
+		if a.mode != packet.InputModeMouse {
+			p.s.log.Debug("touch input refused, login is not touch", "name", p.name)
+		}
+		return packet.InputModeMouse
+	}
+	return mode
+}
+
 // lookAgrees reports whether an input's rotation agrees with the rest of it: a real pitch, the
 // interact rotation for crosshair players (touch players may interact along a tap's own line),
 // and the camera's direction when the client sent one.
-func lookAgrees(pk *packet.PlayerAuthInput) bool {
+func (p *Player) lookAgrees(pk *packet.PlayerAuthInput) bool {
 	if !finite32(pk.Pitch) || !finite32(pk.Yaw) || pk.Pitch < -90 || pk.Pitch > 90 {
 		return false
 	}
-	if pk.InputMode == packet.InputModeMouse || pk.InputMode == packet.InputModeGamePad {
+	if mode := p.aim.mode; mode == packet.InputModeMouse || mode == packet.InputModeGamePad {
 		if absf(pk.Pitch-pk.InteractPitch) > aimAgree || absf(wrapDegrees(pk.Yaw-pk.InteractYaw)) > aimAgree {
 			return false
 		}

@@ -92,6 +92,10 @@ type moveState struct {
 	soundTick uint64
 	// climbing, inWater and onGround are what the last movement found.
 	climbing, inWater, onGround bool
+	// airTicks is how many movements in a row the server found the player off the ground,
+	// airFrom the height it left the ground at and airTop the highest it got since (canCrit).
+	airTicks        int32
+	airFrom, airTop float32
 }
 
 // glideInput is the client asking to start or stop gliding. A start goes through the
@@ -210,6 +214,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 		m.Climbing = p.s.climbableBlock(b)
 	}
 	p.move.climbing, p.move.inWater, p.move.onGround = m.Climbing, m.InWater, m.OnGround
+	p.trackAir(to[1], m.OnGround || m.InWater || m.Climbing)
 	p.trackVibrations(r, &m)
 	sys := p.s.game.sys
 	sys.Fall(p, &m)

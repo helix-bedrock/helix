@@ -2,6 +2,7 @@ package player
 
 import (
 	"sync"
+	"time"
 
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/helix/world"
@@ -9,6 +10,9 @@ import (
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/mcdb"
 )
+
+// radiusEvery is how often a player's view radius may change after the first.
+const radiusEvery = time.Second
 
 // zoneState is where the player's chunk zones are centred and how wide,
 // set from the region (movement) and the network goroutine

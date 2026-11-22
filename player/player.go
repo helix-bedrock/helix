@@ -124,6 +124,15 @@ type Player struct {
 	brk                       breakState
 	// attackCredits are the attacks the player may still make, one earned per server tick.
 	attackCredits int32
+	// lastInputTick is the highest input tick the client sent, badInputs how many of its
+	// inputs were impossible (badinput.go).
+	lastInputTick uint64
+	badInputs     int
+	// swings is how many arm swings were sent on this server tick (handleAnimate);
+	// commandCredits the commands the player may still run, one earned per commandEvery ticks.
+	swings         int32
+	commandCredits int32
+	commandTicks   int32
 	// placeCredits are the items the player may still use on blocks, one earned per server tick.
 	placeCredits int32
 	// aim is the player's latest look directions, for the aim check.

@@ -215,11 +215,39 @@ func weaknessAttack(amplifier int32, v float32) float32 {
 
 // canCrit is BDS's rule for a critical hit: falling, off the ground, not climbing
 // or in water, not blind. Riding does not exist yet.
+//
+// Criticals check: Helix's own rule, beyond BDS. Criticals cheats send a drop of a few hundredths
+// of a block, with jump flags, while standing on the ground, so every hit is critical. A hit is
+// critical only when the server has seen the player in the air for a few movements and it really
+// jumped or dropped: it rose critMinRise since leaving the ground, or fell critMinDrop.
 func (p *Player) canCrit() bool {
 	if _, blind := p.Effect(EffectBlindness); blind {
 		return false
 	}
-	return p.move.fall > 0 && !p.entity.OnGround() && !p.move.climbing && !p.move.inWater
+	if p.move.fall <= 0 || p.entity.OnGround() || p.move.onGround || p.move.climbing || p.move.inWater {
+		return false
+	}
+	return p.move.airTicks >= critMinAir && (p.move.airTop-p.move.airFrom >= critMinRise || p.move.fall >= critMinDrop)
+}
+
+// Numbers of the criticals check. A jump rises 1.25 blocks over 6 ticks; walking off a ledge
+// falls 0.08, 0.23 then 0.46 blocks by the third tick.
+const (
+	critMinAir  = 3
+	critMinRise = 0.2
+	critMinDrop = 0.2
+)
+
+// trackAir keeps how long the player has been off the ground and how high it got, from the
+// server's own ground check. y is its eye height.
+func (p *Player) trackAir(y float32, grounded bool) {
+	m := &p.move
+	if grounded {
+		m.airTicks, m.airFrom, m.airTop = 0, y, y
+		return
+	}
+	m.airTicks++
+	m.airTop = max(m.airTop, y)
 }
 
 // knockbackOf is the extra knockback of the player's hit.
@@ -277,10 +305,20 @@ func knockbackOf(vel mgl32.Vec3, x, z, push, lift, retain, liftScale, liftCap fl
 
 func clampKnockback(v float32) float32 { return min(max(v, -knockbackLimit), knockbackLimit) }
 
+// swingsPerTick is how many arm swings a server tick relays: two inputs may arrive in one tick
+// after lag.
+const swingsPerTick = 2
+
 // handleAnimate is vanilla's Animate handler: a player's arm swing goes to those who
 // see it, always about the player itself.
 func handleAnimate(p *Player, pk *packet.Animate) {
 	if pk.ActionType != packet.AnimateActionSwingArm || p.entity == nil || p.dead() {
+		return
+	}
+	// Swing budget: Helix's own rule, beyond BDS. An arm swings at most once a tick; cheat
+	// clients send many to flood everyone near with relays.
+	p.swings++
+	if p.swings > swingsPerTick {
 		return
 	}
 	p.startSwing()
