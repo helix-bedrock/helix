@@ -246,6 +246,7 @@ func (p *Player) currentViewer() *world.Viewer {
 func (p *Player) readLoop(done <-chan struct{}) {
 	s := p.s
 	spawned := false
+	var lastRadius time.Time
 	for {
 		pk, err := p.conn.ReadPacket()
 		if err != nil {
@@ -267,6 +268,14 @@ func (p *Player) readLoop(done <-chan struct{}) {
 		case *packet.Disconnect:
 			s.log.Info("Player left", "name", p.name, "reason", pk.Reason, "message", pk.Message)
 		case *packet.RequestChunkRadius:
+			// Radius budget: Helix's own rule, beyond BDS. Each request re-plans the player's
+			// chunks; crash clients send hundreds a second. After the first, one a second is
+			// answered and the rest are dropped.
+			now := time.Now()
+			if spawned && now.Sub(lastRadius) < radiusEvery {
+				continue
+			}
+			lastRadius = now
 			radius := max(min(pk.ChunkRadius, s.viewDistance), 1)
 			p.send(&packet.ChunkRadiusUpdated{ChunkRadius: radius})
 			p.setRadius(radius)

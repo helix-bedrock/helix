@@ -18,6 +18,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/effect"
 	"github.com/helix-bedrock/helix/network"
@@ -119,7 +120,30 @@ type Player struct {
 	// modifiers changed, so they go back when the effects go.
 	effectValued, effectMaxed uint32
 	brk                       breakState
-	move                      moveState
+	// attackCredits are the attacks the player may still make, one earned per server tick.
+	attackCredits int32
+	// lastInputTick is the highest input tick the client sent, badInputs how many of its
+	// inputs were impossible (badinput.go).
+	lastInputTick uint64
+	badInputs     int
+	// swings is how many arm swings were sent on this server tick (handleAnimate);
+	// commandCredits the commands the player may still run, one earned per commandEvery ticks.
+	swings         int32
+	commandCredits int32
+	commandTicks   int32
+	// placeCredits are the items the player may still use on blocks, one earned per server tick.
+	placeCredits int32
+	// aim is the player's latest look directions, for the aim check.
+	aim aimState
+	// anchor is the respawn anchor the player last placed or used (anchorpace.go).
+	anchor anchorPace
+	// heldAt is the world tick the player last changed its held hotbar slot (anchorpace.go).
+	heldAt int64
+	// takeCredits pay for taking items out of containers (steal.go).
+	takeCredits int32
+	// pastBuf is reused for a target's earlier positions.
+	pastBuf []mgl32.Vec3
+	move    moveState
 	// steps tracks walking for vibrations, warden the shriekers' warnings (sculk.go).
 	steps  vibrationSteps
 	warden wardenTracker

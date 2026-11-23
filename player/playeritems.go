@@ -181,6 +181,7 @@ func (inv *playerItems) save(data map[string]any) {
 // taken from the client; the item is the server's.
 func handleMobEquipment(p *Player, pk *packet.MobEquipment) {
 	if pk.WindowID == protocol.WindowIDInventory && pk.HotBarSlot < hotbarSize {
+		p.noteHeld(pk.HotBarSlot)
 		p.inventory.held = pk.HotBarSlot
 		p.sendEquipment()
 	}

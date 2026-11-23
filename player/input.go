@@ -100,6 +100,12 @@ func (p *Player) handleInput(*world.Entity) {
 	p.tickShield()
 	p.tickSleep()
 	p.reseat()
+	p.brk.credits = min(p.brk.credits+1, breakCreditMax)
+	p.attackCredits = min(p.attackCredits+1, attackCreditMax)
+	p.placeCredits = min(p.placeCredits+1, placeCreditMax)
+	p.swings = 0
+	p.earnCommand()
+	p.tickTakes()
 	// The packets the think step took, so its handlers saw the same ones.
 	run := p.batch
 	if !p.thought {
@@ -215,6 +221,10 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		// Sent before the client took the teleport: it would put the player back.
 		return
 	}
+	if p.badInput(pk) {
+		return
+	}
+	p.recordAim(pk)
 	sys := p.s.game.sys
 	if req, ok := pk.ItemStackRequest.Value(); ok && pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
 		// The client sends some requests (the held tool's mine block action) inside its

@@ -32,6 +32,10 @@ const (
 	// breakCooldownTicks is BDS's GameMode 250 ms after a block that did
 	// not break at once, in which the next block makes no progress.
 	breakCooldownTicks = 5
+	// breakCreditMax is how many server ticks of breaking a player may bank, so inputs that
+	// arrive in a burst after lag still count, but a client sending inputs faster than 20 a
+	// second (a timer cheat) breaks no faster than the server's clock. Helix's own rule.
+	breakCreditMax = 10
 )
 
 // breakState is a player's block breaking, BDS's "destroying" flag and the
@@ -59,6 +63,8 @@ type breakState struct {
 	// broken counts the blocks the player broke, so a tick can tell
 	// whether the BreakTick hook broke one.
 	broken uint64
+	// credits are the server ticks of breaking not used yet, up to breakCreditMax.
+	credits int32
 }
 
 // BlockBreakEvent fires before a player's block break happens. Cancel
@@ -187,7 +193,7 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 		return
 	}
 	creative := p.creative()
-	hadContinue, predicted, destroyed := false, false, false
+	hadContinue, ticked, predicted, destroyed := false, false, false, false
 	var predictPos cube.Pos
 	var predictFace int32
 	for _, a := range actions {
@@ -215,8 +221,13 @@ func (p *Player) handleBlockActions(actions []protocol.PlayerBlockAction) {
 				p.startCrack(r, pos)
 			}
 			hadContinue = true
-			if p.serverBreakTick(pos, a.Face) {
-				destroyed = true
+			// Helix's own rule, beyond BDS: breaking moves one tick per input, so a client
+			// stuffing many continues into one input (Nyx's FastBreak) gets no extra progress.
+			if !ticked {
+				ticked = true
+				if p.serverBreakTick(pos, a.Face) {
+					destroyed = true
+				}
 			}
 		}
 	}
@@ -324,6 +335,10 @@ func (p *Player) serverBreakTick(pos cube.Pos, face int32) bool {
 		p.stopBreak()
 		return false
 	}
+	if p.brk.credits <= 0 {
+		return false
+	}
+	p.brk.credits--
 	p.brk.target, p.brk.targetFace = pos, face
 	p.brk.clock++
 	before := p.brk.broken
