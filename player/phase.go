@@ -94,10 +94,7 @@ func (p *Player) cutMove(r *world.Region, from, at, to mgl32.Vec3, pk *packet.Pl
 			}
 		}
 	}
-	p.send(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer, Position: at,
-		Rotation: mgl32.Vec2{pk.Pitch, pk.Yaw}, OnGround: p.move.onGround, Tick: pk.Tick,
-	})
+	p.markMoveFix()
 	p.move.velocity = mgl32.Vec3{}
 	return at
 }

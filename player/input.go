@@ -297,9 +297,11 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	if p.vehicle == nil && p.entity != nil {
 		if r := p.entity.Region(); r != nil {
 			p.noteLiquid(r, from)
+			p.noteSlowdown(r, from)
 			pos = p.phaseCheck(r, from, pos, pk)
 			pos = p.speedCheck(r, from, pos, pk)
 			pos = p.verticalCheck(r, from, pos, pk)
+			p.sendMoveFix(r, pos, pk)
 			p.simMove(r, from, pk.Position, pos, pk)
 		}
 	}

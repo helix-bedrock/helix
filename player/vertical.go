@@ -188,6 +188,10 @@ func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.
 			s.bank -= over
 		}
 		p.vertMoved(m.dy, m.groundFrom, m.groundTo)
+		if p.move.fix.slowUp < 1 {
+			// Stuck in the block: the speed it carried is gone.
+			s.vy = 0
+		}
 		return to
 	}
 	return p.vertCut(r, from, to, min(max(m.dy, floor), limit), pk)
@@ -236,11 +240,9 @@ func (p *Player) vertCut(r *world.Region, from, to mgl32.Vec3, dy float32, pk *p
 	}
 	at := from.Add(got)
 	s.vy = got[1]
-	p.s.log.Debug("move up or down cut", "name", p.name, "from", from, "to", to, "at", at, "dy", to[1]-from[1], "allowed", dy)
-	p.send(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer, Position: at,
-		Rotation: mgl32.Vec2{pk.Pitch, pk.Yaw}, OnGround: p.groundUnder(r, at), Tick: pk.Tick,
-	})
+	p.s.log.Debug("move up or down cut", "name", p.name, "from", from, "to", to, "at", at, "dy", to[1]-from[1], "allowed", dy, "tick", pk.Tick)
+	p.markMoveFix()
+	p.move.fix.delta[1] = s.vy
 	p.move.velocity = mgl32.Vec3{}
 	p.move.speed.last = 0
 	return at
@@ -265,6 +267,11 @@ func (p *Player) vertLimits(r *world.Region, m *vertMove) (limit, floor float32)
 		}
 	default:
 		limit, floor = p.fallLimits()
+		if slow := p.move.fix.slowUp; slow < 1 {
+			// A cobweb or berry bush scales the move: a no slowdown cheat falls through at full
+			// speed.
+			limit, floor = limit*slow, floor*slow
+		}
 	}
 	if m.mode == modeWalk || m.mode == modeLiquid {
 		limit = max(limit, p.groundLimit(r, m))

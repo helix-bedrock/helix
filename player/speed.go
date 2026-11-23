@@ -66,12 +66,17 @@ type speedState struct {
 	pushTicks int32
 	// bank is how far past the limit the player may still go.
 	bank float32
+	// knock is a push the client must use within knockWait more moves, or the server puts it on
+	// the player (movefix.go).
+	knock     mgl32.Vec3
+	knockWait int32
 }
 
 // notePush allows the player the horizontal speed of v, which the server gave it. Region tick.
 func (p *Player) notePush(v mgl32.Vec3) {
 	p.notePushSpeed(flatSpeed(v))
 	p.noteVerticalPush(v[1])
+	p.noteKnock(v)
 }
 
 // notePushSpeed allows the player a horizontal speed of v. Region tick.
@@ -96,35 +101,44 @@ func (p *Player) speedCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 	friction, push := p.speedPhysics(r, from, d[1] > 0, pk)
 	carried := s.last * friction
 	limit := max(carried+push, p.boostSpeed(carried))
+	stuck := p.move.fix.slowFlat < 1
+	if stuck {
+		// A cobweb, berry bush or powder snow scales the move and stops what it carried.
+		limit *= p.move.fix.slowFlat
+	}
 	if s.pushTicks > 0 {
 		pushed := max(s.push, carried) + push
 		if dist > limit+speedSlack && dist <= pushed+speedSlack {
 			// The client took the push now.
-			s.pushTicks = 0
+			s.pushTicks, s.knock, s.knockWait = 0, mgl32.Vec3{}, 0
 		} else {
 			s.pushTicks--
+			if s.knockWait > 0 {
+				if s.knockWait--; s.knockWait == 0 {
+					return p.enforceKnock(r, from, to, limit)
+				}
+			}
 		}
 		limit = max(limit, pushed)
 	}
 	s.bank = min(s.bank+speedRefill, speedBank)
 	over := dist - limit - speedSlack
-	if over <= 0 {
-		s.last = dist
-		return to
-	}
-	if over <= s.bank {
-		s.bank -= over
-		s.last = limit
+	if over <= 0 || over <= s.bank {
+		s.bank -= max(over, 0)
+		s.last = min(dist, limit)
+		if stuck {
+			s.last = 0
+		}
 		return to
 	}
 	s.last = limit
+	if stuck {
+		s.last = 0
+	}
 	scale := limit / dist
 	at := mgl32.Vec3{from[0] + d[0]*scale, to[1], from[2] + d[2]*scale}
 	p.s.log.Debug("move too fast cut", "name", p.name, "from", from, "to", to, "at", at, "dist", dist, "limit", limit)
-	p.send(&packet.CorrectPlayerMovePrediction{
-		PredictionType: packet.PredictionTypePlayer, Position: at,
-		Rotation: mgl32.Vec2{pk.Pitch, pk.Yaw}, OnGround: p.move.onGround, Tick: pk.Tick,
-	})
+	p.markMoveFix()
 	p.move.velocity = mgl32.Vec3{}
 	return at
 }
@@ -156,7 +170,7 @@ func (p *Player) speedPhysics(r *world.Region, from mgl32.Vec3, rising bool, pk 
 		ground = max(ground, p.s.frictionOf(r, under.Add(cube.Pos{0, 1, 0})))
 	}
 	friction = ground * speedAirFriction
-	walk := (max(p.attributes.get(attrMovement), 0) + p.soulSpeed(r, under)) * speedSprint
+	walk := (max(p.attributes.get(attrMovement), 0) + p.soulSpeed(r, under)) * speedSprint * p.sneakFactor()
 	push = walk * speedGroundPush / (friction * friction * friction)
 	if rising && (pk.InputData.Load(packet.InputFlagStartJumping) || pk.InputData.Load(packet.InputFlagJumping)) {
 		push += speedJumpBoost

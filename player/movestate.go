@@ -106,6 +106,9 @@ type moveState struct {
 	vehicle vehicleState
 	// clock is the player's input credits (inputrate.go).
 	clock inputClock
+	// fix is the correction this input's checks asked for and the slowdown they hold it to
+	// (movefix.go).
+	fix moveFix
 	// sim is the server's simulated copy of the player (movesim.go).
 	sim moveSim
 }
