@@ -222,8 +222,30 @@ type Player struct {
 	rng *rand.Rand
 	// seen is State, for other regions.
 	seen seenState
+	// lastWhisperFrom is the last player who sent a private message to this player (for /reply).
+	lastWhisperFrom *Player
 	// runs are what Run queued for the player's tick.
 	runs runQueue
+}
+
+// Send queues packets for the player through their connection.
+// Returns true if the packets were queued successfully, false if the connection failed.
+func (p *Player) Send(pks ...packet.Packet) bool {
+	return p.send(pks...)
+}
+
+// LastWhisperFrom returns the last player who sent a private message to this player,
+// or an error if no one has yet.
+func (p *Player) LastWhisperFrom() (*Player, error) {
+	if p.lastWhisperFrom == nil {
+		return nil, fmt.Errorf("no last whisper sender")
+	}
+	return p.lastWhisperFrom, nil
+}
+
+// SetLastWhisperFrom sets the last player who sent a private message to this player.
+func (p *Player) SetLastWhisperFrom(src *Player) {
+	p.lastWhisperFrom = src
 }
 
 // eyeHeight is how far above its feet a player's position is: the client

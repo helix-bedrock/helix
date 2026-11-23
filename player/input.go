@@ -202,6 +202,9 @@ func vanillaHandlers(s *Setup) error {
 	if err := Handle(s, handleLevelSoundEvent); err != nil {
 		return err
 	}
+	if err := Handle(s, handleText); err != nil {
+		return err
+	}
 	if err := vanillaGameplay(s); err != nil {
 		return err
 	}

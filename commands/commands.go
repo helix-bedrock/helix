@@ -25,6 +25,7 @@ var all = []command.Spec{
 	summon,
 	effectSpec,
 	kill,
+	msgSpec,
 }
 
 // Register puts every built-in command on a Setup.
