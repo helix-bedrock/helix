@@ -248,6 +248,9 @@ func vanillaRespawn(p *Player, pos mgl32.Vec3) {
 	p.respawn = respawnNone
 	p.resetBody()
 	p.s.handlers.movement(p, moveTo(pos, p.entity.Rotation(), p.entity.Tick()))
+	// The players who saw it die still hold a dead body: lying down, its name at its feet and
+	// its box off, gone once their death animation ends. A fresh spawn brings it back alive.
+	p.entity.Respawn()
 	p.send(&packet.SetHealth{Health: int32(p.Health())})
 	if r := p.entity.Region(); r != nil {
 		r.Broadcast(p.blockPos(), actorEvent(p.runtimeID, packet.ActorEventSpawnAlive), nil)

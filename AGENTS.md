@@ -330,7 +330,7 @@ sibling library folders, so unreleased library changes are used.
   and `Server`), the default (vanilla's, or `Setup.SetTuning`). Vanilla's systems read `Player.Tuning` instead of constants; a new
   number of these systems gets a Tune too. `-testcmds` adds /tune. `death.go`: BDS's death (`Die`: items thrown unless
   `keepinventory`, death event and message) and its Respawn packet sequence
-  (`Respawn`), a first pass without the spawn search. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
+  (`Respawn`), a first pass without the spawn search; on respawn the player is spawned again for everyone who sees it (`world.Entity.Respawn`: RemoveActor and fresh spawn packets), since their clients still hold the dead body. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
   on the minimal event core (named priorities, registration order, no
   allocation without listeners, panics recovered per plugin). Block
   changes, and any packet given to `Region.Broadcast`, reach every
