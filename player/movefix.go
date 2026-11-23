@@ -14,6 +14,10 @@ import (
 // and one CorrectPlayerMovePrediction with where the move ends after all of them is sent once
 // they ran. Two for the same client tick (the speed check's, keeping the client's height, then
 // the vertical check's) let a client take the first and keep flying while only its speed was cut.
+// After a correction none is sent for the client's round trip and two ticks (at least
+// fixQuietMin), as BDS waits between corrections: the inputs the client sent before it took the
+// first still start from where it was, and each would be corrected again. Those moves are still
+// cut, so the server's player never goes where the client may not.
 //
 // Slowdowns: a cobweb (0.25 sideways, 0.05 up and down), a sweet berry bush (0.8, 0.75) or
 // powder snow (0.9 sideways) touching the player scales the move and stops the speed it carried,
@@ -44,11 +48,16 @@ const (
 	// knockMin the smallest push the server puts on a client that did not.
 	knockGrace = 4
 	knockMin   = 0.1
+	// fixQuietMin is the fewest inputs after a correction that send none, fixQuietExtra how many
+	// past the round trip.
+	fixQuietMin, fixQuietExtra = 5, 2
 )
 
 // moveFix is the correction an input's checks asked for. Region tick.
 type moveFix struct {
 	pending bool
+	// quiet is how many more inputs send no correction.
+	quiet int32
 	// delta is the speed the client goes on with from the corrected place.
 	delta mgl32.Vec3
 	// slowFlat and slowUp are how much of the move the blocks around the player leave this
@@ -64,9 +73,17 @@ func (p *Player) markMoveFix() {
 // sendMoveFix sends the one correction the checks asked for this input, to pos.
 func (p *Player) sendMoveFix(r *world.Region, pos mgl32.Vec3, pk *packet.PlayerAuthInput) {
 	f := &p.move.fix
+	if f.quiet > 0 {
+		f.quiet--
+	}
 	if !f.pending {
 		return
 	}
+	if f.quiet > 0 {
+		f.pending, f.delta = false, mgl32.Vec3{}
+		return
+	}
+	f.quiet = max(p.roundTripTicks()+fixQuietExtra, fixQuietMin)
 	p.send(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer, Position: pos, Delta: f.delta,
 		Rotation: mgl32.Vec2{pk.Pitch, pk.Yaw}, OnGround: p.groundUnder(r, pos), Tick: pk.Tick,

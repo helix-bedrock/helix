@@ -226,6 +226,9 @@ func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.
 		}
 		return to
 	}
+	p.s.log.Debug("move up or down cut why", "name", p.name, "vy", s.vy, "limit", limit, "floor", floor,
+		"groundFrom", m.groundFrom, "groundTo", m.groundTo, "under", p.blockUnderName(r, from), "underTo", p.blockUnderName(r, to),
+		"mode", m.mode, "tick", pk.Tick)
 	return p.vertCut(r, from, to, min(max(m.dy, floor), limit), pk)
 }
 
@@ -565,4 +568,14 @@ func (p *Player) vertWhy(m *vertMove, limit float32, switched bool) {
 		"groundFrom", m.groundFrom, "groundTo", m.groundTo, "switched", switched, "gliding", p.Gliding(),
 		"pushTicks", s.pushTicks, "up", s.up, "liquid", s.liquid, "shallowTicks", s.shallowTicks,
 		"climbing", p.move.climbing, "bank", s.bank, "tick", m.pk.Tick)
+}
+
+// blockUnderName is the name of the block right under the feet of the player whose eyes are at
+// eyes, for the debug log.
+func (p *Player) blockUnderName(r *world.Region, eyes mgl32.Vec3) string {
+	b, ok := r.Block(vecPos(eyes.Sub(mgl32.Vec3{0, eyeHeight + 0.01, 0})), 0)
+	if !ok {
+		return "unloaded"
+	}
+	return p.s.reg.Blocks.Name(b)
 }
