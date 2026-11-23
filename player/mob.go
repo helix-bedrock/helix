@@ -171,7 +171,7 @@ func (o *Mob) add(d *world.Dimension) {
 func (o *Mob) config(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: int64(o.m.ID()), RuntimeID: o.m.RuntimeID(), Pos: pos, Rot: rot,
-		Owner: o, Actor: true, Spawn: o.spawnPackets, Move: o.movePacket, Think: o.think, Input: o.apply, Save: o.saveEntity,
+		Owner: o, Actor: true, Spawn: o.spawnPackets, Move: o.movePacket, Physics: o.physics, Publish: o.publish, Think: o.think, Input: o.apply, Save: o.saveEntity,
 	}
 }
 
@@ -239,14 +239,32 @@ func (m *Mob) movePacket(e *world.Entity) packet.Packet {
 	return nil
 }
 
-// think runs the mob's AI and movement: the think phase, maybe on another core while other
-// mobs think too. It changes only the mob; the rest waits for apply.
+// physics moves the mob by what it decided last tick: the physics phase, maybe on another
+// core while other mobs move too. It changes only the mob; the rest waits for apply.
+func (m *Mob) physics(e *world.Entity) {
+	m.ended = false
+	r := e.Region()
+	if r == nil || m.gone {
+		return
+	}
+	m.ended = m.m.TickPhysics(r)
+}
+
+// publish shows the other mobs where the mob moved to before they think.
+func (m *Mob) publish(*world.Entity) {
+	if !m.gone {
+		m.m.Publish()
+	}
+}
+
+// think runs the mob's AI after every mob has moved: the think phase, maybe on another core
+// while other mobs think too. It changes only the mob; the rest waits for apply.
 func (m *Mob) think(e *world.Entity) {
 	r := e.Region()
 	if r == nil || m.gone {
 		return
 	}
-	m.ended = m.m.Tick(r)
+	m.m.Tick()
 	m.thinkHazards(r)
 }
 

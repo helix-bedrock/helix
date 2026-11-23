@@ -115,6 +115,15 @@ type EntityConfig struct {
 	// Move returns the packet that moves the entity for the players who see
 	// it, built once per tick it moved; nil sends nothing.
 	Move func(e *Entity) packet.Packet
+	// Physics runs every tick before any entity's Think, for every entity at once (on several
+	// cores in a crowded region), with Think's rules: it moves the entity by what it decided
+	// last tick. BDS runs its movement systems over every actor before its AI systems, so an
+	// entity's AI sees the others where they moved to this tick.
+	Physics func(e *Entity)
+	// Publish runs after every entity's Physics and before any Think, for every entity at
+	// once: it updates what the others read of the entity while they think, and must not
+	// read any other entity.
+	Publish func(e *Entity)
 	// Think runs every tick just before the input phase, for every entity at once: a crowded
 	// region spreads the calls over idle cores (Region.Parallel), so Think may only read the
 	// region and other entities and change the entity's own state. What it does to anything
@@ -123,7 +132,7 @@ type EntityConfig struct {
 	// Input runs every tick in the region's player input phase, entities
 	// in runtime ID order: a player handles the packets it queued here.
 	Input func(e *Entity)
-	// TickAnywhere runs Think and Input even while the entity's chunk is not ticking. Without
+	// TickAnywhere runs Physics, Publish, Think and Input even while the entity's chunk is not ticking. Without
 	// it an entity that is not a player's stands still where no simulation zone or ticking
 	// ticket reaches, as BDS ticks actors only in ticking chunks; a player's always ticks.
 	TickAnywhere bool
@@ -319,7 +328,8 @@ func (e *Entity) Chunk() mcdb.ChunkPos { return e.chunk }
 
 // SetActorBox sets the box the entity's owner gives for it as an actor, min and max corners,
 // for AppendActorsTouching. The owner must set it again each time that box changes, or the
-// search misses the entity. Runs: owner, not in a Parallel phase.
+// search misses the entity. Runs: owner, not in a Parallel phase other than its own Publish
+// (which no search runs in).
 func (e *Entity) SetActorBox(minimum, maximum mgl32.Vec3) {
 	e.box = actorBox{lo: minimum, hi: maximum, set: true}
 	if e.actors != nil {
@@ -617,16 +627,12 @@ func (r *Region) tickEntities() {
 	r.thinkers = r.thinkers[:0]
 	for _, e := range r.entities {
 		e.frozen = !r.entityTicks(e)
-		if e.conf.Think != nil && !e.frozen {
+		if (e.conf.Physics != nil || e.conf.Publish != nil || e.conf.Think != nil) && !e.frozen {
 			r.thinkers = append(r.thinkers, e)
 		}
 	}
 	if len(r.thinkers) > 0 {
-		if r.thinkFn == nil {
-			r.thinkFn = r.think
-		}
-		r.Parallel(len(r.thinkers), r.thinkFn)
-		clear(r.thinkers)
+		r.runThinkers()
 	}
 	// Input may move entities between chunks, never add or remove them.
 	for _, e := range r.entities {
@@ -646,10 +652,38 @@ func (r *Region) entityTicks(e *Entity) bool {
 	return recent
 }
 
+// runThinkers runs the thinking entities' Physics, then their Publish, then their Think,
+// each phase over all of them before the next starts.
+func (r *Region) runThinkers() {
+	if r.thinkFn == nil {
+		r.physicsFn, r.publishFn, r.thinkFn = r.physics, r.publish, r.think
+	}
+	n := len(r.thinkers)
+	r.Parallel(n, r.physicsFn)
+	r.Parallel(n, r.publishFn)
+	r.Parallel(n, r.thinkFn)
+	clear(r.thinkers)
+}
+
+// physics runs the Physics of the i-th thinking entity.
+func (r *Region) physics(i int) {
+	if e := r.thinkers[i]; e.conf.Physics != nil {
+		e.conf.Physics(e)
+	}
+}
+
+// publish runs the Publish of the i-th thinking entity.
+func (r *Region) publish(i int) {
+	if e := r.thinkers[i]; e.conf.Publish != nil {
+		e.conf.Publish(e)
+	}
+}
+
 // think runs the Think of the i-th thinking entity.
 func (r *Region) think(i int) {
-	e := r.thinkers[i]
-	e.conf.Think(e)
+	if e := r.thinkers[i]; e.conf.Think != nil {
+		e.conf.Think(e)
+	}
 }
 
 // removeEntity takes e out of the world and tells the players who see it.

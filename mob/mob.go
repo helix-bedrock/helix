@@ -391,6 +391,9 @@ type Mob struct {
 	flagsDirty bool
 	ops        []op
 	snap       Snapshot
+	// tickAI is set by TickPhysics when Publish and Tick should run this tick; noAITick and
+	// stillTick are what TickPhysics found for Tick (no_ai set, and not moving by itself).
+	tickAI, noAITick, stillTick bool
 	// onBox is told the snapshot's box each time it is taken (SetBoxListener).
 	onBox func(behavior.Box)
 
@@ -508,25 +511,50 @@ func boxAt(p path.Vec3, w, h float32) path.Box {
 	return path.Box{Min: path.Vec3{X: p.X - w/2, Y: p.Y, Z: p.Z - w/2}, Max: path.Vec3{X: p.X + w/2, Y: p.Y + h, Z: p.Z + w/2}}
 }
 
-// Tick runs the thinking half of one tick of the mob on region r, in BDS 1.26.60's system
-// order: the definition's pending changes and the actor tick, the movement pipeline (moving
-// by the controls of the previous tick), the goal selector, navigation, the move control, the
-// jump and look controls and the body control. It may run at the same time as
-// other mobs' Tick (see think.go); call Apply after it. It reports whether the mob's death has
-// ended and it should be removed.
-func (m *Mob) Tick(r *world.Region) (remove bool) {
+// TickPhysics runs the first part of the thinking half of one tick of the mob on region r, in BDS
+// 1.26.60's system order: the definition's pending changes and the actor tick, then the
+// movement pipeline, which moves the mob by what its controls decided on the previous tick.
+// The region runs every mob's TickPhysics, then every mob's Publish, then every mob's Tick, as BDS
+// runs each system over every actor before the next. It may run at the same time as other
+// mobs' TickPhysics (see think.go). It reports whether the mob's death has ended and it should be
+// removed; then Tick does nothing this tick.
+func (m *Mob) TickPhysics(r *world.Region) (remove bool) {
 	m.v.r = r
+	m.tickAI = false
 	if !m.trace.Step() {
 		return false
 	}
 	m.traceTick()
 	m.thinking = true
-	remove = m.think()
+	remove = m.move()
 	m.thinking = false
 	return remove
 }
 
-func (m *Mob) think() (remove bool) {
+// Publish takes the snapshot the other mobs read while they run Tick, so their goals see
+// where the mob moved to this tick. It may run at the same time as other mobs' Publish and
+// reads nothing of them.
+func (m *Mob) Publish() {
+	if m.tickAI {
+		m.snapshot()
+	}
+}
+
+// Tick runs the rest of the thinking half after every mob's TickPhysics: the goal selector,
+// navigation, the move control, the jump and look controls and the body control. It may run
+// at the same time as other mobs' Tick (see think.go); call Apply after it.
+func (m *Mob) Tick() {
+	if !m.tickAI {
+		return
+	}
+	m.tickAI = false
+	m.thinking = true
+	m.think()
+	m.thinking = false
+}
+
+// move is TickPhysics' work; it leaves tickAI set when the AI half should run.
+func (m *Mob) move() (remove bool) {
 	if m.inst.Changed() || m.inst.Components() == nil {
 		m.refresh()
 	}
@@ -562,31 +590,34 @@ func (m *Mob) think() (remove bool) {
 	m.lookSet = false
 	m.noActionTime++
 
-	noAI := m.flags.Has(FlagNoAI)
+	m.noAITick = m.flags.Has(FlagNoAI)
 	m.squidPreStep()
-	// BDS runs the movement pipeline before the goal selector: the mob moves by what its
-	// controls decided on the previous tick, then decides again.
-	still := m.ridingStill()
-	if !still {
+	m.stillTick = m.ridingStill()
+	if !m.stillTick {
 		m.physicsTick()
 		m.squidStep()
 	}
-	m.sel.Tick(noAI)
+	m.tickAI = true
+	return false
+}
+
+// think is Tick's work: the AI systems, which run after every mob has moved.
+func (m *Mob) think() {
+	m.sel.Tick(m.noAITick)
 	m.hasPushedBy = false
 	if m.nv != nil {
 		nm := m.navMob()
-		if nav.ShouldTick(false, noAI, m.health) {
+		if nav.ShouldTick(false, m.noAITick, m.health) {
 			m.nv.Tick(pathWorld{&m.v}, &nm)
 		}
 		m.openDoorsTick(&nm)
 		m.traceWanted()
 	}
-	if !still {
+	if !m.stillTick {
 		m.moveControl()
 	}
 	m.lookControl()
 	m.bodyControl()
-	return false
 }
 
 // refresh rebuilds the mob from its definition's components, as BDS's reload: goals,

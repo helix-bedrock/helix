@@ -44,10 +44,12 @@ type Region struct {
 	// phase, reused.
 	parallel atomic.Bool
 	job      parallelJob
-	// thinkers are the entities with a Think this tick, and thinkFn runs one (made once, so
-	// the phase allocates nothing).
-	thinkers []*Entity
-	thinkFn  func(i int)
+	// thinkers are the entities with a Physics, Publish or Think this tick, and physicsFn,
+	// publishFn and thinkFn run one's (made once, so the phases allocate nothing).
+	thinkers  []*Entity
+	physicsFn func(i int)
+	publishFn func(i int)
+	thinkFn   func(i int)
 	// seers are the players for the visibility and movement phases, visR2 and visN the view
 	// disc, visFn and fanFn those phases' per-player parts.
 	seers        []*Entity

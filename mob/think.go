@@ -8,10 +8,12 @@ import (
 	"github.com/helix-bedrock/helix/effect"
 )
 
-// A mob's tick has two halves (world.EntityConfig Think and Input). Tick is the thinking
-// half: goals, navigation, the controls and physics. In a crowded region many mobs think at
-// once on different cores, so while thinking a mob changes only itself, sees every other
-// entity as its Snapshot from the end of their last apply, and queues whatever it does to
+// A mob's tick has two halves. The thinking half is TickPhysics (physics, world.EntityConfig
+// Physics), Publish and Tick (goals, navigation and the controls, Think); the region runs
+// each over every mob before the next, as BDS runs its systems. In a crowded region many
+// mobs think at once on different cores, so while thinking a mob changes only itself, sees
+// every other entity as its Snapshot (taken after its TickPhysics, and again at the end of its
+// Apply), and queues whatever it does to
 // anything else. Apply is the other half: it runs on the region's goroutine, mobs in runtime
 // ID order, and does the queued work in the order it was asked for. One core or many, the
 // results are the same.
@@ -274,7 +276,7 @@ func (m *Mob) run(o op) {
 }
 
 // Snapshot is a mob as the other mobs see it while they think: a copy taken when its last
-// Apply ended. Valid until its next Apply.
+// Apply ended, and again by Publish once it has moved this tick. Valid until its next Apply.
 type Snapshot struct {
 	// mob is the mob it was taken of, for Apply-time work such as pushing; never read
 	// while mobs think.
