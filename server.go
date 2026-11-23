@@ -89,6 +89,11 @@ type Config struct {
 	// players see other players and entities, whatever the view and tick
 	// distances; see world.Config.EntityViewRadius2.
 	EntityViewRadius2 int32
+	// MobSpawning lets mobs spawn on their own (the natural spawner, structure mobs and
+	// mineshaft carts) where level.dat's domobspawning allows it. Off by default: false keeps
+	// every world's spawning off whatever its game rule says. server.properties' mob-spawning.
+	// Monster spawners and spawn eggs still work.
+	MobSpawning bool
 	// TickCores is how many goroutines tick the world's regions, shared by
 	// every dimension. 0 means one per CPU; 1 ticks regions one after
 	// another in a fixed order, for debugging and exact reproduction.

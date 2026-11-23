@@ -74,6 +74,9 @@ func (s *Server) openWorld() error {
 	ldat.Generator = gt.Level
 	s.useStores(db)
 	s.level = levelOf(ldat)
+	if !s.conf.MobSpawning {
+		noMobSpawning(&s.level)
+	}
 	s.ticker = world.NewScheduler(s.conf.TickCores)
 	s.ticker.SetPanicHandler(s.panicked)
 	s.ticker.SetCurrentTick(ldat.CurrentTick)
@@ -113,6 +116,17 @@ func (s *Server) useStores(db *hxdb.DB) {
 	}
 	if st := s.conf.Storage.Players; st != nil {
 		s.playerStore = st
+	}
+}
+
+// noMobSpawning turns mobs spawning on their own off, whatever level.dat's domobspawning
+// says, and shows the game rule off. level.dat keeps its own value.
+func noMobSpawning(lv *player.Level) {
+	lv.DoMobSpawning = false
+	for i := range lv.GameRules {
+		if lv.GameRules[i].Name == "domobspawning" {
+			lv.GameRules[i].Value = false
+		}
 	}
 }
 

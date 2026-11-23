@@ -177,7 +177,7 @@ sibling library folders, so unreleased library changes are used.
   arrival.
 - `properties.go`: `Config.LoadProperties`, the server settings file in
   BDS's server.properties format (`level-type`, `level-type-options` are
-  Helix's own keys); cmd/helix reads it (`-config`), flags given on the
+  Helix's own keys; `mob-spawning`, `Config.MobSpawning`, off by default, keeps mobs from spawning on their own whatever the world's domobspawning says); cmd/helix reads it (`-config`), flags given on the
   command line win.
 - `setup.go`: `Setup`, the one boot builder: the registry's `Setup` plus
   `Player`, the player package's Setup. Vanilla registers through both

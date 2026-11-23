@@ -34,6 +34,10 @@ view-distance=%d
 tick-distance=%d
 # Chunks this far from a player, in chunks, are loaded and ticked.
 
+mob-spawning=%t
+# Mobs spawn on their own where the world's domobspawning game rule allows it. false keeps
+# every world's spawning off; monster spawners and spawn eggs still work.
+
 level-name=%s
 # The world's folder in worlds/, and the name of a new world.
 
@@ -57,7 +61,7 @@ level-type-options=
 func (c *Config) LoadProperties(path string) error {
 	data, err := os.ReadFile(path) //nolint:gosec // the path is the operator's own setting
 	if errors.Is(err, os.ErrNotExist) {
-		data = fmt.Appendf(nil, propertiesTemplate, c.Name, c.MaxPlayers, c.OnlineMode, c.ViewDistance, c.TickDistance, c.LevelName)
+		data = fmt.Appendf(nil, propertiesTemplate, c.Name, c.MaxPlayers, c.OnlineMode, c.ViewDistance, c.TickDistance, c.MobSpawning, c.LevelName)
 		if err := os.WriteFile(path, data, 0o644); err != nil { //nolint:gosec // a settings file others may read
 			return fmt.Errorf("helix: write %s: %w", path, err)
 		}
@@ -98,6 +102,8 @@ func (c *Config) setProperty(key, value string) error {
 		c.ViewDistance, err = parseInt32(value)
 	case "tick-distance":
 		c.TickDistance, err = parseInt32(value)
+	case "mob-spawning":
+		c.MobSpawning, err = strconv.ParseBool(value)
 	case "level-name":
 		c.LevelName = value
 	case "level-seed":
