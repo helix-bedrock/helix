@@ -48,8 +48,6 @@ type Player struct {
 	// (SetLocalPlayerAsInitialised). Portals wait for it: a dimension change
 	// in the middle of the join disconnects the client. Runs: anywhere.
 	initialised atomic.Bool
-	// seeHidden lets the player past the anti X-ray (SetSeeHidden). Runs: anywhere.
-	seeHidden atomic.Bool
 	// traceSends counts down the packets logged at debug level after a
 	// dimension change, to see what the client gets around it. Runs: anywhere.
 	traceSends atomic.Int32

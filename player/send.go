@@ -58,21 +58,8 @@ func (p *Player) sendNow(pks ...packet.Packet) bool {
 func (p *Player) addViewer(d *world.Dimension) *world.Viewer {
 	v := d.AddViewer(func(pk packet.Packet) { p.send(pk) }, p.flush)
 	v.SetRaw(p.sendRaw)
-	v.SetSeeHidden(p.seeHidden.Load())
 	return v
 }
-
-// SetSeeHidden lets the player see past the anti X-ray (the dimension's Config.Hiding), or not:
-// for staff, spectators or testing. It holds across dimensions until changed. Runs: anywhere.
-func (p *Player) SetSeeHidden(on bool) {
-	p.seeHidden.Store(on)
-	if v := p.currentViewer(); v != nil {
-		v.SetSeeHidden(on)
-	}
-}
-
-// SeesHidden reports whether the player sees past the anti X-ray. Runs: anywhere.
-func (p *Player) SeesHidden() bool { return p.seeHidden.Load() }
 
 // sendRaw writes a packet already encoded in the latest version, false if the client
 // needs it as a packet instead (another version, a packet-out hook).

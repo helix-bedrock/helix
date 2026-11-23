@@ -112,18 +112,6 @@ type Config struct {
 	// own; 0 means one per core besides the region's (DefaultParallelHelpers) and below 0
 	// keeps every region on one core.
 	ParallelHelpers int
-	// Hiding says which buried blocks clients are shown as something else, Helix's anti X-ray
-	// (hide.go). If nil, OreHiding; NoHiding shows every block. Read when the dimension is made.
-	Hiding BlockHiding
-	// NoSubHiding keeps the anti X-ray's solid stand-ins for far underground sub chunks off
-	// (subhide.go): every sub chunk is sent as it is, with only the hidden blocks disguised.
-	NoSubHiding bool
-	// RevealRadius is how close, in blocks, a player must be to a disguised block with an open
-	// face to be sent the real one; 0 means DefaultRevealRadius.
-	RevealRadius int32
-	// SubRevealRadius is how close, in blocks, a player must be to an underground sub chunk to be
-	// sent the real one (subhide.go); 0 means DefaultSubRevealRadius.
-	SubRevealRadius int32
 }
 
 // DefaultConfig returns BDS 1.26.60's tick-distance of 4 chunks and its
@@ -159,7 +147,6 @@ type Dimension struct {
 	pool     *pool
 	cache    *netCache
 	light    *lightTable
-	hide     atomic.Pointer[hideTable]
 	sched    *Scheduler
 	ownSched bool
 
@@ -239,9 +226,6 @@ type Chunk struct {
 	// staleNet is set when the network form being encoded was started before a border
 	// switch: it is encoded again when it comes back.
 	staleNet bool
-	// opened are disguised blocks a change opened a face of while it was loaded, sent as they are
-	// to players near them (hide.go).
-	opened []cube.Pos
 	// version counts changes, so a stale encode is recognised.
 	version uint64
 	// ticks and randomTicks are the chunk's tick queues; ticksDirty means
@@ -303,7 +287,6 @@ func New(conf Config) (*Dimension, error) {
 		viewers: map[*Viewer]struct{}{},
 	}
 	d.light = newLightTable(conf)
-	d.hide.Store(newHideTable(conf, conf.Hiding, r))
 	if err := d.SetEntityViewRadius2(conf.EntityViewRadius2); err != nil {
 		return nil, err
 	}
@@ -580,7 +563,7 @@ func (d *Dimension) load(pos mcdb.ChunkPos) {
 			live = stored
 		}
 	}
-	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hiding())
+	nc := encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light)
 	d.publish(pos, nc)
 	light := d.lightColumn(col.Chunk)
 	d.postArrival(pos, func(o *Region) { o.arrive(pos, col, nc, discard, light, settle, live) })
