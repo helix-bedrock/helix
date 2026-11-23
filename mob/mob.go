@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/component"
@@ -53,8 +52,6 @@ const (
 	hurtTicks = 10
 	// deathTicks is how long a dead mob stays before it is removed.
 	deathTicks = 20
-	// lookYaw is the body control's turn limit when the head looks away.
-	bodyMaxTurn = 75
 )
 
 // Runtime is what every mob of a server shares: the block tables, the engine's answers and
@@ -230,6 +227,10 @@ type Mob struct {
 
 	pitch, yaw, headYaw, bodyYaw float32
 	prevPitch, prevYaw           float32
+	// stillTicks and lastHeadYaw are BDS's body control state: how long the head has stayed
+	// within 15 degrees of lastHeadYaw (control.go).
+	stillTicks  int32
+	lastHeadYaw float32
 
 	health, maxHealth float32
 	// baseMaxHealth is the health attribute's maximum before healthBoost, Health Boost's
@@ -505,9 +506,10 @@ func boxAt(p path.Vec3, w, h float32) path.Box {
 	return path.Box{Min: path.Vec3{X: p.X - w/2, Y: p.Y, Z: p.Z - w/2}, Max: path.Vec3{X: p.X + w/2, Y: p.Y + h, Z: p.Z + w/2}}
 }
 
-// Tick runs the thinking half of one tick of the mob on region r, in BDS's system order: the
-// definition's pending changes, the goal selector, navigation, the move control, the jump and
-// look controls, the movement pipeline and the body control. It may run at the same time as
+// Tick runs the thinking half of one tick of the mob on region r, in BDS 1.26.60's system
+// order: the definition's pending changes and the actor tick, the movement pipeline (moving
+// by the controls of the previous tick), the goal selector, navigation, the move control, the
+// jump and look controls and the body control. It may run at the same time as
 // other mobs' Tick (see think.go); call Apply after it. It reports whether the mob's death has
 // ended and it should be removed.
 func (m *Mob) Tick(r *world.Region) (remove bool) {
@@ -560,6 +562,13 @@ func (m *Mob) think() (remove bool) {
 
 	noAI := m.flags.Has(FlagNoAI)
 	m.squidPreStep()
+	// BDS runs the movement pipeline before the goal selector: the mob moves by what its
+	// controls decided on the previous tick, then decides again.
+	still := m.ridingStill()
+	if !still {
+		m.physicsTick()
+		m.squidStep()
+	}
 	m.sel.Tick(noAI)
 	m.hasPushedBy = false
 	if m.nv != nil {
@@ -570,15 +579,10 @@ func (m *Mob) think() (remove bool) {
 		m.openDoorsTick(&nm)
 		m.traceWanted()
 	}
-	still := m.ridingStill()
 	if !still {
 		m.moveControl()
 	}
 	m.lookControl()
-	if !still {
-		m.physicsTick()
-		m.squidStep()
-	}
 	m.bodyControl()
 	return false
 }
@@ -831,47 +835,6 @@ func (m *Mob) moveControl() {
 	m.flags = b.Flags
 }
 
-// lookControl matches BDS: the head turns toward what a
-// goal looks at, or to the rotation a control asked for; with neither, the pitch goes back
-// to level and the head to the body, 10 degrees a tick. The head then stays within 75
-// degrees of the body.
-func (m *Mob) lookControl() {
-	switch {
-	case m.look.Has:
-		d := path.Vec3{X: m.look.Pos.X - m.body.Pos.X, Y: m.look.Pos.Y - (m.body.Pos.Y + m.eyeHeight()), Z: m.look.Pos.Z - m.body.Pos.Z}
-		yaw := float32(math.Atan2(float64(d.Z), float64(d.X)))*180/math.Pi - 90
-		h := float32(math.Sqrt(float64(d.X*d.X + d.Z*d.Z)))
-		pitch := -float32(math.Atan2(float64(d.Y), float64(h))) * 180 / math.Pi
-		m.pitch = approach(m.pitch, pitch, m.look.PitchSpeed)
-		m.headYaw = approach(m.headYaw, yaw, m.look.YawSpeed)
-		m.look.Has = false
-	case m.look.HasYaw:
-		m.pitch = approach(m.pitch, m.look.Pitch, m.look.PitchSpeed)
-		m.headYaw = approach(m.headYaw, m.look.Yaw, m.look.YawSpeed)
-		m.look.HasYaw = false
-	default:
-		m.pitch = approach(m.pitch, 0, lookReset)
-		m.headYaw = approach(m.headYaw, m.bodyYaw, lookReset)
-	}
-	m.headYaw = clampAround(m.headYaw, m.bodyYaw, bodyMaxTurn)
-}
-
-// lookReset is how far, in degrees a tick, the look control turns the head back when
-// nothing is looked at.
-const lookReset = 10
-
-// bodyControl turns the body: with the movement while it moves, else within reach of the
-// head.
-func (m *Mob) bodyControl() {
-	dx, dz := m.body.Pos.X-m.body.PrevPos.X, m.body.Pos.Z-m.body.PrevPos.Z
-	if dx*dx+dz*dz > 2.5e-7 {
-		m.bodyYaw = m.yaw
-		m.headYaw = clampAround(m.headYaw, m.bodyYaw, bodyMaxTurn)
-		return
-	}
-	m.bodyYaw = clampAround(m.bodyYaw, m.headYaw, bodyMaxTurn)
-}
-
 func (m *Mob) physicsTick() {
 	m.body.PrevPos = m.body.Pos
 	m.body.Yaw = m.yaw
@@ -970,27 +933,6 @@ const (
 )
 
 func (m *Mob) eyeHeight() float32 { return m.body.Height * 0.85 }
-
-func wrap(d float32) float32 {
-	d = float32(math.Mod(float64(d), 360))
-	if d >= 180 {
-		d -= 360
-	}
-	if d < -180 {
-		d += 360
-	}
-	return d
-}
-
-func approach(from, to, step float32) float32 {
-	d := wrap(to - from)
-	return from + max(-step, min(step, d))
-}
-
-func clampAround(v, centre, limit float32) float32 {
-	d := wrap(v - centre)
-	return centre + max(-limit, min(limit, d))
-}
 
 // Hurt takes damage from the attacker (NoID for none) with a cause. It applies BDS's hurt
 // time: within it only damage above the last hurt counts. It reports the damage dealt.
