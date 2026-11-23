@@ -1,6 +1,8 @@
 package player
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -8,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/helix-bedrock/helix/world"
 	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/conn"
 	"github.com/helix-bedrock/protocol/packet"
 )
 
@@ -247,9 +250,7 @@ func (p *Player) readLoop(done <-chan struct{}) {
 	for {
 		pk, err := p.conn.ReadPacket()
 		if err != nil {
-			if !isClosed(err) {
-				s.log.Info("read failed", "name", p.name, "err", err)
-			}
+			p.readFailed(err)
 			return
 		}
 		if pk.ID() == packet.IDPlayerAuthInput {
@@ -305,5 +306,29 @@ func (p *Player) spawnWhenReady(done <-chan struct{}) {
 		p.send(&packet.PlayStatus{Status: packet.PlayStatusPlayerSpawn})
 		p.flush()
 	case <-done:
+	}
+}
+
+// unreadableDump is the most bytes of a packet that cannot be decoded that are logged.
+const unreadableDump = 4096
+
+// readFailed logs why the player's connection could not be read. A packet that does not decode
+// is logged with its bytes, so a malformed packet can be told from a decoder that reads a
+// vanilla one wrong, and the player is disconnected as BDS does for a bad packet. Runs: the
+// player's network goroutine.
+func (p *Player) readFailed(err error) {
+	if isClosed(err) {
+		return
+	}
+	var bad *conn.DecodeError
+	if !errors.As(err, &bad) {
+		p.s.log.Info("read failed", "name", p.name, "err", err)
+		return
+	}
+	raw := bad.Payload[:min(len(bad.Payload), unreadableDump)]
+	p.s.log.Info("packet unreadable, disconnected", "name", p.name, "packet", bad.PacketID,
+		"size", len(bad.Payload), "err", bad.Err, "bytes", hex.EncodeToString(raw))
+	if err := p.conn.Disconnect(packet.DisconnectReasonBadPacket, ""); err != nil && !isClosed(err) {
+		p.s.log.Debug("disconnect after unreadable packet", "name", p.name, "err", err)
 	}
 }
