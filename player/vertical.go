@@ -64,6 +64,9 @@ const (
 	// speed pulling up turns into rising, vertGlideDive how much of the falling speed a dive gives
 	// back.
 	vertGlideLift, vertGlidePull, vertGlideDive = 0.06, 0.13, 0.1
+	// vertGlideTrade is how much rising pulling up gives for each block a tick of horizontal speed
+	// it takes.
+	vertGlideTrade = 3.2
 	// vertFlyDrag is what a flyer keeps of its vertical speed each tick, vertFlyPush how many times
 	// the fly speed (times the vertical fly speed) a tick adds, with room to spare.
 	vertFlyDrag, vertFlyPush = 0.6, 6
@@ -81,6 +84,11 @@ const (
 	// vertReach is how far beside the player's box a block still counts as touching it: honey
 	// walls slow a slide from just beside them.
 	vertReach = 0.1
+	// vertModeSteady is how many moves the way of moving must have stayed the same before a change
+	// earns vertModeChange: a cheat flipping it every move (starting and stopping gliding) earns
+	// it once. vertWhyEvery is how many moves pass between two logs of why a high move passed.
+	vertModeSteady = 10
+	vertWhyEvery   = 20
 	// vertJumpDelay is how many moves must pass between two jumps while the jump key stays held,
 	// and vertJumpRise the least rise off the ground that counts as a jump.
 	vertJumpDelay = 10
@@ -110,6 +118,12 @@ type vertState struct {
 	shallowTicks int32
 	// jumpWait is how many more moves the next jump must wait while the jump key stays held.
 	jumpWait int32
+	// modeTicks is how many moves the way of moving stayed the same; whyWait how many more moves
+	// until a high move that passed is logged again.
+	modeTicks, whyWait int32
+	// glidePull is how much a glide rose past gravity, lift and a dive on its last move: pulling
+	// up turned that much horizontal speed (over vertGlideTrade) into rising.
+	glidePull float32
 }
 
 // vertSurround is what touches the player's box over a move.
@@ -185,8 +199,14 @@ func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.
 		return p.vertCut(r, from, to, 0, pk)
 	}
 	limit, floor := p.vertLimits(r, &m)
-	if s.changed || s.mode != m.mode {
+	switched := s.mode != m.mode
+	if s.changed || switched && s.modeTicks >= vertModeSteady {
 		limit, floor = max(limit, s.vy+vertModeChange, vertModeChange), min(floor, s.vy-vertModeChange)
+	}
+	if switched {
+		s.modeTicks = 0
+	} else {
+		s.modeTicks++
 	}
 	s.mode, s.changed = m.mode, false
 	limit, floor = p.vertPushes(m.dy, limit, floor)
@@ -196,6 +216,7 @@ func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.
 		if over > 0 {
 			s.bank -= over
 		}
+		p.vertWhy(&m, limit, switched)
 		p.vertMoved(m.dy, m.groundFrom, m.groundTo)
 		if p.move.fix.slowUp < 1 {
 			// Stuck in the block: the speed it carried is gone.
@@ -225,6 +246,11 @@ func (p *Player) vertPushes(dy, limit, floor float32) (float32, float32) {
 // vertMoved keeps the vertical speed and the landing speed of a move the check let through.
 func (p *Player) vertMoved(dy float32, groundFrom, groundTo bool) {
 	s := &p.move.vert
+	s.glidePull = 0
+	if s.mode == modeGlide {
+		vy := s.vy
+		s.glidePull = max(dy-(vy-vertGravity+vertGlideLift+vertGlideDive*max(-vy, 0))*vertDrag, 0)
+	}
 	if groundTo && dy <= 0 {
 		if !groundFrom {
 			// Landed: the speed it would have fallen at, which a slime block gives back.
@@ -508,4 +534,27 @@ func (p *Player) jumpTooSoon(m *vertMove, bounce bool) bool {
 	}
 	s.jumpWait = vertJumpDelay
 	return false
+}
+
+// vertWhy logs, at debug level and at most every vertWhyEvery moves, what let a walking move rise
+// past plain gravity: the ground, a way of moving changing, a push, a liquid, a climb. A cheat
+// that hovers and is not cut shows which allowance it rides on.
+func (p *Player) vertWhy(m *vertMove, limit float32, switched bool) {
+	s := &p.move.vert
+	if s.whyWait > 0 {
+		s.whyWait--
+		return
+	}
+	if m.mode != modeWalk && m.mode != modeGlide {
+		return
+	}
+	plain, _ := p.fallLimits()
+	if m.dy <= plain+vertSlack+s.bank {
+		return
+	}
+	s.whyWait = vertWhyEvery
+	p.s.log.Debug("move up passed", "name", p.name, "from", m.from, "to", m.to, "dy", m.dy, "plain", plain, "limit", limit,
+		"groundFrom", m.groundFrom, "groundTo", m.groundTo, "switched", switched, "gliding", p.Gliding(),
+		"pushTicks", s.pushTicks, "up", s.up, "liquid", s.liquid, "shallowTicks", s.shallowTicks,
+		"climbing", p.move.climbing, "bank", s.bank, "tick", m.pk.Tick)
 }

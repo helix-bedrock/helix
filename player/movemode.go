@@ -23,7 +23,7 @@ const (
 	// modeGlideDrag is what the elytra leaves of the horizontal speed each tick; modeGlideDive
 	// how much of the falling speed a dive turns into horizontal speed, and modeGlideTurn the
 	// most a turn adds.
-	modeGlideDrag, modeGlideDive, modeGlideTurn = 0.99, 0.1, 0.05
+	modeGlideDrag, modeGlideDive, modeGlideTurn = 0.99, 0.1, 0.01
 	// modeRocketSpeed is the most a rocket held while gliding drives the player, in any direction.
 	modeRocketSpeed = 2.2
 	// modeFlyDrag is what the air leaves of a flyer's speed, modeFlyPush how many times the fly
@@ -112,9 +112,13 @@ func (p *Player) liquidPhysics() (friction, push float32) {
 }
 
 // glidePhysics is what the elytra leaves of the horizontal speed and the most a tick adds: a dive
-// turns a tenth of the falling speed into horizontal speed.
+// turns a tenth of the falling speed into horizontal speed, a turn only turns it (0.01 for
+// rounding), and pulling up takes back what it gave as rising.
 func (p *Player) glidePhysics() (friction, push float32) {
-	return modeGlideDrag, modeGlideDive*max(-p.move.vert.vy, 0) + modeGlideTurn
+	// Rising by pulling up on the last move cost horizontal speed: the elytra makes no speed of its
+	// own, so a glide cannot hover and keep its speed.
+	v := &p.move.vert
+	return modeGlideDrag, modeGlideDive*max(-v.vy, 0) + modeGlideTurn - v.glidePull/vertGlideTrade
 }
 
 // flyPhysics is what the air leaves of a flyer's horizontal speed and the most a tick adds.
