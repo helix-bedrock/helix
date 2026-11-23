@@ -531,6 +531,11 @@ func (p *Player) jumpTooSoon(m *vertMove, bounce bool) bool {
 		bounce || s.liquid > 0 || p.move.climbing || p.move.boost.rocketTicks > 0 || p.spin.active {
 		return false
 	}
+	if s.vy > 0 {
+		// Still rising from the last move: the same jump passing a block's top on its way up
+		// onto it, not a new one.
+		return false
+	}
 	if held && s.jumpWait > 0 {
 		p.s.log.Debug("jump too soon cut", "name", p.name, "wait", s.jumpWait)
 		return true
