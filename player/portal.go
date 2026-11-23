@@ -363,6 +363,7 @@ func (p *Player) teleportFeetCause(feet mgl32.Vec3, rot world.Rotation, cause in
 		return
 	}
 	p.move.fall = 0
+	p.move.vert.reset = true
 	p.moveZones(eyes)
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,

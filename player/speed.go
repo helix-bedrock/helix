@@ -15,7 +15,8 @@ import (
 // from the movement attribute (Speed and Slowness in it), sprinting always counted, plus a
 // sprint jump's boost when it jumps off the ground. Knockback, explosions, pulls and teleports
 // raise the speed the player may have; gliding, riding, swimming, flying and Riptide are not
-// held and their speed carries over. A move past the limit is cut to it and the client is
+// held and their speed carries over. Water and lava count once their surface is well over the
+// feet (vertical.go): a cheat walking on the surface is held. A move past the limit is cut to it and the client is
 // corrected there.
 
 const (
@@ -61,6 +62,7 @@ type speedState struct {
 // notePush allows the player the horizontal speed of v, which the server gave it. Region tick.
 func (p *Player) notePush(v mgl32.Vec3) {
 	p.notePushSpeed(flatSpeed(v))
+	p.noteVerticalPush(v[1])
 }
 
 // notePushSpeed allows the player a horizontal speed of v. Region tick.
@@ -121,7 +123,7 @@ func (p *Player) speedCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 // speedFree reports whether the player's speed is not held this move: its client moves it in
 // ways the check does not follow.
 func (p *Player) speedFree() bool {
-	return p.spectating() || p.dead() || p.vehicle != nil || p.Gliding() || p.move.inWater ||
+	return p.spectating() || p.dead() || p.vehicle != nil || p.Gliding() || p.deepInLiquid() ||
 		p.spin.active || p.abilities.Flag(AbilityFlying) && p.abilities.Flag(AbilityMayFly)
 }
 

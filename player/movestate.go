@@ -98,6 +98,8 @@ type moveState struct {
 	airFrom, airTop float32
 	// speed is what the speed check knows of the player's horizontal speed (speed.go).
 	speed speedState
+	// vert is what the vertical check knows of the player's vertical speed (vertical.go).
+	vert vertState
 	// sim is the server's simulated copy of the player (movesim.go).
 	sim moveSim
 }

@@ -1283,6 +1283,7 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 		return
 	}
 	p.move.fall = 0
+	p.move.vert.reset = true
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),
