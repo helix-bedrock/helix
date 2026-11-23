@@ -759,6 +759,10 @@ func (r *Region) visibility(i int) {
 				if o == p || o.conf.VisibleTo != nil && !o.conf.VisibleTo(p) {
 					continue
 				}
+				if v := p.conf.Viewer; v != nil && v.hidesEntityAt(o.pos) {
+					// In a sub chunk the client has as solid stone (subhide.go).
+					continue
+				}
 				if k, ok := p.known[o]; ok {
 					k.seen = true
 					p.known[o] = k

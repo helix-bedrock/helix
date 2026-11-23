@@ -57,7 +57,7 @@ func (d *Dimension) loadView(pos mcdb.ChunkPos) {
 			d.log.Error("load chunk block entities", "pos", pos, "err", err)
 		}
 	}
-	d.publish(pos, encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light))
+	d.publish(pos, encodeNetChunk(pos, d.conf.Dim, col.Chunk, d.netBorderOf(col.Extra[borderTag]), entities, d.light, d.hiding()))
 }
 
 // loadTerrain reads the chunk's terrain, from the store's terrain call if it

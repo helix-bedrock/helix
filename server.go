@@ -94,6 +94,10 @@ type Config struct {
 	// every world's spawning off whatever its game rule says. server.properties' mob-spawning.
 	// Monster spawners and spawn eggs still work.
 	MobSpawning bool
+	// NoAntiXray turns the anti X-ray off in every dimension (world.NoHiding, no stand-in sub
+	// chunks): chunks are encoded and sent as they are, with none of its work. server.properties'
+	// anti-xray=false.
+	NoAntiXray bool
 	// TickCores is how many goroutines tick the world's regions, shared by
 	// every dimension. 0 means one per CPU; 1 ticks regions one after
 	// another in a fixed order, for debugging and exact reproduction.

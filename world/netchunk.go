@@ -5,6 +5,7 @@ import (
 	"github.com/helix-bedrock/protocol/nbt"
 	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/chunk"
+	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -20,7 +21,16 @@ type NetChunk struct {
 	bottom int32 // absolute sub chunk Y of section 0
 	level  *packet.LevelChunk
 	subs   []netSub
-	size   int
+	// near are its disguised blocks with a face that may be open, with their real blocks, worked
+	// out once at encode: sent as they are to the players who may see them (hide.go).
+	near []hiddenBlock
+	// underground has a bit for each sub chunk under the render height in every column
+	// (subhide.go).
+	underground uint64
+	// links has, for each sub chunk, which pairs of its faces are joined through open cells
+	// (subvis.go).
+	links []uint64
+	size  int
 }
 
 // netSub is one sub chunk as SubChunk answers it.
@@ -39,7 +49,7 @@ type columnHeights [256]int16
 
 // encodeNetChunk encodes c, which must not change while this runs: pass a
 // snapshot or a chunk no other goroutine has yet.
-func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable) *NetChunk {
+func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, border []byte, entities []chunk.BlockEntity, light *lightTable, hide *hideTable) *NetChunk {
 	r := c.Range()
 	nc := &NetChunk{pos: pos, dim: int32(dim), bottom: int32(r[0] >> 4)} //nolint:gosec // dimension IDs and heights are small
 	count := c.HighestFilledSubChunk()
@@ -58,13 +68,16 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		heights[col] = light.columnTop(c, x, z, lightStopsSky)
 		render[col] = light.columnTop(c, x, z, lightStopsRender)
 	}
+	// Heights come from the real blocks; clients are sent the disguised ones (hide.go).
+	shown, near := hide.apply(c, pos, &render)
+	nc.near = near
 	subs := c.Sub()
 	nc.subs = make([]netSub, len(subs))
 	for i := range subs {
 		s := &nc.subs[i]
-		s.payload = chunk.EncodeSubChunk(c, chunk.NetworkHashEncoding, i)
+		s.payload = chunk.EncodeSubChunk(shown, chunk.NetworkHashEncoding, i)
 		for _, be := range entities {
-			if int(c.SubY(int16(i))) != be.Pos[1]&^15 { //nolint:gosec // few sections
+			if int(c.SubY(int16(i))) != be.Pos[1]&^15 || disguised(c, shown, be.Pos) { //nolint:gosec // few sections
 				continue
 			}
 			// A compound that cannot be encoded is left out; the block still shows.
@@ -76,8 +89,28 @@ func encodeNetChunk(pos mcdb.ChunkPos, dim mcdb.Dimension, c *chunk.Chunk, borde
 		base := int(c.SubY(int16(i))) //nolint:gosec // few sections
 		s.hmType, s.hm = subHeightMap(&heights, base)
 		s.setRender(&render, base)
+		if i < maxHiddenSubs && underground(&render, base) {
+			nc.underground |= 1 << i
+		}
+		if hide != nil && hide.fake != nil {
+			if nc.links == nil {
+				nc.links = make([]uint64, len(subs))
+			}
+			nc.links[i] = hide.subLinks(subs[i])
+		}
 	}
 	return nc
+}
+
+// underground reports whether the section starting at Y base is covered in every column: the
+// render height (just above the highest block that stops it) is above the section's top.
+func underground(render *columnHeights, base int) bool {
+	for _, h := range render {
+		if int(h) <= base+16 {
+			return false
+		}
+	}
+	return true
 }
 
 // setRender sets the render height map of the section starting at Y base, as
@@ -153,4 +186,14 @@ func (nc *NetChunk) entry(off protocol.SubChunkOffset, y int32) protocol.SubChun
 		e.RenderHeightMapData = protocol.Option(*s.render)
 	}
 	return e
+}
+
+// disguised reports whether the block at pos goes out as something else in shown, the chunk c as
+// clients are sent it: its block entity data would give it away (hide.go).
+func disguised(c, shown *chunk.Chunk, pos cube.Pos) bool {
+	if shown == c {
+		return false
+	}
+	x, y, z := uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15) //nolint:gosec // masked, world heights fit
+	return shown.Block(x, y, z, 0) != c.Block(x, y, z, 0)
 }

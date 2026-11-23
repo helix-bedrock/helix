@@ -32,6 +32,7 @@ func (p *Player) moveZones(pos mgl32.Vec3) {
 	z.mu.Lock()
 	defer z.mu.Unlock()
 	z.pos = pos
+	p.viewer.SetEye(pos)
 	cp := world.ChunkPos(floorInt(pos[0]), floorInt(pos[2]))
 	if z.radius <= 0 || (cp == z.centre && z.published) {
 		return

@@ -286,6 +286,11 @@ func (r *Region) set(c *Chunk, pos cube.Pos, layer uint8, block uint32) {
 	r.lightChanged(c, pos, old, block)
 	c.col.Chunk.SetBlock(uint8(pos[0]&15), int16(pos[1]), uint8(pos[2]&15), layer, block) //nolint:gosec // masked and range-checked
 	r.updateBlock(pos, layer, block)
+	if layer == 0 {
+		r.revealAround(pos, old, block)
+		r.hideAround(pos, old, block)
+		r.notePlaced(pos, block)
+	}
 	c.dirty, c.net = true, nil
 	c.version++
 	r.blockWrites++
@@ -642,7 +647,7 @@ func (r *Region) encode(c *Chunk) {
 	snap, version, entities := c.col.Chunk.Snapshot(), c.version, c.networkBlockEntities()
 	border := c.col.Extra[borderTag]
 	d.pool.do(pos, prioView, func() {
-		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities, d.light)
+		nc := encodeNetChunk(pos, d.conf.Dim, snap, d.netBorderOf(border), entities, d.light, d.hiding())
 		if !d.postAt(pos, func(o *Region) { o.encoded(c, nc, version) }) {
 			d.encodedUnloaded(c, nc, version)
 		}

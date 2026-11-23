@@ -4,10 +4,13 @@ import (
 	"cmp"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/helix-bedrock/protocol"
 	"github.com/helix-bedrock/protocol/packet"
+	"github.com/helix-bedrock/world/cube"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -69,6 +72,31 @@ type Viewer struct {
 	planCentre             mcdb.ChunkPos
 	planRadius             int32
 	planned                bool
+	// reveal is what the client was sent of each chunk's disguised blocks, under netMu;
+	// revealAt and revealTick are where and when the last reveal scan ran (hide.go).
+	reveal     map[mcdb.ChunkPos]*revealState
+	revealAt   cube.Pos
+	revealTick int64
+	// revealOut is RevealNear's reused packet list.
+	revealOut []packet.Packet
+	// sightLeft is the line of sight checks left this scan (hide.go).
+	sightLeft int
+	// eye is where the player is, once eyeSet, for which sub chunks it is sent as they are;
+	// under netMu (subhide.go).
+	eye    mgl32.Vec3
+	eyeSet bool
+	// seeAll lets the player past the anti X-ray (seeall.go).
+	seeAll atomic.Bool
+	// visGrid marks the sub chunks the player may see, from the last walk (subvis.go), around visAt
+	// within visReach chunks: where, when and with how many chunks it ran, and its reused queue.
+	// Under netMu.
+	visGrid              []uint8
+	visAt                subKey
+	visReach             int32
+	visBottom, visHeight int32
+	visNets              int
+	visTick              int64
+	visQueue             []visNode
 }
 
 // AddViewer adds a player's zones in a region of their own, which merges
@@ -170,7 +198,7 @@ func (v *Viewer) SubChunks(pk *packet.SubChunkRequest) *packet.SubChunk {
 			resp.SubChunkEntries = append(resp.SubChunkEntries, protocol.SubChunkEntry{Offset: off, Result: protocol.SubChunkResultChunkNotFound})
 			continue
 		}
-		resp.SubChunkEntries = append(resp.SubChunkEntries, nc.entry(off, pk.Position[1]+int32(off[1])))
+		resp.SubChunkEntries = append(resp.SubChunkEntries, v.subEntry(pos, nc, off, pk.Position[1]+int32(off[1])))
 	}
 	return resp
 }
@@ -279,6 +307,7 @@ func (r *Region) rezone(v *Viewer, centre mcdb.ChunkPos, radius, sim int32) {
 				r.d.unwant(pos, v)
 			}
 			delete(v.nets, pos)
+			delete(v.reveal, pos)
 		}
 	}
 	v.netMu.Unlock()
@@ -465,6 +494,8 @@ func (v *Viewer) SetRaw(fn func(b []byte) bool) {
 func (v *Viewer) deliver(nc *NetChunk) {
 	v.netMu.Lock()
 	v.nets[nc.pos] = nc
+	// Sent anew: the client drops what it had of the chunk and asks for its sub chunks again.
+	delete(v.reveal, nc.pos)
 	v.netMu.Unlock()
 	v.send(nc.level)
 }
