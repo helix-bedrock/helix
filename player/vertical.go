@@ -212,7 +212,9 @@ func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.
 	limit, floor = p.vertPushes(m.dy, limit, floor)
 	s.bank = min(s.bank+vertRefill, vertBank)
 	over := max(m.dy-limit, floor-m.dy) - vertSlack
-	if over <= 0 || over <= s.bank {
+	// The bank covers drops only: on a rise it would let every jump off the ground go higher
+	// than a jump, and a fly cheat cut back to the ground hop that high each time it lands.
+	if over <= 0 || m.dy-limit <= vertSlack && over <= s.bank {
 		if over > 0 {
 			s.bank -= over
 		}
