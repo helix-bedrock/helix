@@ -1,6 +1,8 @@
 package player
 
 import (
+	"time"
+
 	"sync"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -97,9 +99,11 @@ func (p *Player) handleInput(*world.Entity) {
 	p.warden.tick()
 	p.tickFreeze()
 	p.tickSpin()
+	p.tickBoost()
 	p.tickShield()
 	p.tickSleep()
 	p.reseat()
+	p.earnInputs(time.Now())
 	p.brk.credits = min(p.brk.credits+1, breakCreditMax)
 	p.attackCredits = min(p.attackCredits+1, attackCreditMax)
 	p.placeCredits = min(p.placeCredits+1, placeCreditMax)
@@ -223,7 +227,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		p.noteTeleportMove()
 		return
 	}
-	if p.badInput(pk) {
+	if p.badInput(pk) || !p.spendInput(pk) {
 		return
 	}
 	p.recordAim(pk)
@@ -272,7 +276,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		if id, has := pk.ClientPredictedVehicle.Value(); has && id == b.entity.UniqueID() {
 			predicted = true
 		}
-		b.drive(p, pk.Position, yaw, predicted)
+		b.drive(p, pk.Position, yaw, predicted, pk.Tick)
 	}
 	if o, ok := p.vehicle.(*Mob); ok {
 		yaw := o.entity.Rotation().Yaw
@@ -280,7 +284,10 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 			yaw = rot[1]
 		}
 		id, has := pk.ClientPredictedVehicle.Value()
-		o.driveMob(p, pk.Position, yaw, has && id == o.entity.UniqueID())
+		o.driveMob(p, pk.Position, yaw, has && id == o.entity.UniqueID(), pk.Tick)
+	}
+	if p.vehicle == nil {
+		p.move.vehicle.of = nil
 	}
 	if p.vehicle != nil {
 		pos = p.seatPosition()

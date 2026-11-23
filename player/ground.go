@@ -28,6 +28,13 @@ func (p *Player) groundUnder(r *world.Region, eyes mgl32.Vec3) bool {
 	feet := eyes.Sub(mgl32.Vec3{0, eyeHeight, 0})
 	lo := mgl32.Vec3{feet[0] - playerHalfWidth, feet[1], feet[2] - playerHalfWidth}
 	hi := mgl32.Vec3{feet[0] + playerHalfWidth, eyes[1], feet[2] + playerHalfWidth}
+	return p.groundUnderBox(r, lo, hi, nil)
+}
+
+// groundUnderBox reports whether something solid holds the box lo..hi up: a block's or an
+// entity's top right under its bottom. skip is an entity that does not count (the box's own).
+func (p *Player) groundUnderBox(r *world.Region, lo, hi mgl32.Vec3, skip *world.Entity) bool {
+	feet := mgl32.Vec3{(lo[0] + hi[0]) / 2, lo[1], (lo[2] + hi[2]) / 2}
 	x0, x1 := int(math.Floor(float64(lo[0]))), int(math.Floor(float64(hi[0])))
 	z0, z1 := int(math.Floor(float64(lo[2]))), int(math.Floor(float64(hi[2])))
 	y1 := int(math.Floor(float64(feet[1] + groundAbove)))
@@ -52,14 +59,14 @@ func (p *Player) groundUnder(r *world.Region, eyes mgl32.Vec3) bool {
 			}
 		}
 	}
-	return p.entityUnder(r, feet, lo, hi)
+	return p.entityUnder(r, feet, lo, hi, skip)
 }
 
 // entityUnder reports an entity box (a boat, a cart) whose top is under the feet.
-func (p *Player) entityUnder(r *world.Region, feet, lo, hi mgl32.Vec3) bool {
+func (p *Player) entityUnder(r *world.Region, feet, lo, hi mgl32.Vec3, skip *world.Entity) bool {
 	p.touching = r.AppendEntitiesIn(p.touching[:0], lo[0]-1, lo[2]-1, hi[0]+1, hi[2]+1)
 	for _, e := range p.touching {
-		if e == p.entity {
+		if e == p.entity || e == skip {
 			continue
 		}
 		b, ok := e.Owner().(interface {

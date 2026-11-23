@@ -11,18 +11,25 @@ import (
 )
 
 // Vertical check: Helix's own rule, beyond BDS. Helix takes the client's position, so a cheat
-// flies, hovers, jumps in the air, climbs walls, steps up whole blocks or stands on water by
-// sending a position the client's physics never reaches. Each move's rise is held to what the
-// client's own physics allows from the vertical speed the player had: the last move's speed
-// less gravity (Slow Falling's lower gravity, Levitation's pull up), times air drag. From the
-// ground a jump (Jump Boost in it) is allowed, a step up of a slab or stair when the move ends
-// on a block, and a bounce as fast as the fall that landed on a slime block or bed. Ladders,
-// vines, scaffolding and powder snow allow climbing, cobwebs, honey and berry bushes slow
-// falling, a move that ends on the ground may stop a fall, and pushes from the server
-// (knockback, explosions, wind) are allowed until the client takes them. Deep water or lava,
-// gliding, riding, creative flying and Riptide are not held; their speed carries over, and the
-// first move out of them may rise as far as a jump out of water. A move past the limit is cut
-// where it would have fallen and the client is corrected there.
+// flies, hovers, jumps in the air, climbs walls, steps up whole blocks, stands on water or drops
+// faster than it falls by sending a position the client's physics never reaches. Each move's
+// rise and drop are held between what the client's own physics allows from the vertical speed
+// the player had.
+//
+// Walking, falling and jumping: the last move's speed less gravity (Slow Falling's lower gravity
+// while falling, Levitation's pull up), times air drag, both ways. From server-checked ground a
+// jump (Jump Boost in it) is allowed, a step up of a slab or stair when the move ends on a block,
+// and a bounce as fast as the fall that landed on a slime block or bed. Ladders, vines,
+// scaffolding and powder snow allow climbing up and down; cobwebs, honey and berry bushes slow
+// falling; a move that ends on the ground may stop a fall. A liquid touching the player but not
+// deep enough to swim in allows a jump out of it for a second (a swimmer bobbing at the surface
+// goes through it quickly), and no longer: a cheat keeping its feet just under the surface falls.
+// Over a bubble column its push is allowed. The other ways of moving have their own limits
+// (movemode.go): swimming, gliding, creative flying, a Riptide launch, a held rocket. Pushes from
+// the server (knockback, explosions, wind, pistons, pulls) are allowed until the client takes
+// them, the first move after the way of moving changed may rise or drop as far as a jump out of
+// water, and a teleport frees one move. A move past the limits is moved straight up or down as
+// far as they and the blocks allow, and the client is corrected there.
 
 const (
 	// vertGravity and vertSlowGravity are what gravity takes from the vertical speed each tick,
@@ -34,24 +41,38 @@ const (
 	// vertLevitation is the speed each Levitation level pulls toward, and vertLevitationPull how
 	// much of the gap it closes each tick.
 	vertLevitation, vertLevitationPull = 0.05, 0.2
-	// vertClimb is the most a climb (ladders, vines, scaffolding, powder snow) or a slowing block
-	// (cobwebs, honey, berry bushes) lets the player rise each tick, with room to spare.
+	// vertClimb is the most a climb (ladders, vines, scaffolding, powder snow) moves the player up
+	// or down each tick, with room to spare.
 	vertClimb = 0.25
 	// vertShallowRise is the most a player touching a liquid but not swimming may rise: a jump
-	// out of water at a block's edge.
-	vertShallowRise = 0.35
-	// vertFreeExit is the most the first move out of water, gliding or flying may rise: a jump
-	// out of water at a block's edge.
-	vertFreeExit = 0.5
-	// vertDeep is how far a liquid's surface must be over the feet before the player swims and is
-	// not held.
+	// out of water at a block's edge; vertShallowDrop the most it may drop.
+	vertShallowRise, vertShallowDrop = 0.35, 1
+	// vertShallowTicks is how many moves in a row a player not on the ground may stay in a liquid
+	// too shallow to swim in before it is held as in the air.
+	vertShallowTicks = 20
+	// vertModeChange is the most the first move after the way of moving changed may rise or drop
+	// past the rest: a jump out of water at a block's edge.
+	vertModeChange = 0.5
+	// vertDeep is how far a liquid's surface must be over the feet before the player swims.
 	vertDeep = 0.2
-	// vertSlack is how far a move may rise past the limit before it costs anything: float
+	// vertLiquidPush is the most a swimmer's stroke moves it up or down each tick past the drag.
+	vertLiquidPush = 0.1
+	// vertBubbleUp and vertBubbleDown are the most a bubble column pushes the player up (launched
+	// out of its surface) and pulls it down; vertBubbleStep how much a tick adds.
+	vertBubbleUp, vertBubbleDown, vertBubbleStep = 1.8, 0.95, 0.1
+	// vertGlideLift is the elytra's lift against gravity, vertGlidePull how much of the horizontal
+	// speed pulling up turns into rising, vertGlideDive how much of the falling speed a dive gives
+	// back.
+	vertGlideLift, vertGlidePull, vertGlideDive = 0.06, 0.13, 0.1
+	// vertFlyDrag is what a flyer keeps of its vertical speed each tick, vertFlyPush how many times
+	// the fly speed (times the vertical fly speed) a tick adds, with room to spare.
+	vertFlyDrag, vertFlyPush = 0.6, 6
+	// vertSlack is how far a move may go past the limits before it costs anything: float
 	// rounding, and the client working gravity out a little differently.
 	vertSlack = 0.03
-	// vertBank and vertRefill are how far past the limit and slack a player may go in all, and how
-	// much comes back each move: a client and server that disagree for a moment about the blocks
-	// under the player are not corrected.
+	// vertBank and vertRefill are how far past the limits and slack a player may go in all, and
+	// how much comes back each move: a client and server that disagree for a moment about the
+	// blocks under the player are not corrected.
 	vertBank, vertRefill = 0.2, 0.01
 	// vertLiquidCell is a liquid's height in ninths of a block for depth 0 (a source).
 	vertLiquidCell = 9
@@ -69,36 +90,63 @@ type vertState struct {
 	// fall is how fast the player was falling when it last landed: a slime block or bed may give
 	// it back.
 	fall float32
-	// free is set when the last move was not held; reset when the next one is not held either
-	// (a teleport).
-	free, reset bool
-	// push is an upward speed the server gave the player that its client has not used yet, and
-	// pushTicks how many more moves it waits.
-	push      float32
+	// mode is the way the player moved on its last move; changed is set when the next move is the
+	// first after it was not held, and reset when it is not held either (a teleport).
+	mode           moveMode
+	changed, reset bool
+	// up and down are speeds the server pushed the player with that its client has not used yet,
+	// and pushTicks how many more moves they wait.
+	up, down  float32
 	pushTicks int32
-	// bank is how far past the limit the player may still go.
+	// bank is how far past the limits the player may still go.
 	bank float32
-	// liquid is how far a liquid's surface is over the player's feet at the start of the move.
-	liquid float32
+	// liquid is how far a liquid's surface is over the player's feet at the start of the move;
+	// shallowTicks how many moves in a row it stayed in a liquid too shallow to swim in.
+	liquid       float32
+	shallowTicks int32
 }
 
 // vertSurround is what touches the player's box over a move.
 type vertSurround struct {
-	// climb is set for a climbable block, slow for a block that slows falling.
-	climb, slow bool
+	// climb is set for a climbable block, slow for a block that slows falling, bubble for a bubble
+	// column.
+	climb, slow, bubble bool
 }
 
-// noteVerticalPush allows the player the upward speed of v, which the server gave it. Region
-// tick.
+// vertMove is one move the vertical check holds: where from and to, and whether the server finds
+// ground under each end.
+type vertMove struct {
+	from, to             mgl32.Vec3
+	dy                   float32
+	groundFrom, groundTo bool
+	mode                 moveMode
+	pk                   *packet.PlayerAuthInput
+}
+
+// noteVerticalPush allows the player the vertical speed of v, up or down, which the server gave
+// it. Region tick.
 func (p *Player) noteVerticalPush(v float32) {
 	s := &p.move.vert
-	if v <= 0 {
+	if v == 0 {
 		return
 	}
-	if s.pushTicks <= 0 || v > s.push {
-		s.push = v
+	if s.pushTicks <= 0 {
+		s.up, s.down = 0, 0
+	}
+	if v > 0 {
+		s.up = max(s.up, v)
+	} else {
+		s.down = max(s.down, -v)
 	}
 	s.pushTicks = speedPushTicks
+}
+
+// noteMotion allows the player to move by v, or back by as much, which the server moved it by
+// (a piston): its client's moves on their way started before it. Region tick.
+func (p *Player) noteMotion(v mgl32.Vec3) {
+	p.notePushSpeed(flatSpeed(v))
+	p.noteVerticalPush(v[1])
+	p.noteVerticalPush(-v[1])
 }
 
 // noteTeleportMove lets the player's next move go anywhere the speed check carries it: the server
@@ -117,47 +165,54 @@ func (p *Player) noteLiquid(r *world.Region, from mgl32.Vec3) {
 func (p *Player) deepInLiquid() bool { return p.move.vert.liquid >= vertDeep }
 
 // verticalCheck returns where the move from from to to may end: to itself, or where the player
-// would have fallen, after correcting the client.
+// could have got, after correcting the client.
 func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.PlayerAuthInput) mgl32.Vec3 {
 	s := &p.move.vert
-	dy := to[1] - from[1]
-	if s.reset || p.speedFree() {
-		s.reset, s.free, s.vy, s.pushTicks, s.fall = false, true, dy, 0, 0
+	m := vertMove{from: from, to: to, dy: to[1] - from[1], mode: p.moveMode(), pk: pk}
+	if s.reset || m.mode == modeFree {
+		s.reset, s.changed, s.vy, s.pushTicks, s.fall, s.shallowTicks = false, true, m.dy, 0, 0, 0
+		s.mode = m.mode
 		return to
 	}
-	groundFrom := p.groundUnder(r, from)
-	groundTo := p.groundUnder(r, to)
-	limit := p.vertLimit(r, from, to, dy, groundFrom, groundTo)
-	if s.free {
-		limit = max(limit, vertFreeExit)
+	m.groundFrom, m.groundTo = p.groundUnder(r, from), p.groundUnder(r, to)
+	limit, floor := p.vertLimits(r, &m)
+	if s.changed || s.mode != m.mode {
+		limit, floor = max(limit, s.vy+vertModeChange, vertModeChange), min(floor, s.vy-vertModeChange)
 	}
-	if s.pushTicks > 0 {
-		if dy > limit+vertSlack && dy <= s.push+vertSlack {
-			// The client took the push now.
-			s.pushTicks = 0
-		} else {
-			s.pushTicks--
-		}
-		limit = max(limit, s.push)
-	}
-	s.free = false
+	s.mode, s.changed = m.mode, false
+	limit, floor = p.vertPushes(m.dy, limit, floor)
 	s.bank = min(s.bank+vertRefill, vertBank)
-	over := dy - limit - vertSlack
+	over := max(m.dy-limit, floor-m.dy) - vertSlack
 	if over <= 0 || over <= s.bank {
 		if over > 0 {
 			s.bank -= over
 		}
-		p.vertMoved(dy, groundFrom, groundTo)
+		p.vertMoved(m.dy, m.groundFrom, m.groundTo)
 		return to
 	}
-	return p.vertCut(r, from, to, limit, pk)
+	return p.vertCut(r, from, to, min(max(m.dy, floor), limit), pk)
+}
+
+// vertPushes widens limit and floor for the pushes from the server the client has not taken yet.
+func (p *Player) vertPushes(dy, limit, floor float32) (float32, float32) {
+	s := &p.move.vert
+	if s.pushTicks <= 0 {
+		return limit, floor
+	}
+	pushedUp, pushedDown := max(limit, s.up), min(floor, -s.down)
+	if dy > limit+vertSlack && dy <= pushedUp+vertSlack || dy < floor-vertSlack && dy >= pushedDown-vertSlack {
+		// The client took the push now.
+		s.pushTicks = 0
+	} else {
+		s.pushTicks--
+	}
+	return pushedUp, pushedDown
 }
 
 // vertMoved keeps the vertical speed and the landing speed of a move the check let through.
 func (p *Player) vertMoved(dy float32, groundFrom, groundTo bool) {
 	s := &p.move.vert
-	switch {
-	case groundTo && dy <= 0:
+	if groundTo && dy <= 0 {
 		if !groundFrom {
 			// Landed: the speed it would have fallen at, which a slime block gives back.
 			s.fall = max(-(s.vy-vertGravity)*vertDrag, 0)
@@ -165,23 +220,23 @@ func (p *Player) vertMoved(dy float32, groundFrom, groundTo bool) {
 			s.fall = 0
 		}
 		s.vy = 0
-	default:
-		s.vy = dy
+		return
 	}
+	s.vy = dy
 }
 
-// vertCut moves the player from from as far as its vertical speed limit takes it, straight up or
-// down and no further than the blocks let it, corrects the client there and returns it.
-func (p *Player) vertCut(r *world.Region, from, to mgl32.Vec3, limit float32, pk *packet.PlayerAuthInput) mgl32.Vec3 {
+// vertCut moves the player from from by dy straight up or down, no further than the blocks let
+// it, corrects the client there and returns it.
+func (p *Player) vertCut(r *world.Region, from, to mgl32.Vec3, dy float32, pk *packet.PlayerAuthInput) mgl32.Vec3 {
 	s := &p.move.vert
 	lo, hi := p.phaseBox(from)
-	got, ok := p.s.sweepMove(r, lo, hi, mgl32.Vec3{0, limit, 0}, 0)
+	got, ok := p.s.sweepMove(r, lo, hi, mgl32.Vec3{0, dy, 0}, 0)
 	if !ok {
 		got = mgl32.Vec3{}
 	}
 	at := from.Add(got)
 	s.vy = got[1]
-	p.s.log.Debug("move too high cut", "name", p.name, "from", from, "to", to, "at", at, "dy", to[1]-from[1], "limit", limit)
+	p.s.log.Debug("move up or down cut", "name", p.name, "from", from, "to", to, "at", at, "dy", to[1]-from[1], "allowed", dy)
 	p.send(&packet.CorrectPlayerMovePrediction{
 		PredictionType: packet.PredictionTypePlayer, Position: at,
 		Rotation: mgl32.Vec2{pk.Pitch, pk.Yaw}, OnGround: p.groundUnder(r, at), Tick: pk.Tick,
@@ -191,47 +246,127 @@ func (p *Player) vertCut(r *world.Region, from, to mgl32.Vec3, limit float32, pk
 	return at
 }
 
-// vertLimit is the most the player may rise this move, from the speed it had and what holds,
-// pushes or slows it. The blocks around are looked at only for a move of dy past the rest.
-func (p *Player) vertLimit(r *world.Region, from, to mgl32.Vec3, dy float32, groundFrom, groundTo bool) float32 {
+// vertLimits are the most the player may rise this move (limit) and the lowest it may go
+// (floor, negative for a drop), by the way it moves. The blocks around are looked at only for a
+// move past the rest.
+func (p *Player) vertLimits(r *world.Region, m *vertMove) (limit, floor float32) {
 	s := &p.move.vert
-	gravity := float32(vertGravity)
-	if _, ok := p.Effect(EffectSlowFalling); ok {
-		gravity = vertSlowGravity
-	}
-	limit := (s.vy - gravity) * vertDrag
-	if amp, ok := p.Effect(EffectLevitation); ok {
-		pull := vertLevitation * float32(amp+1)
-		limit = max(limit, (s.vy+(pull-s.vy)*vertLevitationPull)*vertDrag)
-	}
-	if groundFrom {
-		jump := float32(vertJump)
-		if amp, ok := p.Effect(EffectJumpBoost); ok {
-			jump += vertJumpBoost * float32(amp+1)
+	switch m.mode {
+	case modeGlide:
+		limit, floor = p.glideLimits()
+	case modeFly:
+		limit, floor = p.flyLimits()
+	case modeLiquid:
+		limit = max(s.vy, 0)*modeLiquidDrag + vertLiquidPush
+		floor = min(s.vy, 0)*modeLiquidDrag - vertLiquidPush
+		if m.pk.InputData.Load(packet.InputFlagHorizontalCollision) {
+			// A swimmer against a wall climbs out of the water.
+			limit = max(limit, vertShallowRise)
 		}
-		limit = max(limit, jump, p.vertBounce(r, from))
-		if groundTo {
-			limit = max(limit, phaseStep)
-		}
+	default:
+		limit, floor = p.fallLimits()
 	}
-	if groundTo {
+	if m.mode == modeWalk || m.mode == modeLiquid {
+		limit = max(limit, p.groundLimit(r, m))
+	}
+	if m.groundTo {
 		// Landing stops a fall, standing keeps the player where it is.
 		limit = max(limit, 0)
 	}
-	if dy <= limit+vertSlack {
-		// Within the limit already: the blocks around need not be looked at.
-		return limit
+	if p.move.boost.rocketTicks > 0 {
+		limit, floor = max(limit, modeRocketSpeed), min(floor, -modeRocketSpeed)
 	}
-	if s.liquid > 0 || p.liquidDepth(r, to) > 0 {
-		limit = max(limit, vertShallowRise)
+	if p.spin.active {
+		limit = max(limit, s.vy+p.spin.launch+modeRiptideLift)
+		floor = min(floor, s.vy-p.spin.launch)
 	}
-	if p.move.climbing {
-		limit = max(limit, vertClimb)
+	limit, floor = p.vertShallow(r, m, limit, floor)
+	if m.dy >= floor-vertSlack && m.dy <= limit+vertSlack || m.mode == modeGlide || m.mode == modeFly {
+		// Within the limits already: the blocks around need not be looked at.
+		return limit, floor
 	}
-	if sur := p.vertSurroundings(r, from, to); sur.climb || sur.slow {
-		limit = max(limit, vertClimb)
+	sur := p.vertSurroundings(r, m.from, m.to)
+	if p.move.climbing || sur.climb {
+		limit, floor = max(limit, vertClimb), min(floor, -vertClimb)
+	}
+	if sur.slow {
+		limit = max(limit, 0)
+	}
+	if sur.bubble {
+		limit = max(limit, min(max(s.vy, 0)+vertBubbleStep, vertBubbleUp))
+		floor = min(floor, max(min(s.vy, 0)-vertBubbleStep, -vertBubbleDown))
+	}
+	return limit, floor
+}
+
+// fallLimits are the rise and drop of a player falling or jumping through the air: gravity
+// (Slow Falling's while falling) and drag, Levitation's pull.
+func (p *Player) fallLimits() (limit, floor float32) {
+	vy := p.move.vert.vy
+	gravity := float32(vertGravity)
+	if _, ok := p.Effect(EffectSlowFalling); ok && vy <= 0 {
+		gravity = vertSlowGravity
+	}
+	limit = (vy - gravity) * vertDrag
+	floor = limit
+	if amp, ok := p.Effect(EffectLevitation); ok {
+		pull := vertLevitation * float32(amp+1)
+		lev := (vy + (pull-vy)*vertLevitationPull) * vertDrag
+		limit, floor = max(limit, lev), min(floor, lev)
+	}
+	return limit, floor
+}
+
+// glideLimits are the rise and drop of a gliding player: gravity less the elytra's lift, what
+// pulling up turns from the horizontal speed into rising, and what a dive gives back.
+func (p *Player) glideLimits() (limit, floor float32) {
+	vy := p.move.vert.vy
+	h := p.move.speed.last
+	limit = (vy - vertGravity + vertGlideLift + vertGlidePull*h + vertGlideDive*max(-vy, 0)) * vertDrag
+	floor = (vy - vertGravity) * vertDrag
+	return limit, floor
+}
+
+// flyLimits are the rise and drop of a creative flyer: drag and one tick of the fly speed.
+func (p *Player) flyLimits() (limit, floor float32) {
+	vy := p.move.vert.vy
+	push := max(p.abilities.Speed(AbilityFlySpeed), 0) * max(p.abilities.Speed(AbilityVerticalFlySpeed), 1) * vertFlyPush
+	return max(vy, 0)*vertFlyDrag + push, min(vy, 0)*vertFlyDrag - push
+}
+
+// groundLimit is the most a player on the ground may rise: a jump, a bounce, a step onto a block.
+func (p *Player) groundLimit(r *world.Region, m *vertMove) float32 {
+	if !m.groundFrom {
+		return 0
+	}
+	jump := float32(vertJump)
+	if amp, ok := p.Effect(EffectJumpBoost); ok {
+		jump += vertJumpBoost * float32(amp+1)
+	}
+	limit := max(jump, p.vertBounce(r, m.from))
+	if m.groundTo {
+		limit = max(limit, phaseStep)
 	}
 	return limit
+}
+
+// vertShallow widens limit and floor for a player touching a liquid too shallow to swim in, not
+// on the ground, for vertShallowTicks moves in a row.
+func (p *Player) vertShallow(r *world.Region, m *vertMove, limit, floor float32) (float32, float32) {
+	s := &p.move.vert
+	if m.mode != modeWalk || s.liquid <= 0 && p.liquidDepth(r, m.to) <= 0 {
+		s.shallowTicks = 0
+		return limit, floor
+	}
+	if m.groundFrom || p.move.climbing {
+		s.shallowTicks = 0
+	} else {
+		s.shallowTicks++
+	}
+	if s.shallowTicks > vertShallowTicks {
+		return limit, floor
+	}
+	return max(limit, vertShallowRise), min(floor, -vertShallowDrop)
 }
 
 // vertBounce is how fast a slime block or bed under the player at from sends it back up.
@@ -262,6 +397,8 @@ func (p *Player) vertSurroundings(r *world.Region, from, to mgl32.Vec3) vertSurr
 		lo[i], hi[i] = min(lo[i], tlo[i]), max(hi[i], thi[i])
 	}
 	lo[0], lo[2], hi[0], hi[2] = lo[0]-vertReach, lo[2]-vertReach, hi[0]+vertReach, hi[2]+vertReach
+	// A bubble column under the feet pushes a player just over its surface.
+	lo[1]--
 	blocks := p.s.reg.Blocks
 	for x := itemFloor(lo[0]); x <= itemFloor(hi[0]); x++ {
 		for y := itemFloor(lo[1]); y <= itemFloor(hi[1]); y++ {
@@ -276,6 +413,8 @@ func (p *Player) vertSurroundings(r *world.Region, from, to mgl32.Vec3) vertSurr
 				switch blocks.Name(b) {
 				case nameCobweb, nameHoneyBlock, nameBerryBush:
 					sur.slow = true
+				case nameBubbleColumn:
+					sur.bubble = true
 				}
 			}
 		}
@@ -291,8 +430,7 @@ func (p *Player) liquidDepth(r *world.Region, eyes mgl32.Vec3) float32 {
 	for x := itemFloor(lo[0]); x <= itemFloor(hi[0]); x++ {
 		for y := itemFloor(lo[1]); y <= itemFloor(hi[1]); y++ {
 			for z := itemFloor(lo[2]); z <= itemFloor(hi[2]); z++ {
-				pos := cube.Pos{x, y, z}
-				top, ok := p.liquidTop(r, pos)
+				top, ok := p.liquidTop(r, cube.Pos{x, y, z})
 				if !ok || top <= lo[1] {
 					continue
 				}

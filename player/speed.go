@@ -13,10 +13,14 @@ import (
 // client's own physics can reach from the speed the player had: the last move slowed by
 // friction (the block under it on the ground, air otherwise), plus one tick of walking push
 // from the movement attribute (Speed and Slowness in it), sprinting always counted, plus a
-// sprint jump's boost when it jumps off the ground. Knockback, explosions, pulls and teleports
-// raise the speed the player may have; gliding, riding, swimming, flying and Riptide are not
-// held and their speed carries over. Water and lava count once their surface is well over the
-// feet (vertical.go): a cheat walking on the surface is held. A move past the limit is cut to it and the client is
+// sprint jump's boost when it jumps off the ground, and Soul Speed's boost on soul sand and soul
+// soil. Knockback, explosions, pulls, pistons and teleports raise the speed the player may have.
+// The other ways of moving have their own limits (movemode.go): in water or lava (once the
+// surface is well over the feet, so a cheat walking on the surface is held as on land) the
+// liquid's drag and a swimming push, Depth Strider in it; gliding, the elytra's drag and what
+// a dive or a rocket adds; creative flying, the air's drag and the fly speed ability; a Riptide
+// launch adds its strength. Only spectators, the dead and riders are not held here (vehicles
+// have their own check, vehicle.go). A move past the limit is cut to it and the client is
 // corrected there.
 
 const (
@@ -45,6 +49,11 @@ const (
 	// speedPushTicks is how many moves a push from the server stays allowed before the client
 	// uses it: it arrives a round trip later.
 	speedPushTicks = 40
+	// speedSoulSpeed and speedSoulSpeedLevel are Soul Speed's boost to the movement attribute on
+	// soul sand and soul soil: 0.03 times 1 plus 0.35 a level.
+	speedSoulSpeed, speedSoulSpeedLevel = 0.03, 0.35
+	// speedWalkFriction is the ground's friction for the push under Depth Strider: a plain block's.
+	speedWalkFriction = 0.6 * speedAirFriction
 )
 
 // speedState is what the speed check knows of the player's horizontal speed. Region tick.
@@ -80,13 +89,13 @@ func (p *Player) speedCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 	s := &p.move.speed
 	d := to.Sub(from)
 	dist := flatSpeed(d)
-	if p.speedFree() {
+	if p.moveMode() == modeFree {
 		s.last, s.pushTicks = dist, 0
 		return to
 	}
 	friction, push := p.speedPhysics(r, from, d[1] > 0, pk)
 	carried := s.last * friction
-	limit := carried + push
+	limit := max(carried+push, p.boostSpeed(carried))
 	if s.pushTicks > 0 {
 		pushed := max(s.push, carried) + push
 		if dist > limit+speedSlack && dist <= pushed+speedSlack {
@@ -120,18 +129,23 @@ func (p *Player) speedCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 	return at
 }
 
-// speedFree reports whether the player's speed is not held this move: its client moves it in
-// ways the check does not follow.
-func (p *Player) speedFree() bool {
-	return p.spectating() || p.dead() || p.vehicle != nil || p.Gliding() || p.deepInLiquid() ||
-		p.spin.active || p.abilities.Flag(AbilityFlying) && p.abilities.Flag(AbilityMayFly)
-}
+// speedFree reports whether the player moves some other way than walking, falling and jumping:
+// the speed check is not held or holds it by that way's own rules.
+func (p *Player) speedFree() bool { return p.moveMode() != modeWalk }
 
 // speedPhysics returns what is left of the player's speed after one tick, and the most its
 // client's push may add this tick, from where it was at from (its eyes) and whether it stood.
 // A jump's boost counts only on a move that rises: a cheat claiming the ground under it and a
 // jump every tick gets none.
 func (p *Player) speedPhysics(r *world.Region, from mgl32.Vec3, rising bool, pk *packet.PlayerAuthInput) (friction, push float32) {
+	switch p.moveMode() {
+	case modeLiquid:
+		return p.liquidPhysics()
+	case modeGlide:
+		return p.glidePhysics()
+	case modeFly:
+		return p.flyPhysics()
+	}
 	if !p.move.onGround {
 		return speedAirFriction, speedAirPush
 	}
@@ -142,10 +156,33 @@ func (p *Player) speedPhysics(r *world.Region, from mgl32.Vec3, rising bool, pk 
 		ground = max(ground, p.s.frictionOf(r, under.Add(cube.Pos{0, 1, 0})))
 	}
 	friction = ground * speedAirFriction
-	walk := max(p.attributes.get(attrMovement), 0) * speedSprint
+	walk := (max(p.attributes.get(attrMovement), 0) + p.soulSpeed(r, under)) * speedSprint
 	push = walk * speedGroundPush / (friction * friction * friction)
 	if rising && (pk.InputData.Load(packet.InputFlagStartJumping) || pk.InputData.Load(packet.InputFlagJumping)) {
 		push += speedJumpBoost
 	}
 	return friction, push
+}
+
+// soulSpeed is what Soul Speed on the player's boots adds to its movement attribute on the block
+// at under: soul sand and soul soil only.
+func (p *Player) soulSpeed(r *world.Region, under cube.Pos) float32 {
+	level := heldEnchant(p.inventory.armor[armorFeet], enchantSoulSpeed)
+	if level <= 0 {
+		return 0
+	}
+	b, ok := r.Block(under, 0)
+	if !ok {
+		return 0
+	}
+	if name := p.s.reg.Blocks.Name(b); name != nameSoulSand && name != nameSoulSoil {
+		return 0
+	}
+	return speedSoulSpeed * (1 + speedSoulSpeedLevel*float32(level))
+}
+
+// walkPush is one tick of sprinting push on a plain block, for Depth Strider.
+func (p *Player) walkPush() float32 {
+	f := float32(speedWalkFriction)
+	return max(p.attributes.get(attrMovement), 0) * speedSprint * speedGroundPush / (f * f * f)
 }

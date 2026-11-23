@@ -155,6 +155,19 @@ func (a *Abilities) Flag(ab Ability) bool {
 	return false
 }
 
+// Speed returns a speed ability: the highest layer that sets it wins, as on the client.
+func (a *Abilities) Speed(ab Ability) float32 {
+	if ab >= abilityCount || !ab.isFloat() {
+		return 0
+	}
+	for l := abilityLayerCount - 1; l >= 0; l-- {
+		if v := a.layers[l][ab]; v.set {
+			return v.f
+		}
+	}
+	return 0
+}
+
 // SetPermission sets the permission level and, as BDS does, the abilities
 // it grants in the base layer. Custom leaves them as they are.
 func (a *Abilities) SetPermission(level uint8) {

@@ -100,6 +100,12 @@ type moveState struct {
 	speed speedState
 	// vert is what the vertical check knows of the player's vertical speed (vertical.go).
 	vert vertState
+	// boost is what drives the player: a held rocket (movemode.go).
+	boost moveBoost
+	// vehicle is what the vehicle check knows of the vehicle the player steers (vehicle.go).
+	vehicle vehicleState
+	// clock is the player's input credits (inputrate.go).
+	clock inputClock
 	// sim is the server's simulated copy of the player (movesim.go).
 	sim moveSim
 }

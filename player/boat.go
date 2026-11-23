@@ -303,7 +303,7 @@ func (b *Boat) tick(e *world.Entity) {
 // drive moves the boat where its driver's client put it, turned to yaw: at pos itself when
 // the client predicts the boat, else so that the rider at pos (its eyes) is in its seat.
 // Region tick of the driver.
-func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
+func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool, tick uint64) {
 	if b.gone || b.Driver() != p {
 		return
 	}
@@ -320,6 +320,9 @@ func (b *Boat) drive(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
 		pos = mgl32.Vec3{pos[0] - off[0]*c - off[2]*s, pos[1] - off[1], pos[2] - off[2]*c + off[0]*s}
 	}
 	from := e.Position()
+	if r := e.Region(); r != nil {
+		pos = p.vehicleCheck(r, e, from, pos, vehicleKind{boat: true}, tick)
+	}
 	if e.Apply(world.Movement{Pos: pos, Rot: world.Rotation{Yaw: yaw, HeadYaw: yaw}, Tick: e.Tick()}) {
 		b.moved = pos.Sub(from)
 	}

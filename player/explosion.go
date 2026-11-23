@@ -464,6 +464,7 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 	}
 	if push != (mgl32.Vec3{}) {
 		target.BlastPush(push)
+		noteDrivenPush(o, push)
 	}
 	if e.NegatesFallDamage {
 		clearFall(o)

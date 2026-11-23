@@ -69,7 +69,7 @@ func (p *Player) releaseTrident(held ItemStack, used int32) {
 		if p.Wet() && p.vehicle == nil {
 			sound := riptideSounds[min(int(level), len(riptideSounds))-1]
 			playSound(r, p.blockPos(), soundEvent{name: sound, pos: p.AttachPos(AttachWeapon), extra: -1, entity: "minecraft:player"}, nil)
-			p.startSpin()
+			p.startSpin(level)
 		}
 		return
 	}
@@ -231,11 +231,13 @@ const (
 type spinState struct {
 	active bool
 	ticks  int32
+	// launch is the speed the launch gave the player, which the movement checks allow.
+	launch float32
 }
 
-// startSpin starts the spin attack and shows its flag.
-func (p *Player) startSpin() {
-	p.spin = spinState{active: true}
+// startSpin starts the spin attack of a trident with Riptide level and shows its flag.
+func (p *Player) startSpin(level int32) {
+	p.spin = spinState{active: true, launch: riptideLaunch(level)}
 	p.sendActorFlags()
 }
 

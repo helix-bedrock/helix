@@ -80,13 +80,21 @@ func removeRider(v vehicle, r ride.Rider) {
 // driveMob moves the mob the player steers where its client put it, when BDS lets the
 // client predict it: a tamed, saddled horse whose controlling seat the player has.
 // Otherwise the player only sits. Region tick of the rider.
-func (o *Mob) driveMob(p *Player, pos mgl32.Vec3, yaw float32, predicted bool) {
+func (o *Mob) driveMob(p *Player, pos mgl32.Vec3, yaw float32, predicted bool, tick uint64) {
 	if !o.clientDriven(p) {
 		return
 	}
 	if !predicted {
 		off := o.m.Seats().SeatOffset(p)
 		pos = ride.Position(pos, yaw, off.Mul(-1))
+	}
+	if r := o.entity.Region(); r != nil {
+		jump, _, ok := o.m.JumpStrength()
+		if !ok {
+			jump = vehHorseJump
+		}
+		from := o.m.Pos()
+		pos = p.vehicleCheck(r, o.entity, mgl32.Vec3{from.X, from.Y, from.Z}, pos, vehicleKind{speed: o.m.MovementSpeed(), jump: max(jump, vehHorseJump)}, tick)
 	}
 	o.m.Driven(vec(pos), yaw)
 }
