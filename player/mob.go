@@ -171,7 +171,7 @@ func (o *Mob) add(d *world.Dimension) {
 func (o *Mob) config(pos mgl32.Vec3, rot world.Rotation) world.EntityConfig {
 	return world.EntityConfig{
 		UniqueID: int64(o.m.ID()), RuntimeID: o.m.RuntimeID(), Pos: pos, Rot: rot,
-		Owner: o, Actor: true, Spawn: o.spawnPackets, Move: o.movePacket, Physics: o.physics, Publish: o.publish, Think: o.think, Input: o.apply, Save: o.saveEntity,
+		Owner: o, Actor: true, Spawn: o.spawnPackets, Move: o.movePacket, Physics: o.physics, Publish: o.publish, Serial: o.goals, Think: o.think, Input: o.apply, Save: o.saveEntity,
 	}
 }
 
@@ -255,6 +255,14 @@ func (m *Mob) publish(*world.Entity) {
 	if !m.gone {
 		m.m.Publish()
 	}
+}
+
+// goals runs the mob's goal selector, one mob at a time on the region's goroutine.
+func (m *Mob) goals(e *world.Entity) {
+	if e.Region() == nil || m.gone {
+		return
+	}
+	m.m.Goals()
 }
 
 // think runs the mob's AI after every mob has moved: the think phase, maybe on another core

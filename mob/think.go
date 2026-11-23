@@ -9,11 +9,12 @@ import (
 )
 
 // A mob's tick has two halves. The thinking half is TickPhysics (physics, world.EntityConfig
-// Physics), Publish and Tick (goals, navigation and the controls, Think); the region runs
-// each over every mob before the next, as BDS runs its systems. In a crowded region many
-// mobs think at once on different cores, so while thinking a mob changes only itself, sees
-// every other entity as its Snapshot (taken after its TickPhysics, and again at the end of its
-// Apply), and queues whatever it does to
+// Physics), Publish, Goals (Serial) and Tick (navigation and the controls, Think); the region
+// runs each over every mob before the next, as BDS runs its systems. Goals runs one mob at a
+// time, newest first, and changes other mobs' AI state at once, as BDS's goal system does.
+// The other phases run many mobs at once on different cores in a crowded region, so there a
+// mob changes only itself, sees every other entity as its Snapshot (taken after its
+// TickPhysics, after its Goals, and at the end of its Apply), and queues whatever it does to
 // anything else. Apply is the other half: it runs on the region's goroutine, mobs in runtime
 // ID order, and does the queued work in the order it was asked for. One core or many, the
 // results are the same.
@@ -111,13 +112,26 @@ type op struct {
 	spawn *state.SpawnEntry
 }
 
-// do runs o now, or queues it for Apply while the mob thinks.
+// do runs o now, or queues it for Apply while the mob thinks. While the goals run one mob
+// at a time, an op that changes another mob's AI state runs now, as in BDS.
 func (m *Mob) do(o op) {
-	if m.thinking {
+	if m.thinking && !(m.serial && landsAtOnce(o.kind)) {
 		m.ops = append(m.ops, o)
 		return
 	}
 	m.run(o)
+}
+
+// landsAtOnce reports the ops that only change another mob's AI state: run at once while
+// the goals run one mob at a time. Hurting, items, spawning and the world still wait for
+// Apply.
+func landsAtOnce(k opKind) bool {
+	switch k {
+	case opSetMobTarget, opLovePartner, opLoveLeader, opWilling, opJoinCaravan, opLeaveCaravan,
+		opSetMingle, opMobEvent:
+		return true
+	}
+	return false
 }
 
 // flagsChanged tells those who see the mob its flags changed: once, at Apply, while thinking.

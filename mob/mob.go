@@ -394,6 +394,9 @@ type Mob struct {
 	// tickAI is set by TickPhysics when Publish and Tick should run this tick; noAITick and
 	// stillTick are what TickPhysics found for Tick (no_ai set, and not moving by itself).
 	tickAI, noAITick, stillTick bool
+	// serial is set while the goals run one mob at a time (Goals): ops that change another
+	// mob's AI state then run at once instead of waiting for Apply.
+	serial bool
 	// onBox is told the snapshot's box each time it is taken (SetBoxListener).
 	onBox func(behavior.Box)
 
@@ -514,7 +517,7 @@ func boxAt(p path.Vec3, w, h float32) path.Box {
 // TickPhysics runs the first part of the thinking half of one tick of the mob on region r, in BDS
 // 1.26.60's system order: the definition's pending changes and the actor tick, then the
 // movement pipeline, which moves the mob by what its controls decided on the previous tick.
-// The region runs every mob's TickPhysics, then every mob's Publish, then every mob's Tick, as BDS
+// The region runs every mob's TickPhysics, then every mob's Publish, Goals and Tick, as BDS
 // runs each system over every actor before the next. It may run at the same time as other
 // mobs' TickPhysics (see think.go). It reports whether the mob's death has ended and it should be
 // removed; then Tick does nothing this tick.
@@ -540,9 +543,24 @@ func (m *Mob) Publish() {
 	}
 }
 
-// Tick runs the rest of the thinking half after every mob's TickPhysics: the goal selector,
-// navigation, the move control, the jump and look controls and the body control. It may run
-// at the same time as other mobs' Tick (see think.go); call Apply after it.
+// Goals runs the mob's goal selector after every mob's Publish, one mob at a time on the
+// region's goroutine, newest first, as BDS's goal system visits mobs. What the goals do to
+// other mobs' AI state (targets, love, caravans, mingling, events) lands at once, so the mobs
+// after it see it, and the mob's snapshot is taken again for them.
+func (m *Mob) Goals() {
+	if !m.tickAI {
+		return
+	}
+	m.thinking, m.serial = true, true
+	m.sel.Tick(m.noAITick)
+	m.hasPushedBy = false
+	m.thinking, m.serial = false, false
+	m.snapshot()
+}
+
+// Tick runs the rest of the thinking half after every mob's Goals: navigation, the move
+// control, the jump and look controls and the body control. It may run at the same time as
+// other mobs' Tick (see think.go); call Apply after it.
 func (m *Mob) Tick() {
 	if !m.tickAI {
 		return
@@ -601,10 +619,9 @@ func (m *Mob) move() (remove bool) {
 	return false
 }
 
-// think is Tick's work: the AI systems, which run after every mob has moved.
+// think is Tick's work: the AI systems after the goals, which read only the mob itself and
+// the other mobs' snapshots.
 func (m *Mob) think() {
-	m.sel.Tick(m.noAITick)
-	m.hasPushedBy = false
 	if m.nv != nil {
 		nm := m.navMob()
 		if nav.ShouldTick(false, m.noAITick, m.health) {

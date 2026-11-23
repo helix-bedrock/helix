@@ -124,6 +124,11 @@ type EntityConfig struct {
 	// once: it updates what the others read of the entity while they think, and must not
 	// read any other entity.
 	Publish func(e *Entity)
+	// Serial runs after every entity's Publish and before any Think, one entity at a time
+	// on the region's goroutine, the newest entity first, as BDS's systems visit actors one
+	// after another. Unlike Think it may change other entities' state directly, and the
+	// entities after it see that change. Mob goals run here.
+	Serial func(e *Entity)
 	// Think runs every tick just before the input phase, for every entity at once: a crowded
 	// region spreads the calls over idle cores (Region.Parallel), so Think may only read the
 	// region and other entities and change the entity's own state. What it does to anything
@@ -132,7 +137,7 @@ type EntityConfig struct {
 	// Input runs every tick in the region's player input phase, entities
 	// in runtime ID order: a player handles the packets it queued here.
 	Input func(e *Entity)
-	// TickAnywhere runs Physics, Publish, Think and Input even while the entity's chunk is not ticking. Without
+	// TickAnywhere runs Physics, Publish, Serial, Think and Input even while the entity's chunk is not ticking. Without
 	// it an entity that is not a player's stands still where no simulation zone or ticking
 	// ticket reaches, as BDS ticks actors only in ticking chunks; a player's always ticks.
 	TickAnywhere bool
@@ -627,7 +632,7 @@ func (r *Region) tickEntities() {
 	r.thinkers = r.thinkers[:0]
 	for _, e := range r.entities {
 		e.frozen = !r.entityTicks(e)
-		if (e.conf.Physics != nil || e.conf.Publish != nil || e.conf.Think != nil) && !e.frozen {
+		if (e.conf.Physics != nil || e.conf.Publish != nil || e.conf.Serial != nil || e.conf.Think != nil) && !e.frozen {
 			r.thinkers = append(r.thinkers, e)
 		}
 	}
@@ -652,8 +657,8 @@ func (r *Region) entityTicks(e *Entity) bool {
 	return recent
 }
 
-// runThinkers runs the thinking entities' Physics, then their Publish, then their Think,
-// each phase over all of them before the next starts.
+// runThinkers runs the thinking entities' Physics, Publish, Serial and Think, each phase
+// over all of them before the next starts.
 func (r *Region) runThinkers() {
 	if r.thinkFn == nil {
 		r.physicsFn, r.publishFn, r.thinkFn = r.physics, r.publish, r.think
@@ -661,8 +666,20 @@ func (r *Region) runThinkers() {
 	n := len(r.thinkers)
 	r.Parallel(n, r.physicsFn)
 	r.Parallel(n, r.publishFn)
+	r.runSerial()
 	r.Parallel(n, r.thinkFn)
 	clear(r.thinkers)
+}
+
+// runSerial runs the thinking entities' Serial one at a time, newest first: the region
+// keeps entities by runtime ID, which grows with each new entity, and BDS's systems visit
+// the newest actor first.
+func (r *Region) runSerial() {
+	for i := len(r.thinkers) - 1; i >= 0; i-- {
+		if e := r.thinkers[i]; e.conf.Serial != nil {
+			e.conf.Serial(e)
+		}
+	}
 }
 
 // physics runs the Physics of the i-th thinking entity.
