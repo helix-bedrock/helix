@@ -98,6 +98,15 @@ notes with API names: [STATUS.md](STATUS.md). Updated 2026-11-18.
 | Load testing (400 players in one region, heavy redstone, mass entities) | 🟡 test harness and scenarios built; bot players next |
 | Plugin API (WASM plugins, sandbox, custom content) | ⬜ not started |
 
+### Anti-cheat branch
+
+The [`anti-cheat`](https://github.com/helix-bedrock/helix/tree/anti-cheat) branch holds Helix's
+movement anti-cheat (speed, fly, phase, vehicles, knockback, the server's own movement simulation)
+and the anti X-ray. **It does not fully work and is not stable at all:** normal players get a lot of
+movement corrections, which is why it is kept off `main`. Main keeps the checks that are stable
+(reach, aim, line of sight, break speed, air place, chest stealing, packet floods). If you want to
+work on the anti-cheat, go for it: open a PR against the `anti-cheat` branch.
+
 **The goal is to match the latest Minecraft version exactly.** After that, every time Minecraft
 updates, Helix will be updated to the new version and gain everything the update adds. The project
 is maintained.
