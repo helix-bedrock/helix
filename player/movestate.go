@@ -92,25 +92,6 @@ type moveState struct {
 	soundTick uint64
 	// climbing, inWater and onGround are what the last movement found.
 	climbing, inWater, onGround bool
-	// airTicks is how many movements in a row the server found the player off the ground,
-	// airFrom the height it left the ground at and airTop the highest it got since (canCrit).
-	airTicks        int32
-	airFrom, airTop float32
-	// speed is what the speed check knows of the player's horizontal speed (speed.go).
-	speed speedState
-	// vert is what the vertical check knows of the player's vertical speed (vertical.go).
-	vert vertState
-	// boost is what drives the player: a held rocket (movemode.go).
-	boost moveBoost
-	// vehicle is what the vehicle check knows of the vehicle the player steers (vehicle.go).
-	vehicle vehicleState
-	// clock is the player's input credits (inputrate.go).
-	clock inputClock
-	// fix is the correction this input's checks asked for and the slowdown they hold it to
-	// (movefix.go).
-	fix moveFix
-	// sim is the server's simulated copy of the player (movesim.go).
-	sim moveSim
 }
 
 // glideInput is the client asking to start or stop gliding. A start goes through the
@@ -220,7 +201,7 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 		return
 	}
 	to := p.entity.Position()
-	m := MoveInfo{From: from, To: to, OnGround: collided && to[1] <= from[1] && p.groundUnder(r, to)}
+	m := MoveInfo{From: from, To: to, OnGround: collided && to[1] <= from[1]}
 	feet := vecPos(to.Sub(mgl32.Vec3{0, eyeHeight, 0}))
 	eyes := vecPos(to)
 	m.HeadInWater = p.water(r, eyes)
@@ -229,7 +210,6 @@ func (p *Player) afterMove(from mgl32.Vec3, collided bool) {
 		m.Climbing = p.s.climbableBlock(b)
 	}
 	p.move.climbing, p.move.inWater, p.move.onGround = m.Climbing, m.InWater, m.OnGround
-	p.trackAir(to[1], m.OnGround || m.InWater || m.Climbing)
 	p.trackVibrations(r, &m)
 	sys := p.s.game.sys
 	sys.Fall(p, &m)

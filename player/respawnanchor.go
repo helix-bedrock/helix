@@ -47,13 +47,6 @@ func (a *respawnAnchorBlock) Use(u *BlockUse) bool {
 	if r == nil {
 		return false
 	}
-	if !p.anchorReady(r, u.Pos) {
-		// Too soon after the last use (anchorpace.go): the click does nothing, and the client
-		// is shown the anchor and its held item as they are.
-		p.sendBlock(r, u.Pos)
-		p.sendHeld()
-		return true
-	}
 	charge := anchorCharge(p, u.Block)
 	if u.Item.Name == nameGlowstone && charge < anchorMaxCharge {
 		if !p.creative() {

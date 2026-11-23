@@ -323,7 +323,6 @@ func (p *Player) pushOffShield(blocker *Player) {
 	away := p.entity.Position().Sub(blocker.entity.Position())
 	vel := p.knockbackStep(p.move.velocity, away[0], away[2], p.Tuning(TuneShieldPush)*resist, p.Tuning(TuneShieldLift)*resist)
 	p.move.velocity = vel
-	p.notePush(vel)
 	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: vel, Tick: p.entity.Tick()})
 	p.flush()
 }

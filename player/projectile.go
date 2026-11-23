@@ -1264,7 +1264,6 @@ func (p *Player) projectileKnockback(flight mgl32.Vec3, punch float32) {
 		vel = p.knockbackStep(vel, flight[0], flight[2], punch*p.Tuning(TuneKnockbackExtraPush)*resist, punch*p.Tuning(TuneKnockbackExtraLift)*resist)
 	}
 	p.move.velocity = vel
-	p.notePush(vel)
 	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: vel, Tick: p.entity.Tick()})
 	p.flush()
 }
@@ -1283,7 +1282,6 @@ func (t *Projectile) teleportOwner(r *world.Region, at mgl32.Vec3) {
 		return
 	}
 	p.move.fall = 0
-	p.move.vert.reset = true
 	p.send(&packet.MovePlayer{
 		EntityRuntimeID: p.runtimeID, Position: eyes, Pitch: rot.Pitch, Yaw: rot.Yaw, HeadYaw: rot.HeadYaw,
 		Mode: packet.MoveModeTeleport, Tick: p.entity.Tick(),

@@ -691,9 +691,6 @@ func (p *Player) spectating() bool {
 // locked in its slot stays, and armour with the curse of binding stays on
 // a player not in creative.
 func (p *Player) mayRemove(r slotRef, s ItemStack) bool {
-	if !s.Empty() && !p.mayTake(r.kind) {
-		return false
-	}
 	if lock, _ := s.Tag["minecraft:item_lock"].(uint8); lock == itemLockInSlot {
 		return false
 	}

@@ -50,7 +50,6 @@ func (p *Player) SetVelocity(v mgl32.Vec3) {
 		return
 	}
 	p.move.velocity = v
-	p.notePush(v)
 	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: v, Tick: p.entity.Tick()})
 	p.flush()
 }

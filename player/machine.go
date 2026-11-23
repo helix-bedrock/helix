@@ -569,7 +569,6 @@ func (s *Host) IsArrow(e *world.Entity) bool {
 // the server moves it, stopped by blocks as BDS's actor move is, and corrects the client.
 // Runs: owner of the entity's region.
 func (s *Host) PistonPush(r *world.Region, e *world.Entity, by mgl32.Vec3) {
-	noteDrivenPush(e, pistonLaunch(by))
 	if m, ok := e.Owner().(*Mob); ok {
 		// The mob's body is where it is; the entity follows it at the mob's next Apply.
 		if !m.gone && e.Apply(world.Movement{Pos: e.Position().Add(by), Rot: e.Rotation(), OnGround: e.OnGround(), Tick: e.Tick()}) {
@@ -607,10 +606,6 @@ func (p *Player) pistonPush(r *world.Region, by mgl32.Vec3) {
 	if moved == (mgl32.Vec3{}) {
 		return
 	}
-	// The client's moves already on their way started before the push, so they may seem to go
-	// back as far as it went; a pushing slime block launches the player at up to a block a tick
-	// along the push, which the client works out itself.
-	p.noteMotion(pistonLaunch(by))
 	rot, onGround, tick := p.entity.Rotation(), p.entity.OnGround(), p.entity.Tick()
 	pos := p.entity.Position().Add(moved)
 	p.s.handlers.movement(p, world.Movement{Pos: pos, Rot: rot, OnGround: onGround, Tick: tick})
@@ -922,21 +917,4 @@ func faceVec(f cube.Face) mgl32.Vec3 {
 		return mgl32.Vec3{-1, 0, 0}
 	}
 	return mgl32.Vec3{1, 0, 0}
-}
-
-// pistonLaunchSpeed is the most a slime block a piston moves launches a player, along the push.
-const pistonLaunchSpeed = 1.1
-
-// pistonLaunch is the motion a piston pushing by may give a player: the push, or a slime
-// block's launch along it.
-func pistonLaunch(by mgl32.Vec3) mgl32.Vec3 {
-	for i := range 3 {
-		switch {
-		case by[i] > 0:
-			by[i] = max(by[i], pistonLaunchSpeed)
-		case by[i] < 0:
-			by[i] = min(by[i], -pistonLaunchSpeed)
-		}
-	}
-	return by
 }

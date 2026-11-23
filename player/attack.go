@@ -20,16 +20,6 @@ const (
 	attackRangeCreative = 12
 	// attackScan is how far around the player its target is looked for.
 	attackScan = 13
-	// attackCreditMax is how many attacks a player may bank, one earned per server tick:
-	// Helix's own rule, beyond BDS. 20 a second is faster than anyone clicks, and the bank
-	// covers inputs arriving together after lag, but a client hitting several entities in one
-	// tick (kill aura's multi mode, "hits per attack") or clicking faster than the tick rate
-	// loses the extra hits.
-	attackCreditMax = 4
-	// placeCreditMax is the same for items used on blocks (placing, crystals, anchors,
-	// rails, flint and steel): one per server tick, a bank of 4. Holding the button places
-	// far slower; fast place and crystal or anchor auras lose the extra uses.
-	placeCreditMax = 4
 	// critMultiplier is what a critical hit multiplies damage by.
 	critMultiplier = 1.5
 	// strengthMultiplier and strengthAdd are Strength, once per level.
@@ -94,16 +84,8 @@ func loadCombat() (*combatTable, error) {
 // handleUseOnEntity is BDS's use on actor transaction, with its checks in order.
 // Interacting with entities is not built yet.
 func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
-	if p.dead() || p.entity == nil || !p.seesEntityID(d.TargetEntityRuntimeID, d.ActionType == protocol.UseItemOnEntityActionAttack) {
+	if p.dead() || p.entity == nil {
 		return
-	}
-	if d.ActionType == protocol.UseItemOnEntityActionAttack {
-		if p.attackCredits <= 0 {
-			return
-		}
-		p.attackCredits--
-		// A hit slows the attacker: the fast stop check lets the next move fall short.
-		p.move.speed.hit = true
 	}
 	if p.useOnCart(d) || p.useOnBoat(d) || p.useOnCushion(d) || p.useOnPainting(d) || p.useOnEndCrystal(d) || p.useOnKnot(d) || p.useOnMob(d) || p.useOnProjectile(d) {
 		return
@@ -217,39 +199,11 @@ func weaknessAttack(amplifier int32, v float32) float32 {
 
 // canCrit is BDS's rule for a critical hit: falling, off the ground, not climbing
 // or in water, not blind. Riding does not exist yet.
-//
-// Criticals check: Helix's own rule, beyond BDS. Criticals cheats send a drop of a few hundredths
-// of a block, with jump flags, while standing on the ground, so every hit is critical. A hit is
-// critical only when the server has seen the player in the air for a few movements and it really
-// jumped or dropped: it rose critMinRise since leaving the ground, or fell critMinDrop.
 func (p *Player) canCrit() bool {
 	if _, blind := p.Effect(EffectBlindness); blind {
 		return false
 	}
-	if p.move.fall <= 0 || p.entity.OnGround() || p.move.onGround || p.move.climbing || p.move.inWater {
-		return false
-	}
-	return p.move.airTicks >= critMinAir && (p.move.airTop-p.move.airFrom >= critMinRise || p.move.fall >= critMinDrop)
-}
-
-// Numbers of the criticals check. A jump rises 1.25 blocks over 6 ticks; walking off a ledge
-// falls 0.08, 0.23 then 0.46 blocks by the third tick.
-const (
-	critMinAir  = 3
-	critMinRise = 0.2
-	critMinDrop = 0.2
-)
-
-// trackAir keeps how long the player has been off the ground and how high it got, from the
-// server's own ground check. y is its eye height.
-func (p *Player) trackAir(y float32, grounded bool) {
-	m := &p.move
-	if grounded {
-		m.airTicks, m.airFrom, m.airTop = 0, y, y
-		return
-	}
-	m.airTicks++
-	m.airTop = max(m.airTop, y)
+	return p.move.fall > 0 && !p.entity.OnGround() && !p.move.climbing && !p.move.inWater
 }
 
 // knockbackOf is the extra knockback of the player's hit.
@@ -283,7 +237,6 @@ func vanillaKnockback(target, attacker *Player, extra float32) {
 		vel = target.knockbackStep(vel, -direction.Sin(yaw), direction.Cos(yaw), extra*target.Tuning(TuneKnockbackExtraPush)*resist, extra*target.Tuning(TuneKnockbackExtraLift)*resist)
 	}
 	target.move.velocity = vel
-	target.notePush(vel)
 	target.send(&packet.SetActorMotion{EntityRuntimeID: target.runtimeID, Velocity: vel, Tick: target.entity.Tick()})
 	target.flush()
 }
@@ -308,20 +261,10 @@ func knockbackOf(vel mgl32.Vec3, x, z, push, lift, retain, liftScale, liftCap fl
 
 func clampKnockback(v float32) float32 { return min(max(v, -knockbackLimit), knockbackLimit) }
 
-// swingsPerTick is how many arm swings a server tick relays: two inputs may arrive in one tick
-// after lag.
-const swingsPerTick = 2
-
 // handleAnimate is vanilla's Animate handler: a player's arm swing goes to those who
 // see it, always about the player itself.
 func handleAnimate(p *Player, pk *packet.Animate) {
 	if pk.ActionType != packet.AnimateActionSwingArm || p.entity == nil || p.dead() {
-		return
-	}
-	// Swing budget: Helix's own rule, beyond BDS. An arm swings at most once a tick; cheat
-	// clients send many to flood everyone near with relays.
-	p.swings++
-	if p.swings > swingsPerTick {
 		return
 	}
 	p.startSwing()

@@ -179,9 +179,6 @@ func fireworkLifetime(item ItemStack) int32 {
 // owner of the chunk at pos.
 func (s *Host) LaunchFirework(d *world.Dimension, pos, dir mgl32.Vec3, item ItemStack, attached *Player) *FireworkRocket {
 	f := &FireworkRocket{s: s, dir: dir, item: item, attached: attached, lifetime: fireworkLifetime(item)}
-	if attached != nil {
-		attached.noteRocket(f.lifetime)
-	}
 	jitter := mgl32.Vec3{float32(rand.NormFloat64()), float32(rand.NormFloat64()), float32(rand.NormFloat64())} //nolint:gosec // a flight, not a secret
 	f.vel = jitter.Mul(fireworkJitter).Add(dir.Mul(fireworkThrust))
 	f.entity = d.AddEntity(world.EntityConfig{

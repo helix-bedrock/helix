@@ -69,7 +69,6 @@ func (m *Mob) Knockback(_ *mob.Mob, target behavior.ID, k behavior.Knockback) {
 		}
 		resist := max(1-e.attributes.get(attrKnockbackResistance), 0)
 		e.move.velocity = knockbackParams(e.move.velocity, k, resist)
-		e.notePush(e.move.velocity)
 		e.send(&packet.SetActorMotion{EntityRuntimeID: e.runtimeID, Velocity: e.move.velocity, Tick: e.entity.Tick()})
 		e.flush()
 	}

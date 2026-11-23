@@ -1,8 +1,6 @@
 package player
 
 import (
-	"time"
-
 	"sync"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -99,17 +97,9 @@ func (p *Player) handleInput(*world.Entity) {
 	p.warden.tick()
 	p.tickFreeze()
 	p.tickSpin()
-	p.tickBoost()
 	p.tickShield()
 	p.tickSleep()
 	p.reseat()
-	p.earnInputs(time.Now())
-	p.brk.credits = min(p.brk.credits+1, breakCreditMax)
-	p.attackCredits = min(p.attackCredits+1, attackCreditMax)
-	p.placeCredits = min(p.placeCredits+1, placeCreditMax)
-	p.swings = 0
-	p.earnCommand()
-	p.tickTakes()
 	// The packets the think step took, so its handlers saw the same ones.
 	run := p.batch
 	if !p.thought {
@@ -219,18 +209,12 @@ func vanillaHandlers(s *Setup) error {
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	if p.portal.changing || p.moving != nil {
 		// Input from before a dimension change is for the old dimension.
-		p.noteTeleportMove()
 		return
 	}
 	if p.teleportWait.holds(pk.InputData.Load(packet.InputFlagHandledTeleport)) {
 		// Sent before the client took the teleport: it would put the player back.
-		p.noteTeleportMove()
 		return
 	}
-	if p.badInput(pk) || !p.spendInput(pk) {
-		return
-	}
-	p.recordAim(pk)
 	sys := p.s.game.sys
 	if req, ok := pk.ItemStackRequest.Value(); ok && pk.InputData.Load(packet.InputFlagPerformItemStackRequest) {
 		// The client sends some requests (the held tool's mine block action) inside its
@@ -276,7 +260,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		if id, has := pk.ClientPredictedVehicle.Value(); has && id == b.entity.UniqueID() {
 			predicted = true
 		}
-		b.drive(p, pk.Position, yaw, predicted, pk.Tick)
+		b.drive(p, pk.Position, yaw, predicted)
 	}
 	if o, ok := p.vehicle.(*Mob); ok {
 		yaw := o.entity.Rotation().Yaw
@@ -284,26 +268,10 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 			yaw = rot[1]
 		}
 		id, has := pk.ClientPredictedVehicle.Value()
-		o.driveMob(p, pk.Position, yaw, has && id == o.entity.UniqueID(), pk.Tick)
-	}
-	if p.vehicle == nil {
-		p.move.vehicle.of = nil
+		o.driveMob(p, pk.Position, yaw, has && id == o.entity.UniqueID())
 	}
 	if p.vehicle != nil {
 		pos = p.seatPosition()
-		// The first move off a vehicle starts from wherever the seat left the player.
-		p.move.vert.reset = true
-	}
-	if p.vehicle == nil && p.entity != nil {
-		if r := p.entity.Region(); r != nil {
-			p.noteLiquid(r, from)
-			p.noteSlowdown(r, from)
-			pos = p.phaseCheck(r, from, pos, pk)
-			pos = p.speedCheck(r, from, pos, pk)
-			pos = p.verticalCheck(r, from, pos, pk)
-			p.sendMoveFix(r, pos, pk)
-			p.simMove(r, from, pk.Position, pos, pk)
-		}
 	}
 	p.s.handlers.movement(p, world.Movement{
 		Pos: pos, Rot: world.Rotation{Pitch: pk.Pitch, Yaw: pk.Yaw, HeadYaw: pk.HeadYaw},

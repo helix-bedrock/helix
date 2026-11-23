@@ -467,7 +467,6 @@ func (m *Mob) Attack(_ *mob.Mob, target behavior.ID) (hit, killed bool) {
 		resist := max(1-p.attributes.get(attrKnockbackResistance), 0) * p.Tuning(TuneKnockbackTakenScale)
 		vel := p.knockbackStep(p.move.velocity, away[0], away[2], p.Tuning(TuneKnockbackPush)*resist, p.Tuning(TuneKnockbackLift)*resist)
 		p.move.velocity = vel
-		p.notePush(vel)
 		p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: vel, Tick: p.entity.Tick()})
 		p.flush()
 	}

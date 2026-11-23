@@ -28,8 +28,6 @@ func cartViewers(t *testing.T, id string) (p, q *Player, m *Minecart, d *world.D
 		for _, v := range []*Player{p, q} {
 			v.window.open, v.window.inv, v.window.kind, v.window.cart, v.window.dim = true, m.chest.Inventory(r), m.chest.Kind(), m, r.Dimension()
 			m.chest.addViewer(r, v)
-			// As a player who has had the window open a while (steal.go).
-			v.window.openTicks, v.takeCredits = takeOpenTicks, takeCreditMax
 		}
 	})
 	return p, q, m, d

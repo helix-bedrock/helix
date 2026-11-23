@@ -336,33 +336,9 @@ func (p *Player) commandsPacket() *packet.AvailableCommands {
 	return p.s.commands.Packet(&CommandSource{p: p})
 }
 
-// Command budget: Helix's own rule, beyond BDS. A player may bank commandCreditMax commands and
-// earns one every commandEvery server ticks (5 a second): faster than anyone types or clicks a
-// command block button, but cheat clients sending hundreds a second lose the rest unanswered.
-const (
-	commandCreditMax = 10
-	commandEvery     = 4
-)
-
-// earnCommand earns the player's command credits. Region tick.
-func (p *Player) earnCommand() {
-	if p.commandCredits >= commandCreditMax {
-		return
-	}
-	p.commandTicks++
-	if p.commandTicks >= commandEvery {
-		p.commandTicks = 0
-		p.commandCredits++
-	}
-}
-
 // handleCommandRequest runs a command a player typed and sends what it said back as BDS
 // does, in a CommandOutput.
 func handleCommandRequest(p *Player, pk *packet.CommandRequest) {
-	if p.commandCredits <= 0 {
-		return
-	}
-	p.commandCredits--
 	out := p.s.commands.Execute(&CommandSource{p: p}, pk.CommandLine)
 	msgs := out.Messages()
 	if len(msgs) == 0 {

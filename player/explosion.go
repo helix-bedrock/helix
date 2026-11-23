@@ -464,7 +464,6 @@ func (s *Host) blastEntity(r *world.Region, e *Explosion, o *world.Entity, targe
 	}
 	if push != (mgl32.Vec3{}) {
 		target.BlastPush(push)
-		noteDrivenPush(o, push)
 	}
 	if e.NegatesFallDamage {
 		clearFall(o)
@@ -726,7 +725,6 @@ func (p *Player) BlastPush(push mgl32.Vec3) {
 		return
 	}
 	p.move.velocity = p.move.velocity.Add(push)
-	p.notePush(p.move.velocity)
 	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: p.move.velocity, Tick: p.entity.Tick()})
 	p.flush()
 }
