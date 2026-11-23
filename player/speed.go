@@ -70,6 +70,10 @@ type speedState struct {
 	// the player (movefix.go).
 	knock     mgl32.Vec3
 	knockWait int32
+	// dir is the way the last move went, flat and of length 1, for the fast stop check; hit is
+	// set when the player attacked since its last move.
+	dir mgl32.Vec2
+	hit bool
 }
 
 // notePush allows the player the horizontal speed of v, which the server gave it. Region tick.
@@ -129,8 +133,18 @@ func (p *Player) speedCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.Pla
 		if stuck {
 			s.last = 0
 		}
+		if !stuck {
+			if at, cut := p.fastStop(r, from, to, d, carried, push); cut {
+				s.hit = false
+				return at
+			}
+		}
+		s.hit = false
+		p.noteMoveDir(d)
 		return to
 	}
+	s.hit = false
+	p.noteMoveDir(d)
 	s.last = limit
 	if stuck {
 		s.last = 0

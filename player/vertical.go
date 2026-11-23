@@ -81,6 +81,10 @@ const (
 	// vertReach is how far beside the player's box a block still counts as touching it: honey
 	// walls slow a slide from just beside them.
 	vertReach = 0.1
+	// vertJumpDelay is how many moves must pass between two jumps while the jump key stays held,
+	// and vertJumpRise the least rise off the ground that counts as a jump.
+	vertJumpDelay = 10
+	vertJumpRise  = 0.1
 )
 
 // vertState is what the vertical check knows of the player's vertical speed. Region tick.
@@ -104,6 +108,8 @@ type vertState struct {
 	// shallowTicks how many moves in a row it stayed in a liquid too shallow to swim in.
 	liquid       float32
 	shallowTicks int32
+	// jumpWait is how many more moves the next jump must wait while the jump key stays held.
+	jumpWait int32
 }
 
 // vertSurround is what touches the player's box over a move.
@@ -175,6 +181,9 @@ func (p *Player) verticalCheck(r *world.Region, from, to mgl32.Vec3, pk *packet.
 		return to
 	}
 	m.groundFrom, m.groundTo = p.groundUnder(r, from), p.groundUnder(r, to)
+	if p.jumpTooSoon(&m, p.vertBounce(r, from) > 0) {
+		return p.vertCut(r, from, to, 0, pk)
+	}
 	limit, floor := p.vertLimits(r, &m)
 	if s.changed || s.mode != m.mode {
 		limit, floor = max(limit, s.vy+vertModeChange, vertModeChange), min(floor, s.vy-vertModeChange)
@@ -475,4 +484,28 @@ func (p *Player) liquidIn(r *world.Region, pos cube.Pos) (material uint8, depth 
 		}
 	}
 	return 0, 0, false
+}
+
+// jumpTooSoon reports whether m is a jump less than vertJumpDelay moves after the last one with
+// the jump key held all along: the client waits that long between jumps while the key stays down
+// (no jump delay cheats do not). Letting the key go clears the wait. Only a rise off the ground
+// that nothing else explains counts: not a slime block's or bed's bounce, a push, a climb, water, a step onto a block.
+func (p *Player) jumpTooSoon(m *vertMove, bounce bool) bool {
+	s := &p.move.vert
+	held := m.pk.InputData.Load(packet.InputFlagJumpDown)
+	if !held {
+		s.jumpWait = 0
+	} else if s.jumpWait > 0 {
+		s.jumpWait--
+	}
+	if m.mode != modeWalk || !m.groundFrom || m.groundTo || m.dy <= vertJumpRise || s.pushTicks > 0 ||
+		bounce || s.liquid > 0 || p.move.climbing || p.move.boost.rocketTicks > 0 || p.spin.active {
+		return false
+	}
+	if held && s.jumpWait > 0 {
+		p.s.log.Debug("jump too soon cut", "name", p.name, "wait", s.jumpWait)
+		return true
+	}
+	s.jumpWait = vertJumpDelay
+	return false
 }

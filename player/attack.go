@@ -102,6 +102,8 @@ func (p *Player) handleUseOnEntity(d *protocol.UseItemOnEntityTransactionData) {
 			return
 		}
 		p.attackCredits--
+		// A hit slows the attacker: the fast stop check lets the next move fall short.
+		p.move.speed.hit = true
 	}
 	if p.useOnCart(d) || p.useOnBoat(d) || p.useOnCushion(d) || p.useOnPainting(d) || p.useOnEndCrystal(d) || p.useOnKnot(d) || p.useOnMob(d) || p.useOnProjectile(d) {
 		return

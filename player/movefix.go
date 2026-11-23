@@ -159,3 +159,76 @@ func (p *Player) enforceKnock(r *world.Region, from, to mgl32.Vec3, limit float3
 	p.move.fix.delta = mgl32.Vec3{k[0], k[1], k[2]}
 	return at
 }
+
+// Fast stop: a client's speed falls off by its friction, and its keys push at most push the
+// other way, so each move goes at least the speed it carried less one push along the way the last
+// move went, unless a block stops it. A fast stop cheat drops the speed at once (in the air above
+// all), and a move that falls short is carried on as far as the physics takes it and corrected.
+// Not held: sneaking (edges stop it), climbing, a push from the server, a hit (it slows the
+// attacker), soul sand and honey, the blocks that slow (they are held the other way), the other
+// ways of moving.
+
+const (
+	// stopMin is the least shortfall the fast stop check looks at: below it a client's
+	// rounding and the ground's friction stop the player about as fast anyway.
+	stopMin = 0.05
+)
+
+// fastStop returns where a move that stopped faster than the client's physics lets it must end,
+// and true; false when the move is fine. d is the move, carried and push what the speed check
+// worked out for it.
+func (p *Player) fastStop(r *world.Region, from, to, d mgl32.Vec3, carried, push float32) (mgl32.Vec3, bool) {
+	s := &p.move.speed
+	least := carried - push - speedSlack
+	if least <= stopMin || s.pushTicks > 0 || s.hit || p.move.fix.pending || p.moveMode() != modeWalk ||
+		p.Moving(MoveSneaking) || p.move.climbing || p.slowGround(r, from) || p.slowGround(r, to) {
+		return to, false
+	}
+	along := d[0]*s.dir[0] + d[2]*s.dir[1]
+	short := least - along
+	if short <= 0 {
+		return to, false
+	}
+	if short <= s.bank {
+		s.bank -= short
+		return to, false
+	}
+	lo, hi := p.phaseBox(from)
+	way := mgl32.Vec3{s.dir[0] * least, 0, s.dir[1] * least}
+	if got, ok := p.s.sweepMove(r, lo, hi, way, phaseStep); !ok || !reached(got, way) {
+		// A block stops it.
+		return to, false
+	}
+	flat := mgl32.Vec3{d[0] + s.dir[0]*short, 0, d[2] + s.dir[1]*short}
+	got, ok := p.s.sweepMove(r, lo, hi, flat, phaseStep)
+	if !ok || !reached(got, flat) {
+		return to, false
+	}
+	at := mgl32.Vec3{from[0] + flat[0], to[1], from[2] + flat[2]}
+	p.s.log.Debug("move stopped too fast", "name", p.name, "from", from, "to", to, "at", at, "least", least, "along", along)
+	s.last = flatSpeed(flat)
+	p.markMoveFix()
+	p.move.fix.delta[0], p.move.fix.delta[2] = s.dir[0]*carried, s.dir[1]*carried
+	return at, true
+}
+
+// slowGround reports whether the block under the player whose eyes are at eyes is soul sand or
+// honey, which slow walking on them.
+func (p *Player) slowGround(r *world.Region, eyes mgl32.Vec3) bool {
+	b, ok := r.Block(vecPos(eyes.Sub(mgl32.Vec3{0, eyeHeight + 0.5, 0})), 0)
+	if !ok {
+		return true
+	}
+	switch p.s.reg.Blocks.Name(b) {
+	case nameSoulSand, nameSoulSoil, nameHoneyBlock:
+		return true
+	}
+	return false
+}
+
+// noteMoveDir keeps the way a move of d went, for the fast stop check.
+func (p *Player) noteMoveDir(d mgl32.Vec3) {
+	if l := flatSpeed(d); l > 1e-3 {
+		p.move.speed.dir = mgl32.Vec2{d[0] / l, d[2] / l}
+	}
+}
