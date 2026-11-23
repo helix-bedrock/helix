@@ -15,8 +15,9 @@ import (
 // with the same physics mobs run (the entity library's, matched to BDS), driven by the
 // input's move vector, look, sprint, sneak and jump, the movement attribute (Speed and
 // Slowness in it), Jump Boost, Levitation, Slow Falling, Depth Strider and Soul Speed. Where
-// the client says it ended up is compared with where the copy did, and a difference is
-// logged at debug level ("move sim differs"); nothing is corrected. The copy then takes the
+// the client says it ended up is compared with where the copy did; every 100 inputs with a
+// difference a summary is logged at debug level ("move sim summary", with the worst
+// difference's positions and input); nothing is corrected. The copy then takes the
 // client's position, so each tick is compared on its own. Not simulated yet: water, lava,
 // gliding, riding, flying, Riptide and server pushes; those reset the copy.
 
@@ -31,7 +32,7 @@ const (
 	simAirSpeed = 0.02
 	// simReportEvery is how many inputs pass between two summaries of how well the copy kept
 	// up.
-	simReportEvery = 200
+	simReportEvery = 100
 	// enchantDepthStrider and enchantSoulSpeed are the boot enchantments the copy reads.
 	enchantDepthStrider = int16(7)
 	enchantSoulSpeed    = int16(36)
@@ -47,6 +48,12 @@ type moveSim struct {
 	// summary; worst is the biggest difference.
 	inputs, differ int
 	worst          float32
+	// worstClient, worstSim, worstVel and worstGround are the worst difference's positions, the
+	// copy's speed and whether it stood; worstInput its input.
+	worstClient, worstSim mgl32.Vec3
+	worstVel              path.Vec3
+	worstGround           bool
+	worstInput            mgl32.Vec2
 }
 
 // simMove moves the player's copy by one input from from (the eyes, where the server had
@@ -78,12 +85,15 @@ func (p *Player) simMove(r *world.Region, from, to, accepted mgl32.Vec3, pk *pac
 	s.inputs++
 	if diff > simTolerance {
 		s.differ++
-		s.worst = max(s.worst, diff)
-		p.s.log.Debug("move sim differs", "name", p.name, "diff", diff, "client", want, "sim", got,
-			"vel", b.Vel, "ground", b.OnGround, "input", pk.MoveVector, "flags", pk.InputData)
+		if diff > s.worst {
+			s.worst, s.worstClient, s.worstSim, s.worstVel, s.worstGround, s.worstInput = diff, want, got, b.Vel, b.OnGround, pk.MoveVector
+		}
 	}
 	if s.inputs >= simReportEvery {
-		p.s.log.Debug("move sim summary", "name", p.name, "inputs", s.inputs, "differ", s.differ, "worst", s.worst)
+		if s.differ > 0 {
+			p.s.log.Debug("move sim summary", "name", p.name, "inputs", s.inputs, "differ", s.differ, "worst", s.worst,
+				"client", s.worstClient, "sim", s.worstSim, "vel", s.worstVel, "ground", s.worstGround, "input", s.worstInput)
+		}
 		s.inputs, s.differ, s.worst = 0, 0, 0
 	}
 	// Shadow mode: the copy goes on from where the server put the player.
@@ -122,6 +132,10 @@ func (p *Player) simInputs(pk *packet.PlayerAuthInput) {
 		b.AirSpeed *= speedSprint
 	}
 	var flags path.ActorFlags
+	// A player falls, swims and climbs, and its keys steer it.
+	flags.Set(physics.FlagHasGravity, true)
+	flags.Set(physics.FlagCanSwim, true)
+	flags.Set(physics.FlagKeyboardControlled, true)
 	flags.Set(physics.FlagClimb, true)
 	flags.Set(physics.FlagSprinting, sprint)
 	height := float32(simHeight)
