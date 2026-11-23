@@ -15,15 +15,19 @@ func breathRatioOf(typ string) breathRatio {
 		"minecraft:rabbit", "minecraft:ocelot", "minecraft:cat", "minecraft:llama",
 		"minecraft:trader_llama", "minecraft:polar_bear", "minecraft:panda", "minecraft:bee",
 		"minecraft:goat", "minecraft:camel", "minecraft:camel_husk", "minecraft:sniffer",
-		"minecraft:armadillo", "minecraft:horse", "minecraft:donkey", "minecraft:mule",
+		"minecraft:horse", "minecraft:donkey", "minecraft:mule",
 		"minecraft:skeleton_horse", "minecraft:zombie_horse", "minecraft:fox", "minecraft:frog",
-		"minecraft:happy_ghast", "minecraft:axolotl", "minecraft:mooshroom", "minecraft:strider",
+		"minecraft:axolotl", "minecraft:mooshroom", "minecraft:strider",
 		"minecraft:parrot", "minecraft:turtle",
 		"minecraft:villager", "minecraft:villager_v2", "minecraft:creaking":
 		return breathRatio{up: 0.85}
 	case "minecraft:creeper", "minecraft:witch", "minecraft:guardian", "minecraft:elder_guardian",
 		"minecraft:shulker":
 		return breathRatio{up: 0.9}
+	case "minecraft:armadillo":
+		return breathRatio{up: 0.84}
+	case "minecraft:happy_ghast":
+		return breathRatio{up: 0.2, forward: 0.45}
 	case "minecraft:breeze":
 		return breathRatio{up: 0.76}
 	case "minecraft:pufferfish":
