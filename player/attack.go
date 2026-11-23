@@ -281,6 +281,7 @@ func vanillaKnockback(target, attacker *Player, extra float32) {
 		vel = target.knockbackStep(vel, -direction.Sin(yaw), direction.Cos(yaw), extra*target.Tuning(TuneKnockbackExtraPush)*resist, extra*target.Tuning(TuneKnockbackExtraLift)*resist)
 	}
 	target.move.velocity = vel
+	target.notePush(vel)
 	target.send(&packet.SetActorMotion{EntityRuntimeID: target.runtimeID, Velocity: vel, Tick: target.entity.Tick()})
 	target.flush()
 }

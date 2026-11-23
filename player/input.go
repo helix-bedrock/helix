@@ -215,10 +215,12 @@ func vanillaHandlers(s *Setup) error {
 func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	if p.portal.changing || p.moving != nil {
 		// Input from before a dimension change is for the old dimension.
+		p.notePushSpeed(speedTeleportCarry)
 		return
 	}
 	if p.teleportWait.holds(pk.InputData.Load(packet.InputFlagHandledTeleport)) {
 		// Sent before the client took the teleport: it would put the player back.
+		p.notePushSpeed(speedTeleportCarry)
 		return
 	}
 	if p.badInput(pk) {
@@ -286,6 +288,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 	if p.vehicle == nil && p.entity != nil {
 		if r := p.entity.Region(); r != nil {
 			pos = p.phaseCheck(r, from, pos, pk)
+			pos = p.speedCheck(r, from, pos, pk)
 		}
 	}
 	p.s.handlers.movement(p, world.Movement{

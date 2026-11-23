@@ -725,6 +725,7 @@ func (p *Player) BlastPush(push mgl32.Vec3) {
 		return
 	}
 	p.move.velocity = p.move.velocity.Add(push)
+	p.notePush(p.move.velocity)
 	p.send(&packet.SetActorMotion{EntityRuntimeID: p.runtimeID, Velocity: p.move.velocity, Tick: p.entity.Tick()})
 	p.flush()
 }

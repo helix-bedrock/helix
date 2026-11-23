@@ -96,6 +96,8 @@ type moveState struct {
 	// airFrom the height it left the ground at and airTop the highest it got since (canCrit).
 	airTicks        int32
 	airFrom, airTop float32
+	// speed is what the speed check knows of the player's horizontal speed (speed.go).
+	speed speedState
 }
 
 // glideInput is the client asking to start or stop gliding. A start goes through the
