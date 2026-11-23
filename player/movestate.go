@@ -98,6 +98,8 @@ type moveState struct {
 	airFrom, airTop float32
 	// speed is what the speed check knows of the player's horizontal speed (speed.go).
 	speed speedState
+	// sim is the server's simulated copy of the player (movesim.go).
+	sim moveSim
 }
 
 // glideInput is the client asking to start or stop gliding. A start goes through the

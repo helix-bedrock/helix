@@ -289,6 +289,7 @@ func handlePlayerAuthInput(p *Player, pk *packet.PlayerAuthInput) {
 		if r := p.entity.Region(); r != nil {
 			pos = p.phaseCheck(r, from, pos, pk)
 			pos = p.speedCheck(r, from, pos, pk)
+			p.simMove(r, from, pk.Position, pos, pk)
 		}
 	}
 	p.s.handlers.movement(p, world.Movement{
