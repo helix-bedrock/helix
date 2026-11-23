@@ -53,11 +53,11 @@ func (m *Mob) lookControl() {
 	switch {
 	case m.look.Has:
 		m.look.Has = false
-		// BDS aims from the mob's breathing attach point; mobs have no attach offsets in
-		// Helix yet, so the eyes stand in for it.
-		dx := m.look.Pos.X - m.body.Pos.X
-		dy := m.look.Pos.Y - (m.body.Pos.Y + m.eyeHeight())
-		dz := m.look.Pos.Z - m.body.Pos.Z
+		// BDS aims from the mob's breathing point, not its eyes.
+		bx, by, bz := m.breathingPos()
+		dx := m.look.Pos.X - bx
+		dy := m.look.Pos.Y - by
+		dz := m.look.Pos.Z - bz
 		h := float32(math.Sqrt(float64(dx*dx + dz*dz)))
 		yaw := float32(math.Atan2(float64(dz), float64(dx)))*radToDeg32 - 90
 		pitch := float32(math.Atan2(float64(dy), float64(h))) * -radToDeg32

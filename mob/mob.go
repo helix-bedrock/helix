@@ -231,6 +231,8 @@ type Mob struct {
 	// within 15 degrees of lastHeadYaw (control.go).
 	stillTicks  int32
 	lastHeadYaw float32
+	// breath is where the look control aims from (breathing.go).
+	breath breathRatio
 
 	health, maxHealth float32
 	// baseMaxHealth is the health attribute's maximum before healthBoost, Health Boost's
@@ -409,7 +411,7 @@ func (rt *Runtime) NewWithEvent(typ string, uniqueID int64, runtimeID uint64, po
 		return nil, fmt.Errorf("mob: no definition for %s", typ)
 	}
 	m := &Mob{
-		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
+		rt: rt, hooks: hooks, typ: typ, walk: behavior.WalkKindOf(typ), breath: breathRatioOf(typ), id: behavior.ID(uniqueID), rid: runtimeID,
 		target: behavior.NoID, lastHurtBy: behavior.NoID, lastHurtMob: behavior.NoID, lastHurtByPlayer: behavior.NoID, lastCause: -1, leashHolder: behavior.NoID, owner: behavior.NoID, dw: dweller{trading: behavior.NoID}, love: love{partner: behavior.NoID},
 		targetLeader: behavior.NoID, caravanHead: behavior.NoID, caravanTail: behavior.NoID, ride: riding{vehicle: behavior.NoID},
 		yaw: yaw, headYaw: yaw, bodyYaw: yaw, prevYaw: yaw,

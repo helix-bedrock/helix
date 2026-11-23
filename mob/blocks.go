@@ -86,6 +86,7 @@ func (b *Blocks) fill(id uint32) {
 		Solid: props.BlockSolid, SolidBlocking: solidBlocking(props.MaterialFlags),
 		Open:         stateTrue(states, "open_bit"),
 		Extinguished: stateTrue(states, "extinguished"),
+		Arms:         armsOf(states),
 		Flowing:      name == "flowing_water",
 		VisualTop:    visualTop(name, states, top),
 	}
@@ -189,6 +190,24 @@ func stateTrue(s map[string]any, key string) bool {
 		return v != 0
 	}
 	return false
+}
+
+// armsOf reads a fence, pane or bar's arms from its connection states, which since 1.26
+// are part of the block state.
+func armsOf(s map[string]any) uint8 {
+	var arms uint8
+	for i, state := range armStates {
+		if stateTrue(s, state) {
+			arms |= 1 << i
+		}
+	}
+	return arms
+}
+
+// armStates are the connection states in the order of the pathfinder's Arm bits.
+var armStates = [...]string{
+	"minecraft:connection_north", "minecraft:connection_east",
+	"minecraft:connection_south", "minecraft:connection_west",
 }
 
 // visualTop is how high the block looks inside its cell: water by its depth, otherwise the
