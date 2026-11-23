@@ -308,7 +308,8 @@ func (p *Player) vertLimits(r *world.Region, m *vertMove) (limit, floor float32)
 			limit, floor = limit*slow, floor*slow
 		}
 	}
-	if m.mode == modeWalk || m.mode == modeLiquid {
+	if (m.mode == modeWalk || m.mode == modeLiquid) && m.groundFrom {
+		// Only from the ground: in the air a jump's room would let a hover (no fall at all) by.
 		limit = max(limit, p.groundLimit(r, m))
 	}
 	if m.groundTo {
