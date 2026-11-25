@@ -82,10 +82,13 @@ players (replaces `play.go`).
 4. No felt lag with 400 players in one spot: no steady-state allocations on
    hot paths, no waiting inside a tick, proven by benchmarks.
 5. Never assume the player is right. What a client says is a request, not
-   the truth: the server's state decides, the way BDS does it, with BDS's
-   own checks and corrections. This is not an anti-cheat: no checks beyond
-   BDS's by default and nothing strict. An anti-cheat comes later as a
-   separate, optional module.
+   the truth: the server's state decides, with BDS's own checks and
+   corrections as the base. Where a cheat or exploit works on BDS, Helix
+   closes it with its own stricter rule (marked "Helix's own rule, beyond
+   BDS") that never refuses legit play; inventory, items, enchanting and
+   client sounds are always checked against server state. Anti-cheat checks
+   (movement first, then reach, kill aura, CPS, packet limits) live in one
+   anti-cheat module with a shared check interface, not as one-off code.
 
 ## Gotchas
 
