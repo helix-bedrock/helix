@@ -3,6 +3,7 @@ package mob
 import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/state"
+	"github.com/helix-bedrock/protocol"
 )
 
 // Taming, trusting, healing and sitting: the interactions a player's use on a mob runs, as
@@ -11,9 +12,6 @@ import (
 // BDS's code, and the first component that offers an interaction
 // wins). The engine calls these in that order and does the item work.
 
-// dataOwner is actor data 5, the owner's unique ID.
-const dataOwner = 5
-
 // Owner is the entity that tamed the mob, behavior.NoID for none.
 func (m *Mob) Owner() behavior.ID { return m.owner }
 
@@ -21,7 +19,7 @@ func (m *Mob) Owner() behavior.ID { return m.owner }
 // BDS's code. Loading a saved owner calls it too.
 func (m *Mob) SetOwner(id behavior.ID) {
 	m.owner = id
-	m.setData(dataOwner, int64(id))
+	m.setData(protocol.EntityDataKeyOwner, int64(id))
 }
 
 // Tame is a player trying to tame the mob with the item in hand, as BDS 1.26.60's

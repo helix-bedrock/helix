@@ -76,17 +76,11 @@ const (
 	enchantPunch    = int16(20)
 	enchantInfinity = int16(22)
 
-	// actorEventArrowShake is the event BDS sends when one sticks, with how long it shakes.
-	actorEventArrowShake = 39
-	// levelEventPop is BDS's sound of a picked up arrow.
-	levelEventPop = 1030
-	// levelEventDispenseProjectile is a dispenser's sound for what it shoots.
-	levelEventDispenseProjectile = 1002
 	// dispenseProjectilePitch is the data of that sound, BDS's.
 	dispenseProjectilePitch = 78642
 	// dispenseLift is how far up a dispenser aims above its front.
 	dispenseLift = 0.1
-	// popPitchSpread and popPitchScale make the random pitch of levelEventPop.
+	// popPitchSpread and popPitchScale make the random pitch of packet.LevelEventSoundInfinityArrowPickup.
 	popPitchSpread = 0.7
 	popPitchScale  = 2000
 
@@ -663,7 +657,7 @@ func (t *Projectile) fly(r *world.Region, e *world.Entity) {
 		t.moves.sendNow(e)
 	}
 	if t.shake > 0 {
-		e.Send(actorEventData(e.RuntimeID(), actorEventArrowShake, t.shake))
+		e.Send(actorEventData(e.RuntimeID(), packet.ActorEventShake, t.shake))
 		t.shake = 0
 	}
 	if t.tridentReturns(r, e) {
@@ -1168,7 +1162,7 @@ func (t *Projectile) pickedUpBy(r *world.Region, e *world.Entity, p *Player) boo
 			return false
 		}
 		pitch := int32((((rand.Float32()-rand.Float32())*popPitchSpread + 1) * popPitchScale)) //nolint:gosec // a pitch, not a secret
-		levelEvent(r, floorPos(e.Position()), e.Position(), levelEventPop, pitch)
+		levelEvent(r, floorPos(e.Position()), e.Position(), packet.LevelEventSoundInfinityArrowPickup, pitch)
 	default:
 		item := t.item
 		if item.Empty() {
@@ -1590,7 +1584,7 @@ func (s *Host) dispenseProjectile(r *world.Region, pos cube.Pos, at, dir mgl32.V
 	if id == nameArrow {
 		t.aux = arrowAux(it)
 	}
-	levelEvent(r, pos, at, levelEventDispenseProjectile, dispenseProjectilePitch)
+	levelEvent(r, pos, at, packet.LevelEventSoundLaunch, dispenseProjectilePitch)
 	return true
 }
 

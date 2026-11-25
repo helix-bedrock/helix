@@ -1,15 +1,15 @@
 package mob
 
-import "github.com/helix-bedrock/entity/behavior"
+import (
+	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/protocol/packet"
+)
 
 // The goals that tie a mob to others of its kind: play's chase flag
 // (IsChasingDuringPlayFlagComponent), follow_target_captain's leader (BDS's code,
 // saved as TargetCaptainID by BDS's code, BDS 1.26.60) and follow_caravan's
 // head and tail. The other mob's half of a caravan link is written at
 // Apply, as BDS 1.26.60's joinCaravan and leaveCaravan do in place.
-
-// actorEventCaravanUpdated is the actor event the caravan's front gets with its length.
-const actorEventCaravanUpdated = 64
 
 // caravanWalkLimit bounds the walks along a caravan, so a looped one cannot hang the tick.
 const caravanWalkLimit = 4096
@@ -132,6 +132,6 @@ func (m *Mob) caravanUpdated(from *Mob) {
 		n++
 	}
 	if h, ok := front.hooks.(ActorEventDataHooks); ok {
-		h.ActorEventData(front, actorEventCaravanUpdated, n)
+		h.ActorEventData(front, packet.ActorEventCaravanUpdated, n)
 	}
 }

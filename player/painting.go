@@ -40,9 +40,8 @@ const (
 	// paintingBreakBlock is the block whose particles a broken painting leaves.
 	paintingBreakBlock = "minecraft:oak_planks"
 	// The level events of a painting placed and broken, and its break particles.
-	levelEventPaintingPlace    = 1040
-	levelEventPaintingBreak    = 1041
-	levelEventPaintingParticle = 2021
+	levelEventPaintingPlace = 1040
+	levelEventPaintingBreak = 1041
 
 	paintingMotiveTag    = "Motive"
 	paintingOldMotiveTag = "Motif"
@@ -379,7 +378,7 @@ func (p *Painting) Break(r *world.Region, drops bool) {
 	at := floorPos(pos)
 	levelEvent(r, at, pos, levelEventPaintingBreak, 0)
 	if planks, ok := p.s.reg.Blocks.Block(paintingBreakBlock); ok {
-		levelEvent(r, at, pos, levelEventPaintingParticle, int32(p.s.reg.Blocks.Hash(planks))) //nolint:gosec // hashes are sent as int32
+		levelEvent(r, at, pos, packet.LevelEventParticlesDestroyBlockNoSound, int32(p.s.reg.Blocks.Hash(planks))) //nolint:gosec // hashes are sent as int32
 	}
 	if drops && p.s.level.DoEntityDrops {
 		p.s.spawnItem(r.Dimension(), ItemStack{Name: paintingID, Count: 1}, pos.Add(mgl32.Vec3{0, paintingDropUp, 0}), mgl32.Vec3{}, world.Rotation{}, paintingDropDelay, 0)

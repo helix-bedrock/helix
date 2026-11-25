@@ -838,7 +838,7 @@ func (s *Host) BreakBlock(r *world.Region, p behavior.Pos, _ behavior.ID) {
 	}
 	r.SetBlock(at, 0, s.reg.Blocks.Air())
 	r.UpdateNeighbours(at)
-	levelEvent(r, at, blockCenter(at), levelEventDestroyParticles, int32(s.reg.Blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, at, blockCenter(at), packet.LevelEventParticlesDestroyBlock, int32(s.reg.Blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
 }
 
 // SetBlock places the block a goal chose (an enderman's held block, a sheep's grass).

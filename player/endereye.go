@@ -46,8 +46,6 @@ const (
 	enderEyePickupDelay = 10
 	// enderEyeShatterData is LevelEvent 2003's data.
 	enderEyeShatterData = 10
-	// levelEventEnderEyeShatter is the sound LevelEvent BDS sends with it (1041).
-	levelEventEnderEyeShatter = 1041
 )
 
 // EnderEye is a thrown eye of ender flying toward a stronghold. Runs: owner of its entity.
@@ -190,5 +188,5 @@ func (y *EnderEye) finish(r *world.Region, e *world.Entity) {
 	}
 	at := vecPos(pos)
 	levelEvent(r, at, pos, packet.LevelEventParticlesEyeOfEnderDeath, enderEyeShatterData)
-	levelEvent(r, at, pos, levelEventEnderEyeShatter, 0)
+	levelEvent(r, at, pos, packet.LevelEventSoundItemFrameBreak, 0)
 }

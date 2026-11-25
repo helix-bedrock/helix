@@ -65,8 +65,6 @@ const (
 	spawnerEntityID = "MobSpawner"
 	// mobSpawnerBlock is the spawner's block.
 	mobSpawnerBlock = "minecraft:mob_spawner"
-	// levelEventSpawnerSpawn shows a spawn's flames at the spawner.
-	levelEventSpawnerSpawn = 2004
 	// blockEventSpawnerDelay is the BlockEvent a delay reset sends.
 	blockEventSpawnerDelay = 1
 )
@@ -278,7 +276,7 @@ func (m *MobSpawner) spawnAt(r *world.Region, pos cube.Pos, at mgl32.Vec3) bool 
 	if o, ok := sm.(*spawnedMob); ok {
 		w, h := o.o.m.Size()
 		data := int32(math.Ceil(float64(w))) + int32(math.Ceil(float64(h)))<<8
-		levelEvent(r, pos, blockVec(pos), levelEventSpawnerSpawn, data)
+		levelEvent(r, pos, blockVec(pos), packet.LevelEventParticlesMobBlockSpawn, data)
 	}
 	return true
 }

@@ -50,8 +50,6 @@ const (
 	// enchantRespiration on what it wears lets a player sleep in a bed under water, as do
 	// Water Breathing and Conduit Power.
 	enchantRespiration = int16(6)
-	// levelEventDestroyStrawBed is the break particles a used straw bed leaves.
-	levelEventDestroyStrawBed = 2021
 )
 
 // The answers of startSleepInBed, as BDS numbers them.
@@ -494,7 +492,7 @@ func (s *Host) useUpStrawBed(r *world.Region, head cube.Pos, b uint32) {
 	blocks := s.reg.Blocks
 	foot := blockuse.BedOther(blocks, head, b)
 	air := blocks.Air()
-	levelEvent(r, head, blockVec(head), levelEventDestroyStrawBed, int32(blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, head, blockVec(head), packet.LevelEventParticlesDestroyBlockNoSound, int32(blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
 	r.SetBlock(head, 0, air)
 	if f, ok := r.Block(foot, 0); ok && blocks.Name(f) == blockuse.StrawBed {
 		r.SetBlock(foot, 0, air)

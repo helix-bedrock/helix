@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/protocol/packet"
 )
 
 // The hooks of ram_attack (behavior.Rammer, the goat) and stalk_and_pounce_on_target
@@ -20,8 +21,6 @@ const (
 	damageRam = 30
 	// attachHead is the attach point BDS's code aims from and at.
 	attachHead = 3
-	// levelEventJumpPrevented is the level event of a jump a honey block stopped.
-	levelEventJumpPrevented = 9810
 	// degrees turns radians into degrees as BDS does.
 	degrees = 57.295776
 )
@@ -105,7 +104,7 @@ func (m *Mob) JumpPrevented() {
 		return
 	}
 	at := behavior.Vec3{X: m.body.Pos.X, Y: m.body.Box.Min.Y, Z: m.body.Pos.Z}
-	m.LevelEventData(levelEventJumpPrevented, at, int32(m.v.block(p, 0))) //nolint:gosec // runtime IDs fit
+	m.LevelEventData(packet.LevelEventJumpPrevented, at, int32(m.v.block(p, 0))) //nolint:gosec // runtime IDs fit
 }
 
 // SetFallImmune implements behavior.Pouncer: CurrentlyImmuneToFallDamageComponent. Helix's

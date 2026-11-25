@@ -134,7 +134,7 @@ func (s *Host) startFallingBlock(r *world.Region, pos cube.Pos, block uint32) (*
 func (s *Host) DestroySnow(r *world.Region, pos cube.Pos, block uint32) {
 	r.SetBlock(pos, 0, s.reg.Blocks.Air())
 	r.UpdateNeighbours(pos)
-	levelEvent(r, pos, blockCenter(pos), levelEventDestroyParticles, int32(s.reg.Blocks.Hash(block))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, pos, blockCenter(pos), packet.LevelEventParticlesDestroyBlock, int32(s.reg.Blocks.Hash(block))) //nolint:gosec // hashes are sent as int32
 }
 
 // SpawnFallingBlock adds a falling block carrying block with its middle at pos.
@@ -281,7 +281,7 @@ func (f *FallingBlock) breakApart(r *world.Region, e *world.Entity, at cube.Pos)
 	for _, it := range items {
 		s.spawnItem(r.Dimension(), it, pos, mgl32.Vec3{}, world.Rotation{}, fallingPickupDelay, 0)
 	}
-	levelEvent(r, at, pos, levelEventDestroyParticles, int32(s.reg.Blocks.Hash(f.block))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, at, pos, packet.LevelEventParticlesDestroyBlock, int32(s.reg.Blocks.Hash(f.block))) //nolint:gosec // hashes are sent as int32
 	f.remove(e)
 }
 

@@ -7,6 +7,8 @@ import (
 
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/state"
+	"github.com/helix-bedrock/protocol"
+	"github.com/helix-bedrock/protocol/packet"
 	"github.com/helix-bedrock/world/mcdb"
 )
 
@@ -20,12 +22,6 @@ import (
 // with createBornActor (which always adds the persistent marker), then spawns
 // seven heart particles and experience_reward's on_bred, each expression rounded.
 // The heart particles are the client's and are not sent.
-
-// dataLeashHolder is the actor data key with the leash holder's unique ID, -1 for none.
-const dataLeashHolder = 37
-
-// actorEventBabyEat is the actor event a fed baby sends (ActorEvent 60).
-const actorEventBabyEat = 60
 
 // SavedState is the age and breeding state a mob saves, BDS's AgeableComponent ("Age",
 // "GrowthPaused", load) and BreedableComponent ("InLove", "LoveCause",
@@ -163,7 +159,7 @@ func (m *Mob) Feed(player behavior.Actor, h state.Hand) (result string, ok bool)
 			// which the client plays the eating sound and particles. The baby flag stays:
 			// the next ageable tick grows the mob up and fires grow_up, which takes off the
 			// baby component groups (scale included).
-			m.do(op{kind: opActorEvent, n: actorEventBabyEat})
+			m.do(op{kind: opActorEvent, n: packet.ActorEventBabyEat})
 			return orResult(a.Config().FeedItems[i].Result, a.Config().TransformToItem), true
 		}
 	}
@@ -270,7 +266,7 @@ func (m *Mob) LeashHolder() behavior.ID { return m.leashHolder }
 func (m *Mob) SetLeashHolder(id behavior.ID) {
 	m.leashHolder = id
 	m.SetFlag(behavior.FlagLeashed, id != behavior.NoID)
-	m.setData(dataLeashHolder, int64(id))
+	m.setData(protocol.EntityDataKeyLeashHolder, int64(id))
 }
 
 // LeashInteract is a player leashing the mob with a lead, or taking off a lead it holds (the

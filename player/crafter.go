@@ -24,8 +24,6 @@ const (
 	stateCrafting      = "crafting"
 	allCrafterSlots    = 1<<crafterSize - 1
 	crafterEjectHeight = 0.3
-	// levelEventCrafterCraft is the crafter's smoke, with data 4 + x + 3z of the face.
-	levelEventCrafterCraft = 3609
 )
 
 // crafterOrientations is BDS's orientation state, in its order: the first part is the way
@@ -210,7 +208,7 @@ func (c *Chest) craft(r *world.Region, pos cube.Pos, block uint32) {
 func (c *Chest) throwResults(r *world.Region, pos cube.Pos, face cube.Face, results []ItemStack) {
 	dir := faceVec(face)
 	at := blockVec(pos).Add(mgl32.Vec3{0.5, crafterEjectHeight, 0.5}).Add(dir.Mul(ejectReach))
-	levelEvent(r, pos, at, levelEventCrafterCraft, int32(dir[0])+3*int32(dir[2])+4)
+	levelEvent(r, pos, at, packet.LevelEventParticlesShootWhiteSmoke, int32(dir[0])+3*int32(dir[2])+4)
 	playSound(r, pos, soundEvent{name: packet.SoundEventCrafterCraft, pos: blockVec(pos), extra: -1}, nil)
 	for _, stack := range results {
 		c.s.eject(r, stack, pos, dir, at)

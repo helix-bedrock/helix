@@ -19,10 +19,9 @@ const (
 
 // BDS's LevelEvents for block breaking.
 const (
-	levelEventStartCracking    = 3600
-	levelEventStopCracking     = 3601
-	levelEventUpdateCracking   = 3602
-	levelEventDestroyParticles = 2001
+	levelEventStartCracking  = 3600
+	levelEventStopCracking   = 3601
+	levelEventUpdateCracking = 3602
 )
 
 const (
@@ -433,7 +432,7 @@ func vanillaBreakFinish(p *Player, pos cube.Pos) bool {
 		k.Break(r)
 	}
 	g.sys.Exhaust(p, p.Tuning(TuneExhaustMine))
-	levelEvent(r, pos, blockCenter(pos), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, pos, blockCenter(pos), packet.LevelEventParticlesDestroyBlock, int32(p.s.reg.Blocks.Hash(b.Block))) //nolint:gosec // hashes are sent as int32
 	p.s.postBlockGameEvent(r, gameEventBlockDestroy, pos, p, b.Block, true)
 	p.s.throwDrops(r, drops)
 	p.s.SpawnExperience(r, blockVec(pos), xp)
@@ -455,7 +454,7 @@ func (p *Player) breakDoublePlantLower(r *world.Region, pos cube.Pos, block uint
 	if !ok || p.s.reg.Blocks.Name(lower) != p.s.reg.Blocks.Name(block) || f.DoublePlantUpper(lower) {
 		return
 	}
-	levelEvent(r, at, blockCenter(at), levelEventDestroyParticles, int32(p.s.reg.Blocks.Hash(lower))) //nolint:gosec // hashes are sent as int32
+	levelEvent(r, at, blockCenter(at), packet.LevelEventParticlesDestroyBlock, int32(p.s.reg.Blocks.Hash(lower))) //nolint:gosec // hashes are sent as int32
 	if r.SetBlock(at, 0, p.s.reg.Blocks.Air()) {
 		r.UpdateNeighbours(at)
 	}

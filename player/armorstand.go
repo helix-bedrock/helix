@@ -34,11 +34,10 @@ const (
 	// armorStandDropUp is how far above its feet its own item drops.
 	armorStandDropUp = 1
 	// Level events: broken, hit, fallen, placed, and the break particles.
-	levelEventArmorStandBreak    = 1060
-	levelEventArmorStandHit      = 1061
-	levelEventArmorStandFall     = 1062
-	levelEventArmorStandPlace    = 1063
-	levelEventArmorStandParticle = 2017
+	levelEventArmorStandBreak = 1060
+	levelEventArmorStandHit   = 1061
+	levelEventArmorStandFall  = 1062
+	levelEventArmorStandPlace = 1063
 	// The pose save: a Pose compound with PoseIndex and LastSignal.
 	armorStandPoseTag   = "Pose"
 	armorStandIndexTag  = "PoseIndex"
@@ -279,8 +278,8 @@ func (o *Mob) standWobble() {
 	o.stand.hurt = armorStandHurtTime
 	o.stand.hurtDir = -o.stand.hurtDir
 	o.entity.Send(actorData(o.entity.RuntimeID(), protocol.EntityMetadata{
-		protocol.EntityDataKeyHurtDirection:      o.stand.hurtDir,
-		protocol.EntityDataKeyHurt:               int32(armorStandHurtTime),
+		protocol.EntityDataKeyHurtDirection:       o.stand.hurtDir,
+		protocol.EntityDataKeyHurt:                int32(armorStandHurtTime),
 		protocol.EntityDataKeyStructuralIntegrity: int32(armorStandStructural),
 	}))
 }
@@ -296,7 +295,7 @@ func (o *Mob) standBreak(r *world.Region, drops bool) {
 	}
 	_, h := o.m.Size()
 	at := floorPos(pos)
-	levelEvent(r, at, pos, levelEventArmorStandParticle, int32(h))
+	levelEvent(r, at, pos, packet.LevelEventParticlesDestroyArmorStand, int32(h))
 	levelEvent(r, at, pos, levelEventArmorStandBreak, 0)
 	o.remove(o.entity)
 }

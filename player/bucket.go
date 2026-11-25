@@ -167,7 +167,7 @@ func (p *Player) bucketTarget(r *world.Region, clicked cube.Pos, face int32, kin
 	}
 	below := pos.Side(cube.FaceDown)
 	if b, ok := r.Block(below, 0); ok && blocks.Name(b) == nameSnowLayer {
-		levelEvent(r, below, blockVec(below), levelEventDestroyParticles, int32(blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
+		levelEvent(r, below, blockVec(below), packet.LevelEventParticlesDestroyBlock, int32(blocks.Hash(b))) //nolint:gosec // hashes are sent as int32
 		if r.SetBlock(below, 0, blocks.Air()) {
 			r.UpdateNeighbours(below)
 		}

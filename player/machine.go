@@ -27,8 +27,6 @@ const (
 	// The item appears this far below where it is thrown from.
 	ejectDropSide     = -0.15625
 	ejectDropVertical = -0.125
-	// levelEventDispenseSmoke is BDS's smoke, with data 4 + x + 3z of the face.
-	levelEventDispenseSmoke = 2000
 	// transferCooldownTag is the saved hopper cooldown.
 	transferCooldownTag = "TransferCooldown"
 	// stateHopperOff turns a hopper off.
@@ -726,7 +724,7 @@ func (d dispense) takeOne() {
 
 // smoke shows the dispense smoke on the side fired from.
 func (d dispense) smoke() {
-	levelEvent(d.r, d.pos, d.at, levelEventDispenseSmoke, int32(d.dir[0])+3*int32(d.dir[2])+4)
+	levelEvent(d.r, d.pos, d.at, packet.LevelEventParticlesShoot, int32(d.dir[0])+3*int32(d.dir[2])+4)
 }
 
 // click plays the dispense click.

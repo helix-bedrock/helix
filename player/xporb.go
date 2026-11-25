@@ -52,8 +52,6 @@ const (
 	// Lava throws an orb up and to a side.
 	xpOrbLavaUp   = 0.2
 	xpOrbLavaSide = 0.2
-	// levelEventXPPickup is the LevelEvent of taking an orb.
-	levelEventXPPickup = 1051
 	// A level sound plays every levelSoundEvery levels, at most once in
 	// levelSoundGap ticks, and is at its loudest from levelSoundLoudest.
 	levelSoundEvery   = 5
@@ -369,7 +367,7 @@ func (o *XPOrb) touch(r *world.Region, e *world.Entity, p *Player) {
 		return
 	}
 	e.Send(&packet.TakeItemActor{ItemEntityRuntimeID: e.RuntimeID(), TakerEntityRuntimeID: p.runtimeID})
-	levelEvent(r, floorPos(e.Position()), e.Position(), levelEventXPPickup, 0)
+	levelEvent(r, floorPos(e.Position()), e.Position(), packet.LevelEventSoundExperienceOrbPickup, 0)
 	o.remove(e)
 	if rest := p.mend(o.value); rest > 0 {
 		p.AddExperience(rest)
