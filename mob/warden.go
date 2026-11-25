@@ -12,9 +12,6 @@ import (
 // WardenHooks. The vibration_listener that also raises anger is not hooked yet
 // (HeardVibration answers none).
 
-// damageSonicBoom is BDS's ActorDamageCause SonicBoom.
-const damageSonicBoom = 31
-
 // attrKnockbackResistance is the attribute component BDS's code scales by.
 const attrKnockbackResistance = "minecraft:knockback_resistance"
 

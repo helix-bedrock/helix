@@ -31,8 +31,6 @@ const (
 	poiFailEvent = 2009
 	poiFailShows = 3
 	poiFailMax   = 2
-	// dwellerInhabitant is the role that takes job sites.
-	dwellerInhabitant = "inhabitant"
 	// markerOpenDoor is the component the door goals need.
 	markerOpenDoor = "minecraft:annotation.open_door"
 	// componentHide is minecraft:hide.
@@ -375,10 +373,6 @@ func (m *Mob) SecondPart(p behavior.Pos) bool {
 	}
 	b, ok := m.v.r.Block(cube.Pos{int(p.X), int(p.Y), int(p.Z)}, 0)
 	return ok && blockuse.IsBed(m.v.blocks.reg, b)
-}
-
-func blockAt(p behavior.Vec3) behavior.Pos {
-	return behavior.Pos{X: floor32(p.X), Y: floor32(p.Y), Z: floor32(p.Z)}
 }
 
 // --- behavior.Hider ---

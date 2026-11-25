@@ -76,15 +76,6 @@ func (m *Mob) effectHooks() (EffectHooks, bool) {
 	return h, ok
 }
 
-// effectID is the ID of the named effect, false if unknown or the engine has no effects.
-func (m *Mob) effectID(name string) (int32, bool) {
-	h, ok := m.effectHooks()
-	if !ok {
-		return 0, false
-	}
-	return h.EffectID(name)
-}
-
 // giveEffectNamed queues the named effect for target.
 func (m *Mob) giveEffectNamed(target behavior.ID, name string, ticks, amplifier int32, ambient bool) {
 	m.do(op{kind: opGiveEffect, id: target, name: name, effect: effect.Instance{Amplifier: amplifier, Duration: ticks, Ambient: ambient}})

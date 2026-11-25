@@ -78,8 +78,6 @@ type view struct {
 	env    Env
 	rnd    *Random
 	m      *Mob
-	// boxes is a scratch list for collision queries.
-	boxes []registry.Box
 }
 
 // block is the block at p on layer as mobs see it: every cell of a border column on layer 0
