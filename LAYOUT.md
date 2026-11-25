@@ -1,0 +1,485 @@
+# Code layout
+
+File-by-file map of the engine. Not loaded into agent context; search it for the package or file you are about to touch.
+
+- `helix` (root): `Server`, the main struct, and its `Config`.
+- `network`: transports (NetherNet, RakNet) and the login sequence as named,
+  replaceable steps, in BDS 1.26.60's order.
+- `registry`: the one boot `Setup` (register, replace, delete) and the
+  frozen tables. Blocks so far: dense state IDs, network hashes, a per-state
+  property table swapped whole on live changes (collision boxes
+  from helix-data's `bds/collision.json` included, plus BDS's shape rules
+  that read only the state, in `collision.go` and `collision_more.go`;
+  `CollisionComputed` marks the states that need the world, a block
+  entity or the colliding entity: doors (`Door`), shulker boxes,
+  scaffolding, powder snow, end gateways, piston parts), BDS's climbable flag
+  and material per block, its liquid facts (reaction, can contain liquid,
+  solid material; helix-data's `bds/liquids.json`), and `chunk.BlockRegistry`
+  for the world library. Items: BDS's network IDs, versions and
+  components, stack sizes and tags, and the ItemRegistry packet built once.
+  Biomes: BDS's numeric IDs, climate and tags, `Resolve` for deleted or
+  unknown saved IDs (plains). Entity types: identifiers, runtime IDs and
+  behaviour pack definitions (engine hooks come with entities). Creative
+  inventory and recipes are `Live` packets swapped on change, re-sent to
+  online players. Unchanged, every packet is BDS's own; once a plugin
+  changes biomes or entity types they are rebuilt (tests check the rebuild
+  of vanilla is byte for byte BDS's). `Vanilla` loads helix-data.
+- `liquid`: water and lava as BDS 1.26.60 (`Liquids`, the default
+  `Config.BlockTicker`): the tick (depth from the neighbours, infinite
+  water, falling, spreading along the shortest way down), lava solidifying,
+  and the old `flowing_*` names turning into water and lava. Not ported:
+  lava fire, stair and slab shape rules. `settle.go` is Helix's own rule, not BDS's: as
+  `world.Config.Settler` it finds liquid generation left beside open space
+  (below or on a side) and queues its tick, inside the chunk on the loading
+  worker, at the chunk's edge on its ticks once the next chunk is loaded. It
+  runs on every chunk that loads, generated or saved, and skips liquid
+  already ticking.
+- `world.go`: opens the world folder and its stores (`world/hxdb`, Helix's
+  own format `world/hx`; the world and player stores can be replaced
+  through `Config.Storage`) with the block registry. `worldformat.go`: a BDS
+  world (a `db` folder, no `world.hx`) is converted on start into
+  `<name>.converting`, then moved aside to `<name>-bds` untouched while the
+  Helix world takes its name (a stop halfway starts again; one between the
+  renames finishes them); `Server.ExportBDS` exports the running world to a
+  BDS world from a snapshot, `ExportBDSWorld` (cmd/helix `-export-bds`) a
+  stopped one. `TestBDSWorldStart` (`HELIX_BDS_WORLD`) runs a real world
+  through it.
+- `world` (package): the world in memory. A `Dimension` per dimension,
+  split into regions (RFC 0002): groups of sections (8 by 8 chunks) that
+  each own their chunks and viewers and tick at 20 TPS on a shared
+  `Scheduler`, earliest deadline first. Regions merge when they come
+  within `MergeDistance` sections and split when their sections part,
+  only between ticks: a region that must merge with one still ticking
+  parks until it ends, so no tick waits. `RunAt` runs code on the owner
+  of a chunk, loading it. `Entity` is the part every entity shares (IDs,
+  position, rotation), owned by its region and indexed by chunk; a
+  player's entity follows its viewer and sees every entity in BDS's
+  57-chunk disc by default (`EntityViewRadius2`, changeable while running
+  through `SetEntityViewRadius2`, never wider than the gap between
+  regions; spawn packets on entering, RemoveActor on leaving), and
+  each entity's movement is built once per tick for everyone who sees it.
+  Other entities live in loaded chunks only, and think and take input only
+  while their chunk ticks, as BDS ticks actors (`EntityConfig.TickAnywhere`
+  lifts that): `Apply` refuses a move into
+  an unloaded chunk, an entity that moved into another region's section
+  is handed to it at the end of the tick, and one whose chunk unloads is
+  unloaded with it (`EntityConfig.Unloaded`).
+  Regions tick only the phases that exist so far (queued work, player
+  input, chunk sending, block ticks, visibility, movement, one flush per
+  player, saving). Crowded regions spread their work over idle cores with
+  `Region.Parallel` (`parallel.go`; `Config.ParallelMin`, `ParallelHelpers`,
+  `Dimension.SetParallel`): every entity's `EntityConfig.Think` (mob AI,
+  players' `Setup.Think` steps, the physics of items, orbs, TNT, falling
+  blocks, projectiles, fireworks, carts and boats), each player's
+  visibility scan, movement fan-out, block change packets and zone
+  planning, random tick planning (`randomplan.go`), relighting changes far
+  apart (`lightparallel.go`) and redstone's separate circuits. A parallel
+  item only reads the region and changes its own state; everything else is
+  applied afterwards in a fixed order, so results are the same on one core
+  and many. Handlers that change blocks (queued ticks, random ticks
+  themselves, block entities, weather) still run in BDS's order. Block ticks (`ticks.go`) are BDS 1.26.60's: each chunk
+  in a simulation zone ticks once per world tick, random ticks first
+  (BDS's count and position generator, `RandomTickSpeed`), then its two
+  queues (pending ticks and the random ticking queue, up to 100 each, in
+  time then priority order, waiting while chunks within 8 blocks are not
+  loaded, run only if the block type is still there). Beyond BDS (Helix's own rule against tick growth): a queue holds one tick per block position and type; a tick asked for while one waits merges into it, keeping the earliest time and the latest, and is put back for the latest when it runs, so no queue outgrows its chunk's blocks however fast a contraption asks; saved ticks load through the same rule, dropping those outside the chunk or for blocks no longer there (the world library's `chunk.DecodeTicks` reads them one at a time, at most `chunk.MaxTicks`). Blocks get their
+  behaviour through `Config.Ticker` (`BlockTicker`): ticks, `Placed`
+  (BDS's onPlace, from `Region.SetBlock` when the state changes) and
+  `NeighbourChanged` (from `Region.UpdateNeighbours`, BDS's order -x +x
+  +z -z +y -y, layer 0 then the second layer). Beyond BDS: past 1024 calls inside each other (`maxUpdateDepth`; no vanilla chain is deeper than the world is tall) a position waits and the outermost call tells its neighbours afterwards, so no chain can overflow the stack; a chain that never ends is stopped after 2^20 waiting positions with a warning. Gameplay that changes a
+  block calls `SetBlock` then `UpdateNeighbours`, as BDS's update flag.
+  `SetBlock` of air on layer 0 moves a block's second layer (water in a
+  waterlogged block) down, as BDS's chunk does. `Region.ScheduleTick`
+  adds ticks; `Region.Local` keeps a system's per-region working state. The queues are saved with the chunk; the world tick clock
+  lives on the `Scheduler` and in level.dat's currentTick. Tickets
+  (`ticket.go`, RFC 0003): `Dimension.KeepLoaded(area, ticking)` holds
+  every chunk of an `Area` (`Chunks`, `Box`, `Radius`) as a simulation
+  zone does, claiming sections so regions form around it, until
+  `Ticket.Release`; a ticking ticket's chunks get block ticks after the
+  players' zones, a frozen one's only stay loaded. A region keeps its
+  ticket holds in ticket order; they move with their sections on merges
+  and splits, and the release goes to every region. A viewer whose centre
+  moves more than `MergeDistance` sections from every section of its
+  region (a teleport) is handed, with its player's entity and its queued
+  work, to the region owning the new section or a new one, as entities
+  are handed off, instead of merging the two regions. Loads, generation, network encoding and
+  saves run on a worker pool (`pool.go`) that takes the most urgent first:
+  chunks held loaded and block entities being opened, then chunks shown
+  (nearest to a player first, raised when a player comes nearer), then
+  unload saves, then auto-saves; every 8th pick is the oldest, so nothing
+  starves. Jobs for one chunk run one at a time in order, on any free
+  worker. Each player is a `Viewer`
+  with two zones: the simulation zone is held loaded, the view zone is
+  sent and released. Chunks load in stages (`stage.go`): a held chunk
+  loads whole, one only shown loads its terrain and its block entities'
+  network data (`TerrainLoader`, `BlockEntityViewer`; hxdb does both,
+  never reading a chest's Items for it), with no entities or live block
+  entities. A view load whose players all moved away before it ran is
+  skipped (`Dimension.wanted`). Encoded chunks (`NetChunk`) are shared by every
+  player and kept in a byte-budget cache. Changed chunks are saved at the
+  end of each tick from a copy-on-write snapshot, then wait
+  `Config.SaveDelayTicks` (5 s by default), or 100 times as long as their
+  last save took (up to 10 minutes), before saving again, so a machine
+  changing a chunk every tick does not re-save its block entities 20 times
+  a second and slow saves never queue up; the auto-save waits too, only
+  unloading and Close save at once; every `Config.AutoSaveTicks`
+  (30 s by default, spread over the ticks by chunk) each loaded chunk also
+  saves its entities and tick queues, and online players are saved on the
+  same interval (`Player.autoSave`), so a crash loses at most that much.
+  Tick rates (`tps.go`): `TickMeter` (TPS and MSPT over the last 100 ticks,
+  falling at once when ticks stop), `Region.TPS`/`MSPT`, `RegionInfo.TPS`,
+  `Dimension.TPS` (mean of its regions); `Server.TPS` is the mean of every
+  region, `Player.TPS` the client's own tick rate (its PlayerAuthInput
+  arrivals), `Player.RegionTPS` the player's region's. `-testcmds` adds /tps.
+  Generators: `Flat`
+  (level.dat's layers), `Empty`, any `Generator`; a `ColumnGenerator` also
+  hands over block entities, a `Spawner` answers the spawn height.
+- `generator`: the world types `Config.WorldType` picks by name (`Types`,
+  `Default`: vanilla, flat, void; plugins add their own `Type`). `Vanilla`
+  is worldgen's 1.26.60 overworld built over the registry's own states
+  (`blocks.New`), so its indices are Helix state IDs; block tags and
+  translucency come from the registry (`Blocks.Tags`, `Properties.Translucency`).
+  `Nether` and `End` (dimensions.go) are worldgen's Nether and End the same way;
+  `End.ExitPortal` hands the engine the podium shape, which generation never places.
+- `portal`: nether portal frames (BDS's PortalShape), lighting and breaking (`Ticker`
+  wraps the fire ticker for neighbour changes), the `portals` level key records, finding
+  or building an arrival portal (`Portals.Find`, `Make`), the End's arrival platform and
+  the end portal frame ring. `end.go` (root) builds the End's exit portal on the first
+  arrival.
+- `properties.go`: `Config.LoadProperties`, the server settings file in
+  BDS's server.properties format (`level-type`, `level-type-options` are
+  Helix's own keys; `mob-spawning`, `Config.MobSpawning`, off by default, keeps mobs from spawning on their own whatever the world's domobspawning says); cmd/helix reads it (`-config`), flags given on the
+  command line win.
+- `setup.go`: `Setup`, the one boot builder: the registry's `Setup` plus
+  `Player`, the player package's Setup. Vanilla registers through both
+  first, then `Config.Setup`.
+- `player` (package): everything a player is and does, one file per job.
+  `host.go`: the `Host` the server builds once the world is open
+  (`NewHost`, from the frozen player Setup); it admits players
+  (`Admit`, with the duplicate and full checks on the global owner),
+  finds and broadcasts to them, and disconnects and saves them on
+  `Close`. `list.go`: the global owner (RFC 0002), one goroutine at 20
+  TPS that owns the player list and publishes a copy for readers.
+  `setup.go`: the packet handler table: `Handle[T]` replaces the handler
+  of a packet type, `WrapHandle[T]` wraps it; system hooks (`Movement`,
+  `WrapMovement`) swap one vanilla system without rewriting the packet;
+  frozen into a slice indexed by packet ID. `input.go`: each player's
+  ordered input queue (network goroutine to region tick, bounded, two
+  swapped buffers), drained in the region's player input phase through
+  the frozen handlers; vanilla's PlayerAuthInput handler hands movement
+  to the movement hook; after a MovePlayer teleport its input is skipped until the client
+  acknowledges it (InputFlagHandledTeleport, or 40 inputs at most: `teleportwait.go`, Helix's
+  own rule), so input sent before the teleport does not pull the player back. `join.go`: the join in BDS's order and the read
+  loop. `send.go`: every packet to a player goes through `send` /
+  `sendNow`, which check the write and log the first failure (a closed
+  connection at debug level). `data.go`: the player's BDS data, loaded
+  and saved. `view.go`: what other players see (AddPlayer, MovePlayer)
+  and the synched actor data BDS sends a joining player about itself
+  (gravity, collision, hitbox), which the client's physics run on.
+  `zones.go`: the chunks published around the player. `window.go`:
+  the player's window (BDS's window ID counter, `showWindow`, `closeWindow`), opening the inventory
+  (Interact) and ContainerClose as BDS answers them, and the container events (`OnContainerOpen`,
+  `OnContainerClose`, `OnContainerItem`). Every window opens through `mayOpen` and `showWindow`.
+  `player.go`: `Player` = session (connection, identity, skin) + entity +
+  saved data. Joins in BDS's order as far as built (PlayerList broadcast,
+  StartGame, registry packets, full PlayerList), shows players to each
+  other with AddPlayer and MovePlayer, and saves Pos, Rotation,
+  DimensionId and UniqueID back into the player's BDS data on leave.
+  `abilities.go`: BDS's layered abilities (base and spectator layers),
+  permission levels and the per-game-mode rules, read from and saved in
+  the player's BDS data; `attributes.go`: BDS's 17 player attributes in
+  its join order. `SetGameMode` sends what BDS sends: UpdatePlayerGameType to all, then the abilities.
+  `item.go`, `playeritems.go`, `stackrequest.go`: the server-held items
+  (BDS's saved format) and BDS's checks on stack
+  requests (take, place, swap, destroy, creative items), applied all or
+  nothing on a copy. The client's view of its items is never read back. Book pages are sent only
+  with books in the player's own slots, never in other windows, other players' hands, items on the
+  ground or inside another item, a shulker box's or a bundle's, at any depth (`ItemStack.networkTag`,
+  `networkShown`), and a book a request puts in
+  the player's own slots is sent again whole: Helix's own rule, so a chest of shulker boxes of full
+  books is not one packet of 28 MB. A book edit is ignored when a page is over 4096 bytes or the
+  photo name, title, author or XUID is over 256 bytes (`player/book.go`; Helix's own rule, BDS has
+  no limit). An item's nested `Items` (a shulker box's contents) is kept as an `nbt.Raw`, encoded
+  bytes the collector never scans (`player/nesteditems.go`). Contents of 16 KB or more go further
+  (`player/helditems.go`, Helix's own rule): a `heldItems` holder whose bytes a background
+  writer moves into the world's `items.hx` records (`HostConfig.Items`, hxdb), keyed by SHA-256;
+  the item then keeps only a reference and the items as shown (no pages), saves write the
+  `helix:items` reference, and nothing reads the contents while the item lies, moves or is
+  shown. Items on the ground, picked-up items and chest items read back from disk are handed to
+  the writer. A box placed from such an item stays cold on that reference (`player/heldbox.go`)
+  until it is opened or a hopper uses it, and breaking it unopened gives the item the same
+  reference. Every holder loads items through `Host.loadedItem` (or offloads them itself:
+  players, mobs, items on the ground), so chests, barrels, boxes, machines, furnaces, carts,
+  boats, frames, shelves, bookshelves, pots, campfires, lecterns and inventories all keep only
+  references. Block entities that show items (frames, shelves, chiseled bookshelves, decorated
+  pots, campfires, suspicious blocks) send them as `ItemStack.shownNBT`: no book pages, a box's
+  items without pages; lecterns send their book whole, which the client reads. A book's
+  `pages` of 16 KB or more go the same way (a holder under `pages`, saved as `helix:pages`) and
+  are read back only where they are used: the book sent to the player's own slots, a book edit
+  (ignored if they cannot be read), a lectern's page count and its network data.
+  Records no reference uses are not removed yet. What one shulker box or one bundle holds
+  is capped at 2 MB saved (`heldMaxBytes`, `player/holdlimit.go`): an item that would take it over
+  is refused, by request or hopper, so every holder of items holds at most its slots times that
+  (Helix's own rule; BDS takes any amount). A refused request resends
+  all the player's slots (Helix's own rule, beyond BDS) so a client out of step recovers.
+  `inventory.go`: the `Inventory` wrapper every set of slots is reached through, and the only code
+  that writes InventorySlot and InventoryContent, through the per-player view (`OnInventoryView`,
+  `Inventory.SetView`). Packets written in many places have one wrapper each so a protocol change is
+  made once: `sound.go` (`playSound`, `soundEvent`, `blockSound`), `entitydata.go` (`actorData`,
+  `actorEvent`), `send.go` (`blockPos`, own-slot sends). Add to these rather than writing those
+  packets by hand.
+  `drop.go`: drops from stack requests and the legacy transaction, stricter
+  than BDS: client items are compared, never kept (lead's decision, core
+  architecture, not anti-cheat). `Give`, pick-up and held item updates.
+  `itemactor.go`: item entities with BDS 1.26.60's tick (`DropItem`, `PickUp`
+  systems), saved with their chunk in BDS's format. World gained
+  `EntityConfig.Owner`, `Region.AppendEntitiesIn`, and for saving `EntityConfig.Save`
+  and `Dimension.SetEntityLoader` (saved entities nothing takes, such as mobs, stay
+  in the chunk's data untouched). `itemview.go`: the plugin API on an item:
+  `SetVisibility` (per player; refused players get no packets and cannot pick it
+  up), `SetView` (per player name and shown item, server unchanged), `SetStack`
+  (the real item), `SetLifetime` and the server-wide `Host.SetItemLifetime`,
+  events `OnItemDrop`, `OnItemLoad`. Rules are not saved; items with a
+  visibility rule or a different lifetime never merge, a view does not stop a merge. Packets about an entity go through `Entity.Send`,
+  which reaches only those who see it, never `Region.Broadcast`; the world's
+  `EntityConfig.VisibleTo` and `SpawnFor` work for any entity.
+  Armour and offhand take the items BDS allows (registry `Wearable`,
+  `ArmorSlot`, `Offhand`, from helix-data's `item_equipment.json`).
+  `crafting` (package): the recipes by network ID from the `CraftingData` packet and BDS's fit rule; knows nothing
+  of players. `player/craft.go`: the crafting table's window and the craft actions of a stack request (`OnCraft`).
+  `player/smith.go`: the smithing table's action, upgrades and armour trims (`OnSmith`; registry `Trims`, helix-data's `bds/trim.json`); `registry/smithing.go`: `EditSmithing` and `Smithing`, the
+  plugin API over the recipes (clear, remove, change, for an item), boot or live; `registry/recipes.go`: `EditRecipes` and
+  `Recipes`, the same for shaped and shapeless recipes of every block. `attach/`: torches, lanterns and ladders: which faces of each block hold things (helix-data `bds/support.json`), where they may go, which way they face, and falling off when the holder goes. `player/recipes.go`: `Player.EditRecipes`, rules taking recipes from one player, applied to its packet and checked on every craft. `-testcmds` adds /smithtest and /recipetest.
+  `breaking.go`, `placing.go`, `mining.go`, `gameplay.go`, `event.go`:
+  block breaking and placing as BDS 1.26.60 does them (research notes are
+  private). PlayerAuthInput's block actions run before movement, in BDS's
+  order (server-authoritative breaking: crack LevelEvents, reach 6.7 / 12
+  to the block corner, progress per input tick, break at 0.99999, the
+  resend of four blocks after a refused prediction; in creative and for
+  blocks with no break time the block breaks as soon as breaking starts, as
+  BDS's GameMode start does; after a block breaks, breaking stays on at that
+  position, with a 250 ms cooldown before the next block makes progress; one
+  extra beyond BDS as read so far: LevelEvent 3602 when the break rate changes,
+  so the crack keeps up after landing). Every step is a hook
+  in `Setup.Systems()` (BreakStart, BreakTime, ToolSpeed, BreakTick,
+  BreakFinish, PlaceState, PlaceCheck, Place) to replace or wrap. The
+  break speed is assembled from parts that can each be changed:
+  the tool rule (helix-data's mining table), each enchantment's
+  `ToolSpeed` (Efficiency) and `Underwater` (Aqua Affinity), each
+  effect's `BreakSpeed` and `BreakRate` (Haste, Conduit Power, Mining
+  Fatigue, applied twice as BDS does), and the player's `SetBreakSpeed`
+  and `SetReachScale`. Enchantments and effects are registered entries
+  (`RegisterEnchantment`, `RegisterEffect`). Per-block behaviour is set
+  with `SetBlockBehaviour` (optional interfaces: `PlacementStater`,
+  which wins over vanilla's placement; vanilla's is `placestate.go`:
+  BDS's placement traits and getPlacementBlock rules per block from
+  helix-data's `bds/placement.json`; `bucket.go` pours water and lava,
+  `Replaceable`; without one, a block is built over if it carries BDS's
+  replaceable component, from helix-data's `bds/break_place.json`). Held
+  tools wear by BDS's rule per item from the same table (the `Wear`
+  hook; Unbreaking is the enchantment's `DamageChance`), and break with
+  the break sound. Effects count down each tick and are removed when
+  they run out. `movestate.go`, `fall.go`, `hunger.go`, `health.go`:
+  the movement states (sneak, sprint, swim, glide, crawl) from the
+  client's start and stop input flags (BDS decides them in its own
+  simulation, which belongs to the anti-cheat module), shown to others
+  as actor flags; after each movement BDS's fall distance (cleared in
+  water, on climbable blocks, gliding, slow falling) and fall damage, and
+  BDS's exhaustion for moving, jumping, mining and damage (values from
+  the player definition), burning saturation then hunger. `health.go`: BDS's hurt (armour and toughness, armour
+  enchantments, each effect's `Resist`, 10 hurt ticks letting through only what is above the last hurt, absorption,
+  armour wear). `hunger.go` also has the food tick: regaining health and starving. `attack.go`: players hitting players
+  (BDS's checks, damage from the attribute, item, enchantments and effects, critical hits, knockback, item wear, arm
+  swing relay); numbers from helix-data's `bds/item_combat.json`. `shield.go`: BDS's shield (`ShieldUp`, `ShieldBlock`, `OnPlayerBlock`, actor flags in the second set), `totem.go`: its totem (`Totem`, `OnPlayerTotem`, asked before health reaches 0 so those who see the player never see it dead), `armoruse.go`: using armour swaps it with what is worn (`EquipArmor`, `OnArmorEquip`). Effects (`effect/` holds the list, BDS's merge and countdown, save format and visible effects data, shared by players and mobs; `player/effects.go`, `player/effect_vanilla.go`): all 38 of BDS 1.26.60's effects registered (ID, name, harmful, colour); hooks `Added`, `Removed`, `Tick`, `Apply` (instant), `Died`, `Hurt`, `Modifiers` (attribute modifiers on value or maximum: Speed, Slowness, Health Boost); `GiveEffect` merges as BDS's StoredEffects (stronger takes over, weaker longer one waits), `EffectInfinite`, `ApplyInstantEffect` (splash scale), `ClearEffects`; saved as BDS's ActiveEffects; Invisibility flag and the visible effects actor data. `commands/effect.go` is /effect. Potions (`player/potion.go`, `player/potioncloud.go`): BDS 1.26.60's 49 potions by ID (the item's meta; `RegisterPotion`, `Host.Potion`), drinking (32 ticks, effects, glass bottle), splash potions (thrown_potion_effect: effects on players within 4 blocks, scaled by distance; douse_fire for water) and lingering potions (spawn_aoe_cloud: `AreaEffectCloud`, saved with its chunk as BDS saves it). Mobs have effects too (`mob/effects.go`: the list, goal hooks HasEffect/EffectAmplifier/AddEffect/RemoveAllEffects/drink_potion, state components through `mob.EffectHooks`; `player/mobeffects.go`: giving through BDS's canBeAffected (alive, Mob actor type, undead family kept from Regeneration and Poison, mob_effect_immunity, class rules for the wither, dragon, spiders and Skeleton variant 1), ticking (`Effect.MobTick`/`MobApply`/`MobAdded`/`MobRemoved`: regeneration, poison, wither, instant health and damage swapped for undead actor types), Speed/Slowness, Health Boost on the health maximum, Absorption (saved attribute, taken last after Resistance, effect removed when used up, as for players), Invisibility, Strength/Weakness on their melee damage, Resistance after armour, the death and hurt effects (`MobDied`/`MobHurt`: wind charged, weaving, oozing, infested, sharing `effectSite` with players), saving; splash potions and lingering clouds reach mobs; the melee goals' hit gives minecraft:attack's effect_name unless a shield blocks it, `EffectHooks.MeleeEffect`). `eat.go`: items used in the air, so far foods, read from each
+  item's own data. `bucket.go` fills and pours; `world.Region.SetBlock` keeps a water source in the second layer of a block
+  that can hold it. All are `Systems` hooks (MoveFlags, Jump, Fall, FallDamage, MoveCost, Hurt, TakeHit, HitParts, Exhaust,
+  FoodTick, Attack, AttackParts, Knockback, UseItem, FoodOf, Eat), with events `OnHit`,
+  `OnItemUse`, `OnItemEat`. `hit.go`: every hurt is a `Hit` of parts (Bonuses, Reductions, After; each
+  `Off` or `Scale`d, plus `PartCustom`), built by AttackParts/HitParts, changed in one `OnHit`, resolved in
+  BDS's order; `Player.EditEnchantment` gives one player its own copy of an enchantment. `elytra.go`: gliding (`Systems.StartGlide`, `GlideTick`, `GlideCrash`, `OnGlide`): BDS's start and stop rules, elytra wear, wall crashes. `firework.go`: firework rockets (`FireworkRocket`, `Host.LaunchFirework`, `Systems.Firework`, `OnFirework`): use while gliding (glide boost by `MovementEffect`), use on a block, dispensers, the explosion's particles and damage. `portal.go`: the player's portal time and cooldowns, moving between dimensions (ChangeDimension), arriving at a found or built portal, eyes of ender in end portal frames, lighting nether portals. `endereye.go`: throwing an eye of ender (BDS's code, signalTo, the eye's tick): it flies to the stronghold `world.Dimension.EnderEyeTarget` finds (only the overworld generator has one, through worldgen's `EnderEyeTarget`), then after 80 ticks drops 4 times in 5 or shatters. Ender pearls play LevelEvent 1032 where the player left and arrived. `tuning.go`: every number of hunger, health, armour, falling and knockback as a `Tune`, read in three levels: the
+  player's own (`Player.SetTuning`, `ClearTuning`, `ClearAllTuning`; not saved), the server's while running (the same on `Host`
+  and `Server`), the default (vanilla's, or `Setup.SetTuning`). Vanilla's systems read `Player.Tuning` instead of constants; a new
+  number of these systems gets a Tune too. `-testcmds` adds /tune. `death.go`: BDS's death (`Die`: items thrown unless
+  `keepinventory`, death event and message) and its Respawn packet sequence
+  (`Respawn`), a first pass without the spawn search; on respawn the player is spawned again for everyone who sees it (`world.Entity.Respawn`: RemoveActor and fresh spawn packets), since their clients still hold the dead body. Events: `OnBlockBreak`, `OnBlockPlace` (cancellable),
+  on the minimal event core (named priorities, registration order, no
+  allocation without listeners, panics recovered per plugin). Block
+  changes, and any packet given to `Region.Broadcast`, reach every
+  player whose client has the chunk, in other regions too.
+- `sim`: the load test harness (PRIORITIES item L). `Start` runs a real `helix.Server`
+  (flat world by default, temporary folder, offline) with a square held loaded and ticking
+  by a ticket; a `Scenario` adds one kind of load (`Start` once, `Tick` every 50 ms for
+  loads that end by themselves) or bots (`Bot`, n bots each on its own 50 ms client tick).
+  Bots (`bot.go`) log in like vanilla clients over `network.Memory` (the in-process
+  transport, given to the server through `Config.Transports`), decode only the packets
+  they need, and time each block action until its block update arrives. `Run`/`Sweep`
+  warm up, measure through the world's tick observer (`Dimension.SetTickObserver`,
+  `TickStats`, the `Phase` constants) and runtime/metrics, and give a `Report` (region
+  tick median/p99/worst, late ticks, time per phase, cost per unit, allocations per tick,
+  GC CPU share, live heap, action delays, moves seen per bot). Scenarios: idle, items,
+  tnt, falling, fireworks, mobs, clouds, redstone (observer clocks), players, breakers,
+  miners, explorers (vanilla terrain: generation, saving, reloading). A mechanic that
+  can lag a server gets a scenario here. `cmd/sim` runs them and prints a table (`-json`,
+  `-log`, `-memprofile`). Region ticks are timed with `world/clock*.go`'s fine clock:
+  Go's own clock moves in 0.5 ms steps on Windows.
+- Packet path: the movement fan-out (`Region.encodeOutbox`) encodes each move once per
+  tick with a `packet.RawWriter` and every player whose connection takes raw bytes
+  (`Viewer.SetRaw`, `network.Conn.RawOK`: latest version, no packet-out hook) gets the
+  same bytes; the others get the packet. PlayerAuthInput structs are reused: the
+  connection reads into released ones, and the region tick releases each packet after
+  its handler (`Player.releasePacket`), so a handler must not keep a packet.
+- `cmd/helix`: the server program. `-tick-distance` sets `Config.TickDistance`. `-trace Interact,ItemStackRequest` logs only those packets, whole, both ways, at info level (`Config.TracePackets`, `player/trace.go`), for in-game testing without `-debug`'s noise; PlayerAuthInput only when its input flags change. `-log-file` also writes the log to a file. `-testcmds` adds a stand-in /gamemode
+  (and /gm), listed to the client with an AvailableCommands packet on its
+  first input, for in-game testing until commands are designed, a countdown
+  name tag over dropped items through an item view, and /itemtest to try the
+  item API (private drops, lifetimes per player's drops and server-wide).
+- `player/enchant.go`: `Enchantment` (every vanilla one from helix-data's `bds/enchantments.json`, on the struct plugins use; a table swapped whole for `Host.EditEnchantment`, `SetEnchantment`, `RemoveEnchantment`; read through `gameplay.enchant`), BDS's add rule (one activation list compared, same level goes one up), rules on `Setup` and `Host` (`SetItemEnchantable`, `SetItemRepair`, `SetEnchantPathBlock`, `SetEnchantBookshelf`, `SetEnchantMaterial`). Nothing reads a vanilla ID: flags on the entry (`Knockback`, `SilkTouch`, `Fortune`, `StaysWorn`, `VanishesOnDeath`, `Curse`, `Mends`), so a removed enchantment does nothing. `Systems.EnchantRequire` decides level and lapis; when it differs from what the client takes, the lapis slot is settled after the request and resent. `player/enchanttable.go`: BDS's Random (MT19937), seed, bookshelves, costs and draw, the table's window and action (`Systems.EnchantOptions`, `OnEnchantOptions`, `OnEnchant`, `Host.EnchantItem` for later loot). `player/anvil.go`: anvil (`Systems.Anvil`, `OnAnvil`; `Systems.AnvilWear` and `TuneAnvilWearChance` for its wear) and grindstone (`Systems.Grindstone`, `OnGrindstone`) worked out by the server alone, BDS's repairable component rules read from the item registry, and Mending. A craft's level, seed and experience changes wait in `craftState.after` until the whole request passes. `-testcmds` adds /enchanttest.
+- `fall`: gravity for blocks as BDS 1.26.60 (`Table`, `Ticker` in the default chain under
+  `circuit`): sand, red sand, gravel, concrete powder, anvils and the dragon egg fall when the
+  block under them is free to fall into (lowest of a column first), snow layers when the block
+  right under them changes; landing places the block, or adds snow to snow (rest on top).
+  `player/fallingblock.go` is the entity (`FallingBlock`, `Host.StartFalling`,
+  `SpawnFallingBlock`, `OnBlockFall`; breaks into its item when it cannot land, saved with its
+  chunk). `fall/scaffolding.go`: scaffolding's stability (0 on a block that holds things on top,
+  the same as the scaffolding below, else one more than the steadiest side neighbour, up to 7),
+  kept in its state on place and neighbour changes; at 7 a new one falls and a settled one breaks
+  with its drops (`Ticker.SetBreak`), so a tower whose base goes comes down. `player/scaffolding.go`
+  is the item: using it on scaffolding builds on top of the column. A falling block can hurt the mobs
+  it lands in (FallingBlockActor's causeFallDamage: floor(ceil(fallen - 1) * per block), at
+  most 40): falling stalactites, and anvils (`player/anvilfall.go`: 2 a block, cause Anvil; a
+  landing wears the anvil by chance 0.05 + 0.05 a block, chipped, damaged, then it breaks and
+  vanishes; LevelEvent 1022 when one lands). Not done: concrete powder hardening, suspicious sand and gravel, entities that break
+  falling blocks.
+- `farm/chorus.go`: chorus plants and flowers as BDS 1.26.60: plant connections kept in their states (each side joins chorus, the bottom also end stone) on place and neighbour changes, both blocks' survival (a tick 1 later, then a plant breaks with its drops and a flower with none), flowers growing on random ticks (up, side branches, or dying at age 5, with BDS's grow and death sounds), and projectiles breaking flowers under projectilescanbreakblocks. `player/chorusfruit.go`: eating chorus fruit (on_use_action chorus_teleport): up to 16 random places within on_use_range of the player, each walking down to ground (not air, barrier, border block, portal, water or lava), on top of its collision boxes, with room for the player and no liquid; teleport cause ChorusFruit, the teleport sound where the player left and arrived, game event 64; foods with cooldown_type/cooldown_time start their cooldown when eaten and are not eaten while it runs.
+- `blockuse`: what vanilla doors, trapdoors, gates, levers and buttons do when clicked,
+  with its `Ticker` for buttons popping out and doors breaking.
+- `direction`: every direction beyond `cube`'s faces and positions: `Cardinal` and the numberings block states use for it, the orders BDS walks a block's sides in (`Updates`, `Spread`, `Clockwise`, `Sides`), yaw to direction, axes and BDS's table sine. Systems name what they mean here instead of keeping tables of numbers; a test pins each numbering and order to BDS's.
+- `circuit` (written from BDS's code and not fully tested: only the basics have been tried in game, nothing compared with BDS): vanilla's redstone blocks on the `redstone` library, one System per region (`Ticker`, a `world.RegionTicker`); its components move with their chunks on merges and splits. `comparator.go` has what wire connects to, what comparators read (`SignalEntity` for block entities that work it out themselves) and the comparator's block entity (`Ticker.Entities` wraps the world's list). `piston.go` has pistons and the blocks they move, as block entities (a move starts as BDS's code: one block at a time, farthest along first, the moving block set where it goes and the old place emptied, each telling its neighbours; `SetEntityPush` is how they move entities: `Host.PistonPush` moves a player on the server and sends `CorrectPlayerMovePrediction`); `TakeBlockEntity` moves one without spilling it; a `world.BlockEntityMover` (every `Chest`) is carried as the live object, as BDS's moving block keeps its block actor, others as saved data loaded again where they land. `-testcmds` adds /chestbomb [count] [pistons]: chests full of shulker boxes full of 50-page books, to try lag machines. Hoppers, dispensers and droppers are in `player/machine.go`, as `Chest`s with a `machineSpec`, since they share the chest's slots and window. `player/dispensearmour.go`: dispensers put humanoid armour on the first humanoid monster (by BDS class), armour stand or non-spectating player in front whose slot is empty, and horse armour into the first empty equip slot that takes it; wolf armour, saddles, heads and the other wearables are thrown out.
+- `player/bed.go`: beds and straw beds (`bedEntity`, the colour block entity; placing; using; sleeping,
+  the sleep counter and the night skip on the global owner's tick; the bed respawn point, saved under
+  BDS's Spawn keys with its dimension). `player/respawnanchor.go`: respawn anchors (glowstone charges
+  to 4, a charged one sets the spawn in the Nether and explodes elsewhere when respawn blocks
+  explode, calmed by water around it; respawning takes a charge and stands the player by BDS's
+  search on solid blocks, helix-data's `bds/block_solid.json`; only a player who dies in the
+  Nether respawns at it, as BDS checks the spawn against the dimension of death). `player/shelf.go`: shelves (`Shelf` block entity saved as BDS's "Shelf",
+  `ShelfAt`; clicking the front swaps the held item with a slot; a powered one swaps its whole row, up to
+  three shelves facing the same way, with the hotbar: `player/shelfrow.go`, rows linked by
+  `circuit/shelf.go` on power changes; BDS's row repair without a power change is not ported). `blockuse/bed.go` has the halves (`BedOther`, `BedHeadPos`) and the blockuse
+  Ticker removes a half whose other half went. `player/cushion.go`: cushions (`Cushion`, placing,
+  breaking, the rest check, riders kept across leaving and restarts as `LinksTag`, `reseat` on join).
+- `player/bookshelf.go`: chiseled bookshelves (`Bookshelf` block entity saved as BDS's
+  "ChiseledBookshelf", `BookshelfAt`; clicking a slot on the front takes its book or puts in one
+  of the held item tagged minecraft:bookshelf_books, `books_stored` shows them, the comparator
+  reads the last slot used plus one, books drop when it goes). `player/lectern.go`: lecterns
+  (`Lectern` block entity saved as BDS's "Lectern", `LecternAt`; a book and quill or written book
+  goes on an empty one, clicking one with a book opens window type 25, LecternUpdate sets the
+  page and gives a redstone pulse through `circuit/lectern.go`, hitting or breaking it knocks the
+  book off, the comparator reads how far through the book it is). `player/book.go`: writing in
+  books and quills and signing them (BookEdit on the packet's inventory slot: replace, add, delete
+  and swap pages, 50 at most; signing makes one written book with author, xuid, title, generation 0). `player/lightningrod.go` and
+  `weather/rod.go`: lightning rods (a strike goes to the nearest rod within 64 blocks that is
+  open to the sky and rained on; a struck rod gives power for 8 ticks, `circuit/lightningrod.go`;
+  the strike cleans oxidation off the copper it stands on and copper around it, `player/copper.go`;
+  Channeling tridents on a rod call lightning). Copper ageing, scraping with axes and waxing are not built. `player/strip.go`: axes strip logs, wood, stems, hyphae and bamboo blocks (keeping pillar_axis, wear 1, ItemUseOn sound).
+- Game events (vibrations): `world/gameevent.go` is BDS's dispatcher (`Region.PostGameEvent`, a
+  `GameEvent` passed by value; block entities that are `GameEventListener`s are kept per chunk and
+  hear events within their range and 16 blocks; listeners in other regions' chunks do not hear;
+  chunks that load give listener blocks without a block entity one, as generation places sculk
+  without). `player/gameevent.go`: BDS 1.26.60's event IDs, flags and frequencies, the ignore
+  checks (sneaking, wool and carpet dampers), `Host.postGameEvent`; posted so far: block place
+  and destroy by players, players walking or swimming (BDS's movement tracking, three times the
+  distance per step), landing (hit_ground), standing on sculk. Mobs, projectiles, doors,
+  containers, explosions and the other events are not posted yet. `player/sculk.go`: sculk
+  sensors and calibrated sensors (`SculkSensor`: the vibration selector and flight, wool
+  occlusion, power by distance, amethyst resonance, comparator reads the frequency, calibrated
+  input from behind) and shriekers (`SculkShrieker`: warnings through each player's warden
+  tracker, saved as BDS's Warden* keys, the shriek, darkness, the warden summoned at level 4);
+  `circuit/sculk.go` is their block phases and power.
+- Cheat holes closed with Helix's own rules, beyond BDS (cheats work on BDS; a vanilla client is never refused): `player/sight.go`, line of sight from the eyes on every block click and every use on an entity (only full-cube collision blocks it, so no use or hit through walls); `player/ground.go`, the client's vertical collision counts as landing only with a block or entity box top under the feet (no fake landings for fall damage); one break tick per input with break credits earned per server tick (`breakCreditMax`), attack and item-on-block credits the same way (`attackCreditMax`, `placeCreditMax`, one per tick, a bank of 4); clicks on air are refused (no air place). `player/aim.go`: an attack counts only when the player looked at the target in one of its last 3 inputs (mouse and gamepad: the look passes through the box grown by 0.2; touch: the box within 80 degrees of the look), so kill aura cannot hit what the player does not face. An input whose look disagrees with itself (a pitch past 90, a crosshair player's interact rotation more than 2 degrees off its rotation, or a camera direction more than about 25 degrees off the look, either way round for third person in front) never counts for an attack, so kill aura that fakes only the rotation it sends cannot hit; it is logged at debug level. Reach and hitbox (`player/aim.go`): an attack must reach, aim at and see the target's real server box within 3.5 blocks of the eyes (6.5 in creative), where the target is or anywhere it was in the attacker's round trip plus 3 ticks of client smoothing (`world.Entity.AppendPast`: every entity keeps its last 20 positions by world tick; the whole second when the connection measures no round trip); the attacker's own look needs no allowance, its rotation comes in the same inputs as its attack, so grown hitboxes and long reach do nothing. `player/steal.go`: nothing is taken (moved, swapped or dropped) out of a chest, barrel, cart, boat or shulker box slot until its window has been open 3 ticks, and each take costs 2 take credits, earned one a server tick with at most 6 kept (10 takes a second, 3 in a burst), so chest stealers empty containers no faster than fast clicking; creative is left alone. `world/viewer.go` `SubChunks`: a sub chunk request asking for more than 64 sub chunks of chunks the client was not sent (another dimension included), or for more than it has earned (16,384 a second, at most 131,072 kept, enough for a whole view at join), is ignored without building an answer, so a flood of far requests costs the server almost nothing. `player/anchorpace.go`: a use of a respawn anchor needs 2 ticks since the player's last use of it, 4 since it placed it and 3 since it changed its held slot (by MobEquipment or the slot an item use names); a use too soon does nothing and the anchor and held item are sent back, so auto anchor cannot place, fill and set one off at once. A packet that does not decode disconnects the player with BDS's bad packet reason and is logged at info level ("packet unreadable") with its ID, size and up to 4096 bytes in hex (`player/join.go` `readFailed`, from protocol's `conn.DecodeError`), so a cheat's malformed packet can be told from a decoder bug. Impossible inputs (NaN, infinite or far positions, huge velocity or move stick, tick 0 after counting) are dropped whole (`player/badinput.go`); touch counts for aim only when the login says touch; a critical hit needs the server to have seen the player in the air for 3 movements after a real jump or drop; arm swing relays are 2 a tick, commands 10 banked plus 5 a second, view radius changes once a second after the first. The movement checks (phase, speed, vertical, vehicles, input rate, corrections, no slowdown, knockback, fast stop, jump delay) and the movement sim, and the anti X-ray, live on the `anti-cheat` branch, off main until they are stable (2026-11-23). Research on the client these come from is private.
+- `player/void.go`: the void as BDS's OutOfWorldSystem (below the dimension's min height minus 16; `Systems.OutOfWorld`, `Systems.Void`, `OnVoid`, `TuneVoidDamage`, `OutOfWorlder` for an owner's own answer). Every entity's tick calls `Host.checkVoid`; a new entity kind calls it too.
+- `player/explosion.go`: BDS's explosion as a struct anyone can run (`Explosion`, `Host.Explode`, `Systems.Explode`, `OnExplosionStart` (before anything), `OnExplosion` (once the blocks are known, `Keep`), `OnExplosionHit` (per entity reached), what set it off (`Kind`, `FromBlock`, `Block`, `BlockPos`, `Attacker`), block behaviour `Exploded`, entity owner `Blastable`). `player/primedtnt.go`: lit TNT (`PrimedTNT`, `Host.SpawnTNT`, `OnTNTPrime`, saved with its chunk) and vanilla's TNT block as a block behaviour.
+- `circuit/config.go`: `Config`, every number redstone runs by, BDS's by default (`DefaultConfig`), and `Settings`, which holds it for the regions to read while `Server.SetRedstone` swaps it. A new redstone number goes here, not in a constant. The circuit library's own numbers are `redstone.Rules`.
+- `player/fishing.go`: fishing rods and the fishing hook as BDS 1.26.60 (`FishingHook`, `Player.FishingHook`, `OnFishCatch`): casting and reeling in (rod wear 3 for an entity, 1 for a catch, 2 in the ground), floating and bobbing, the lure and bite timers with their bubbles (Lure, rain, ocean, sky), hooking players and mobs, the catch from the hook's loot table (jungle in jungles, Luck of the Sea and luck) with experience. `player/motion.go`: `Moving` (`Velocity`, `SetVelocity`, `Pull`) on players and mobs, and `PullVelocity`, BDS's pull toward a point; use it for any pull that is not a hit's knockback. `player/attach.go`: `AttachPoint` and `Player.AttachPos`, BDS's attach points (ActorLocation) on a player: feet, body, weapon, head, drop, explosion, eyes, breathing, mouth; start and aim things from these, not the eyes (hook cast and throw sounds from the drop point, bow sound from the weapon point, pulls toward the head). Mobs have none yet. `player/itemstorage.go`: storage items (any item with minecraft:storage_item; vanilla's are the bundles), as BDS 1.26.60: what one holds lives in its stack (`ItemStack.Stored`), saved as BDS's storage_item_component_content + bundle_weight, sent with a runtime bundle_id; stack requests on container 63 (dynamic) with BDS's weight, slot, banned/allowed and nesting rules, checked on the request's copy; the client is sent each one's slots in window 125 (InventoryContent once, then InventorySlot per change) as BDS's DynamicContainerTracker; a destroyed one on the ground spills. Storage rules come from helix-data's item definitions (`registry.ItemType.Storage`).
+- `player/projectile.go`: everything shot or thrown as one `Projectile` with a `ProjectileSpec` read from its definition (`Host.SpawnProjectile`); `throwItem`, `releaseBow` and `dispenseProjectile` start them. `player/xpbottle.go`: bottles o' enchanting (grant_xp: splash, then orbs). `player/deathpos.go`: where a player last died (synched actor data and BDS's DeathPosition* save keys), which the client's recovery compass points to; the plain compass points to the world spawn from SetSpawnPosition. Lodestone compasses are not built. Foods take away their remove_effects (honey bottles cure poison). Like every entity that is not a player's, they stop where chunks do not tick, as BDS's do.
+- `circuit/target.go`: target blocks (`Ticker.HitTarget`, reached by `Host.HitTarget`); projectiles call it once they exist, and `-testcmds` adds /targettest.
+- `daytime`: the overworld clock (`Clock`, worked out from the world tick so any core reads it without a lock), BDS's sun angle and sky darkening, and what a daylight sensor reads. `world/light.go`: sky and block light as BDS 1.26.60's relighter and height map, kept per sub chunk (`Region.Light`, `SkyLight`, `BlockLight`, `Brightness`; `Config.Light` and `Config.Sky` replace the rules), worked out on the loading worker and relit at the end of the tick after block changes. `circuit/daylight.go`: daylight sensors' block entity. `circuit/button.go`: buttons breaking off and arrows on wood buttons. `player/clock.go`: SyncWorldClocks.
+- `player/furnace.go`: furnaces, blast furnaces and smokers, as a `Chest` with a `machineSpec` and a `Furnace` (tick, fuel, smelting, lit swap through `world.BlockEntityKeeper`, experience, hopper sides, window data); `crafting.Table.Smelt` finds their recipes. The ingredient slot takes only an item the furnace kind has a recipe for (the client's own rule; BDS's server takes anything).
+- `player/campfire.go`: campfires and soul campfires as BDS 1.26.60 (`Campfire` block entity, `CampfireAt`, `OnCampfireCook`): food on four slots cooks 600 ticks while lit and drops out cooked, flint and steel or Fire Aspect lights, shovels put out, a lit one burns players and mobs (1, soul 2, then 8 s on fire; Frost Walker boots stop it), something burning lights an unlit one. `fire/campfire.go`: lighting, putting out and water (`LightCampfire`, `DouseCampfire`, `SetCampfireWet`).
+- `player/breath.go`: breathing and drowning. Players run the entity library's minecraft:breathable component (`state.Breathable`, the same one mobs run, `TickFor` with a `state.Breather`), from the player definition: 15 s of air, 2 damage a second once gone (drowning with the head under water, else suffocation), 3.75 s to breathe back in; Respiration, Water Breathing, Conduit Power; air saved under BDS's `Air`, sent as actor data with the breathing flag (`Player.Breathable`, `Setup.SetBreathable`).
+- `player/brush.go`: brushes on suspicious sand and gravel as BDS 1.26.60 (`Brushable`, BDS's "BrushableBlock" block entity: one stroke per 10 ticks, the loot table rolled into its slot on the first, `brushed_progress` from the count, 10 strokes throw the item out of the brushed side and leave sand or gravel, brush wear 1 per finished block, the brush sound every 8 ticks per player; the count decays by 2 every 10 ticks once 40 ticks pass without a stroke). Suspicious blocks do not fall yet.
+- `player/cauldron.go`: cauldrons as BDS 1.26.60 (`Cauldron`, the "Cauldron" block entity: PotionId, PotionType, CustomColor). Buckets of water, lava and powder snow fill and empty a cauldron, bottles take and add two levels of water or a potion, a different liquid or potion empties it (LevelEvent 3501), plain arrows are tipped 16 a level, dyes mix into water (BDS's dye table, averaged with the colour it had), armour dipped in dyed water takes the colour and leather/wolf armour is washed in plain water, dyed shulker boxes and banner patterns are washed off. `player/cauldronfill.go`: rain adds a level of water and snow (below 0.15) a level of powder snow by chance against the downfall (`Host.CauldronPrecipitation`, reached through `weather.Config.Precipitation` on the block under the rain's top), and stalactites drip into cauldrons (`Host.DripAccepts`, `Host.Drip`: lava fills an empty one, water adds 2 levels to an empty or water one with no potion). `drip`: the dripstone side as a `world.BlockTicker` in the vanilla chain (a hanging dripstone base with a water or lava source above drips by chance, 0.42 or 0.07, to the first cauldron under its tip within 10 blocks of air and queues the cauldron's tick at drop height + 50; the cauldron's queued tick looks up for the tip and fills; the source is the one on top of the block the stalactite hangs from). `drip/fall.go` + `player/dripstone.go`: pointed dripstone losing its hold (BDS 1.26.60 canSurvive, neighborChanged, tick): a stalagmite with nothing under it breaks with its drops, a stalactite falls tip first, the tip hurting the mobs it lands in by its fall times the dripstone stacked on it (1 to 6, cause Stalactite), and breaks where it lands (item, LevelEvents 2021 and 1064). Landing on a stalagmite's tip adds 2 to the fall and doubles its damage (cause Stalagmite, players only). A thrown trident faster than 0.6 breaks pointed dripstone under projectilescanbreakblocks. Placed dripstone hangs when put under a block, stands on top, and from the side follows the player's look; its thickness is not worked out, so the tip is taken as the lowest piece. A cauldron under water filling, and lava in one burning, are not built.
+- `player/endcrystal.go`: end crystals as BDS 1.26.60 (`EndCrystal`, "minecraft:ender_crystal"): placed on obsidian or bedrock with two air blocks above and no entity in the way, any damage (a hit, an arrow, another explosion) sets off a power 6 explosion on its next tick that breaks blocks only with mobGriefing, and in the End it lights fire in its own block. The dragon fight (beams, respawning the dragon) is not built.
+- `player/flowerpot.go`: flower pots as BDS 1.26.60 (`FlowerPot`, the "FlowerPot" block entity: PlantBlock, the plant's block state). Using one puts a held pottable plant in (39 plants, the blocks BDS gives flower_pottable) or takes the plant out to the inventory; update_bit follows whether a plant is in; the plant drops when the pot is broken, except by a player who builds instantly. A flower pot needs a block below that holds things on its top (canSurvive): it cannot be placed without one and pops off, with its plant, when that block goes.
+- `player/decoratedpot.go`: decorated pots as BDS 1.26.60 (`DecoratedPot`, the "DecoratedPot" block entity: sherds, item, animation). Using one adds one of the held item to an empty pot or a pot of the same item with room (insert sound pitched by fullness, dust plume), else it wobbles (insert_fail); the animation ends after 7 or 10 ticks. The contents drop on breaking, the pot item keeps its sherds and gives them to the placed pot, A trident or a tool without silk touch shatters it: the shatter sound, and its four sherds (bricks for plain sides) drop instead of the pot. With projectilescanbreakblocks on, a projectile hitting a pot shatters it the same way. The pot is a one-slot container (at most 64): hoppers, hopper minecarts and droppers fill and empty it, comparators read it, and a hopper under it still collects items. A generated pot's loot table is rolled into it the first time a player uses it.
+- `player/beacon.go`: beacons as BDS 1.26.60 (`Beacon`, the "Beacon" block entity: primary, secondary). Every 80 ticks: full layers of iron, gold, emerald, diamond or netherite blocks (up to 4), the column above loaded and clear of opaque blocks (bedrock lets the beam through), the activate/deactivate sound when it turns on or off, and the effects (tiers speed+haste, resistance+jump boost, strength, regeneration; 180 + 40 per layer ticks, ambient) to players within 21/31/41/51 blocks across and anywhere above. The screen (ContainerBeacon) takes a payment in UI slot 27 with the BeaconPayment action, which the request must consume; the slot takes one iron ingot, gold ingot, diamond, emerald or netherite ingot only. The beam's colour from stained glass is the client's.
+- `player/shears.go`: shears carving pumpkins (one seed, wear 1). `player/mobinteract.go`: using an item on a mob runs its minecraft:interact (`mob.Mob.Interact`) and does the item work (hurt_item, use_item, spawn_items, play_sounds, swing): shearing sheep, snow golems, bogged, mooshrooms. Beehives and dispensers shearing are not built.
+- `player/mobbucket.go`: buckets past water and lava, as BDS 1.26.60's BucketItem: a water bucket takes cod, salmon, tropical fish, pufferfish, axolotls and tadpoles and an empty one the sulfur cube (the mob's group stack and health go in the bucket's tag, `mob.Mob.Stack`/`Restore`); pouring brings the mob back (with water for water animals); powder snow buckets; milk (drunk in 32 ticks, clears effects) and milking through minecraft:interact's transform_to_item. `bucket.go`'s water boils away in the Nether.
+- `player/mace.go`: the mace (`MaceBonus` in the base damage; after a hit with over 1.5 blocks of fall: the fall stops, smash sound and dust, nearby players and mobs pushed away). Wind Burst not built.
+- `player/trident.go`: tridents (thrown as thrown_trident carrying the item, saved under `Trident`; Riptide sound only, the launch is the client's; Loyalty return, Impaling, Channeling). `ProjectileSpec.StopOnHurt` reads stop_on_hurt.
+- `player/brewing.go`: brewing stands as BDS 1.26.60, as a `Chest` with a `machineSpec` and a `BrewingStand` (`Chest.BrewingStand`, `Systems.BrewFuel`, `Systems.BrewResult`, `OnBrew`): blaze powder gives 20 brews, a brew takes 400 ticks and stops when the ingredient changes, every bottle with a mix becomes its result, the block shows the bottles, window data, BDS's slot rules for the window and hoppers (top: ingredient; sides: bottles or fuel; bottom takes bottles). `crafting/brewing.go`: the recipes from the CraftingData packet (`Table.Brew`, `HasBrew`, `BrewIngredient`, `BrewBottle`), BDS's PotionBrewing mix order. Drinking potions is not built.
+- `commands/`: Helix's built-in commands, one file each (`give.go`), public API only, `Register` called by `server.go` for the owner "minecraft". New ones go here as their own file plus an entry in `all`.
+- `command/`: the command system, no player or world imports: `Spec`/`Define` (struct overloads read by reflection in `params.go`), `Builder`, `Manager` (copy-on-write table behind an atomic pointer, `Register` by owner, `Wrap`, `Execute` with panic recovery), `parse.go` (scanner, selectors, overload matching, BDS's error keys from en_US.lang), `packet.go` (per-source AvailableCommands, soft enums), `vanilla_enums.go` (generated from a dump of BDS 1.26.60's enums: regenerate, do not edit). `player/commands.go`: `CommandSource`, `SourcePlayer`, selectors over `Player.State` (`player/seen.go`, a seqlock any region may read, published at the end of each player tick), the Item/Block/EntityType/Biome lists, sending the list and handling CommandRequest. `cmd/helix/testcmd_register.go` puts the `-testcmds` stand-ins on it.
+- `weather`: BDS's weather: `Weather` (rain and thunder levels, timers, /weather, sleep clearing it, level.dat's four values) ticked on the player package's global owner, and `Ticker`, the overworld's `world.Config.Weather` (lightning, ice, snow on every ticking chunk; `RainingAt` and friends, which farm, fire and players read). `player/lightning.go` is the bolt, `player/fog.go` the /fog stack, `commands/weather.go` and `commands/fog.go` the commands.
+- `fire`: fire and soul fire (`Ticker`, wrapping `liquid` in the default ticker chain; `Rules` from level.dat, `PrimeFunc` for TNT) and lava setting fire on random ticks. `player/fire.go`: flint and steel (`lightFire`) and putting fire out when breaking starts (`putOutFire`). Block flags fire reads come from `registry.Properties` (`FlameOdds`, `BurnOdds`, `LavaFlammable`, `Material`) and `registry.Biome.Humid`.
+- `player/sign.go`: signs and hanging signs (`signEntity`, BDS's FrontText/BackText/IsWaxed block entity, placing for both items, `useSign` with dyes, glow ink, ink and honeycomb, the editor lock and `handleBlockActorData` for the client's edit, `SignAt`, `SetSignAt`); `attach` holds standing and wall signs like banners and ceiling hanging signs like lanterns.
+- `player/banner.go`: banners (`bannerEntity`, BDS's Base/Type/Patterns block entity, placing, drops through `blockEntityDrops`, `BannerAt`, `SetBannerAt`, `BannerTable` from helix-data's `bds/banner.json`, changed through `Setup.Banners`); `attach` holds them (solid material below or behind). `player/loom.go`: the loom's window and action (`Systems.Loom`, `OnLoom`), UI slots 9, 10, 11. `player/shieldbanner.go`: BDS's shield + banner special recipe (`Systems.ShieldBanner`, `OnShieldBanner`), reached through `crafting.Table.Special` (multi recipes by network ID to UUID) from `craftRecipe`; other special recipes go to `craftSpecial` too, which picks each one's system by UUID. `player/craftrepair.go`: BDS's repair item special recipe (`Systems.CraftRepair`, `OnCraftRepair`), reusing the anvil's repairable component rules and the enchantment add rule for curses. `Player.SetHeldDamage`, `Held`, `MaxDamage` and `ItemStack.Damage` set and read wear directly (no Unbreaking roll, never breaks); `-testcmds` adds /damageitem.
+- `circuit/bell.go`: bells (`Ticker.RingBell`, `bellEntity`). `player/crafter.go`: crafters, as a `Chest` with a `machineSpec` like hoppers (`Chest.craft`, `crafterTakes`, `handleToggleCrafterSlot`).
+- `circuit/rails.go`, `player/minecart.go`: rails as BDS's `Rail` (shapes, power, detector) and all four minecarts as one `Minecart` with a `cartSpec`, on the same `Chest` slots as machines (`Chest.cart`; `Player.windowChest` finds what is open). Hoppers see carts through `Host.cartsAt`.
+- `player/painting.go`: paintings (`Painting`, `Motive`, BDS's 51 motives in its order, `Setup.SetMotives`, `Host.SpawnPainting`): placing picks a random biggest motive that fits (solid wall behind, no block boxes, no other painting), the survive check every 80 to 119 ticks, breaking with BDS's level events and no item (as BDS does in game), saved as BDS saves them. `player/itemframe.go`: item frames and glow item frames (`ItemFrame` block entity, `FrameAt`, `Put`, `Turn`, `Take`): clicking puts in or turns the item, starting to break takes it out, the item drops when the frame goes; `attach` holds frames on solid material and `circuit` reads them only when they face the comparator's way. `player/goathorn.go`: goat horns (the call by aux value, the 140 tick cooldown, `Player.Cooldown`, `StartCooldown`).
+- `player/living.go`: `Living`, what players and mobs share for the world's hazards (`TakeDamage`, fire timer, `Wet`, blast box). Fire and lava blocks, burning, cactus and berry bushes (`Host.tickHazards`), landing (`Host.landed` for mobs; players keep `Systems.Fall`), lightning, explosions and projectiles hurt any `Living`. A new hazard is written against `Living` so it hurts mobs as well as players. Mobs also push each other and are pushed by players (`mob/push.go`, entity's ``). `mob/body.go`: a mob's body components around its physics tick, as BDS 1.26.60's movement systems: entity's `Set.ApplyBody` (water_movement, friction_modifier, air_drag_modifier, bounciness, variable_max_auto_step, can_stand_on_powder_snow, buoyant's auto step; the size stays Helix's), buoyant floating (`Set.BeforeMove`), block_climber's scaffolding and powder snow flags with their fall reset, and the block slowdown of cobwebs, berry bushes and powder snow (block_movement_slowdown_immunity, Weaving, the wither immune); flying_speed is the body's air speed. `mob/ride.go` + `player/mobride.go`: riding mobs, as BDS 1.26.60: minecraft:rideable makes a mob a vehicle in the `ride` package (seats, families, passenger_max_width, dismount_mode, on_rider_enter/exit); players get on by interacting (after minecraft:interact, feeding and leashing), mobs through find_mount and minecraft:addrider (riders spawned with their event, not again on load); a riding mob does not move by itself and sits in its seat after its vehicle's move (rotation_locked_to_vehicle turns it with it); a dead or removed vehicle lets everyone off, mobs landing as riders do; a tamed, saddled horse steered by its rider is client-predicted, as boats. tamemount runs on the riders. A vehicle saves its riders as BDS's LinksTag and seats them again when they load. `mob/steer.go`: pigs and striders steered with a control item (entity's controlled_by_player, item_controllable) and boosted by a boost item (minecraft:boostable, `Player.boostMount` wears the stick and swaps in its replace_item). input_ground_controlled mobs (camels) and horse power jumps are not built. `mob/actions.go` + `player/mobactions.go`: the state components' actions as BDS 1.26.60: minecraft:teleport (ground below the target, room and no liquid, the trail LevelEvent 2023, LevelEvent 1018, the teleport game event), minecraft:spawn_entity (sound, items with spawn_item_event, entities by the born/spawned/summoned methods, entity_place, should_leash, a rideable newborn carrying its parent), minecraft:trail's blocks (air only, mayPlace, snow by its survive rule) and the game events mobs post. Bribing (bribeable) and giving (giveable) are in `mob/tame.go` and `player/mobtame.go`.
+- `player/mobequip.go`: mob equipment and death drops: the minecraft:equipment table rolled once when a mob is created (not loaded), items put where BDS's code puts them, MobEquipment/MobArmourEquipment, shooter shots at the target (`Mob.Shoot`), equipment drop chances, minecraft:loot and experience_reward on death (doMobLoot). `loot/entity.go` rolls entity loot tables as BDS 1.26.60 (`EntityTables`, `EntityContext`, `SpecialMultiplier`); `mob/equipment.go` is the mob's view of its slots and the ranged-attack hooks.
+- `player/mobsave.go`: mobs saved with their chunk in BDS 1.26.60's actor format (Mob's fields: identifier, definitions, UniqueID, Pos, Rotation, Motion, CustomName, Persistent, flag bytes, actor data values, Fire, Air, Mainhand/Offhand/Armor, Attributes); fields Helix does not run are kept from the loaded data and written back; `loadEntity` loads every type the mob runtime runs. Age (Age, GrowthPaused), breeding (InLove, LoveCause, BreedCooldown), LeasherID, anger_level's Nuisances, minecraft:trust's TrustedPlayer keys, TargetCaptainID and a guardian's Elder are saved; ActiveEffects too; anger timers are not yet. `player/mobwarden.go`: the warden's sonic boom (sonic boom damage, BDS's code, the particle level events); `mob/warden.go` and `mob/trust.go` are the warden and trust hooks. `mob/sprint.go` (sneak, sprint and the movement attribute's modifiers), `mob/pack.go` (play, follow_target_captain, follow_caravan), `mob/guardian.go`, `mob/garden.go` (raid_garden, lay_egg's path probe), `mob/flyer.go` (phantom circling and swooping, breeze shots), `mob/golem.go` (target_when_pushed's pusher), `mob/illager.go` (hold_ground, send_event, knockback_roar), `mob/panda.go` (roll, sneeze), `mob/prey.go` (eat_mob, drop_item_for), `mob/ram.go` (ram_attack, stalk_and_pounce_on_target; goat horn drops wait on an engine `HornHooks`), `mob/jumper.go` (jump_around_target, jump_to_block) and `mob/mingle.go` (mingle, swim_with_entity) hook more goals; `player/mobgoals.go` is their engine side (guardian hits, minecraft:on_raided on crops, berry bushes and cave vines, aimed projectiles, goal loot drops, the time of day). Every dimension now has the entity loader and the block entities. `player/spawner.go`: monster spawners (`MobSpawner` block entity, BDS's BaseMobSpawner tick, save fields and defaults; spawns pass the entity library's `spawn.CheckSpawnRules`) and spawn eggs (on a spawner they set its mob in any game mode, elsewhere they spawn the mob facing the player). Name tags: `player/mobinteract.go`'s `nameMob` and `mob.Mob.Name` (BDS's NameableComponent: name, can-show flag, persistent, name_actions). `mob/breed.go` + `player/mobbreed.go`: feeding (ageable then breedable, BDS order), mating in Apply (babies through Hooks.Born, persistent; on_bred experience), leads on mobs. `player/leashknot.go`: leash knots on fences and walls (tie leashed mobs on use, break on hit/use or when the fence goes).
+- `village`: BDS 1.26.60's villages: the POI table (`Table`, `Vanilla`: beds, bells, the 13 job
+  sites with their weights and become_X events), one `Manager` per dimension (POI scans of 32x8x32
+  around dwellers, 1024 blocks a tick; beds found villages, bells and job sites join one within 64
+  blocks), each village ticked by the region holding its centre chunk (`ChunkTick`, from the
+  Host's chunk spawn tick): POIs whose block went, inactive dwellers, and on ticks where
+  tick % 30 == 15 the claims (first free bed and bell; job sites by preferred profession, else a
+  weighted random pick). Losing a job site makes a villager not locked into its trades (trade tier
+  and experience 0) run become_unskilled; goals read villages through published snapshots.
+  Villages are saved as BDS saves them (`village/save.go`: the VILLAGE_<dim>_<uuid>_INFO,
+  DWELLERS, POI and PLAYERS keys, RAID deleted; loaded when a dimension's manager is made,
+  saved every 600 ticks and on close), and dwellers save DwellingUniqueID and
+  PreferredProfession. `mob/dweller.go` is the mob side (Dweller, Sleeper, Worker,
+  Indoorer, Hider, DoorUser, PlayerTrader), `player/village.go` the Host's glue.
+  `player/trade.go`: villager trading as BDS's EconomyTradeableComponent: offers generated from
+  the trade tables (all tiers at once, num_to_select per group, filters, enchanted books priced by
+  enchant_book_for_trading), priced when the window opens (demand, Hero of the Village), the
+  window (UpdateTrade, the trade slots in the UI, CraftRecipe and CraftRecipeAuto by offer net
+  ID), notifyTrade (uses, experience, tiers, riches, orbs), the daily restock on
+  trade_resupply, saved as BDS's Offers/Riches/TradeTier/TradeExperience. Offers go with the
+  economy_trade_table component, so a reroll is the component's removal. Not built: curing
+  discounts, the level-up Regeneration, random_dye, exploration maps, item pick-up and sharing.
+- `player/pushout.go`: BDS's push out of blocks, which only items and experience orbs run; `Properties.PushesOut` and `Stairs` are the block facts it reads.
+- `ride`: riding for anything rideable: seats, seat offset, who may get on, links, where a rider lands. It knows nothing of carts or players: a vehicle keeps a `ride.Vehicle`, a rider implements `ride.Rider`, and `player/riding.go` is the player's side of it (the `vehicle` interface, `mount`, `letOff`).
+- `connect`: the arms of fences, panes, bars and trip wire, kept in their block states since 1.26, from helix-data's rules, and stair corners (`stairs.go`, BDS's corner rule).
+- Block entities: `world/blockentity.go` keeps them with their chunk (`BlockEntity`, optional
+  `BlockEntityTicker`, `BlockEntityPlacer`, `BlockEntityRemover`, `BlockEntityBinder` with its `ChunkHandle`; `Dimension.SetBlockEntities` names who
+  makes them; those it does not take stay saved as they were). A chunk's block entities are read from the store
+  one at a time on the load worker (`storedBlockEntities`, mcdb's `EachBlockEntity`), never as the
+  whole stored value, which chests full of books make hundreds of megabytes. A `ColdBlockEntity`
+  leaves its big data on disk while unused (Helix's own rule, beyond BDS): chests, barrels and
+  shulker boxes (`player/coldchest.go`) unused for a cooling round (`coolEveryTicks`, 10 s) in a
+  chunk whose stored copy is current keep only each slot's count for comparators, load that way
+  from disk (`RawBlockEntities.LoadRaw`; hxdb gives their Items light from each container's
+  summary, `player.LoadsCold`, and keeps every slot as its own record, so a save writes only
+  the slots that changed and never holds a chest whole), and read their items back before anything touches them; a save
+  copies their stored compounds as they are. Opening one and hoppers read them on the chunk's worker
+  (`Chest.whenWarm`, `ChunkHandle.StoredLater`): the window opens once they are back, a hopper tries
+  again later; other code reads them on the tick (`Warm`, `ChunkHandle.Stored`). `player/chest.go` runs chests, ender chests
+  (items in `playerItems.ender`, reached as `Player.EnderChest`), hoppers, dispensers, droppers, crafters
+  and carts' slots: BDS 1.26.60's pairing, lid and window, with `playerItems.open` as a stack request's copy
+  of the open container (container `ContainerLevelEntity`), and the chest API (`Chest.Inventory`, `Kind`,
+  `OnChestPair`, `OnChestSpill`, name and pairing). A `Chest` marks its chunk for saving through the
+  `world.ChunkHandle` it is bound to, so `Inventory` methods need no region. Items a stack
+  request moves between the player and a container saved with a chunk (chests, machines, chest
+  boats and carts) are saved with the player in one commit at the end of the tick
+  (`player/linksave.go`, `Region.SaveLinked`, the store's `mcdb.LinkedStore`), so a crash or a
+  kill never leaves them on both sides or neither: Helix's own rule, beyond BDS. `player/shulker.go` is what a
+  shulker box does differently, as a `Chest` with `shulker` set (container `ContainerShulkerBox` in stack
+  requests). `ContainerOpenEvent`, `ContainerItemEvent` and the methods, which fire no events, are in
+  `window.go` and `inventory.go`. `player/blockdrop.go`: what a player's break drops (`Systems.Drops`, from
+  the `loot` package, BDS's rule per block), `OnBlockDrops`, `Setup.SetBlockDrops`.
+  `player/xporb.go`: experience orbs (`XPOrb`, BDS's sizes, merging, pull and touch; saved with the chunk) and
+  levels (`AddExperience`, `OnExperience`). `-testcmds` adds /chesttest to try the container events in game (`price`, `noopen`, `nobang`, `playersonly` too).
+
