@@ -37,8 +37,6 @@ const (
 	// snow block counts as.
 	maxSnowHeight  = 7
 	layersPerBlock = 8
-	// snowPerLayer is how much snow_accumulation one layer takes.
-	snowPerLayer = 0.125
 	// lcgMul and lcgAdd are BDS's position generator, x = 3x + 1013904223.
 	lcgMul, lcgAdd = 3, 1013904223
 	// coolingStart, coolingRate and coolingDivisor are BDS's cooling above sea level + 17,
