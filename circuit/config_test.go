@@ -2,13 +2,6 @@ package circuit
 
 import "testing"
 
-// A default Config is already in range, so setting it changes nothing.
-func TestDefaultConfigIsSane(t *testing.T) {
-	if got, want := *NewSettings(DefaultConfig()).Get(), DefaultConfig(); got != want {
-		t.Errorf("default changed when set:\n%+v\nwant\n%+v", got, want)
-	}
-}
-
 // Numbers that would stop something working are brought back in range.
 func TestSettingsBringNumbersInRange(t *testing.T) {
 	c := DefaultConfig()

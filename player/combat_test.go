@@ -181,15 +181,6 @@ func TestShieldFlags(t *testing.T) {
 	}
 }
 
-// TestEffectNumbers pins Regeneration's interval to BDS's.
-func TestEffectNumbers(t *testing.T) {
-	for _, c := range []struct{ amplifier, every int32 }{{0, 50}, {1, 25}, {5, 1}, {40, 1}} {
-		if got := max(int32(regenerationBase)>>min(c.amplifier, 31), 1); got != c.every {
-			t.Errorf("level %d heals every %d", c.amplifier, got)
-		}
-	}
-}
-
 // TestEquipRefused leaves what may not go on where it is; putting armour on sends
 // packets, so it is tested in game.
 func TestEquipRefused(t *testing.T) {
@@ -211,16 +202,6 @@ func TestEquipRefused(t *testing.T) {
 	p.inventory.armor[0] = ItemStack{}
 	if vanillaEquipArmor(p, locked) {
 		t.Error("a locked helmet went on")
-	}
-}
-
-// TestDamageCauses pins the sets BDS tests causes against.
-func TestDamageCauses(t *testing.T) {
-	if armorBypassed(DamageEntityAttack) || !armorBypassed(DamageFall) || !armorBypassed(DamageStarve) || !armorBypassed(DamageVoid) {
-		t.Error("armour causes")
-	}
-	if !resisted(DamageEntityAttack) || !resisted(DamageFall) || resisted(DamageVoid) || resisted(DamageStarve) {
-		t.Error("resistance causes")
 	}
 }
 

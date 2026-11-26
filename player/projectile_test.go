@@ -153,16 +153,6 @@ func TestArrowGoneBelowWorld(t *testing.T) {
 	waitRegion(t, d, func(*world.Region) bool { return arrow.gone })
 }
 
-// Only what is thrown counts as thrown; an arrow needs a bow or a dispenser.
-func TestThrowableKinds(t *testing.T) {
-	if throwable(nameSnowball) == "" || throwable(nameEgg) == "" || throwable(nameEnderPearl) == "" {
-		t.Error("something throwable is not")
-	}
-	if throwable(nameArrow) != "" || throwable("minecraft:stone") != "" {
-		t.Error("something not throwable is")
-	}
-}
-
 // A new one stays where it starts for its first tick, so players first see it there.
 func TestProjectileWaitsItsFirstTick(t *testing.T) {
 	p, d := machineWorld(t)

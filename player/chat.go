@@ -16,11 +16,11 @@ func handleText(p *Player, pk *packet.Text) {
 
 	// Broadcast message to all players
 	msg := &packet.Text{
-		TextType:        packet.TextTypeChat,
+		TextType:         packet.TextTypeChat,
 		NeedsTranslation: false,
-		SourceName:      p.Name(),
-		Message:         pk.Message,
-		XUID:            p.XUID(),
+		SourceName:       p.Name(),
+		Message:          pk.Message,
+		XUID:             p.XUID(),
 	}
 
 	// Send to everyone online

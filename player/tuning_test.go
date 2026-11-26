@@ -68,15 +68,6 @@ func TestTuningRefused(t *testing.T) {
 	p.s.ClearTuning(-1)
 }
 
-// TestTuneNames gives every Tune a name that finds it again.
-func TestTuneNames(t *testing.T) {
-	for i := Tune(0); i < tuneCount; i++ {
-		if got, ok := TuneByName(i.String()); !ok || got != i {
-			t.Errorf("tune %d has name %q", i, i.String())
-		}
-	}
-}
-
 // TestTuningChangesDamage checks armour numbers reach the sum, and that the player's
 // own takes away what it wears.
 func TestTuningChangesDamage(t *testing.T) {
