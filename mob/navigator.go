@@ -19,7 +19,33 @@ func (p pathfinder) settings() *path.Settings {
 		MinY: float32(pathWorld{&m.v}.MinY()), StepHeight: max(1.2, m.body.MaxAutoStep),
 		Swim: m.flags.Has(nav.ActorCanSwim), Fly: m.flags.Has(nav.ActorCanFly), Walk: m.flags.Has(nav.ActorCanWalk),
 		InWater: m.body.WasInWater, MobGriefing: m.rt.Env.MobGriefing(),
-		DoorOpener: m.flags.Has(behavior.FlagDoorOpener),
+		DoorOpener: m.flags.Has(behavior.FlagDoorOpener), DoorBreaker: m.flags.Has(behavior.FlagDoorBreaker),
+		// BDS's lava walker test is the actor's fire immunity.
+		LavaWalker:             m.flags.Has(behavior.FlagFireImmune),
+		SpecialStartNeighbours: m.typ == typeBee || m.typ == typeAllay,
+		Path:                   m.prefPath,
+		BreakBlocks:            m.breakable != nil, Breakable: m.breakable,
+	}
+}
+
+// The two actor types BDS's pathfinder starts with six neighbours for.
+const (
+	typeBee   = "minecraft:bee"
+	typeAllay = "minecraft:allay"
+)
+
+// readPathSettings builds the pathfinder's preferred_path and break_blocks from the mob's
+// state components, once per rebuild so searches allocate nothing for them.
+func (m *Mob) readPathSettings() {
+	m.prefPath, m.breakable = nil, nil
+	if m.states == nil {
+		return
+	}
+	if c := m.states.PreferredPath; c != nil {
+		m.prefPath = c.Path(m.rt.Blocks.nameMatcher)
+	}
+	if c := m.states.BreakBlocks; c != nil {
+		m.breakable = m.rt.Blocks.nameMatcher(c.Blocks)
 	}
 }
 

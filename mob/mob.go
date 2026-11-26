@@ -368,6 +368,10 @@ type Mob struct {
 	ticks int32
 	// sway is movement.sway's settings, read with the movement component.
 	sway move.Sway
+	// prefPath is minecraft:preferred_path for the pathfinder, nil for BDS's default;
+	// breakable is the blocks minecraft:break_blocks breaks, nil without it.
+	prefPath  *path.PreferredPath
+	breakable func(path.Block) bool
 	// hijackable is CanBeHijackedByPassengerComponent, which mount_pathing adds while it
 	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
 	// (actions.go). Neither is read by Helix yet.
@@ -663,6 +667,7 @@ func (m *Mob) rebuild(comps definition.Group) {
 	m.readJump(comps)
 	ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
 	m.readStates(ctx, comps)
+	m.readPathSettings()
 	m.readOpenDoors()
 	m.scale = 1
 	if m.states != nil && m.states.Scale != nil {

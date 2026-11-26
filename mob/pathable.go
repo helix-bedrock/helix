@@ -272,3 +272,13 @@ func (b *Blocks) pathRule(id uint32) pathRule {
 	}
 	return pathRule{}
 }
+
+// nameMatcher turns a list of block names (with or without minecraft:) into a test of a
+// block state, by its block name.
+func (b *Blocks) nameMatcher(names []string) func(path.Block) bool {
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[ns(n)] = true
+	}
+	return func(blk path.Block) bool { return set[b.reg.Name(uint32(blk))] }
+}
