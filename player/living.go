@@ -226,6 +226,11 @@ func (m *Mob) tickHazards(r *world.Region) {
 	box := m.m.Box()
 	moved := mglVec(b.Pos).Sub(mglVec(b.PrevPos))
 	lo, hi := mglVec(box.Min), mglVec(box.Max)
+	m.m.SetOnHotBlock(m.s.hotBlockStep(r, m, lo, hi))
+	if m.Dead() {
+		m.hazards = thoughtHazards{}
+		return
+	}
 	if h := &m.hazards; h.ok && h.r == r && h.lo == lo && h.hi == hi && h.writes == r.BlockWrites() {
 		m.s.tickHazardsFrom(r, m, lo, hi, moved, h.c)
 	} else {

@@ -381,6 +381,8 @@ type Mob struct {
 	breakable   func(path.Block) bool
 	// avoid is the navigation's blocks_to_avoid for the pathfinder, nil without any.
 	avoid func(path.Block) bool
+	// onHotBlock is BDS's on-hot-block flag (SetOnHotBlock).
+	onHotBlock bool
 	// hijackable is CanBeHijackedByPassengerComponent, which mount_pathing adds while it
 	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
 	// (actions.go). Neither is read by Helix yet.

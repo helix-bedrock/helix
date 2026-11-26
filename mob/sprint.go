@@ -32,6 +32,9 @@ type attrModifier struct {
 // SetSneaking implements behavior.Prowler.
 func (m *Mob) SetSneaking(on bool) { m.SetFlag(flagSneaking, on) }
 
+// Sneaking reports the sneaking actor flag.
+func (m *Mob) Sneaking() bool { return m.flags.Has(flagSneaking) }
+
 // SetSprinting implements behavior.Prowler.
 func (m *Mob) SetSprinting(on bool) {
 	m.SetFlag(behavior.FlagSprinting, on)

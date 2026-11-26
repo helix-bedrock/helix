@@ -35,6 +35,8 @@ func (p pathfinder) settings() *path.Settings {
 		Path:                   m.prefPath,
 		BreakBlocks:            m.breakable != nil, Breakable: m.breakable,
 		Avoid: m.avoid,
+		// BDS lets a mob a hot block is hurting search through hurting nodes, as a lava walker.
+		LavaComponent: m.onHotBlock,
 		// BDS binds the climb check to either powder snow component; the equipment one is
 		// what leather boots give.
 		ClimbPowderSnow: m.states != nil && m.states.CanStandOnPowderSnow || m.Equipment(EquipFeet).Name == leatherBoots,

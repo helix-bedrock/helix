@@ -193,6 +193,7 @@ func (p *Player) tickBurning() {
 		// Creative and spectator players take no contact damage.
 		moved = mgl32.Vec3{}
 	}
+	p.s.hotBlockStep(r, p, lo, hi)
 	c := p.s.touching(r, lo, hi)
 	p.move.inBerry = c.contact == contactBerry
 	if p.invulnerable() && c.contact == contactCactus {

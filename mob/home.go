@@ -54,3 +54,11 @@ func (m *Mob) Home() (behavior.Pos, int32, bool) {
 	}
 	return p, r, true
 }
+
+// FirstTick reports the mob's first tick since it was made or loaded, BDS's first-tick flag,
+// which its tick clears at the end. The engine's after-think steps read it.
+func (m *Mob) FirstTick() bool { return m.ticks <= 1 }
+
+// SetOnHotBlock sets BDS's on-hot-block flag, which the engine's hot-block step sets each tick
+// a hot block hurts the mob, and the pathfinder reads on its next searches.
+func (m *Mob) SetOnHotBlock(on bool) { m.onHotBlock = on }
