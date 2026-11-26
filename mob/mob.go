@@ -370,8 +370,15 @@ type Mob struct {
 	sway move.Sway
 	// prefPath is minecraft:preferred_path for the pathfinder, nil for BDS's default;
 	// breakable is the blocks minecraft:break_blocks breaks, nil without it.
-	prefPath  *path.PreferredPath
-	breakable func(path.Block) bool
+	// dyn and hopper are minecraft:jump.dynamic's jump kinds and the hop control's state;
+	// hasDyn is set when the mob has jump.dynamic. wasOnGround is OnGround before the
+	// last move.
+	dyn         move.Dynamic
+	hopper      move.Hopper
+	hasDyn      bool
+	wasOnGround bool
+	prefPath    *path.PreferredPath
+	breakable   func(path.Block) bool
 	// hijackable is CanBeHijackedByPassengerComponent, which mount_pathing adds while it
 	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
 	// (actions.go). Neither is read by Helix yet.
@@ -643,6 +650,7 @@ func (m *Mob) think() {
 	if !m.stillTick {
 		m.moveControl()
 	}
+	m.jumpControl()
 	m.lookControl()
 	m.bodyControl()
 }
@@ -668,6 +676,7 @@ func (m *Mob) rebuild(comps definition.Group) {
 	ctx := component.Context{World: goalWorld{&m.v}, Mob: m, Resolver: resolver{m}}
 	m.readStates(ctx, comps)
 	m.readPathSettings()
+	m.readDynamicJump()
 	m.readOpenDoors()
 	m.scale = 1
 	if m.states != nil && m.states.Scale != nil {
@@ -851,7 +860,7 @@ func (m *Mob) moveControl() {
 	b := move.Body{
 		Pos: m.body.Pos, Vel: m.body.Vel, Box: m.body.Box, Width: m.body.Width,
 		Pitch: m.pitch, Yaw: m.yaw, BodyYaw: m.bodyYaw, HeadYaw: m.headYaw, Flags: m.flags,
-		OnGround: m.body.OnGround, WasInWater: m.body.WasInWater, InWater: m.body.WasInWater,
+		OnGround: m.body.OnGround, WasOnGround: m.wasOnGround, WasInWater: m.body.WasInWater, InWater: m.body.WasInWater,
 		MovementSpeed: m.speed, AirSpeed: m.body.AirSpeed, MaxAutoStep: m.body.MaxAutoStep,
 		Speed: m.moveSpeed, MoveSpeed: m.moveSpeed,
 		LocalMove: m.body.Input, Jump: &m.jump, Look: &m.look,
@@ -884,12 +893,14 @@ func (m *Mob) moveControl() {
 		m.swayMove(&b)
 	case "minecraft:movement.amphibious":
 		move.Amphibious(&b, &m.ctl, m.nv != nil && !m.nv.Done(), m.underwaterSpeed, m.body.Height)
+	case "minecraft:movement.skip":
+		m.hopMove(&b)
 	case "minecraft:movement.glide":
 		if g := m.movement.Glider; g != nil {
 			move.Glide(&b, &m.ctl, g, m.body.HorizontalCollision[0] || m.body.HorizontalCollision[1])
 		}
 	default:
-		// Basic, and skip and dolphin, whose controls are not hooked up yet.
+		// Basic, and dolphin, whose control no vanilla mob uses.
 		move.Basic(&b, &m.ctl)
 	}
 	m.yaw, m.bodyYaw, m.pitch = b.Yaw, b.BodyYaw, b.Pitch
@@ -926,6 +937,7 @@ func (m *Mob) physicsTick() {
 	m.beforeMove()
 	m.applyBody()
 	m.liquidPush()
+	m.wasOnGround = m.body.OnGround
 	m.body.Tick(physWorld{&m.v})
 	if !m.customBox {
 		m.body.Box = boxAt(m.body.Pos, m.body.Width, m.body.Height)

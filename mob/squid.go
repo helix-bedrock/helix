@@ -7,6 +7,7 @@ import (
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/component"
 	"github.com/helix-bedrock/entity/move"
+	"github.com/helix-bedrock/entity/state"
 )
 
 // The squid motion numbers.
@@ -150,4 +151,43 @@ func jsonFloat(j component.Object, key string, def float32) float32 {
 		return v
 	}
 	return def
+}
+
+// readDynamicJump reads minecraft:jump.dynamic's jump kinds for the dynamic jump control.
+func (m *Mob) readDynamicJump() {
+	m.hasDyn = m.states != nil && m.states.JumpDynamic != nil
+	if m.hasDyn {
+		m.dyn = m.states.JumpDynamic.Dynamic()
+	}
+}
+
+// hopMove is minecraft:movement.skip: BDS's hop control, hopping along the path towards
+// the centre of the node being followed.
+func (m *Mob) hopMove(b *move.Body) {
+	if !m.hasDyn {
+		// BDS's hop control without the dynamic jump control.
+		m.dyn = state.DefaultJumpDynamic().Dynamic()
+	}
+	var next move.Vec3
+	active := false
+	if m.nv != nil {
+		if p, i := m.nv.Path(); p != nil && i < len(p.Points) {
+			n := p.Points[i].Pos
+			next = move.Vec3{X: float32(n.X) + 0.5, Y: float32(n.Y), Z: float32(n.Z) + 0.5}
+			active = true
+		}
+	}
+	move.Hop(b, &m.ctl, &m.dyn, &m.hopper, active, next)
+}
+
+// jumpControl is BDS 1.26.60's jump control system after the move control. The plain control
+// passes the jump request to the next move unchanged; the dynamic one (jump.dynamic) turns
+// it into a take-off jump and still makes the mob jump.
+func (m *Mob) jumpControl() {
+	if !m.hasDyn || !m.jump.Jumping {
+		return
+	}
+	b := move.Body{Jump: &m.jump}
+	move.TickJump(&b, &m.ctl, &m.dyn, &m.hopper)
+	m.jump.Jumping = true
 }
