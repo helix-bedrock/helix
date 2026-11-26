@@ -6,7 +6,7 @@ require (
 	github.com/go-gl/mathgl v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/helix-bedrock/entity v0.0.0-20261123191543-e4cccf45f913
-	github.com/helix-bedrock/helix-data v0.0.0-20261119173654-1c592be62d85
+	github.com/helix-bedrock/helix-data v0.0.0-20261126001837-aa7c803b5f95
 	github.com/helix-bedrock/nethernet v0.0.0-20261109175854-3c60f0396e41
 	github.com/helix-bedrock/protocol v0.0.0-20261123213602-264a9fe7efcb
 	github.com/helix-bedrock/raknet v0.0.0-20261012015205-6845f0982a24

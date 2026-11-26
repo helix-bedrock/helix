@@ -173,10 +173,9 @@ func (w pathWorld) CollisionBox(b path.Block, p path.Pos) path.Box {
 
 func (w pathWorld) MinY() int32 { return int32(w.r.Dimension().Range()[0]) } //nolint:gosec // world heights fit
 
-// Pathable is canBePathedThrough's default: the material does not block motion. Doors,
-// slabs, snow and liquids have their own rules in the pathfinder.
-func (w pathWorld) Pathable(b path.Block, _, _ path.Pos) bool {
-	return !w.blocks.Goal(uint32(b)).BlocksMotion
+// Pathable matches BDS 1.26.60: each block type's own path-through check (pathable.go).
+func (w pathWorld) Pathable(b path.Block, from, to path.Pos) bool {
+	return w.pathable(uint32(b), from, to, 0)
 }
 
 func (w pathWorld) Door(p path.Pos) (facing int32, open, hinge bool) { return w.door(p) }

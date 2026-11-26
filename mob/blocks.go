@@ -20,6 +20,8 @@ type Blocks struct {
 	goals []behavior.Block
 	// perch is the log groups random_fly and parrots perch on (with the leaves property).
 	perch map[string]bool
+	// rules is each state's path-through check.
+	rules []pathRule
 	// full is set for states whose collision is one whole block.
 	full []bool
 	// wall is what a cell of a border column reads as: the barrier, a solid block of one
@@ -62,8 +64,14 @@ func NewBlocks(reg *registry.Blocks) *Blocks {
 	for _, name := range behavior.DefaultWalkBlocks().Perch {
 		b.perch[name] = true
 	}
+	// A missing table leaves every block on BDS's default check.
+	rules, _ := data.BlockPathRules()
+	b.rules = make([]pathRule, n)
 	for id := range n {
-		b.fill(uint32(id)) //nolint:gosec // n is a state count
+		b.fill(uint32(id))                               //nolint:gosec // n is a state count
+		if kind, ok := rules[reg.Name(uint32(id))]; ok { //nolint:gosec // n is a state count
+			b.rules[id] = readPathRule(kind, reg.Name(uint32(id)), reg.States(uint32(id))) //nolint:gosec // n is a state count
+		}
 	}
 	b.wall, _ = reg.Block("minecraft:barrier")
 	return b
