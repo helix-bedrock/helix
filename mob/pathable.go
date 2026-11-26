@@ -1,10 +1,13 @@
 package mob
 
 import (
+	"encoding/json"
+	"slices"
 	"strings"
 
 	"github.com/helix-bedrock/entity/behavior"
 	"github.com/helix-bedrock/entity/path"
+	"github.com/helix-bedrock/entity/sensor"
 )
 
 // pathRuleKind is which of BDS 1.26.60's per-block path-through checks a block type uses
@@ -139,13 +142,11 @@ func (v *view) pathable(id uint32, from, to path.Pos, depth int) bool {
 	case ruleCampfire:
 		return r.flag || v.fireImmune()
 	case ruleFire:
-		// BDS also lets one more actor type through on a condition not read yet.
-		return v.fireImmune()
+		return v.fireImmune() || v.chasesThroughFire()
 	case ruleScaffolding:
 		return from.Y <= to.Y
 	case ruleBerryBush:
-		// BDS asks one more actor question for a grown bush, not read yet.
-		return r.val <= 0
+		return r.val <= 0 || v.sensorStopsContact(to)
 	case ruleBigDripleaf:
 		return !r.flag || r.val == bigDripleafFullTilt
 	case ruleHangingSign, rulePitcherCrop:
@@ -195,6 +196,37 @@ func (v *view) topSnowPassable(height int32, from, to path.Pos) bool {
 
 func (v *view) fireImmune() bool {
 	return v.m != nil && v.m.flags.Has(behavior.FlagFireImmune)
+}
+
+// fireChasers are the actor types BDS lets path through fire while they have a target:
+// those of its zombie class (which carries the zombie monster categories) and the iron golem.
+var fireChasers = map[string]bool{
+	"minecraft:zombie": true, "minecraft:husk": true, "minecraft:drowned": true,
+	"minecraft:zombie_villager": true, "minecraft:zombie_villager_v2": true,
+	"minecraft:zombie_pigman": true, "minecraft:iron_golem": true,
+}
+
+// chasesThroughFire matches BDS: a zombie or an iron golem paths through fire while its
+// target is still in the world.
+func (v *view) chasesThroughFire() bool {
+	m := v.m
+	return m != nil && fireChasers[m.typ] && m.target != behavior.NoID && m.actor(m.target) != nil
+}
+
+// causeContact is BDS's contact damage cause.
+const causeContact = 1
+
+// sensorStopsContact matches BDS's check of a grown sweet berry bush: passable when the mob's
+// damage sensor stops contact damage with the bush at p as the block subject (the fox's
+// does); a mob without a damage sensor never passes. Only the trigger is matched: whether
+// BDS also runs its event here was not read.
+func (v *view) sensorStopsContact(p path.Pos) bool {
+	m := v.m
+	if m == nil || m.sensors == nil || m.sensors.Damage == nil {
+		return false
+	}
+	t := m.sensors.Damage.Match(causeContact, resolver{m}.Tester(m, nil, &p))
+	return t != nil && t.DealsDamage != sensor.DealsYes
 }
 
 // moveSide is BDS's side of a move between two blocks: 0 to 3 by the larger of the x and z
@@ -281,4 +313,71 @@ func (b *Blocks) nameMatcher(names []string) func(path.Block) bool {
 		set[ns(n)] = true
 	}
 	return func(blk path.Block) bool { return set[b.reg.Name(uint32(blk))] }
+}
+
+// descriptorMatcher turns block descriptors (a name, or an object with a name or a
+// q.any_tag / q.all_tags call on the block's tags) into a test of a block state by its
+// block, nil when there are none. The block names are worked out here, once.
+func (b *Blocks) descriptorMatcher(descs []string) func(path.Block) bool {
+	if len(descs) == 0 {
+		return nil
+	}
+	names := map[string]bool{}
+	var tagExprs []string
+	for _, d := range descs {
+		d = strings.TrimSpace(d)
+		if !strings.HasPrefix(d, "{") {
+			names[ns(d)] = true
+			continue
+		}
+		var o struct{ Name, Tags string }
+		if json.Unmarshal([]byte(d), &o) != nil {
+			continue
+		}
+		if o.Name != "" {
+			names[ns(o.Name)] = true
+		}
+		if o.Tags != "" {
+			tagExprs = append(tagExprs, o.Tags)
+		}
+	}
+	if len(tagExprs) > 0 {
+		for id := range b.reg.Count() {
+			name := b.reg.Name(uint32(id)) //nolint:gosec // a state count
+			if names[name] {
+				continue
+			}
+			tags := b.reg.Tags(uint32(id)) //nolint:gosec // a state count
+			for _, e := range tagExprs {
+				if blockTagsMatch(e, tags) {
+					names[name] = true
+					break
+				}
+			}
+		}
+	}
+	return func(blk path.Block) bool { return names[b.reg.Name(uint32(blk))] }
+}
+
+// blockTagsMatch runs a q.any_tag('a', ...) or q.all_tags(...) call on a block's tags.
+func blockTagsMatch(expr string, tags []string) bool {
+	open := strings.IndexByte(expr, '(')
+	end := strings.LastIndexByte(expr, ')')
+	if open < 0 || end < open {
+		return false
+	}
+	fn := strings.ToLower(strings.TrimSpace(expr[:open]))
+	all := strings.HasSuffix(fn, "all_tags")
+	if !all && !strings.HasSuffix(fn, "any_tag") {
+		return false
+	}
+	anyHas := false
+	for _, a := range strings.Split(expr[open+1:end], ",") {
+		has := slices.Contains(tags, strings.Trim(strings.TrimSpace(a), `'"`))
+		if all && !has {
+			return false
+		}
+		anyHas = anyHas || has
+	}
+	return anyHas
 }

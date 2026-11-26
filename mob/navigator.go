@@ -12,6 +12,15 @@ type navigator struct{ m *Mob }
 // pathfinder searches paths for one mob with its settings.
 type pathfinder struct{ m *Mob }
 
+// settingsTo are the pathfinder's settings for a search toward target, as BDS gathers them.
+func (p pathfinder) settingsTo(target path.Vec3) *path.Settings {
+	s := p.settings()
+	p.m.homeRestriction(s, target)
+	return s
+}
+
+// settings are the pathfinder's settings without a target, which BDS gives its node checks:
+// no home restriction then.
 func (p pathfinder) settings() *path.Settings {
 	m := p.m
 	return &path.Settings{
@@ -25,7 +34,36 @@ func (p pathfinder) settings() *path.Settings {
 		SpecialStartNeighbours: m.typ == typeBee || m.typ == typeAllay,
 		Path:                   m.prefPath,
 		BreakBlocks:            m.breakable != nil, Breakable: m.breakable,
+		Avoid: m.avoid,
+		// BDS binds the climb check to either powder snow component; the equipment one is
+		// what leather boots give.
+		ClimbPowderSnow: m.states != nil && m.states.CanStandOnPowderSnow || m.Equipment(EquipFeet).Name == leatherBoots,
 	}
+}
+
+const leatherBoots = "minecraft:leather_boots"
+
+// homeRestriction matches BDS: a mob whose home restricts all movement keeps its search
+// within the radius around the home when the target is farther from the home's centre
+// than the mob is (the mob by its box's centre and bottom).
+func (m *Mob) homeRestriction(s *path.Settings, target path.Vec3) {
+	h := m.homeState()
+	if h == nil {
+		return
+	}
+	home, dim, ok := h.Get()
+	cfg := h.Config()
+	if !ok || dim != m.Dimension() || cfg.RestrictionType != homeAllMovement {
+		return
+	}
+	cx, cy, cz := float32(home.X)+0.5, float32(home.Y), float32(home.Z)+0.5
+	b := m.body.Box
+	mx, mz := (b.Max.X-b.Min.X)*0.5+b.Min.X, (b.Max.Z-b.Min.Z)*0.5+b.Min.Z
+	dist2 := func(x, y, z float32) float32 { return (cx-x)*(cx-x) + (cy-y)*(cy-y) + (cz-z)*(cz-z) }
+	if dist2(target.X, target.Y, target.Z) <= dist2(mx, b.Min.Y, mz) {
+		return
+	}
+	s.Restricted, s.Home, s.Radius2 = true, home, float32(cfg.RestrictionRadius*cfg.RestrictionRadius)
 }
 
 // The two actor types BDS's pathfinder starts with six neighbours for.
@@ -57,11 +95,13 @@ func (p pathfinder) flags() path.Flags {
 }
 
 func (p pathfinder) PathToBlock(at path.Pos) *path.Path {
-	return p.m.finder.FindPathToBlock(pathWorld{&p.m.v}, p.settings(), p.flags(), at, p.m.followRange)
+	// BDS's target for a block is its centre, just above its floor.
+	target := path.Vec3{X: float32(at.X) + 0.5, Y: float32(at.Y) + 0.05, Z: float32(at.Z) + 0.5}
+	return p.m.finder.FindPathToBlock(pathWorld{&p.m.v}, p.settingsTo(target), p.flags(), at, p.m.followRange)
 }
 
 func (p pathfinder) PathToMob(pos path.Vec3) *path.Path {
-	return p.m.finder.FindPath(pathWorld{&p.m.v}, p.settings(), p.flags(), pos, p.m.followRange)
+	return p.m.finder.FindPath(pathWorld{&p.m.v}, p.settingsTo(pos), p.flags(), pos, p.m.followRange)
 }
 
 func (n *navigator) MoveTo(p behavior.Vec3, speed float32) bool {

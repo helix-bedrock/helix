@@ -379,6 +379,8 @@ type Mob struct {
 	wasOnGround bool
 	prefPath    *path.PreferredPath
 	breakable   func(path.Block) bool
+	// avoid is the navigation's blocks_to_avoid for the pathfinder, nil without any.
+	avoid func(path.Block) bool
 	// hijackable is CanBeHijackedByPassengerComponent, which mount_pathing adds while it
 	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
 	// (actions.go). Neither is read by Helix yet.
@@ -696,13 +698,14 @@ func (m *Mob) rebuild(comps definition.Group) {
 func (m *Mob) readNavigation(order []string, comps definition.Group) {
 	n, _, ok, err := component.Navigation(order, comps)
 	if !ok {
-		m.nv = nil
+		m.nv, m.avoid = nil, nil
 		return
 	}
 	if err != nil {
 		m.rt.Log.Debug("mob navigation", "type", m.typ, "err", err)
 	}
 	m.nv = n
+	m.avoid = m.rt.Blocks.descriptorMatcher(n.BlocksToAvoid)
 	nm := m.navMob()
 	m.nv.Init(&nm)
 }

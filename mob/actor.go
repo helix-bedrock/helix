@@ -121,7 +121,6 @@ func (m *Mob) Event(name string, other behavior.ID) {
 }
 
 func (m *Mob) Dwelling() (behavior.Pos, bool, bool) { return behavior.Pos{}, false, false }
-func (m *Mob) Home() (behavior.Pos, int32, bool)    { return behavior.Pos{}, 0, false }
 func (m *Mob) InLava() bool                         { return m.body.Travel() == physics.TravelLava }
 func (m *Mob) InWater() bool                        { return m.body.WasInWater }
 func (m *Mob) UnderWater() bool                     { return m.body.HeadInWater }

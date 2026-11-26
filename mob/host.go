@@ -28,6 +28,10 @@ func (m *Mob) BeforeEvent(string, definition.Tester) bool { return true }
 // Respond runs a response other than set_property. play_sound and the rest are not hooked up
 // yet; they are logged once at debug.
 func (m *Mob) Respond(r definition.Response, _ definition.Tester) {
+	if r.Name == responseSetHome {
+		m.setHome()
+		return
+	}
 	m.rt.Log.Debug("mob event response not run", "type", m.typ, "response", r.Name)
 }
 
