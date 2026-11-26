@@ -70,8 +70,9 @@ func (m *Mob) YawOf(id behavior.ID) float32 {
 	return yaw
 }
 
-// SetSpeed implements behavior.PlayerControlled: BDS's code.
-func (m *Mob) SetSpeed(s float32) { m.moveSpeed = s }
+// SetSpeed implements behavior.PlayerControlled: the mob's speed setting, which the travel
+// reads.
+func (m *Mob) SetSpeed(s float32) { m.speedSetting = s }
 
 // ResetMovement implements behavior.PlayerControlled: the movement attribute is worked out
 // again from its base value and modifiers.

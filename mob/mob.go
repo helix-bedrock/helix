@@ -399,9 +399,13 @@ type Mob struct {
 	dw        dweller
 	trade     tradeState
 	pathNodes []behavior.Pos
-	// moveSpeed is the speed the move control last chose (BDS's code), kept between
-	// ticks so walking speeds up a tenth at a time.
+	// moveSpeed is the speed the move control last chose, kept between ticks so walking
+	// speeds up a tenth at a time; a move control with nowhere to go sets it to 0.
 	moveSpeed float32
+	// speedSetting is BDS's per-mob speed setting, which the move controls set and the
+	// ground and water travel read in place of the movement attribute. It keeps its value
+	// while the mob stands still.
+	speedSetting float32
 
 	// rnd is the mob's own random, seeded from its ID, so what it draws does not depend on
 	// which mobs think on which core.
@@ -867,7 +871,7 @@ func (m *Mob) moveControl() {
 		Pitch: m.pitch, Yaw: m.yaw, BodyYaw: m.bodyYaw, HeadYaw: m.headYaw, Flags: m.flags,
 		OnGround: m.body.OnGround, WasOnGround: m.wasOnGround, WasInWater: m.body.WasInWater, InWater: m.body.WasInWater,
 		MovementSpeed: m.speed, AirSpeed: m.body.AirSpeed, MaxAutoStep: m.body.MaxAutoStep,
-		Speed: m.moveSpeed, MoveSpeed: m.moveSpeed,
+		Speed: m.speedSetting, MoveSpeed: m.moveSpeed,
 		LocalMove: m.body.Input, Jump: &m.jump, Look: &m.look,
 		Eye: path.Vec3{X: m.body.Pos.X, Y: m.body.Pos.Y + m.eyeHeight(), Z: m.body.Pos.Z},
 	}
@@ -909,22 +913,29 @@ func (m *Mob) moveControl() {
 		move.Basic(&b, &m.ctl)
 	}
 	m.yaw, m.bodyYaw, m.pitch = b.Yaw, b.BodyYaw, b.Pitch
-	// SetSpeed keeps the new speed in Speed; a control that stops clears MoveSpeed.
-	if m.moveSpeed != 0 && b.MoveSpeed == 0 {
-		m.moveSpeed = 0
-	} else {
-		m.moveSpeed = b.Speed
-	}
+	m.speedSetting, m.moveSpeed = b.Speed, b.MoveSpeed
 	m.body.Input = b.LocalMove
 	m.body.Vel = b.Vel
 	m.flags = b.Flags
+}
+
+// travelSpeed is the speed the ground and water travel move a mob by. BDS reads the mob's
+// speed setting there, not its movement attribute, so a mob walking at a speed modifier
+// moves by the attribute times the modifier, squared by the move input. A mob a player
+// steers with WASD has its setting set to the movement attribute first, as BDS does for a
+// vehicle with a controlling rider (its sprint bonus is not ported).
+func (m *Mob) travelSpeed() float32 {
+	if m.flags.Has(state.FlagWASDControlled) {
+		m.speedSetting = m.speed
+	}
+	return m.speedSetting
 }
 
 func (m *Mob) physicsTick() {
 	m.body.PrevPos = m.body.Pos
 	m.body.Yaw = m.yaw
 	m.body.Flags = m.flags
-	m.body.MovementSpeed = m.speed
+	m.body.MovementSpeed = m.travelSpeed()
 	m.body.Attrs.Underwater, m.body.Attrs.Lava = &m.underwaterSpeed, &m.lavaSpeed
 	m.body.Jumping = m.jump.Jumping
 	m.jump.Jumping = false

@@ -62,7 +62,7 @@ func (m *Mob) traceWanted() {
 		return
 	}
 	w := m.ctl.Wanted
-	m.trace.Add(trace.Record{Kind: trace.KindNav, What: "wanted", V: [3]float32{w.X, w.Y, w.Z}, F: m.moveSpeed})
+	m.trace.Add(trace.Record{Kind: trace.KindNav, What: "wanted", V: [3]float32{w.X, w.Y, w.Z}, F: m.speedSetting})
 }
 
 // traceFlag records a flag change.
