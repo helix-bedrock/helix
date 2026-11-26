@@ -363,6 +363,11 @@ type Mob struct {
 	transforming bool
 	blast        state.Explosion
 	noActionTime int32
+	// ticks is the mob's age in ticks since it was loaded, which sets where in its sway a
+	// swimming mob is.
+	ticks int32
+	// sway is movement.sway's settings, read with the movement component.
+	sway move.Sway
 	// hijackable is CanBeHijackedByPassengerComponent, which mount_pathing adds while it
 	// runs; persistSit is PersistSitComponent, which look_at_player's sit variant adds
 	// (actions.go). Neither is read by Helix yet.
@@ -607,6 +612,7 @@ func (m *Mob) move() (remove bool) {
 	m.prevPitch, m.prevYaw = m.pitch, m.yaw
 	m.lookSet = false
 	m.noActionTime++
+	m.ticks++
 
 	m.noAITick = m.flags.Has(FlagNoAI)
 	m.squidPreStep()
@@ -698,6 +704,7 @@ func (m *Mob) readMovement(order []string, comps definition.Group) {
 		m.rt.Log.Debug("mob movement", "type", m.typ, "err", err)
 	}
 	m.movement, m.hasMove = mv, true
+	m.readSway(mv.JSON)
 	m.ctl.MaxTurn = mv.MaxTurn
 }
 
@@ -860,7 +867,7 @@ func (m *Mob) moveControl() {
 		b.Target = &target
 	}
 	switch m.movement.Name {
-	case "minecraft:movement.generic", "minecraft:movement.amphibious":
+	case "minecraft:movement.generic":
 		move.Generic(pathWorld{&m.v}, &b, &m.ctl)
 	case "minecraft:movement.fly":
 		move.Fly(&b, &m.ctl)
@@ -868,9 +875,16 @@ func (m *Mob) moveControl() {
 		move.Hover(&b, &m.ctl)
 	case "minecraft:movement.jump":
 		m.slimeMove(&b)
+	case "minecraft:movement.sway":
+		m.swayMove(&b)
+	case "minecraft:movement.amphibious":
+		move.Amphibious(&b, &m.ctl, m.nv != nil && !m.nv.Done(), m.underwaterSpeed, m.body.Height)
+	case "minecraft:movement.glide":
+		if g := m.movement.Glider; g != nil {
+			move.Glide(&b, &m.ctl, g, m.body.HorizontalCollision[0] || m.body.HorizontalCollision[1])
+		}
 	default:
-		// Basic, skip, sway, glide and dolphin fall back to basic walking in this
-		// first hookup.
+		// Basic, and skip and dolphin, whose controls are not hooked up yet.
 		move.Basic(&b, &m.ctl)
 	}
 	m.yaw, m.bodyYaw, m.pitch = b.Yaw, b.BodyYaw, b.Pitch

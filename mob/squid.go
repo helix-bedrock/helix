@@ -1,9 +1,11 @@
 package mob
 
 import (
+	"encoding/json"
 	"math"
 
 	"github.com/helix-bedrock/entity/behavior"
+	"github.com/helix-bedrock/entity/component"
 	"github.com/helix-bedrock/entity/move"
 )
 
@@ -123,4 +125,29 @@ func (m *Mob) squidMoveParticle(speed float32) {
 func (m *Mob) slimeMove(b *move.Body) {
 	j := move.SlimeJump{Min: m.movement.JumpDelay.Min, Max: m.movement.JumpDelay.Max}
 	move.Slime(b, &m.ctl, &m.slimer, &j, m.v.rnd.NextFloat)
+}
+
+// The movement.sway defaults (BDS 1.26.60).
+const (
+	defaultSwayFrequency = 0.5
+	defaultSwayAmplitude = 0.05
+)
+
+// swayMove is minecraft:movement.sway: BDS's swim control with the mob's sway.
+func (m *Mob) swayMove(b *move.Body) {
+	sw := move.Swimmer{Sway: &m.sway, Ticks: m.ticks, ID: int64(m.id)}
+	move.Swim(b, &m.ctl, &sw)
+}
+
+// readSway reads movement.sway's members, BDS's defaults when missing.
+func (m *Mob) readSway(j component.Object) {
+	m.sway = move.Sway{Frequency: jsonFloat(j, "sway_frequency", defaultSwayFrequency), Amplitude: jsonFloat(j, "sway_amplitude", defaultSwayAmplitude)}
+}
+
+func jsonFloat(j component.Object, key string, def float32) float32 {
+	var v float32
+	if raw, ok := j[key]; ok && json.Unmarshal(raw, &v) == nil {
+		return v
+	}
+	return def
 }
