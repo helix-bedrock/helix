@@ -50,3 +50,16 @@ func (m *Mob) breathingPos() (x, y, z float32) {
 	p := m.body.Pos
 	return p.X + fwd*float32(math.Sin(a)), p.Y + m.breath.up*m.body.Height, p.Z + fwd*float32(math.Cos(a))
 }
+
+// headPos is the mob's head attach point, which BDS's swimming move controls aim the look
+// from. BDS sets it in the same class constructors as the breathing point and to the same
+// ratio, except pufferfish and guardians, whose head stays at the feet while they breathe
+// higher; every other mob has none, so its head is its feet.
+func (m *Mob) headPos() (x, y, z float32) {
+	switch m.typ {
+	case "minecraft:pufferfish", "minecraft:guardian", "minecraft:elder_guardian":
+		p := m.body.Pos
+		return p.X, p.Y, p.Z
+	}
+	return m.breathingPos()
+}

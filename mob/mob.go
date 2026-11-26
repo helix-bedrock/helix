@@ -869,12 +869,12 @@ func (m *Mob) moveControl() {
 	b := move.Body{
 		Pos: m.body.Pos, Vel: m.body.Vel, Box: m.body.Box, Width: m.body.Width,
 		Pitch: m.pitch, Yaw: m.yaw, BodyYaw: m.bodyYaw, HeadYaw: m.headYaw, Flags: m.flags,
-		OnGround: m.body.OnGround, WasOnGround: m.wasOnGround, WasInWater: m.body.WasInWater, InWater: m.body.WasInWater,
+		OnGround: m.body.OnGround, WasOnGround: m.wasOnGround, WasInWater: m.body.WasInWater, InWater: m.body.LiquidPulls(physWorld{&m.v}),
 		MovementSpeed: m.speed, AirSpeed: m.body.AirSpeed, MaxAutoStep: m.body.MaxAutoStep,
 		Speed: m.speedSetting, MoveSpeed: m.moveSpeed,
 		LocalMove: m.body.Input, Jump: &m.jump, Look: &m.look,
-		Eye: path.Vec3{X: m.body.Pos.X, Y: m.body.Pos.Y + m.eyeHeight(), Z: m.body.Pos.Z},
 	}
+	b.Eye.X, b.Eye.Y, b.Eye.Z = m.headPos()
 	// The walking controls speed up towards the end of the path the mob follows (BDS's
 	// BDS's code and the navigation's last node); without them the speed stays 0.
 	var end path.Pos

@@ -24,6 +24,8 @@ github.com/helix-bedrock/entity v0.0.0-20261126004708-4ad8d89bd294 h1:FCPoB0d5qr
 github.com/helix-bedrock/entity v0.0.0-20261126004708-4ad8d89bd294/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
 github.com/helix-bedrock/entity v0.0.0-20261126145654-d5d9624d02ec h1:FrrS1/wRU1IALLsWMYv3TJyO9vH2aByVEnYHvXWAR50=
 github.com/helix-bedrock/entity v0.0.0-20261126145654-d5d9624d02ec/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
+github.com/helix-bedrock/entity v0.0.0-20261126155518-0a560735a823 h1:K4s7Qv62dxE4Wi1whUOUF56oWZaGVug/LpxPSwHDId0=
+github.com/helix-bedrock/entity v0.0.0-20261126155518-0a560735a823/go.mod h1:Zxz4QozhoAwMg50MfJPuhAbeK8YeHNdYZLKgo2tMh1c=
 github.com/helix-bedrock/helix-data v0.0.0-20261119173654-1c592be62d85 h1:79Hw1/1MNVMwc9afmi0LZ/hH+DjcE2vIxQGFQP36Ups=
 github.com/helix-bedrock/helix-data v0.0.0-20261119173654-1c592be62d85/go.mod h1:xEZQQPFT0atBi9fHHalyH8/o5hnIh/QtasrJ8eeRhEs=
 github.com/helix-bedrock/helix-data v0.0.0-20261126001837-aa7c803b5f95 h1:oFMz0WTQWMnVzW2zLR23RscIh6o8YCfHJqi41DZtfGY=
@@ -42,6 +44,8 @@ github.com/helix-bedrock/world v0.0.0-20261114213802-2d626cb278db h1:pEojfEe6rVG
 github.com/helix-bedrock/world v0.0.0-20261114213802-2d626cb278db/go.mod h1:+LAfE2ilirf13+QX7zLDPg3f8Dwy0P8sD3NZc7xR2lY=
 github.com/helix-bedrock/worldgen v0.0.0-20261119211121-c7e981cd9634 h1:xxCkDo5npoHVXmnDn5M15nIA+u0kVwVcwBmR92YePWg=
 github.com/helix-bedrock/worldgen v0.0.0-20261119211121-c7e981cd9634/go.mod h1:RtesvsUqitfOAhb7FuhwbwaKOmiR2f8IyPym6EHdN0A=
+github.com/helix-bedrock/worldgen v0.0.0-20261126155621-8b0bc5ecf949 h1:M268/8wTBTtL6NfbqRbg32/q/nk2XqMbKI37nMLIEyI=
+github.com/helix-bedrock/worldgen v0.0.0-20261126155621-8b0bc5ecf949/go.mod h1:RtesvsUqitfOAhb7FuhwbwaKOmiR2f8IyPym6EHdN0A=
 github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTfY5j4=
 github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
